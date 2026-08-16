@@ -47,6 +47,15 @@ const leadSchema = z.object({
   turnstileToken: z.string().max(2048).optional(),
   consent: z.literal(true),
   consentText: z.string().min(10).max(1000),
+  utmSource: z.string().max(255).optional(),
+  utmMedium: z.string().max(255).optional(),
+  utmCampaign: z.string().max(255).optional(),
+  utmContent: z.string().max(255).optional(),
+  utmTerm: z.string().max(255).optional(),
+  gclid: z.string().max(255).optional(),
+  fbclid: z.string().max(255).optional(),
+  landingPage: z.string().max(500).optional(),
+  referrer: z.string().max(255).optional(),
 });
 
 function parsePhotoUrls(value: unknown): string[] {
@@ -164,6 +173,15 @@ export async function POST(request: Request) {
       roofSize,
       photoUrls = [],
       consentText,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+      utmTerm,
+      gclid,
+      fbclid,
+      landingPage,
+      referrer,
       ...rest
     } = parsed.data;
 
@@ -185,6 +203,15 @@ export async function POST(request: Request) {
         ...(photoUrls.length ? { photoUrls: photoUrls.join("\n") } : {}),
         consentAt: new Date().toISOString(),
         consentText,
+        ...(utmSource ? { utmSource } : {}),
+        ...(utmMedium ? { utmMedium } : {}),
+        ...(utmCampaign ? { utmCampaign } : {}),
+        ...(utmContent ? { utmContent } : {}),
+        ...(utmTerm ? { utmTerm } : {}),
+        ...(gclid ? { gclid } : {}),
+        ...(fbclid ? { fbclid } : {}),
+        ...(landingPage ? { landingPage } : {}),
+        ...(referrer ? { referrer } : {}),
         status: "new",
       },
       overrideAccess: true,

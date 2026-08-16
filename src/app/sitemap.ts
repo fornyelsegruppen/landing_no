@@ -6,6 +6,7 @@ import {
   type CmsContentDocument,
 } from "@/lib/cms-pages";
 import { siteConfig } from "@/lib/site";
+import { seoLandingSlugs } from "@/content/seo-landing-pages";
 
 export const revalidate = 300;
 
@@ -74,20 +75,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       page.priority,
     ),
   );
+  const seoEntries = seoLandingSlugs.flatMap((slug) =>
+    localizedEntries(`/${slug}`, lastModified, "monthly", 0.9),
+  );
 
   try {
     const [pages, posts] = await Promise.all([
       getPublishedPages(),
       getPublishedPosts(),
     ]);
-    const dynamicPages = pages.flatMap((page: CmsContentDocument) =>
-      localizedEntries(
-        `/${page.slug}`,
-        validDate(page.updatedAt, lastModified),
-        "monthly",
-        0.7,
-      ),
-    );
+    const dynamicPages = pages
+      .filter(
+        (page: CmsContentDocument) => !seoLandingSlugs.includes(page.slug),
+      )
+      .flatMap((page: CmsContentDocument) =>
+        localizedEntries(
+          `/${page.slug}`,
+          validDate(page.updatedAt, lastModified),
+          "monthly",
+          0.7,
+        ),
+      );
     const blogPosts = posts.flatMap((post) =>
       localizedEntries(
         `/blogg/${post.slug}`,
@@ -97,9 +105,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ),
     );
 
-    return [...staticEntries, ...dynamicPages, ...blogPosts];
+    return [...staticEntries, ...seoEntries, ...dynamicPages, ...blogPosts];
   } catch (error) {
     console.error("CMS sitemap entries could not be loaded:", error);
-    return staticEntries;
+    return [...staticEntries, ...seoEntries];
   }
 }

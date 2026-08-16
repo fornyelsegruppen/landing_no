@@ -107,7 +107,9 @@ const findPageBySlug = cache(
       where: slugWhere(slug, includeDrafts),
     });
 
-    return (result.docs[0] as unknown as CmsContentDocument | undefined) ?? null;
+    return (
+      (result.docs[0] as unknown as CmsContentDocument | undefined) ?? null
+    );
   },
 );
 
@@ -152,84 +154,114 @@ const findPosts = cache(
 export async function getPageBySlug(
   slug: string,
 ): Promise<CmsContentDocument | null> {
-  const { isEnabled } = await draftMode();
-  return findPageBySlug(slug, isEnabled);
+  try {
+    const { isEnabled } = await draftMode();
+    return await findPageBySlug(slug, isEnabled);
+  } catch (error) {
+    console.error("CMS page could not be loaded:", error);
+    return null;
+  }
 }
 
 export async function getPostBySlug(
   slug: string,
 ): Promise<CmsPostDocument | null> {
-  const { isEnabled } = await draftMode();
-  return findPostBySlug(slug, isEnabled);
+  try {
+    const { isEnabled } = await draftMode();
+    return await findPostBySlug(slug, isEnabled);
+  } catch (error) {
+    console.error("CMS post could not be loaded:", error);
+    return null;
+  }
 }
 
 export async function getPosts(): Promise<CmsPostDocument[]> {
-  const { isEnabled } = await draftMode();
-  return findPosts(isEnabled);
+  try {
+    const { isEnabled } = await draftMode();
+    return await findPosts(isEnabled);
+  } catch (error) {
+    console.error("CMS posts could not be loaded:", error);
+    return [];
+  }
 }
 
 export async function getPublishedPages(): Promise<CmsContentDocument[]> {
-  const payload = await getPayload();
-  const result = await payload.find({
-    collection: "pages",
-    depth: 0,
-    draft: false,
-    limit: 1000,
-    overrideAccess: true,
-    pagination: false,
-    sort: "slug",
-    where: publishedWhere(),
-  });
+  try {
+    const payload = await getPayload();
+    const result = await payload.find({
+      collection: "pages",
+      depth: 0,
+      draft: false,
+      limit: 1000,
+      overrideAccess: true,
+      pagination: false,
+      sort: "slug",
+      where: publishedWhere(),
+    });
 
-  return (result.docs as unknown as CmsContentDocument[]).filter(
-    (page) => !isReservedPageSlug(page.slug),
-  );
+    return (result.docs as unknown as CmsContentDocument[]).filter(
+      (page) => !isReservedPageSlug(page.slug),
+    );
+  } catch (error) {
+    console.error("Published CMS pages could not be loaded:", error);
+    return [];
+  }
 }
 
 export async function getPublishedPosts(): Promise<CmsPostDocument[]> {
-  const payload = await getPayload();
-  const result = await payload.find({
-    collection: "posts",
-    depth: 0,
-    draft: false,
-    limit: 1000,
-    overrideAccess: true,
-    pagination: false,
-    sort: "-publishedAt",
-    where: publishedWhere(),
-  });
+  try {
+    const payload = await getPayload();
+    const result = await payload.find({
+      collection: "posts",
+      depth: 0,
+      draft: false,
+      limit: 1000,
+      overrideAccess: true,
+      pagination: false,
+      sort: "-publishedAt",
+      where: publishedWhere(),
+    });
 
-  return result.docs as unknown as CmsPostDocument[];
+    return result.docs as unknown as CmsPostDocument[];
+  } catch (error) {
+    console.error("Published CMS posts could not be loaded:", error);
+    return [];
+  }
 }
 
 export async function getRedirectForPath(
   locale: Locale,
   path: string,
 ): Promise<CmsRedirectDocument | null> {
-  const candidates = redirectPathCandidates(locale, path);
-  const payload = await getPayload();
-  const result = await payload.find({
-    collection: "redirects",
-    depth: 0,
-    limit: candidates.length,
-    overrideAccess: true,
-    pagination: false,
-    where: {
-      or: candidates.map((candidate) => ({
-        fromPath: {
-          equals: candidate,
-        },
-      })),
-    },
-  });
-  const redirects = result.docs as unknown as CmsRedirectDocument[];
+  try {
+    const candidates = redirectPathCandidates(locale, path);
+    const payload = await getPayload();
+    const result = await payload.find({
+      collection: "redirects",
+      depth: 0,
+      limit: candidates.length,
+      overrideAccess: true,
+      pagination: false,
+      where: {
+        or: candidates.map((candidate) => ({
+          fromPath: {
+            equals: candidate,
+          },
+        })),
+      },
+    });
+    const redirects = result.docs as unknown as CmsRedirectDocument[];
 
-  for (const candidate of candidates) {
-    const match = redirects.find((item) => item.fromPath === candidate);
-    if (match) return match;
+    for (const candidate of candidates) {
+      const match = redirects.find((item) => item.fromPath === candidate);
+      if (match) return match;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("CMS redirects could not be loaded:", error);
+    return null;
   }
-
-  return null;
 }
 
 export function localizeContent(
@@ -244,10 +276,9 @@ export function localizeContent(
   const seoTitle =
     (norwegian ? document.seoTitleNo : document.seoTitleEn)?.trim() || title;
   const seoDescription =
-    (
-      norwegian
-        ? document.seoDescriptionNo
-        : document.seoDescriptionEn
+    (norwegian
+      ? document.seoDescriptionNo
+      : document.seoDescriptionEn
     )?.trim() ||
     excerpt ||
     content.replace(/\s+/g, " ").trim().slice(0, 160);
@@ -258,5 +289,7 @@ export function localizeContent(
 export function getRedirectDestination(
   redirectDocument: CmsRedirectDocument,
 ): string | null {
-  return redirectDocument.toPath?.trim() || redirectDocument.toUrl?.trim() || null;
+  return (
+    redirectDocument.toPath?.trim() || redirectDocument.toUrl?.trim() || null
+  );
 }

@@ -15,6 +15,8 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { StickyBottomCta } from "@/components/layout/sticky-cta";
 import { LivePreviewRefresh } from "@/components/live-preview-refresh";
+import { MarketingAttributionCapture } from "@/components/marketing-attribution";
+import { GoogleAdsConsent } from "@/components/google-ads-consent";
 import "../../globals.css";
 
 export const revalidate = 30;
@@ -58,8 +60,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: meta.description,
     applicationName: content.settings.brandName,
     icons: {
-      icon: [{ url: "/icon", type: "image/png" }],
-      apple: [{ url: "/apple-icon", type: "image/png" }],
+      icon: [{ url: "/icon.png", type: "image/png" }],
+      apple: [{ url: "/apple-icon.png", type: "image/png" }],
     },
     alternates: {
       canonical: `${siteConfig.url}/${locale}`,
@@ -91,6 +93,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [ogImage],
     },
     robots: { index: true, follow: true },
+    verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+      : undefined,
   };
 }
 
@@ -109,15 +114,21 @@ export default async function LocaleLayout({ children, params }: Props) {
   ]);
 
   return (
-    <html lang={locale} className="dark" suppressHydrationWarning>
+    <html
+      lang={locale === "no" ? "nb-NO" : "en"}
+      className="dark"
+      suppressHydrationWarning
+    >
       <body className={`${manrope.variable} font-sans antialiased`}>
         {isDraftMode && <LivePreviewRefresh />}
         <NextIntlClientProvider messages={messages}>
           <SiteSettingsProvider settings={content.settings} copy={content.copy}>
+            <MarketingAttributionCapture />
             <Navbar />
             <main>{children}</main>
             <Footer />
             <StickyBottomCta />
+            <GoogleAdsConsent />
             <Toaster theme="dark" position="top-center" richColors />
           </SiteSettingsProvider>
         </NextIntlClientProvider>

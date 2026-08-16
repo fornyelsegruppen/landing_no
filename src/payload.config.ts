@@ -1,7 +1,5 @@
 import path from "path";
 import { fileURLToPath } from "url";
-import { postgresAdapter } from "@payloadcms/db-postgres";
-import { sqliteAdapter } from "@payloadcms/db-sqlite";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { vercelBlobStorage } from "@payloadcms/storage-vercel-blob";
 import { buildConfig } from "payload";
@@ -59,6 +57,29 @@ const trustedOrigins = Array.from(
 
 const migrationDir = path.resolve(dirname, "payload/migrations");
 
+const databaseAdapter = usePostgres
+  ? (await import("@payloadcms/db-postgres")).postgresAdapter({
+      pool: {
+        connectionString: databaseUrl,
+        // max:1 deadlocks Payload (transactions + nested queries) on serverless.
+        max: 10,
+        idleTimeoutMillis: 20_000,
+        connectionTimeoutMillis: 15_000,
+      },
+      // Avoid nested transaction connection grabs that stall with small pools.
+      transactionOptions: false,
+      // Production never auto-pushes; migrations handle schema.
+      // Local/dev push stays available unless explicitly disabled.
+      push: process.env.NODE_ENV !== "production",
+      migrationDir,
+      prodMigrations: migrations,
+    })
+  : (await import("@payloadcms/db-sqlite")).sqliteAdapter({
+      client: {
+        url: databaseUrl,
+      },
+    });
+
 export default buildConfig({
   serverURL,
   csrf: trustedOrigins,
@@ -69,7 +90,14 @@ export default buildConfig({
       baseDir: path.resolve(dirname, "app/(payload)/admin"),
     },
     livePreview: {
-      collections: ["services", "projects", "products", "faq", "pages", "posts"],
+      collections: [
+        "services",
+        "projects",
+        "products",
+        "faq",
+        "pages",
+        "posts",
+      ],
       globals: ["site-settings"],
       url: `${serverURL}/api/preview?locale=no`,
     },
@@ -92,28 +120,7 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, "payload", "payload-types.ts"),
   },
-  db: usePostgres
-    ? postgresAdapter({
-        pool: {
-          connectionString: databaseUrl,
-          // max:1 deadlocks Payload (transactions + nested queries) on serverless.
-          max: 10,
-          idleTimeoutMillis: 20_000,
-          connectionTimeoutMillis: 15_000,
-        },
-        // Avoid nested transaction connection grabs that stall with small pools.
-        transactionOptions: false,
-        // Production never auto-pushes; migrations handle schema.
-        // Local/dev push stays available unless explicitly disabled.
-        push: process.env.NODE_ENV !== "production",
-        migrationDir,
-        prodMigrations: migrations,
-      })
-    : sqliteAdapter({
-        client: {
-          url: databaseUrl,
-        },
-      }),
+  db: databaseAdapter,
   sharp,
   plugins: [
     vercelBlobStorage({

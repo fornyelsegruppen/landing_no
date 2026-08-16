@@ -19,8 +19,11 @@ Når du sender inn forespørsel via kontaktskjemaet, kan vi lagre:
 - postnummer og omtrentlig takareal
 - meldingstekst og type forespørsel
 - bilder du laster opp (valgfritt)
+- kampanjeparametere (UTM), annonseklikk-ID og første landingsside når du sender inn skjemaet
 
-Vi bruker ikke markedsføringscookies eller sporingsverktøy på nettsiden.
+Vi bruker ikke markedsføringscookies eller tredjeparts sporingsverktøy uten et eget gyldig samtykke. Kampanjeparametere kan lagres midlertidig i nettleserøkten og sendes først når du selv sender inn skjemaet.
+
+Hvis du godtar valgfri annonsemåling, lastes Google Ads-koden for å måle sidebesøk og innsendte henvendelser. Avslår du, lastes ikke Google-koden. Valget lagres lokalt i nettleseren og kan endres via «Personvernvalg» nederst på nettstedet.
 
 ## 3. Formål og rettslig grunnlag
 Opplysningene brukes for å besvare henvendelsen din og følge opp tilbud om takarbeid. Rettslig grunnlag er ditt samtykke (GDPR art. 6 (1) a) og/eller berettiget interesse i å følge opp forespørselen (art. 6 (1) f).
@@ -47,8 +50,11 @@ When you submit an enquiry via the contact form, we may store:
 - postal code and approximate roof size
 - message text and enquiry type
 - photos you upload (optional)
+- campaign parameters (UTM), advertising click ID and first landing page when you submit the form
 
-We do not use marketing cookies or tracking tools on the website.
+We do not use marketing cookies or third-party tracking tools without separate valid consent. Campaign parameters may be held temporarily in the browser session and are sent only when you submit the form.
+
+If you accept optional advertising measurement, Google Ads code is loaded to measure page visits and submitted enquiries. If you decline, Google code is not loaded. Your choice is stored locally in the browser and can be changed through “Privacy choices” in the website footer.
 
 ## 3. Purpose and legal basis
 Data is used to answer your enquiry and follow up on roofing quotes. Legal basis is your consent (GDPR Art. 6 (1) a) and/or legitimate interest in following up the request (Art. 6 (1) f).

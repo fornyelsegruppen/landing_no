@@ -102,5 +102,65 @@ export const Leads: CollectionConfig = {
         description: "Exact consent label shown at submit time.",
       },
     },
+    {
+      type: "collapsible",
+      label: "Marketing attribution",
+      fields: [
+        {
+          name: "utmSource",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "utmMedium",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "utmCampaign",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "utmContent",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "utmTerm",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "gclid",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "fbclid",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "landingPage",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+        {
+          name: "referrer",
+          type: "text",
+          access: adminManagedField,
+          admin: { readOnly: true },
+        },
+      ],
+    },
   ],
 };

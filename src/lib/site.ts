@@ -1,7 +1,11 @@
 export const siteConfig = {
   name: "Takfornyelse",
-  domain: "takfornyelse.no",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+  domain: "takfornyelse.as",
+  url:
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "https://www.takfornyelse.as"),
   phone: "+47 47 73 58 88",
   phoneHref: "tel:+4747735888",
   email: "post@takfornyelse.as",

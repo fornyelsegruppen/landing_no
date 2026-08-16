@@ -19,6 +19,8 @@ import {
   TurnstileWidget,
   turnstileConfigured,
 } from "@/components/leads/turnstile-widget";
+import { readMarketingAttribution } from "@/lib/marketing-attribution";
+import { trackGoogleAdsLeadConversion } from "@/components/google-ads-consent";
 
 const MAX_PHOTOS = 15;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -436,6 +438,7 @@ export function ContactSection() {
           turnstileToken: turnstileToken || undefined,
           consent: true as const,
           consentText,
+          ...readMarketingAttribution(),
           website: honeypot.website,
           company_url_hp: honeypot.company_url_hp,
         }),
@@ -451,6 +454,7 @@ export function ContactSection() {
       }
 
       toast.success(copy.contact.form.success);
+      trackGoogleAdsLeadConversion();
       if (failed > 0 && photoUrls.length) {
         toast.message(copy.contact.form.partialUpload);
       }

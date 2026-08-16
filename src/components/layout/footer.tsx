@@ -7,6 +7,10 @@ import {
   usePageCopy,
   useSiteSettings,
 } from "@/components/site-settings-provider";
+import {
+  googleAdsMeasurementConfigured,
+  openGoogleAdsPrivacyChoices,
+} from "@/components/google-ads-consent";
 
 export function Footer() {
   const copy = usePageCopy();
@@ -117,6 +121,15 @@ export function Footer() {
             <Link href="/personvern" className="hover:text-accent">
               {settings.privacy.linkLabel[locale as "no" | "en"]}
             </Link>
+            {googleAdsMeasurementConfigured() ? (
+              <button
+                type="button"
+                className="hover:text-accent ml-3"
+                onClick={openGoogleAdsPrivacyChoices}
+              >
+                {locale === "no" ? "Personvernvalg" : "Privacy choices"}
+              </button>
+            ) : null}
           </p>
           <p>{copy.footer.warrantyNote}</p>
           <p className="tracking-wider uppercase">{locale}</p>
