@@ -35,7 +35,7 @@ const leadSchema = z
     type: z.enum(inquiryTypes),
     locale: z.enum(["no", "en"]),
     email: z.string().email().max(200).optional(),
-    address: z.string().max(200).optional(),
+    address: z.string().trim().min(3).max(200),
     roofSize: z
       .string()
       .max(20)
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
         language: locale,
         message: message || "",
         ...(email ? { email } : {}),
-        address: address || "Ikke oppgitt",
+        address,
         ...(approxSqm && Number.isFinite(approxSqm) ? { approxSqm } : {}),
         ...(photoUrls.length ? { photoUrls: photoUrls.join("\n") } : {}),
         consentAt: new Date().toISOString(),
