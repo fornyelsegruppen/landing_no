@@ -92,7 +92,7 @@ type FormState = {
   name: string;
   phone: string;
   postal: string;
-  type: InquiryType;
+  type: InquiryType | "";
   email: string;
   address: string;
   roofSize: string;
@@ -103,7 +103,7 @@ const initial: FormState = {
   name: "",
   phone: "",
   postal: "",
-  type: "usikker",
+  type: "",
   email: "",
   address: "",
   roofSize: "",
@@ -675,8 +675,12 @@ export function ContactSection() {
                     onChange={(e) =>
                       update("type", e.target.value as InquiryType)
                     }
+                    required
                     className="service-select text-foreground focus-visible:border-accent/50 focus-visible:ring-accent/30 flex h-11 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-sm outline-none focus-visible:ring-2"
                   >
+                    <option value="" disabled>
+                      {locale === "no" ? "VELG TJENESTE" : "CHOOSE A SERVICE"}
+                    </option>
                     {inquiryTypes.map((value) => (
                       <option key={value} value={value}>
                         {typeLabels[value]}
