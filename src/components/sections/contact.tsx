@@ -68,7 +68,7 @@ const step1Schema = z.object({
 
 const step2Schema = z.object({
   email: z.string().trim().email().optional().or(z.literal("")),
-  address: z.string().trim().max(200).optional(),
+  address: z.string().trim().min(3).max(200),
   roofSize: z
     .string()
     .trim()
@@ -496,7 +496,7 @@ export function ContactSection() {
           type: step1.data.type,
           locale,
           email: step2.data.email || undefined,
-          address: step2.data.address || undefined,
+          address: step2.data.address,
           roofSize: step2.data.roofSize || undefined,
           message: step2.data.message || undefined,
           photoUrls: photoUrls.length ? photoUrls : undefined,
@@ -711,15 +711,14 @@ export function ContactSection() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="address">
-                    {locale === "no"
-                      ? "Adresse (valgfritt)"
-                      : "Address (optional)"}
+                    {locale === "no" ? "Adresse *" : "Address *"}
                   </Label>
                   <Input
                     id="address"
                     value={form.address}
                     onChange={(e) => update("address", e.target.value)}
                     autoComplete="street-address"
+                    required
                     placeholder={
                       locale === "no"
                         ? "Gateadresse og husnummer"
@@ -728,8 +727,8 @@ export function ContactSection() {
                   />
                   <p className="text-muted-foreground text-xs">
                     {locale === "no"
-                      ? "Du kan også oppgi adressen når vi tar kontakt."
-                      : "You can also provide the address when we contact you."}
+                      ? "Nødvendig for at vi skal kunne vurdere objektet før vi tar kontakt."
+                      : "Required so we can assess the property before contacting you."}
                   </p>
                 </div>
                 <div className="space-y-2">
