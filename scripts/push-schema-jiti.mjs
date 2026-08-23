@@ -81,9 +81,10 @@ if (baselineCurrentMigrations) {
     for (const migration of migrations) {
       await baselineClient.query(
         `insert into payload_migrations (name, batch)
-         select $1, 1
+         select $1::varchar, 1
          where not exists (
-           select 1 from payload_migrations where name = $1 and batch <> -1
+           select 1 from payload_migrations
+           where name = $1::varchar and batch <> -1
          )`,
         [migration.name],
       );
