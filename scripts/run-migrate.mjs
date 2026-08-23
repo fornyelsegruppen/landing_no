@@ -13,6 +13,7 @@ import path from "path";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import pg from "pg";
+import { postgresSslOptions } from "./postgres-ssl.mjs";
 
 const rawUrl =
   process.env.DATABASE_URL_MIGRATE ||
@@ -37,7 +38,7 @@ const pool = new pg.Pool({
   connectionString: databaseUrl,
   max: 1,
   connectionTimeoutMillis: 20_000,
-  ssl: { rejectUnauthorized: false },
+  ssl: postgresSslOptions(databaseUrl),
 });
 
 try {
