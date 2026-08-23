@@ -68,7 +68,7 @@ describe("SEO landing pages", () => {
       )
       .join(" ");
 
-    expect(renewalCopy).toContain("360 kr");
+    expect(renewalCopy).toContain("337 kr");
     expect(renewalCopy).not.toContain("600–1 200");
   });
 

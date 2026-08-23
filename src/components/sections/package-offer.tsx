@@ -29,7 +29,7 @@ const content = {
         name: "Standard",
         rating: 4,
         title: "Vask + impregnering",
-        price: "140",
+        price: "138",
         featured: true,
         features: [
           "Alt i Basic",
@@ -41,7 +41,7 @@ const content = {
         name: "Premium",
         rating: 5,
         title: "Komplett takfornying",
-        price: "360",
+        price: "337",
         features: [
           "Alt i Standard",
           "Profesjonell takmaling",
@@ -74,7 +74,7 @@ const content = {
         name: "Standard",
         rating: 4,
         title: "Cleaning + impregnation",
-        price: "140",
+        price: "138",
         featured: true,
         features: [
           "Everything in Basic",
@@ -86,7 +86,7 @@ const content = {
         name: "Premium",
         rating: 5,
         title: "Complete roof renewal",
-        price: "360",
+        price: "337",
         features: [
           "Everything in Standard",
           "Professional roof painting",

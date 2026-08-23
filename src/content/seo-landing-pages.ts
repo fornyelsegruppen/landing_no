@@ -355,8 +355,8 @@ export const seoLandingPages: SeoLandingPage[] = [
       "Aerial view of a renewed housing association",
     ),
     price: l(
-      "Komplett takfornying fra 360 kr/m² + mva",
-      "Complete roof renewal from NOK 360/m² + VAT",
+      "Komplett takfornying fra 337 kr/m² + mva",
+      "Complete roof renewal from NOK 337/m² + VAT",
     ),
     priceNote: l(
       "Veiledende fra-pris for Premium-pakken. Valgt behandling, tilstand, størrelse, sikring og adkomst avgjør endelig pris.",
@@ -546,8 +546,8 @@ export const seoLandingPages: SeoLandingPage[] = [
       "Roof coating in progress with a clear before-and-after contrast",
     ),
     price: l(
-      "Takvask fra 99, vask + impregnering fra 140 og takfornying fra 360 kr/m² + mva",
-      "Cleaning from NOK 99, cleaning + impregnation from NOK 140 and renewal from NOK 360/m² + VAT",
+      "Takvask fra 99, vask + impregnering fra 138 og takfornying fra 337 kr/m² + mva",
+      "Cleaning from NOK 99, cleaning + impregnation from NOK 138 and renewal from NOK 337/m² + VAT",
     ),
     priceNote: l(
       "Dette er veiledende fra-priser, ikke et bindende tilbud. Taktype, tilstand, adkomst og valgt omfang avgjør endelig pris.",
@@ -784,8 +784,8 @@ export const seoLandingPages: SeoLandingPage[] = [
           "What does roof renewal cost in Bærum?",
         ),
         answer: l(
-          "Premium-pakken for komplett takfornying starter veiledende fra 360 kr per m² + mva. Befaringen avgjør riktig behandling og endelig pris.",
-          "The Premium package for complete roof renewal has an indicative starting price of NOK 360 per m² + VAT. Inspection determines the treatment and final price.",
+          "Premium-pakken for komplett takfornying starter veiledende fra 337 kr per m² + mva. Befaringen avgjør riktig behandling og endelig pris.",
+          "The Premium package for complete roof renewal has an indicative starting price of NOK 337 per m² + VAT. Inspection determines the treatment and final price.",
         ),
       },
       {
@@ -1037,8 +1037,8 @@ export const seoLandingPages: SeoLandingPage[] = [
       "Documented 240 m² roof in Viken before renewal",
     ),
     price: l(
-      "Komplett takfornying fra 360 kr/m² + mva",
-      "Complete roof renewal from NOK 360/m² + VAT",
+      "Komplett takfornying fra 337 kr/m² + mva",
+      "Complete roof renewal from NOK 337/m² + VAT",
     ),
     priceNote: l(
       "Veiledende fra-pris for Premium-pakken. Befaring avklarer behandling, reparasjoner, sikring, logistikk og endelig tilbud.",

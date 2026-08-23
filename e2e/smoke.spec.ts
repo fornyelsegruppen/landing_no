@@ -88,19 +88,18 @@ test("project gallery presents photos in a clear chronological order", async ({
 }) => {
   await page.goto("/no#referanser");
 
-  const paintingProject = page
+  const washingProject = page
     .getByRole("article")
-    .filter({ hasText: "Takmaling – 240 m² tak i Viken" });
+    .filter({ hasText: "Takvask – før, under og etter" });
 
-  await expect(paintingProject.getByRole("heading", { level: 4 })).toHaveText([
-    "Før",
-    "Under arbeid",
-    "Etter",
+  await expect(washingProject.getByRole("heading", { level: 4 })).toHaveText([
+    "Før- og ettereksempler",
+    "Flere bilder",
   ]);
-  await expect(paintingProject.locator("figure")).toHaveCount(5);
-  await expect(paintingProject.getByText("Før 1 / 2")).toBeVisible();
-  await expect(paintingProject.getByText("Under arbeid 1 / 1")).toBeVisible();
-  await expect(paintingProject.getByText("Etter 1 / 2")).toBeVisible();
+  await expect(washingProject.locator("figure")).toHaveCount(4);
+  await expect(
+    washingProject.locator("figcaption > p:first-child"),
+  ).toHaveText(["Før", "Etter", "Før", "Under arbeid"]);
 });
 
 test("public pages keep security headers and usable mobile layout", async ({ page }) => {
@@ -118,6 +117,12 @@ test("public pages keep security headers and usable mobile layout", async ({ pag
 
 test("privacy page describes controlled quotes and job follow-up", async ({ page }) => {
   await page.goto("/no/personvern");
-  await expect(page.getByRole("heading", { level: 2, name: "Tilbud, måling og oppdragsoppfølging" })).toBeVisible();
-  await expect(page.getByText(/AI bestemmer ikke pris/)).toBeVisible();
+  const heading = page.getByRole("heading", {
+    level: 2,
+    name: "Tilbud, måling og oppdragsoppfølging",
+  });
+  await expect(heading).toBeVisible();
+  await expect(heading.locator("xpath=following-sibling::p[1]")).toContainText(
+    "AI bestemmer ikke pris",
+  );
 });

@@ -8,6 +8,7 @@ import pg from "pg";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { postgresSslOptions } from "./postgres-ssl.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -32,7 +33,7 @@ const pool = new pg.Pool({
   connectionString: url,
   max: 1,
   connectionTimeoutMillis: 20000,
-  ssl: { rejectUnauthorized: false },
+  ssl: postgresSslOptions(url),
 });
 
 const siteImages = {

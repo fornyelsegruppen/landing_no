@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { getSiteContent } from "@/lib/cms-content";
@@ -38,10 +39,18 @@ function renderMarkdownLite(body: string) {
     const trimmed = block.trim();
     if (!trimmed) return null;
     if (trimmed.startsWith("## ")) {
+      const [heading, ...paragraphLines] = trimmed.split("\n");
       return (
-        <h2 key={i} className="mt-8 text-xl font-semibold tracking-tight">
-          {trimmed.replace(/^##\s+/, "")}
-        </h2>
+        <Fragment key={i}>
+          <h2 className="mt-8 text-xl font-semibold tracking-tight">
+            {heading.replace(/^##\s+/, "")}
+          </h2>
+          {paragraphLines.length > 0 ? (
+            <p className="text-muted-foreground mt-3 leading-relaxed">
+              {paragraphLines.join("\n").trim()}
+            </p>
+          ) : null}
+        </Fragment>
       );
     }
     if (trimmed.startsWith("- ")) {
