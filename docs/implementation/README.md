@@ -9,5 +9,6 @@ Denne katalogen inneholder fasebevis for [samlet implementeringsplan](../full-pl
 | 2 | [Kontoer, admin og worker-skall](./phase-2-accounts-admin-worker-shell.md) | Fullført |
 | 3 | [Bloggfundament og offentlig artikkelmal](./phase-3-blog-foundation.md) | Fullført |
 | 4 | [AI-assistert innholdsmotor](./phase-4-ai-content-engine.md) | Fullført |
+| 5 | [Henvendelser, innboks og kontrollerte svarutkast](./phase-5-lead-inbox-and-messages.md) | Fullført |
 
 En fase kan bare markeres fullført når rapporten inneholder leveranser, verifikasjon, kjente avvik og eksplisitt gate-resultat.

@@ -11,12 +11,13 @@ type DashboardCounts = {
   pendingQuotes: number;
   unassignedWork: number;
   aiDrafts: number;
+  replyDrafts: number;
 };
 
 async function loadCounts(): Promise<DashboardCounts> {
   try {
     const payload = await getPayload();
-    const [newLeads, aiDrafts, operationalAttention, seoAttention, activeWork, unassignedWork] = await Promise.all([
+    const [newLeads, aiDrafts, replyDrafts, operationalAttention, seoAttention, messageAttention, activeWork, unassignedWork] = await Promise.all([
       payload.count({
         collection: "leads",
         where: { status: { equals: "new" } },
@@ -26,11 +27,19 @@ async function loadCounts(): Promise<DashboardCounts> {
         where: { editorialStatus: { in: ["ai_qa", "human_review"] } },
       }),
       payload.count({
+        collection: "messages",
+        where: { status: { equals: "draft" } },
+      }),
+      payload.count({
         collection: "operational-jobs",
         where: { status: { in: ["failed", "attention"] } },
       }),
       payload.count({
         collection: "seo-runs",
+        where: { status: { in: ["failed", "attention"] } },
+      }),
+      payload.count({
+        collection: "messages",
         where: { status: { in: ["failed", "attention"] } },
       }),
       payload.count({
@@ -45,12 +54,13 @@ async function loadCounts(): Promise<DashboardCounts> {
 
     return {
       newLeads: newLeads.totalDocs,
-      attention: operationalAttention.totalDocs + seoAttention.totalDocs,
+      attention: operationalAttention.totalDocs + seoAttention.totalDocs + messageAttention.totalDocs,
       activeWork: activeWork.totalDocs,
       unassignedWork: unassignedWork.totalDocs,
       pendingQuotes: 0,
       pendingContracts: 0,
       aiDrafts: aiDrafts.totalDocs,
+      replyDrafts: replyDrafts.totalDocs,
     };
   } catch {
     return {
@@ -61,6 +71,7 @@ async function loadCounts(): Promise<DashboardCounts> {
       pendingQuotes: 0,
       pendingContracts: 0,
       aiDrafts: 0,
+      replyDrafts: 0,
     };
   }
 }
@@ -68,9 +79,9 @@ async function loadCounts(): Promise<DashboardCounts> {
 const cards = [
   { key: "newLeads", label: "Nye henvendelser", href: "/admin/collections/leads" },
   {
-    key: "pendingQuotes",
-    label: "Tilbud til godkjenning",
-    href: "/admin/collections/leads",
+    key: "replyDrafts",
+    label: "Svarutkast til godkjenning",
+    href: "/admin/collections/messages",
   },
   {
     key: "aiDrafts",

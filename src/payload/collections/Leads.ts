@@ -1,8 +1,17 @@
-import type { CollectionConfig } from "payload";
+import type { CollectionBeforeDeleteHook, CollectionConfig } from "payload";
 import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 
 const adminManagedField = {
   update: adminOnlyField,
+};
+
+export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  await req.payload.delete({
+    collection: "messages",
+    overrideAccess: true,
+    req,
+    where: { lead: { equals: id } },
+  });
 };
 
 export const Leads: CollectionConfig = {
@@ -18,7 +27,9 @@ export const Leads: CollectionConfig = {
       "inquiryType",
       "utmSource",
       "utmCampaign",
-      "language",
+      "status",
+      "nextActionAt",
+      "assignedTo",
       "createdAt",
     ],
   },
@@ -28,6 +39,7 @@ export const Leads: CollectionConfig = {
     read: adminsAndEditors,
     update: adminsAndEditors,
   },
+  hooks: { beforeDelete: [deleteLeadMessagesBeforeLead] },
   fields: [
     { name: "name", type: "text", required: true, access: adminManagedField },
     { name: "email", type: "email", access: adminManagedField },
@@ -90,11 +102,27 @@ export const Leads: CollectionConfig = {
       type: "select",
       defaultValue: "new",
       options: [
-        { label: "New", value: "new" },
-        { label: "Contacted", value: "contacted" },
-        { label: "Qualified", value: "qualified" },
-        { label: "Closed", value: "closed" },
+        { label: "Ny", value: "new" },
+        { label: "Svarutkast klart", value: "draft_ready" },
+        { label: "Venter på kunde", value: "waiting_customer" },
+        { label: "Kvalifisert", value: "qualified" },
+        { label: "Måling", value: "measuring" },
+        { label: "Tilbud", value: "quoted" },
+        { label: "Konvertert", value: "converted" },
+        { label: "Lukket", value: "closed" },
+        { label: "Kontaktet (eldre)", value: "contacted" },
       ],
+    },
+    { name: "assignedTo", type: "relationship", relationTo: "users", label: "Ansvarlig", index: true },
+    { name: "nextAction", type: "textarea", label: "Neste handling" },
+    { name: "nextActionAt", type: "date", label: "Frist", index: true },
+    { name: "lastContactAt", type: "date", label: "Sist kontaktet" },
+    { name: "closedAt", type: "date", label: "Lukket" },
+    { name: "qualification", type: "json", label: "AI-oppsummering (kontrolleres av admin)" },
+    {
+      name: "workflowActions",
+      type: "ui",
+      admin: { components: { Field: "/components/LeadWorkflowActions" } },
     },
     {
       name: "consentAt",

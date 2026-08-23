@@ -62,7 +62,7 @@ export class GeminiAiProvider implements AiProvider {
               responseFormat: {
                 text: {
                   mimeType: "application/json",
-                  schema: generatedArticleJsonSchema,
+                  schema: input.schema || generatedArticleJsonSchema,
                 },
               },
             },

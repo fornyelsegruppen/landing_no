@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Users } from "./Users";
 import { WorkOrders } from "./WorkOrders";
+import { Messages } from "./Messages";
+import { deleteLeadMessagesBeforeLead } from "./Leads";
 
 const request = (user: Record<string, unknown> | null) =>
   ({ req: { user } }) as never;
@@ -27,5 +29,21 @@ describe("internal collection access", () => {
 
     expect(await Users.access?.admin?.(inactive)).toBe(false);
     expect(await WorkOrders.access?.read?.(inactive)).toBe(false);
+  });
+
+  it("keeps message delivery state system-managed even for admins", async () => {
+    const status = Messages.fields.find((field) => "name" in field && field.name === "status");
+    if (!status || !("access" in status)) throw new Error("Message status field is missing");
+    expect(await status.access?.update?.(request({ id: 1, role: "admin", active: true }))).toBe(false);
+  });
+
+  it("removes lead messages before privacy deletion of the lead", async () => {
+    const remove = vi.fn().mockResolvedValue({ docs: [] });
+    await deleteLeadMessagesBeforeLead({ id: 7, req: { payload: { delete: remove } } } as never);
+    expect(remove).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "messages",
+      overrideAccess: true,
+      where: { lead: { equals: 7 } },
+    }));
   });
 });

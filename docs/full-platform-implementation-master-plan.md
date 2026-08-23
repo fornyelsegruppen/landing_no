@@ -706,7 +706,7 @@ Store endringer skal deles i små, reversible migrasjoner. Eksisterende urelater
 | 2. Kontoer og panelskall | Fullført | 2026-08-23 | 2026-08-23 | [Fase 2-rapport](./implementation/phase-2-accounts-admin-worker-shell.md) | Autentisert happy-path gjentas i staging |
 | 3. Bloggfundament | Fullført | 2026-08-23 | 2026-08-23 | [Fase 3-rapport](./implementation/phase-3-blog-foundation.md) | Ekte CMS-dataflyt gjentas i staging |
 | 4. AI-innholdsmotor | Fullført | 2026-08-23 | 2026-08-23 | [Fase 4-rapport](./implementation/phase-4-ai-content-engine.md) | Autentisert admin-smoke og ekte AI/Search Console-kall gjentas i staging |
-| 5. Henvendelser og meldinger | Ikke startet |  |  |  |  |
+| 5. Henvendelser og meldinger | Fullført | 2026-08-23 | 2026-08-23 | [Fase 5-rapport](./implementation/phase-5-lead-inbox-and-messages.md) | Ekte Resend/Gemini og autentisert adminflyt testes i staging |
 | 6. Takmåling og pris | Ikke startet |  |  |  |  |
 | 7. Tilbud og kontrakt | Ikke startet |  |  |  |  |
 | 8. Arbeidsordre og `/user` | Ikke startet |  |  |  |  |

@@ -91,13 +91,23 @@ If you consent in the cookie banner, we use Google Analytics, Google Ads and Met
   return `${body.replace(outdated, "").trim()}\n\n${disclosure}`;
 }
 
+function withAiDisclosure(body: string, locale: "no" | "en") {
+  if (/AI-assistert behandling|AI-assisted processing/i.test(body)) return body;
+  const disclosure = locale === "no"
+    ? `## AI-assistert behandling av henvendelser
+Vi kan bruke en konfigurert AI-leverandør til å lage en intern oppsummering, mangelliste og et forslag til svar. Navn, telefon, e-post og full adresse sendes ikke i standardprompten, og fritekst reduseres og renses før behandling. AI-utkast sendes ikke automatisk til kunden; en administrator må kontrollere og godkjenne innholdet. AI bestemmer ikke pris, garanti, oppstart eller bindende tilbud. Opplysninger lagres og slettes etter våre vanlige regler for henvendelser. Produksjonsbruk forutsetter godkjent databehandleravtale.`
+    : `## AI-assisted processing of enquiries
+We may use a configured AI provider to prepare an internal summary, missing-information list, and reply suggestion. Names, phone numbers, email addresses, and full addresses are not included in the standard prompt, and free text is reduced and cleaned before processing. AI drafts are not sent automatically; an administrator must review and approve them. AI does not decide prices, warranties, start dates, or binding offers. Information follows our normal enquiry retention rules. Production use requires an approved data-processing agreement.`;
+  return `${body.trim()}\n\n${disclosure}`;
+}
+
 export default async function PrivacyPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const loc = locale as "no" | "en";
   const content = await getSiteContent();
   const privacy = content.settings.privacy;
-  const privacyBody = withMarketingDisclosure(privacy.body[loc], loc);
+  const privacyBody = withAiDisclosure(withMarketingDisclosure(privacy.body[loc], loc), loc);
 
   return (
     <section className="section-pad">

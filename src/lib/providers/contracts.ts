@@ -9,6 +9,7 @@ export type AiGenerateRequest = {
   system: string;
   prompt: string;
   schemaName: string;
+  schema?: Record<string, unknown>;
   correlationId: string;
 };
 

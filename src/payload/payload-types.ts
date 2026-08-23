@@ -77,6 +77,7 @@ export interface Config {
     posts: Post;
     redirects: Redirect;
     leads: Lead;
+    messages: Message;
     'work-orders': WorkOrder;
     'seo-topics': SeoTopic;
     'seo-runs': SeoRun;
@@ -101,6 +102,7 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
+    messages: MessagesSelect<false> | MessagesSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
     'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
@@ -624,7 +626,33 @@ export interface Lead {
     | 'kledning';
   message?: string | null;
   language: 'no' | 'en';
-  status?: ('new' | 'contacted' | 'qualified' | 'closed') | null;
+  status?:
+    | (
+        | 'new'
+        | 'draft_ready'
+        | 'waiting_customer'
+        | 'qualified'
+        | 'measuring'
+        | 'quoted'
+        | 'converted'
+        | 'closed'
+        | 'contacted'
+      )
+    | null;
+  assignedTo?: (number | null) | User;
+  nextAction?: string | null;
+  nextActionAt?: string | null;
+  lastContactAt?: string | null;
+  closedAt?: string | null;
+  qualification?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   /**
    * When the visitor accepted the privacy consent checkbox.
    */
@@ -650,6 +678,50 @@ export interface Lead {
   contentSourcePath?: string | null;
   referrer?: string | null;
   marketingConsent?: ('granted' | 'denied' | 'unknown') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Kundekommunikasjon med kontrollert godkjenning og idempotent levering.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messages".
+ */
+export interface Message {
+  id: number;
+  lead?: (number | null) | Lead;
+  direction: 'outbound' | 'inbound';
+  category: 'receipt' | 'ai_reply' | 'information_request' | 'follow_up' | 'quote' | 'contract' | 'reminder';
+  channel: 'email' | 'sms';
+  subject: string;
+  bodyText: string;
+  bodyHtml?: string | null;
+  status: 'draft' | 'approved' | 'queued' | 'sent' | 'delivered' | 'failed' | 'attention' | 'cancelled';
+  idempotencyKey: string;
+  aiAssisted?: boolean | null;
+  aiAnalysis?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  modelVersion?: string | null;
+  promptVersion?: string | null;
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
+  queuedAt?: string | null;
+  sentAt?: string | null;
+  deliveredAt?: string | null;
+  provider?: string | null;
+  providerMessageId?: string | null;
+  failureCode?: string | null;
+  /**
+   * Sanitert teknisk tekst uten kontaktdata eller meldingsinnhold.
+   */
+  failureMessage?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -879,6 +951,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'leads';
         value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'messages';
+        value: number | Message;
       } | null)
     | ({
         relationTo: 'work-orders';
@@ -1243,6 +1319,12 @@ export interface LeadsSelect<T extends boolean = true> {
   message?: T;
   language?: T;
   status?: T;
+  assignedTo?: T;
+  nextAction?: T;
+  nextActionAt?: T;
+  lastContactAt?: T;
+  closedAt?: T;
+  qualification?: T;
   consentAt?: T;
   consentText?: T;
   utmSource?: T;
@@ -1259,6 +1341,36 @@ export interface LeadsSelect<T extends boolean = true> {
   contentSourcePath?: T;
   referrer?: T;
   marketingConsent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "messages_select".
+ */
+export interface MessagesSelect<T extends boolean = true> {
+  lead?: T;
+  direction?: T;
+  category?: T;
+  channel?: T;
+  subject?: T;
+  bodyText?: T;
+  bodyHtml?: T;
+  status?: T;
+  idempotencyKey?: T;
+  aiAssisted?: T;
+  aiAnalysis?: T;
+  modelVersion?: T;
+  promptVersion?: T;
+  approvedBy?: T;
+  approvedAt?: T;
+  queuedAt?: T;
+  sentAt?: T;
+  deliveredAt?: T;
+  provider?: T;
+  providerMessageId?: T;
+  failureCode?: T;
+  failureMessage?: T;
   updatedAt?: T;
   createdAt?: T;
 }

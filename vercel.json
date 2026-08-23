@@ -10,12 +10,33 @@
     },
     "src/app/api/cron/purge-leads/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/seo-drafts/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/publish-posts/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/operational-jobs/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cron/purge-leads",
       "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/seo-drafts",
+      "schedule": "0 7 * * 1,4"
+    },
+    {
+      "path": "/api/cron/publish-posts",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/operational-jobs",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

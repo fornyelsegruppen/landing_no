@@ -1,0 +1,101 @@
+import type { CollectionConfig } from "payload";
+import { adminOnly, adminsAndEditors } from "../access/roles";
+
+const systemManaged = { create: () => false, update: () => false };
+
+export const Messages: CollectionConfig = {
+  slug: "messages",
+  defaultSort: "-createdAt",
+  labels: { singular: "Melding", plural: "Meldinger" },
+  admin: {
+    group: "Henvendelser",
+    useAsTitle: "subject",
+    defaultColumns: ["lead", "category", "channel", "status", "approvedAt", "sentAt"],
+    description: "Kundekommunikasjon med kontrollert godkjenning og idempotent levering.",
+  },
+  access: {
+    create: adminOnly,
+    delete: adminOnly,
+    read: adminsAndEditors,
+    update: adminsAndEditors,
+  },
+  fields: [
+    { name: "lead", type: "relationship", relationTo: "leads", index: true },
+    {
+      name: "direction",
+      type: "select",
+      required: true,
+      defaultValue: "outbound",
+      options: [
+        { label: "Utgående", value: "outbound" },
+        { label: "Innkommende", value: "inbound" },
+      ],
+    },
+    {
+      name: "category",
+      type: "select",
+      required: true,
+      index: true,
+      options: [
+        { label: "Mottaksbekreftelse", value: "receipt" },
+        { label: "AI-svarutkast", value: "ai_reply" },
+        { label: "Be om informasjon", value: "information_request" },
+        { label: "Manuell oppfølging", value: "follow_up" },
+        { label: "Tilbud", value: "quote" },
+        { label: "Kontrakt", value: "contract" },
+        { label: "Påminnelse", value: "reminder" },
+      ],
+    },
+    {
+      name: "channel",
+      type: "select",
+      required: true,
+      options: [
+        { label: "E-post", value: "email" },
+        { label: "SMS", value: "sms" },
+      ],
+    },
+    { name: "subject", type: "text", required: true },
+    { name: "bodyText", type: "textarea", required: true, admin: { rows: 12 } },
+    { name: "bodyHtml", type: "textarea", admin: { rows: 12 } },
+    {
+      name: "status",
+      type: "select",
+      required: true,
+      defaultValue: "draft",
+      index: true,
+      access: systemManaged,
+      admin: { readOnly: true },
+      options: [
+        { label: "Utkast", value: "draft" },
+        { label: "Godkjent", value: "approved" },
+        { label: "I kø", value: "queued" },
+        { label: "Sendt", value: "sent" },
+        { label: "Levert", value: "delivered" },
+        { label: "Feilet", value: "failed" },
+        { label: "Krever kontroll", value: "attention" },
+        { label: "Avbrutt", value: "cancelled" },
+      ],
+    },
+    { name: "idempotencyKey", type: "text", required: true, unique: true, index: true, access: systemManaged, admin: { hidden: true } },
+    { name: "aiAssisted", type: "checkbox", defaultValue: false, access: systemManaged, admin: { readOnly: true } },
+    { name: "aiAnalysis", type: "json", label: "AI-oppsummering og mangelliste", access: systemManaged, admin: { readOnly: true } },
+    { name: "modelVersion", type: "text", access: systemManaged, admin: { readOnly: true } },
+    { name: "promptVersion", type: "text", access: systemManaged, admin: { readOnly: true } },
+    { name: "approvedBy", type: "relationship", relationTo: "users", access: systemManaged, admin: { readOnly: true } },
+    { name: "approvedAt", type: "date", access: systemManaged, admin: { readOnly: true } },
+    { name: "queuedAt", type: "date", access: systemManaged, admin: { readOnly: true } },
+    { name: "sentAt", type: "date", access: systemManaged, admin: { readOnly: true } },
+    { name: "deliveredAt", type: "date", access: systemManaged, admin: { readOnly: true } },
+    { name: "provider", type: "text", access: systemManaged, admin: { readOnly: true } },
+    { name: "providerMessageId", type: "text", access: systemManaged, admin: { readOnly: true } },
+    { name: "failureCode", type: "text", access: systemManaged, admin: { readOnly: true } },
+    {
+      name: "failureMessage",
+      type: "textarea",
+      maxLength: 500,
+      access: systemManaged,
+      admin: { description: "Sanitert teknisk tekst uten kontaktdata eller meldingsinnhold." },
+    },
+  ],
+};

@@ -23,6 +23,7 @@ import { PrivateMedia } from "./payload/collections/PrivateMedia";
 import { WorkOrders } from "./payload/collections/WorkOrders";
 import { SeoTopics } from "./payload/collections/SeoTopics";
 import { SeoRuns } from "./payload/collections/SeoRuns";
+import { Messages } from "./payload/collections/Messages";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -123,6 +124,7 @@ export default buildConfig({
     Posts,
     Redirects,
     Leads,
+    Messages,
     WorkOrders,
     SeoTopics,
     SeoRuns,

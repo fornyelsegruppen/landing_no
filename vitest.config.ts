@@ -10,6 +10,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // PGlite starts a full in-process Postgres instance. Parallel migration
+    // files exhaust Windows ARM resources and create false hook timeouts.
+    fileParallelism: false,
+    hookTimeout: 60_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

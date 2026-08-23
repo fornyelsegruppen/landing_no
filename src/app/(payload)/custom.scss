@@ -149,6 +149,71 @@
   min-height: 2.5rem;
 }
 
+.lead-workflow-actions {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.lead-workflow-actions h3,
+.lead-workflow-actions p {
+  margin-top: 0;
+}
+
+.lead-workflow-actions__header,
+.lead-workflow-actions__buttons,
+.lead-workflow-actions__message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.lead-workflow-actions button {
+  background: var(--theme-success-500);
+  border: 0;
+  border-radius: 0.5rem;
+  color: var(--theme-elevation-0);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.7rem 0.9rem;
+}
+
+.lead-workflow-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.lead-workflow-actions .is-danger {
+  color: var(--theme-error-500);
+}
+
+.lead-workflow-actions__timeline {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.lead-workflow-actions__timeline article {
+  background: var(--theme-elevation-100);
+  border-radius: 0.6rem;
+  padding: 0.9rem;
+}
+
+.lead-workflow-actions__timeline article > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.lead-workflow-actions__timeline span {
+  color: var(--theme-elevation-600);
+  font-size: 0.85rem;
+}
+
 @media (max-width: 900px) {
   .platform-dashboard__cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));

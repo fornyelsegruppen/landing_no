@@ -14,6 +14,10 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { captureException } from "@/lib/monitoring";
 import { contactMethodSchema } from "@/lib/lead-contact-validation";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
+import { createReceiptMessage, deliverMessage, enqueueLeadAiJob } from "@/lib/messages/message-engine";
+import { ResendEmailProvider } from "@/lib/providers/resend-email-provider";
+import { readFeatureFlags } from "@/lib/platform/features";
 
 const optionalAttributionText = (max: number) =>
   z.string().trim().max(max).optional();
@@ -111,6 +115,7 @@ function silentOk() {
 }
 
 export async function POST(request: Request) {
+  const correlationId = correlationIdFromHeaders(request.headers);
   try {
     const ip = clientIp(request);
 
@@ -242,9 +247,31 @@ export async function POST(request: Request) {
         ...(referrer ? { referrer } : {}),
         ...(marketingConsent ? { marketingConsent } : {}),
         status: "new",
+        nextAction: "Kontroller henvendelsen og eventuelt svarutkast.",
+        nextActionAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
       },
       overrideAccess: true,
     });
+
+    try {
+      const receipt = await createReceiptMessage(payload, created.id, correlationId);
+      if (!receipt.skipped && !receipt.duplicate) {
+        const provider = new ResendEmailProvider();
+        if (provider.health().status === "ready") {
+          await deliverMessage(payload, provider, receipt.message.id, correlationId);
+        }
+      }
+    } catch (error) {
+      captureException(error, { route: "POST /api/lead", operation: "receipt-outbox", correlationId });
+    }
+
+    if (readFeatureFlags().aiDrafts) {
+      try {
+        await enqueueLeadAiJob(payload, created.id, correlationId);
+      } catch (error) {
+        captureException(error, { route: "POST /api/lead", operation: "ai-draft-outbox", correlationId });
+      }
+    }
 
     const photoToken = makeLeadPhotoToken(created.id);
     const emailPayload = {

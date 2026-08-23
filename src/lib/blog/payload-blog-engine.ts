@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Payload } from "payload";
 import type { AiProvider, SearchSignal } from "@/lib/providers/contracts";
 import { sanitizeJobError } from "@/lib/jobs/job-policy";
+import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
 import { ArticleQualityBlockedError, generateBlogDraft } from "./draft-engine";
 import {
   highestTopicOverlap,
@@ -130,24 +131,6 @@ export async function importSearchSignals(payload: Payload, signals: SearchSigna
   return { accepted, filtered, received: signals.length };
 }
 
-async function assertGeminiDailyLimit(payload: Payload, now = new Date()) {
-  const configured = Number(process.env.GEMINI_DAILY_REQUEST_LIMIT || 20);
-  const limit = Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 20;
-  const start = new Date(now);
-  start.setUTCHours(0, 0, 0, 0);
-  const usage = await payload.count({
-    collection: "seo-runs",
-    overrideAccess: true,
-    where: {
-      and: [
-        { startedAt: { greater_than_equal: start.toISOString() } },
-        { jobType: { in: ["blog.article.draft", "blog.article.regenerate"] } },
-      ],
-    },
-  });
-  if (usage.totalDocs >= limit) throw new Error("Gemini daily request limit reached");
-}
-
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
   if (value && typeof value === "object" && "id" in value) {
@@ -244,7 +227,7 @@ export async function generateNextPayloadBlogDraft(input: {
   }
 
   await ensureManualBlogTopics(input.payload);
-  await assertGeminiDailyLimit(input.payload);
+  await assertPayloadAiUsageAvailable(input.payload, { reserve: 1 });
   const topicDocument = await nextTopic(input.payload);
   if (!topicDocument) throw new Error("No eligible SEO topic is available");
   const run = await input.payload.create({
@@ -357,7 +340,7 @@ export async function regeneratePayloadBlogPost(input: {
   idempotencyKey: string;
   correlationId: string;
 }) {
-  await assertGeminiDailyLimit(input.payload);
+  await assertPayloadAiUsageAvailable(input.payload, { reserve: 1 });
   const post = await input.payload.findByID({
     collection: "posts",
     id: input.postId,
