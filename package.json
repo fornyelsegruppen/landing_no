@@ -11,6 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:ci:unit": "vitest run --exclude src/payload/migration-tests/** --maxWorkers=2",
+    "test:ci:migrations": "vitest run src/payload/migration-tests --maxWorkers=1 --fileParallelism=false",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "payload": "payload",
