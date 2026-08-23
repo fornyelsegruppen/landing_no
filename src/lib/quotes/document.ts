@@ -1,0 +1,176 @@
+import { createHash, createHmac } from "node:crypto";
+import { z } from "zod";
+import { siteConfig } from "@/lib/site";
+
+function stable(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+export function documentHash(value: unknown) {
+  return createHash("sha256").update(stable(value)).digest("hex");
+}
+
+const integer = z.number().int().nonnegative().safe();
+export const quoteSnapshotSchema = z.object({
+  schemaVersion: z.literal("quote-v1"),
+  quoteReference: z.string(),
+  leadId: z.number().int().positive(),
+  serviceKey: z.string(),
+  serviceDescription: z.string(),
+  propertyAddress: z.string(),
+  measurement: z.object({
+    id: z.number().int().positive(), version: z.number().int().positive(), inputHash: z.string().length(64),
+    horizontalAreaTenths: integer, actualAreaMinTenths: integer, actualAreaMaxTenths: integer,
+    source: z.string(), credits: z.string(), capturedAt: z.string(), assumptions: z.array(z.string()),
+  }),
+  pricing: z.object({
+    calculationId: z.number().int().positive(), inputHash: z.string().length(64), ruleId: z.number().int().positive(), ruleVersion: z.number().int().positive(),
+    unitPriceExVatOre: integer, subtotalExVatOre: integer, vatBasisPoints: integer, vatOre: integer,
+    totalIncVatOre: integer, toleranceBasisPoints: integer, maximumTotalIncVatOre: integer.nullable(),
+  }),
+  termsVersion: z.string(),
+  validUntil: z.string(),
+});
+
+export type QuoteSnapshot = z.infer<typeof quoteSnapshotSchema>;
+
+export function buildQuoteSnapshot(input: Omit<QuoteSnapshot, "schemaVersion">): QuoteSnapshot {
+  const snapshot = quoteSnapshotSchema.parse({ schemaVersion: "quote-v1", ...input });
+  if (new Date(snapshot.validUntil).getTime() <= Date.now()) throw new TypeError("Quote validity must be in the future");
+  if (snapshot.measurement.actualAreaMinTenths > snapshot.measurement.actualAreaMaxTenths) throw new TypeError("Minimum area cannot exceed maximum area");
+  return snapshot;
+}
+
+export function quoteDisplayModel(snapshotInput: unknown) {
+  const snapshot = quoteSnapshotSchema.parse(snapshotInput);
+  return {
+    reference: snapshot.quoteReference,
+    service: snapshot.serviceDescription,
+    address: snapshot.propertyAddress,
+    estimatedAreaMin: snapshot.measurement.actualAreaMinTenths / 10,
+    estimatedAreaMax: snapshot.measurement.actualAreaMaxTenths / 10,
+    unitPriceExVatNok: snapshot.pricing.unitPriceExVatOre / 100,
+    subtotalExVatNok: snapshot.pricing.subtotalExVatOre / 100,
+    vatPercent: snapshot.pricing.vatBasisPoints / 100,
+    vatNok: snapshot.pricing.vatOre / 100,
+    totalIncVatNok: snapshot.pricing.totalIncVatOre / 100,
+    tolerancePercent: snapshot.pricing.toleranceBasisPoints / 100,
+    maximumTotalIncVatNok: snapshot.pricing.maximumTotalIncVatOre == null ? null : snapshot.pricing.maximumTotalIncVatOre / 100,
+    assumptions: snapshot.measurement.assumptions,
+    source: snapshot.measurement.source,
+    credits: snapshot.measurement.credits,
+    validUntil: snapshot.validUntil,
+    termsVersion: snapshot.termsVersion,
+  };
+}
+
+export type ContractSnapshot = {
+  schemaVersion: "contract-v1";
+  contractReference: string;
+  quoteHash: string;
+  quote: QuoteSnapshot;
+  supplier: { name: string; orgNumber: string; address: string; email: string; phone: string };
+  customer: { name: string; address: string; email?: string | null; phone?: string | null };
+  terms: { version: string; text: string; withdrawalInstructions: string; withdrawalFormUrl: string };
+};
+
+export function buildContractSnapshot(input: {
+  contractReference: string;
+  quote: QuoteSnapshot;
+  customer: ContractSnapshot["customer"];
+  terms: ContractSnapshot["terms"];
+}): ContractSnapshot {
+  if (!input.terms.text.trim() || !input.terms.withdrawalInstructions.trim() || !input.terms.withdrawalFormUrl.trim()) {
+    throw new TypeError("Approved contract and withdrawal terms are required");
+  }
+  return {
+    schemaVersion: "contract-v1",
+    contractReference: input.contractReference,
+    quoteHash: documentHash(input.quote),
+    quote: quoteSnapshotSchema.parse(input.quote),
+    supplier: {
+      name: siteConfig.parentOrg,
+      orgNumber: siteConfig.orgNr,
+      address: `${siteConfig.address.street}, ${siteConfig.address.postal} ${siteConfig.address.city}`,
+      email: siteConfig.email,
+      phone: siteConfig.phone,
+    },
+    customer: input.customer,
+    terms: input.terms,
+  };
+}
+
+export type SignatureEvidenceRecord = {
+  documentHash: string;
+  signatureHash: string;
+  signerName: string;
+  signedAt: string;
+  method: "drawn-and-typed";
+  paymentObligationAccepted: true;
+  termsAccepted: true;
+  withdrawalInformationReceived: true;
+  earlyStartRequested: boolean;
+  earlyStartLossAcknowledged: boolean;
+  ipEvidenceHash: string;
+  userAgentEvidenceHash: string;
+};
+
+function validatedPngSignature(dataUrl: string) {
+  const prefix = "data:image/png;base64,";
+  if (!dataUrl.startsWith(prefix) || dataUrl.length > 1_500_000) {
+    throw new TypeError("Signature drawing is invalid");
+  }
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(dataUrl.slice(prefix.length), "base64");
+  } catch {
+    throw new TypeError("Signature drawing is invalid");
+  }
+  const pngMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (bytes.length < 64 || !bytes.subarray(0, pngMagic.length).equals(pngMagic)) {
+    throw new TypeError("Signature drawing is invalid");
+  }
+  return bytes;
+}
+
+export function createSignatureEvidence(input: {
+  contract: ContractSnapshot;
+  expectedDocumentHash: string;
+  signatureData: string;
+  signerName: string;
+  paymentObligationAccepted: boolean;
+  termsAccepted: boolean;
+  withdrawalInformationReceived: boolean;
+  earlyStartRequested: boolean;
+  earlyStartLossAcknowledged: boolean;
+  ipAddress: string;
+  userAgent: string;
+  securitySalt: string;
+  now?: Date;
+}): SignatureEvidenceRecord {
+  const actualHash = documentHash(input.contract);
+  if (actualHash !== input.expectedDocumentHash) throw new Error("Contract document has changed");
+  if (!input.paymentObligationAccepted || !input.termsAccepted || !input.withdrawalInformationReceived) throw new Error("Required contract consents are missing");
+  if (input.earlyStartRequested && !input.earlyStartLossAcknowledged) throw new Error("Early start acknowledgement is required");
+  const signerName = input.signerName.trim();
+  if (signerName.length < 3 || signerName.length > 160) throw new TypeError("Signer name is invalid");
+  validatedPngSignature(input.signatureData);
+  if (input.securitySalt.length < 32) throw new TypeError("Signature evidence secret is too short");
+  const hmac = (value: string) => createHmac("sha256", input.securitySalt).update(value).digest("hex");
+  return {
+    documentHash: actualHash,
+    signatureHash: createHash("sha256").update(input.signatureData).digest("hex"),
+    signerName,
+    signedAt: (input.now ?? new Date()).toISOString(),
+    method: "drawn-and-typed",
+    paymentObligationAccepted: true,
+    termsAccepted: true,
+    withdrawalInformationReceived: true,
+    earlyStartRequested: input.earlyStartRequested,
+    earlyStartLossAcknowledged: input.earlyStartLossAcknowledged,
+    ipEvidenceHash: hmac(input.ipAddress || "unknown"),
+    userAgentEvidenceHash: hmac(input.userAgent || "unknown"),
+  };
+}

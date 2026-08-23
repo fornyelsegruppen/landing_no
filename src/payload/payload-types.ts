@@ -81,6 +81,9 @@ export interface Config {
     'roof-measurements': RoofMeasurement;
     'price-rules': PriceRule;
     'price-calculations': PriceCalculation;
+    quotes: Quote;
+    contracts: Contract;
+    'contract-terms': ContractTerm;
     'work-orders': WorkOrder;
     'seo-topics': SeoTopic;
     'seo-runs': SeoRun;
@@ -109,6 +112,9 @@ export interface Config {
     'roof-measurements': RoofMeasurementsSelect<false> | RoofMeasurementsSelect<true>;
     'price-rules': PriceRulesSelect<false> | PriceRulesSelect<true>;
     'price-calculations': PriceCalculationsSelect<false> | PriceCalculationsSelect<true>;
+    quotes: QuotesSelect<false> | QuotesSelect<true>;
+    contracts: ContractsSelect<false> | ContractsSelect<true>;
+    'contract-terms': ContractTermsSelect<false> | ContractTermsSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
     'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
@@ -697,11 +703,23 @@ export interface Message {
   id: number;
   lead?: (number | null) | Lead;
   direction: 'outbound' | 'inbound';
-  category: 'receipt' | 'ai_reply' | 'information_request' | 'follow_up' | 'quote' | 'contract' | 'reminder';
+  category:
+    | 'receipt'
+    | 'ai_reply'
+    | 'information_request'
+    | 'follow_up'
+    | 'quote'
+    | 'contract'
+    | 'customer_question'
+    | 'reminder';
   channel: 'email' | 'sms';
   subject: string;
   bodyText: string;
   bodyHtml?: string | null;
+  /**
+   * Private, varige dokumenter lagt ved av kontrollert arbeidsflyt.
+   */
+  attachments?: (number | PrivateMedia)[] | null;
   status: 'draft' | 'approved' | 'queued' | 'sent' | 'delivered' | 'failed' | 'attention' | 'cancelled';
   idempotencyKey: string;
   aiAssisted?: boolean | null;
@@ -730,6 +748,33 @@ export interface Message {
   failureMessage?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * Customer, contract and work files. Access must always be authorized server-side.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "private-media".
+ */
+export interface PrivateMedia {
+  id: number;
+  classification: 'customer' | 'measurement' | 'contract' | 'work';
+  ownerType?: string | null;
+  ownerId?: string | null;
+  /**
+   * Required when the file is an image shown in UI.
+   */
+  alt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * Versjonerte takmålinger. AI kan foreslå; geometri og pris beregnes av kode og må godkjennes av administrator.
@@ -810,33 +855,6 @@ export interface RoofMeasurement {
   createdAt: string;
 }
 /**
- * Customer, contract and work files. Access must always be authorized server-side.
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "private-media".
- */
-export interface PrivateMedia {
-  id: number;
-  classification: 'customer' | 'measurement' | 'contract' | 'work';
-  ownerType?: string | null;
-  ownerId?: string | null;
-  /**
-   * Required when the file is an image shown in UI.
-   */
-  alt?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-}
-/**
  * Kun godkjente, versjonerte regler kan brukes. Markedsføringspriser er ikke automatisk bindende prisregler.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -907,6 +925,103 @@ export interface PriceCalculation {
     | number
     | boolean
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Versjonerte kundetilbud låst til godkjent måling og prisberegning.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "quotes".
+ */
+export interface Quote {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  measurement: number | RoofMeasurement;
+  priceCalculation: number | PriceCalculation;
+  version: number;
+  supersedes?: (number | null) | Quote;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  snapshotHash: string;
+  serviceDescription: string;
+  totalIncVatOre: number;
+  maximumTotalIncVatOre?: number | null;
+  termsVersion: string;
+  validUntil: string;
+  status: 'draft' | 'approved' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired' | 'revoked' | 'superseded';
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
+  sentAt?: string | null;
+  viewedAt?: string | null;
+  acceptedAt?: string | null;
+  declinedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Låste kontraktsdokumenter med hash, samtykker og signaturbevis.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contracts".
+ */
+export interface Contract {
+  id: number;
+  reference: string;
+  quote: number | Quote;
+  version: number;
+  supersedes?: (number | null) | Contract;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  documentHash: string;
+  termsVersion: string;
+  status: 'draft' | 'issued' | 'signed' | 'declined' | 'revoked' | 'superseded';
+  signatureEvidence?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  signedDocument?: (number | null) | PrivateMedia;
+  signedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Versjonerte vilkår. Produksjonsgodkjenning krever dokumentert juridisk referanse.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contract-terms".
+ */
+export interface ContractTerm {
+  id: number;
+  version: string;
+  title: string;
+  contractText: string;
+  withdrawalInstructions: string;
+  withdrawalFormUrl: string;
+  status: 'draft' | 'approved' | 'retired';
+  legalReviewReference?: string | null;
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1125,6 +1240,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'price-calculations';
         value: number | PriceCalculation;
+      } | null)
+    | ({
+        relationTo: 'quotes';
+        value: number | Quote;
+      } | null)
+    | ({
+        relationTo: 'contracts';
+        value: number | Contract;
+      } | null)
+    | ({
+        relationTo: 'contract-terms';
+        value: number | ContractTerm;
       } | null)
     | ({
         relationTo: 'work-orders';
@@ -1526,6 +1653,7 @@ export interface MessagesSelect<T extends boolean = true> {
   subject?: T;
   bodyText?: T;
   bodyHtml?: T;
+  attachments?: T;
   status?: T;
   idempotencyKey?: T;
   aiAssisted?: T;
@@ -1621,6 +1749,70 @@ export interface PriceCalculationsSelect<T extends boolean = true> {
   maximumTotalIncVatOre?: T;
   status?: T;
   blockingReasons?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "quotes_select".
+ */
+export interface QuotesSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  measurement?: T;
+  priceCalculation?: T;
+  version?: T;
+  supersedes?: T;
+  snapshot?: T;
+  snapshotHash?: T;
+  serviceDescription?: T;
+  totalIncVatOre?: T;
+  maximumTotalIncVatOre?: T;
+  termsVersion?: T;
+  validUntil?: T;
+  status?: T;
+  approvedBy?: T;
+  approvedAt?: T;
+  sentAt?: T;
+  viewedAt?: T;
+  acceptedAt?: T;
+  declinedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contracts_select".
+ */
+export interface ContractsSelect<T extends boolean = true> {
+  reference?: T;
+  quote?: T;
+  version?: T;
+  supersedes?: T;
+  snapshot?: T;
+  documentHash?: T;
+  termsVersion?: T;
+  status?: T;
+  signatureEvidence?: T;
+  signedDocument?: T;
+  signedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contract-terms_select".
+ */
+export interface ContractTermsSelect<T extends boolean = true> {
+  version?: T;
+  title?: T;
+  contractText?: T;
+  withdrawalInstructions?: T;
+  withdrawalFormUrl?: T;
+  status?: T;
+  legalReviewReference?: T;
+  approvedBy?: T;
+  approvedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

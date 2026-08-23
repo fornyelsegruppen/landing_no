@@ -43,6 +43,7 @@ export const Messages: CollectionConfig = {
         { label: "Manuell oppfølging", value: "follow_up" },
         { label: "Tilbud", value: "quote" },
         { label: "Kontrakt", value: "contract" },
+        { label: "Kundespørsmål", value: "customer_question" },
         { label: "Påminnelse", value: "reminder" },
       ],
     },
@@ -58,6 +59,7 @@ export const Messages: CollectionConfig = {
     { name: "subject", type: "text", required: true },
     { name: "bodyText", type: "textarea", required: true, admin: { rows: 12 } },
     { name: "bodyHtml", type: "textarea", admin: { rows: 12 } },
+    { name: "attachments", type: "relationship", relationTo: "private-media", hasMany: true, access: systemManaged, admin: { readOnly: true, description: "Private, varige dokumenter lagt ved av kontrollert arbeidsflyt." } },
     {
       name: "status",
       type: "select",

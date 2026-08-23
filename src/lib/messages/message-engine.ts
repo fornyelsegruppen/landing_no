@@ -4,6 +4,7 @@ import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { sanitizeJobError } from "@/lib/jobs/job-policy";
 import { generateLeadReplyDraft } from "@/lib/leads/lead-ai";
 import { assertMessageCanDeliver } from "./message-policy";
+import { readPrivateMediaContent } from "@/lib/private-media-content";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -193,6 +194,14 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
   if (!lead.email) throw new TypeError("Lead has no email address");
   try {
+    const attachments = [];
+    for (const relation of message.attachments ?? []) {
+      const mediaId = relationId(relation);
+      if (!mediaId) continue;
+      const media = await payload.findByID({ collection: "private-media", id: mediaId, depth: 0, overrideAccess: true });
+      const content = await readPrivateMediaContent(media);
+      attachments.push({ filename: content.filename, contentType: content.contentType, contentBase64: content.data.toString("base64") });
+    }
     const result = await provider.send({
       template: message.category,
       to: lead.email,
@@ -202,6 +211,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       replyTo: process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
       idempotencyKey: message.idempotencyKey,
       correlationId,
+      ...(attachments.length ? { attachments } : {}),
     });
     const updated = await payload.update({
       collection: "messages",
@@ -217,8 +227,14 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       },
     });
     const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
-      ? message.aiAnalysis as { recommendedNextAction?: string }
+      ? message.aiAnalysis as { recommendedNextAction?: string; quoteId?: number }
       : {};
+    if (message.category === "quote" && typeof analysis.quoteId === "number") {
+      const quote = await payload.findByID({ collection: "quotes", id: analysis.quoteId, depth: 0, overrideAccess: true });
+      if (quote.status === "approved") {
+        await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
+      }
+    }
     const followUp = message.category === "receipt"
       ? {}
       : message.category === "information_request" || analysis.recommendedNextAction === "request_information"

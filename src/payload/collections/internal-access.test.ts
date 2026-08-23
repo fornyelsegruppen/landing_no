@@ -39,11 +39,25 @@ describe("internal collection access", () => {
 
   it("removes lead messages before privacy deletion of the lead", async () => {
     const remove = vi.fn().mockResolvedValue({ docs: [] });
-    await deleteLeadMessagesBeforeLead({ id: 7, req: { payload: { delete: remove } } } as never);
+    const find = vi.fn().mockResolvedValue({ docs: [] });
+    const update = vi.fn().mockResolvedValue({ docs: [] });
+    await deleteLeadMessagesBeforeLead({ id: 7, req: { payload: { delete: remove, find, update } } } as never);
     expect(remove).toHaveBeenCalledWith(expect.objectContaining({
       collection: "messages",
       overrideAccess: true,
       where: { lead: { equals: 7 } },
     }));
+  });
+
+  it("blocks privacy deletion when the lead has a signed contract", async () => {
+    const find = vi.fn()
+      .mockResolvedValueOnce({ docs: [{ id: 11 }] })
+      .mockResolvedValueOnce({ docs: [{ id: 12, status: "signed" }] });
+    const remove = vi.fn();
+    await expect(deleteLeadMessagesBeforeLead({
+      id: 7,
+      req: { payload: { delete: remove, find, update: vi.fn() } },
+    } as never)).rejects.toThrow(/signed contract/);
+    expect(remove).not.toHaveBeenCalled();
   });
 });

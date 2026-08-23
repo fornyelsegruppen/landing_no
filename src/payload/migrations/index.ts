@@ -16,6 +16,8 @@ import * as migration_20260823_160853_phase4_ai_content_engine from './20260823_
 import * as migration_20260823_163755_phase5_lead_inbox_messages from './20260823_163755_phase5_lead_inbox_messages';
 import * as migration_20260823_171411_phase6_measurement_pricing from './20260823_171411_phase6_measurement_pricing';
 import * as migration_20260823_172422_phase6_measurement_license_evidence from './20260823_172422_phase6_measurement_license_evidence';
+import * as migration_20260823_173944_phase7_quotes_contracts from './20260823_173944_phase7_quotes_contracts';
+import * as migration_20260823_175110_phase7_message_attachments from './20260823_175110_phase7_message_attachments';
 
 export const migrations = [
   {
@@ -106,6 +108,16 @@ export const migrations = [
   {
     up: migration_20260823_172422_phase6_measurement_license_evidence.up,
     down: migration_20260823_172422_phase6_measurement_license_evidence.down,
-    name: '20260823_172422_phase6_measurement_license_evidence'
+    name: '20260823_172422_phase6_measurement_license_evidence',
+  },
+  {
+    up: migration_20260823_173944_phase7_quotes_contracts.up,
+    down: migration_20260823_173944_phase7_quotes_contracts.down,
+    name: '20260823_173944_phase7_quotes_contracts',
+  },
+  {
+    up: migration_20260823_175110_phase7_message_attachments.up,
+    down: migration_20260823_175110_phase7_message_attachments.down,
+    name: '20260823_175110_phase7_message_attachments'
   },
 ];

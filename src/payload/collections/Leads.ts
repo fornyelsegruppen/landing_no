@@ -6,6 +6,16 @@ const adminManagedField = {
 };
 
 export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ id, req }) => {
+  const quotes = await req.payload.find({ collection: "quotes", depth: 0, limit: 100, overrideAccess: true, req, where: { lead: { equals: id } } });
+  for (const quote of quotes.docs) {
+    const contracts = await req.payload.find({ collection: "contracts", depth: 0, limit: 100, overrideAccess: true, req, where: { quote: { equals: quote.id } } });
+    if (contracts.docs.some((contract) => contract.status === "signed")) {
+      throw new Error("A lead with a signed contract must be archived according to the retention policy, not deleted.");
+    }
+    for (const contract of contracts.docs) await req.payload.delete({ collection: "contracts", id: contract.id, overrideAccess: true, req });
+    await req.payload.update({ collection: "access-tokens", overrideAccess: true, req, where: { and: [{ subjectType: { equals: "quote" } }, { subjectId: { equals: String(quote.id) } }] }, data: { revokedAt: new Date().toISOString() } });
+    await req.payload.delete({ collection: "quotes", id: quote.id, overrideAccess: true, req });
+  }
   await req.payload.delete({
     collection: "price-calculations",
     overrideAccess: true,

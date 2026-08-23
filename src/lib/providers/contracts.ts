@@ -38,6 +38,11 @@ export type EmailMessage = {
   replyTo?: string;
   idempotencyKey: string;
   correlationId: string;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    contentBase64: string;
+  }>;
 };
 
 export type DeliveryResult = {

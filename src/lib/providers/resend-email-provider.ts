@@ -25,6 +25,11 @@ export class ResendEmailProvider implements EmailProvider {
         text: message.text,
         ...(message.html ? { html: message.html } : {}),
         ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+        ...(message.attachments?.length ? { attachments: message.attachments.map((attachment) => ({
+          filename: attachment.filename,
+          content: attachment.contentBase64,
+          contentType: attachment.contentType,
+        })) } : {}),
       },
       { idempotencyKey: message.idempotencyKey },
     );

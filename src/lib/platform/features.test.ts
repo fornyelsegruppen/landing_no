@@ -67,4 +67,21 @@ describe("platform feature configuration", () => {
       new FeatureUnavailableError("aiDrafts", "disabled"),
     );
   });
+
+  it("keeps quote viewing separate from the stronger signing gate", () => {
+    const quoteEnvironment = {
+      FEATURE_CUSTOMER_QUOTES: "true",
+      RESEND_API_KEY: "configured",
+      LEGAL_REVIEW_REFERENCE: "lawyer-review-2026-08",
+    };
+    expect(() => assertFeatureReady("customerQuotes", quoteEnvironment)).not.toThrow();
+    expect(featureReadiness("contractSigning", {
+      ...quoteEnvironment,
+      FEATURE_CONTRACT_SIGNING: "true",
+    })).toMatchObject({
+      enabled: true,
+      ready: false,
+      unavailable: ["signature"],
+    });
+  });
 });

@@ -27,6 +27,9 @@ import { Messages } from "./payload/collections/Messages";
 import { RoofMeasurements } from "./payload/collections/RoofMeasurements";
 import { PriceRules } from "./payload/collections/PriceRules";
 import { PriceCalculations } from "./payload/collections/PriceCalculations";
+import { Quotes } from "./payload/collections/Quotes";
+import { Contracts } from "./payload/collections/Contracts";
+import { ContractTerms } from "./payload/collections/ContractTerms";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -131,6 +134,9 @@ export default buildConfig({
     RoofMeasurements,
     PriceRules,
     PriceCalculations,
+    Quotes,
+    Contracts,
+    ContractTerms,
     WorkOrders,
     SeoTopics,
     SeoRuns,

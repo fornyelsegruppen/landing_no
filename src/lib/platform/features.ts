@@ -38,7 +38,7 @@ export function readFeatureFlags(
 }
 
 export type IntegrationName =
-  "ai" | "email" | "sms" | "maps" | "imagery" | "signature" | "searchData" | "jobs";
+  "ai" | "email" | "sms" | "maps" | "imagery" | "signature" | "legal" | "searchData" | "jobs";
 
 export type IntegrationReadiness =
   "ready" | "configuration_required" | "disabled";
@@ -119,6 +119,12 @@ export function readIntegrationStatus(
         ? []
         : ["CUSTOMER_TOKEN_SECRET or PAYLOAD_SECRET"],
     },
+    legal: {
+      name: "legal",
+      readiness: configured(environment, "LEGAL_REVIEW_REFERENCE") ? "ready" : "configuration_required",
+      provider: "approved-contract-terms",
+      missing: configured(environment, "LEGAL_REVIEW_REFERENCE") ? [] : ["LEGAL_REVIEW_REFERENCE"],
+    },
     searchData: {
       name: "searchData",
       readiness: searchReady ? "ready" : "configuration_required",
@@ -139,8 +145,8 @@ export function readIntegrationStatus(
 const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   aiDrafts: ["ai"],
   roofMeasurement: ["maps", "imagery"],
-  customerQuotes: ["email", "signature"],
-  contractSigning: ["signature", "email"],
+  customerQuotes: ["email", "legal"],
+  contractSigning: ["signature", "email", "legal"],
   workerPortal: [],
   automatedReminders: ["email", "jobs"],
   seoScheduler: ["ai", "jobs"],

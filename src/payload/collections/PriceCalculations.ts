@@ -26,5 +26,6 @@ export const PriceCalculations: CollectionConfig = {
       { label: "Utkast", value: "draft" }, { label: "Klar for tilbud", value: "ready" }, { label: "Blokkert", value: "blocked" }, { label: "Erstattet", value: "superseded" },
     ] },
     { name: "blockingReasons", type: "json" },
+    { name: "quoteDraftAction", type: "ui", admin: { components: { Field: "/components/QuoteDraftAction" } } },
   ],
 };
