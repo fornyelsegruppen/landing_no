@@ -1,7 +1,7 @@
 # Fullføringsaudit mot Definition of Done
 
-Dato: 23. august 2026  
-Commit: `dc232fa`  
+Dato: 24. august 2026  
+Teknisk gate-commit: `3b852b3`  
 PR: `darbasnorvegija4-eng/landing_no#52`
 
 Denne kontrollen bruker kapittel 4 i `full-platform-implementation-master-plan.md` som fasit. `Implementert` betyr at kode og målrettet automatisk test finnes. Det betyr ikke at ekstern staging eller produksjon er godkjent.
@@ -24,9 +24,9 @@ Denne kontrollen bruker kapittel 4 i `full-platform-implementation-master-plan.m
 | Avvik over ramme blokkerer og krever skriftlig endring | endringsavtale engine/workflow/document-tester | Bevist automatisk | Kundeaksept i staging og juridisk kontroll |
 | Påminnelser/ferdigmelding er idempotente og feil synlige | communications-, jobs-, idempotency- og message-engine-tester | Bevist automatisk | Ekte Resend/testtidssone og leveringsfeil i staging |
 | Tilgang, personvern, audit, backup og restore er testet | tilgang/token/media/audit-tester og driftsrunbooks | Delvis | Reell backup, Blob-inventar og isolert restore mangler |
-| Migrasjoner kjøres mot produksjonslik kopi | 11 migrasjonstester med PGlite, `up`/`down` bestått | Delvis | Anonymisert snapshot i separat PostgreSQL staging mangler |
+| Migrasjoner kjøres mot produksjonslik kopi | 12 migrasjonsfiler / 24 PGlite-tester, samt tom PostgreSQL 16-bootstrap, 23 baselineregistreringer og produksjonsbuild i [GitHub gate 32669148448](https://github.com/fornyelsegruppen/landing_no/actions/runs/32669148448) | Delvis | Anonymisert produksjonslik snapshot og isolert restore mangler |
 | Stagingpilot er godkjent før produksjon | release-gate og staging-runbook | Ikke oppfylt | Preview DB/secrets, manuell QA, 20–30 leads og eiergodkjenning |
-| Tester, lint, typecheck, build og E2E består | 92 filer/253 tester, lint/typecheck/build bestått | Delvis | Autentisert browser-E2E på staging mangler |
+| Tester, lint, typecheck, build og E2E består | [GitHub gate 32669148448](https://github.com/fornyelsegruppen/landing_no/actions/runs/32669148448): 95 filer/259 tester, audit, lint, typecheck, PostgreSQL-build og 7/7 offentlig Chromium-E2E bestått | Delvis | Autentisert admin/worker/kundelenke-E2E på separat staging mangler |
 
 ## Konklusjon
 

@@ -1,6 +1,6 @@
 # Fase 11 – stagingpilot og produksjonsgate
 
-Dato: 23. august 2026  
+Dato: 24. august 2026  
 Gren: `codex/master-platform-implementation`  
 Produksjon: ikke endret
 
@@ -25,14 +25,30 @@ Kodebasen er teknisk klargjort for intern staging og kontrollert feature-for-fea
 |---|---|
 | Anonymisert full plattformreise | 1 test bestått |
 | Release-gate, feature readiness og sikker helsestatus | 3 filer, 11 tester bestått |
-| Alle ikke-migrasjonstester | 81 filer, 231 tester bestått i minnesikre grupper |
-| Alle migrasjonstester | 11 filer, 22 tester bestått enkeltvis |
-| Samlet testomfang | 92 filer, 253 tester bestått |
+| Alle ikke-migrasjonstester | 83 filer, 235 tester bestått |
+| Alle migrasjonstester | 12 filer, 24 tester bestått enkeltvis |
+| Samlet testomfang | 95 filer, 259 tester bestått |
 | TypeScript | Bestått |
 | ESLint | Bestått uten feil/advarsler |
 | Produksjonsbuild | Bestått; 59 statiske sider og alle dynamiske ruter kompilert |
 | Standardtilstand | 7 av 7 risikofunksjoner avslått |
 | Hemmelighetsvern | Gate-output inneholder bare nøkkelnavn, aldri verdier |
+
+## GitHub-kvalitetsgate
+
+[Quality gate 32669148448](https://github.com/fornyelsegruppen/landing_no/actions/runs/32669148448) er grønn mot commit `3b852b3`:
+
+- Ubuntu og Node 22;
+- ekte PostgreSQL 16-container med eksplisitt `sslmode=disable` kun for lokal CI;
+- produksjonsavhengighetsaudit på high-nivå, ESLint og TypeScript bestått;
+- 83 filer / 235 enhets- og API-tester bestått;
+- 12 filer / 24 migrasjons- og rollbacktester bestått;
+- en helt tom PostgreSQL-database ble sikkerhetskontrollert, bygget til gjeldende schema og registrert med 23 baselinemigrasjoner;
+- deterministisk offentlig testinnhold ble seedet uten produksjonsdata;
+- produksjonsbuild med 59 statiske sider bestått;
+- 7 av 7 Chromium-smoketester mot det ferdige produksjonsbygget bestått.
+
+Dette beviser den tekniske tom-databasebanen. Det erstatter ikke restore fra en anonymisert produksjonslik kopi eller autentisert manuell staging-QA.
 
 ## Ekstern staginggate – ikke utført
 
