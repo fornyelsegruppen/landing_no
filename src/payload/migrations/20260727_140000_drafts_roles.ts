@@ -207,20 +207,41 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 
         SELECT
           string_agg(
-            format('%I', 'version_' || attribute.attname),
-            ', ' ORDER BY attribute.attnum
+            format('%I', 'version_' || source_attribute.attname),
+            ', ' ORDER BY source_attribute.attnum
           ),
           string_agg(
-            format('source.%I', attribute.attname),
-            ', ' ORDER BY attribute.attnum
+            CASE
+              WHEN source_attribute.atttypid <> target_attribute.atttypid
+                AND source_type.typtype = 'e'
+                AND target_type.typtype = 'e'
+              THEN format(
+                'source.%I::text::%s',
+                source_attribute.attname,
+                format_type(target_attribute.atttypid, target_attribute.atttypmod)
+              )
+              ELSE format('source.%I', source_attribute.attname)
+            END,
+            ', ' ORDER BY source_attribute.attnum
           )
         INTO target_columns, source_columns
-        FROM pg_attribute AS attribute
-        WHERE attribute.attrelid =
+        FROM pg_attribute AS source_attribute
+        INNER JOIN pg_attribute AS target_attribute
+          ON target_attribute.attrelid =
+              to_regclass(format('public.%I', version_table.target_name))
+          AND target_attribute.attname =
+              'version_' || source_attribute.attname
+          AND target_attribute.attnum > 0
+          AND NOT target_attribute.attisdropped
+        INNER JOIN pg_type AS source_type
+          ON source_type.oid = source_attribute.atttypid
+        INNER JOIN pg_type AS target_type
+          ON target_type.oid = target_attribute.atttypid
+        WHERE source_attribute.attrelid =
             to_regclass(format('public.%I', version_table.source_name))
-          AND attribute.attname <> 'id'
-          AND attribute.attnum > 0
-          AND NOT attribute.attisdropped;
+          AND source_attribute.attname <> 'id'
+          AND source_attribute.attnum > 0
+          AND NOT source_attribute.attisdropped;
 
         IF version_table.has_parent THEN
           EXECUTE format(
