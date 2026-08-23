@@ -9,6 +9,7 @@ import {
 export const Pages: CollectionConfig = {
   slug: "pages",
   admin: {
+    group: "Blogg",
     useAsTitle: "titleNo",
     defaultColumns: ["titleNo", "slug", "_status", "updatedAt"],
   },

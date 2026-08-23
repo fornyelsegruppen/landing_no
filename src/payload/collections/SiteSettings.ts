@@ -6,6 +6,7 @@ export const SiteSettings: GlobalConfig = {
   slug: "site-settings",
   label: "Site Settings",
   admin: {
+    group: "Innstillinger",
     description:
       "Edit website contact info, images, prices, and all page texts (NO/EN). Upload photos in Media first, then select them under Images.",
   },

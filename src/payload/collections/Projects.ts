@@ -8,6 +8,7 @@ import {
 export const Projects: CollectionConfig = {
   slug: "projects",
   admin: {
+    group: "Innstillinger",
     useAsTitle: "titleNo",
     defaultColumns: ["titleNo", "order", "updatedAt"],
   },

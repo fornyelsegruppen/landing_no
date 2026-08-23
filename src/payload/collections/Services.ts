@@ -8,6 +8,7 @@ import {
 export const Services: CollectionConfig = {
   slug: "services",
   admin: {
+    group: "Innstillinger",
     useAsTitle: "titleNo",
     defaultColumns: ["titleNo", "featured", "order"],
   },

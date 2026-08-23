@@ -3,6 +3,7 @@ import { draftMode } from "next/headers";
 import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
+import { userIsAdmin } from "@/payload/access/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ async function isAuthorized(
 
   const payload = await getPayload();
   const { user } = await payload.auth({ headers: request.headers });
-  return Boolean(user);
+  return userIsAdmin(user);
 }
 
 export async function GET(request: Request) {

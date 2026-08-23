@@ -6,7 +6,7 @@ export const AccessTokens: CollectionConfig = {
   defaultSort: "-createdAt",
   labels: { singular: "Access token", plural: "Access tokens" },
   admin: {
-    group: "System",
+    group: "Innstillinger",
     useAsTitle: "purpose",
     defaultColumns: [
       "purpose",

@@ -7,7 +7,9 @@ const adminManagedField = {
 
 export const Leads: CollectionConfig = {
   slug: "leads",
+  labels: { singular: "Henvendelse", plural: "Henvendelser" },
   admin: {
+    group: "Henvendelser",
     useAsTitle: "name",
     defaultColumns: [
       "name",

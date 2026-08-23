@@ -20,6 +20,7 @@ import { AuditEvents } from "./payload/collections/AuditEvents";
 import { OperationalJobs } from "./payload/collections/OperationalJobs";
 import { AccessTokens } from "./payload/collections/AccessTokens";
 import { PrivateMedia } from "./payload/collections/PrivateMedia";
+import { WorkOrders } from "./payload/collections/WorkOrders";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -90,6 +91,9 @@ export default buildConfig({
   cors: trustedOrigins,
   admin: {
     user: Users.slug,
+    components: {
+      beforeDashboard: ["/components/AdminDashboard"],
+    },
     importMap: {
       baseDir: path.resolve(dirname, "app/(payload)/admin"),
     },
@@ -117,6 +121,7 @@ export default buildConfig({
     Posts,
     Redirects,
     Leads,
+    WorkOrders,
     AuditEvents,
     OperationalJobs,
     AccessTokens,

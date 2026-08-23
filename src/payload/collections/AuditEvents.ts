@@ -6,7 +6,7 @@ export const AuditEvents: CollectionConfig = {
   defaultSort: "-createdAt",
   labels: { singular: "Audit event", plural: "Audit events" },
   admin: {
-    group: "System",
+    group: "Innstillinger",
     useAsTitle: "action",
     defaultColumns: [
       "action",

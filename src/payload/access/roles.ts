@@ -1,37 +1,42 @@
 import type { Access, FieldAccess, PayloadRequest } from "payload";
 
-export type UserRole = "admin" | "editor";
+export type UserRole = "admin" | "worker";
 
 type UserWithRole = {
-  role?: UserRole | null;
+  active?: boolean | null;
+  id?: string | number;
+  role?: string | null;
 };
 
 export function getUserRole(user: PayloadRequest["user"]): UserRole | null {
   if (!user) return null;
+  const role = (user as UserWithRole).role;
+  return role === "admin" || role === "worker" ? role : null;
+}
 
-  // Users created before roles were introduced are admins. The migration
-  // persists that default, while this fallback avoids a deployment lockout.
-  return (user as UserWithRole).role === "editor" ? "editor" : "admin";
+export function userIsActive(user: PayloadRequest["user"]): boolean {
+  return Boolean(user && (user as UserWithRole).active === true);
 }
 
 export function userIsAdmin(user: PayloadRequest["user"]): boolean {
-  return getUserRole(user) === "admin";
+  return userIsActive(user) && getUserRole(user) === "admin";
 }
 
-export function userCanEditContent(user: PayloadRequest["user"]): boolean {
-  const role = getUserRole(user);
-  return role === "admin" || role === "editor";
+export function userIsWorker(user: PayloadRequest["user"]): boolean {
+  return userIsActive(user) && getUserRole(user) === "worker";
 }
+
+export const userCanEditContent = userIsAdmin;
 
 export const adminOnly: Access = ({ req }) => userIsAdmin(req.user);
 
 export const adminsAndEditors: Access = ({ req }) =>
   userCanEditContent(req.user);
 
-export const authenticated: Access = ({ req }) => Boolean(req.user);
+export const authenticated: Access = ({ req }) => userIsActive(req.user);
 
 export const authenticatedOrPublished: Access = ({ req }) => {
-  if (req.user) return true;
+  if (userIsActive(req.user)) return true;
 
   return {
     _status: {
@@ -41,3 +46,14 @@ export const authenticatedOrPublished: Access = ({ req }) => {
 };
 
 export const adminOnlyField: FieldAccess = ({ req }) => userIsAdmin(req.user);
+
+export const assignedWorkerOrAdmin: Access = ({ req }) => {
+  if (userIsAdmin(req.user)) return true;
+  if (!userIsWorker(req.user)) return false;
+
+  return {
+    assignedWorker: {
+      equals: req.user?.id,
+    },
+  };
+};

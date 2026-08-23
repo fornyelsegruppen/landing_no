@@ -5,7 +5,7 @@ export const PrivateMedia: CollectionConfig = {
   slug: "private-media",
   labels: { singular: "Private file", plural: "Private files" },
   admin: {
-    group: "System",
+    group: "Innstillinger",
     useAsTitle: "filename",
     defaultColumns: ["filename", "classification", "createdAt"],
     description:

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const migrationPath = fileURLToPath(
-  new URL("./20260823_135227_phase1_platform_foundation.ts", import.meta.url),
+  new URL("../migrations/20260823_135227_phase1_platform_foundation.ts", import.meta.url),
 );
 const migration = readFileSync(migrationPath, "utf8");
 

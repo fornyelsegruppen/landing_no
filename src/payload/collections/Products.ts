@@ -8,6 +8,7 @@ import {
 export const Products: CollectionConfig = {
   slug: "products",
   admin: {
+    group: "Innstillinger",
     useAsTitle: "name",
   },
   access: {

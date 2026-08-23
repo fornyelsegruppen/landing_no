@@ -8,6 +8,7 @@ import {
 export const Faq: CollectionConfig = {
   slug: "faq",
   admin: {
+    group: "Innstillinger",
     useAsTitle: "questionNo",
   },
   access: {

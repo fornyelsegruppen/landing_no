@@ -6,6 +6,6 @@ export default createMiddleware(routing);
 export const config = {
   // Exclude Payload admin, API, lead gallery, Next internals and static files
   matcher: [
-    "/((?!admin|api|payload|media|henvendelse|_next|_vercel|.*\\..*).*)",
+    "/((?!admin|user|api|payload|media|henvendelse|_next|_vercel|.*\\..*).*)",
   ],
 };

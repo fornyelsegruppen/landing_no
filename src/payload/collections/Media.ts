@@ -4,6 +4,7 @@ import { adminOnly, adminsAndEditors } from "../access/roles";
 export const Media: CollectionConfig = {
   slug: "media",
   admin: {
+    group: "Blogg",
     useAsTitle: "alt",
     description:
       "Upload images here (stored on Vercel Blob). Then pick them in Site Settings or Project stages. Prefer WebP when possible; large JPEG/PNG are auto-converted when supported.",

@@ -19,6 +19,7 @@ function validateInternalPath(
 export const Redirects: CollectionConfig = {
   slug: "redirects",
   admin: {
+    group: "Innstillinger",
     useAsTitle: "fromPath",
     defaultColumns: ["fromPath", "toPath", "toUrl", "permanent"],
     description:

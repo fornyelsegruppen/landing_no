@@ -6,7 +6,7 @@ export const OperationalJobs: CollectionConfig = {
   defaultSort: "-createdAt",
   labels: { singular: "Operational job", plural: "Operational jobs" },
   admin: {
-    group: "System",
+    group: "Innstillinger",
     useAsTitle: "type",
     defaultColumns: [
       "type",

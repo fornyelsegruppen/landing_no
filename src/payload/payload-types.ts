@@ -77,6 +77,7 @@ export interface Config {
     posts: Post;
     redirects: Redirect;
     leads: Lead;
+    'work-orders': WorkOrder;
     'audit-events': AuditEvent;
     'operational-jobs': OperationalJob;
     'access-tokens': AccessToken;
@@ -98,6 +99,7 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
+    'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
     'operational-jobs': OperationalJobsSelect<false> | OperationalJobsSelect<true>;
     'access-tokens': AccessTokensSelect<false> | AccessTokensSelect<true>;
@@ -146,12 +148,23 @@ export interface UserAuthOperations {
   };
 }
 /**
+ * Opprett egne kontoer for ansatte. Deaktivering avslutter aktive sesjoner.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
   id: number;
-  role: 'admin' | 'editor';
+  /**
+   * Navnet som vises i arbeidsoversikten.
+   */
+  displayName?: string | null;
+  phone?: string | null;
+  role: 'admin' | 'worker';
+  /**
+   * Slå av for å stanse innlogging og tilbakekalle aktive sesjoner.
+   */
+  active: boolean;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -446,6 +459,23 @@ export interface Lead {
   createdAt: string;
 }
 /**
+ * Grunnskall for tildelte oppdrag. Arbeidsflyt og dokumentasjon utvides i arbeidsordrefasen.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "work-orders".
+ */
+export interface WorkOrder {
+  id: number;
+  reference: string;
+  lead?: (number | null) | Lead;
+  assignedWorker?: (number | null) | User;
+  scheduledAt?: string | null;
+  status: 'unassigned' | 'assigned' | 'scheduled';
+  workSummary?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Immutable operational audit trail. Sensitive values and raw customer data must not be stored here.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -656,6 +686,10 @@ export interface PayloadLockedDocument {
         value: number | Lead;
       } | null)
     | ({
+        relationTo: 'work-orders';
+        value: number | WorkOrder;
+      } | null)
+    | ({
         relationTo: 'audit-events';
         value: number | AuditEvent;
       } | null)
@@ -718,7 +752,10 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  displayName?: T;
+  phone?: T;
   role?: T;
+  active?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -947,6 +984,20 @@ export interface LeadsSelect<T extends boolean = true> {
   landingPage?: T;
   referrer?: T;
   marketingConsent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "work-orders_select".
+ */
+export interface WorkOrdersSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  assignedWorker?: T;
+  scheduledAt?: T;
+  status?: T;
+  workSummary?: T;
   updatedAt?: T;
   createdAt?: T;
 }

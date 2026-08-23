@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const source = readFileSync(
   fileURLToPath(
-    new URL("./20260823_135227_phase1_platform_foundation.ts", import.meta.url),
+    new URL("../migrations/20260823_135227_phase1_platform_foundation.ts", import.meta.url),
   ),
   "utf8",
 );
