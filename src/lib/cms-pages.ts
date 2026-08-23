@@ -9,16 +9,17 @@ import {
   redirectPathCandidates,
 } from "@/lib/content-paths";
 import type { Locale } from "@/lib/site";
+import { availablePostLocales as editorialAvailablePostLocales } from "@/lib/blog/editorial-policy";
 
 export type CmsContentDocument = {
   id: number | string;
   slug: string;
   titleNo: string;
-  titleEn: string;
+  titleEn?: string | null;
   excerptNo?: string | null;
   excerptEn?: string | null;
   contentNo: string;
-  contentEn: string;
+  contentEn?: string | null;
   seoTitleNo?: string | null;
   seoTitleEn?: string | null;
   seoDescriptionNo?: string | null;
@@ -41,6 +42,39 @@ export type CmsPostDocument = CmsContentDocument & {
           card?: { url?: string | null } | null;
         } | null;
       }
+    | null;
+  authorName?: string | null;
+  reviewerName?: string | null;
+  reviewedAt?: string | null;
+  ctaVariant?: "assessment" | "wash" | "renewal" | "new_roof" | null;
+  sources?:
+    | {
+        label: string;
+        url: string;
+        publisher?: string | null;
+        accessedAt?: string | null;
+      }[]
+    | null;
+  faqItems?:
+    | {
+        questionNo: string;
+        answerNo: string;
+        questionEn?: string | null;
+        answerEn?: string | null;
+      }[]
+    | null;
+  relatedPosts?: (number | string | CmsPostDocument)[] | null;
+  relatedServices?:
+    | (
+        | number
+        | string
+        | {
+            id: number | string;
+            key: string;
+            titleNo: string;
+            titleEn: string;
+          }
+      )[]
     | null;
 };
 
@@ -121,7 +155,7 @@ const findPostBySlug = cache(
     const payload = await getPayload();
     const result = await payload.find({
       collection: "posts",
-      depth: 1,
+      depth: 2,
       draft: includeDrafts,
       limit: 1,
       overrideAccess: true,
@@ -269,10 +303,10 @@ export function localizeContent(
   locale: Locale,
 ): LocalizedContent {
   const norwegian = locale === "no";
-  const title = norwegian ? document.titleNo : document.titleEn;
+  const title = (norwegian ? document.titleNo : document.titleEn)?.trim() || "";
   const excerpt =
     (norwegian ? document.excerptNo : document.excerptEn)?.trim() || "";
-  const content = norwegian ? document.contentNo : document.contentEn;
+  const content = (norwegian ? document.contentNo : document.contentEn) || "";
   const seoTitle =
     (norwegian ? document.seoTitleNo : document.seoTitleEn)?.trim() || title;
   const seoDescription =
@@ -284,6 +318,14 @@ export function localizeContent(
     content.replace(/\s+/g, " ").trim().slice(0, 160);
 
   return { title, excerpt, content, seoTitle, seoDescription };
+}
+
+export function availablePostLocales(post: CmsPostDocument): Locale[] {
+  return editorialAvailablePostLocales(post);
+}
+
+export function postHasLocale(post: CmsPostDocument, locale: Locale): boolean {
+  return availablePostLocales(post).includes(locale);
 }
 
 export function getRedirectDestination(

@@ -64,6 +64,11 @@ const leadSchema = z
     fbclid: optionalAttributionText(512),
     msclkid: optionalAttributionText(512),
     landingPage: optionalAttributionText(1000),
+    contentSourcePath: z
+      .string()
+      .regex(/^\/(no|en)\/blogg\/[a-z0-9-]+$/)
+      .max(500)
+      .optional(),
     referrer: optionalAttributionText(1000),
     marketingConsent: z.enum(["granted", "denied", "unknown"]).optional(),
   })
@@ -198,6 +203,7 @@ export async function POST(request: Request) {
       fbclid,
       msclkid,
       landingPage,
+      contentSourcePath,
       referrer,
       marketingConsent,
       ...rest
@@ -232,6 +238,7 @@ export async function POST(request: Request) {
         ...(fbclid ? { fbclid } : {}),
         ...(msclkid ? { msclkid } : {}),
         ...(landingPage ? { landingPage } : {}),
+        ...(contentSourcePath ? { contentSourcePath } : {}),
         ...(referrer ? { referrer } : {}),
         ...(marketingConsent ? { marketingConsent } : {}),
         status: "new",
@@ -265,6 +272,7 @@ export async function POST(request: Request) {
       fbclid,
       msclkid,
       landingPage,
+      contentSourcePath,
       referrer,
       marketingConsent,
     };

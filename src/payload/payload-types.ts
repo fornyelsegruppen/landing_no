@@ -78,6 +78,8 @@ export interface Config {
     redirects: Redirect;
     leads: Lead;
     'work-orders': WorkOrder;
+    'seo-topics': SeoTopic;
+    'seo-runs': SeoRun;
     'audit-events': AuditEvent;
     'operational-jobs': OperationalJob;
     'access-tokens': AccessToken;
@@ -100,6 +102,8 @@ export interface Config {
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
+    'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
+    'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
     'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
     'operational-jobs': OperationalJobsSelect<false> | OperationalJobsSelect<true>;
     'access-tokens': AccessTokensSelect<false> | AccessTokensSelect<true>;
@@ -359,26 +363,146 @@ export interface Post {
    */
   slug: string;
   titleNo: string;
-  titleEn: string;
+  titleEn?: string | null;
   excerptNo?: string | null;
   excerptEn?: string | null;
   /**
-   * Plain text with optional Markdown-style ## headings and - lists.
+   * Safe Markdown: ## headings, lists, **bold** and [link text](https://...). HTML is not rendered.
    */
   contentNo: string;
   /**
-   * Plain text with optional Markdown-style ## headings and - lists.
+   * Leave empty until a complete English version has been reviewed.
    */
-  contentEn: string;
+  contentEn?: string | null;
   heroImage?: (number | null) | Media;
   seoTitleNo?: string | null;
   seoTitleEn?: string | null;
   seoDescriptionNo?: string | null;
   seoDescriptionEn?: string | null;
   publishedAt?: string | null;
+  editorialStatus: 'draft' | 'ai_qa' | 'human_review' | 'approved' | 'scheduled' | 'published';
+  /**
+   * Kan bare lagres når redaksjonell status er Godkjent.
+   */
+  scheduledAt?: string | null;
+  searchIntent?: ('informational' | 'commercial' | 'local' | 'comparison') | null;
+  primaryKeyword?: string | null;
+  secondaryKeywords?:
+    | {
+        keyword: string;
+        id?: string | null;
+      }[]
+    | null;
+  primaryService?: (number | null) | Service;
+  locationText?: string | null;
+  category?: string | null;
+  sources?:
+    | {
+        label: string;
+        url: string;
+        publisher?: string | null;
+        accessedAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  authorName?: string | null;
+  reviewerName?: string | null;
+  reviewedAt?: string | null;
+  aiAssisted?: boolean | null;
+  aiGenerationRun?: (number | null) | SeoRun;
+  qualityScore?: number | null;
+  relatedPosts?: (number | Post)[] | null;
+  relatedServices?: (number | Service)[] | null;
+  ctaVariant?: ('assessment' | 'wash' | 'renewal' | 'new_roof') | null;
+  faqItems?:
+    | {
+        questionNo: string;
+        answerNo: string;
+        questionEn?: string | null;
+        answerEn?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  lastContentAuditAt?: string | null;
+  performanceNotes?: string | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * Ikke-sensitive spor for temavalg, utkast og kvalitetssjekk.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "seo-runs".
+ */
+export interface SeoRun {
+  id: number;
+  jobType: string;
+  status: 'running' | 'completed' | 'failed' | 'attention';
+  startedAt: string;
+  finishedAt?: string | null;
+  selectedTopics?: (number | SeoTopic)[] | null;
+  rejectedTopics?: (number | SeoTopic)[] | null;
+  modelVersion?: string | null;
+  promptVersion?: string | null;
+  knowledgeVersion?: string | null;
+  qualityResult?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  errorCode?: string | null;
+  /**
+   * Sanitert feiltekst uten prompts, nøkler eller kundedata.
+   */
+  errorMessage?: string | null;
+  createdPost?: (number | null) | Post;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "seo-topics".
+ */
+export interface SeoTopic {
+  id: number;
+  topic: string;
+  primaryKeyword: string;
+  secondaryKeywords?:
+    | {
+        keyword: string;
+        id?: string | null;
+      }[]
+    | null;
+  searchIntent: 'informational' | 'commercial' | 'local' | 'comparison';
+  service?: (number | null) | Service;
+  location?: string | null;
+  season?: string | null;
+  source: 'search_console' | 'ads' | 'trends' | 'lead' | 'manual';
+  /**
+   * Kun aggregerte tall; aldri kundedata eller tokens.
+   */
+  sourceMetrics?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  topicScore: number;
+  overlapScore: number;
+  reasonForSelection: string;
+  status: 'candidate' | 'rejected' | 'queued' | 'drafted' | 'approved' | 'published';
+  checkedAt?: string | null;
+  relatedPost?: (number | null) | Post;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * Redirects are currently resolved for CMS page slugs and blog post routes.
@@ -453,6 +577,10 @@ export interface Lead {
   fbclid?: string | null;
   msclkid?: string | null;
   landingPage?: string | null;
+  /**
+   * Last blog article CTA used before this inquiry.
+   */
+  contentSourcePath?: string | null;
   referrer?: string | null;
   marketingConsent?: ('granted' | 'denied' | 'unknown') | null;
   updatedAt: string;
@@ -688,6 +816,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'work-orders';
         value: number | WorkOrder;
+      } | null)
+    | ({
+        relationTo: 'seo-topics';
+        value: number | SeoTopic;
+      } | null)
+    | ({
+        relationTo: 'seo-runs';
+        value: number | SeoRun;
       } | null)
     | ({
         relationTo: 'audit-events';
@@ -935,6 +1071,48 @@ export interface PostsSelect<T extends boolean = true> {
   seoDescriptionNo?: T;
   seoDescriptionEn?: T;
   publishedAt?: T;
+  editorialStatus?: T;
+  scheduledAt?: T;
+  searchIntent?: T;
+  primaryKeyword?: T;
+  secondaryKeywords?:
+    | T
+    | {
+        keyword?: T;
+        id?: T;
+      };
+  primaryService?: T;
+  locationText?: T;
+  category?: T;
+  sources?:
+    | T
+    | {
+        label?: T;
+        url?: T;
+        publisher?: T;
+        accessedAt?: T;
+        id?: T;
+      };
+  authorName?: T;
+  reviewerName?: T;
+  reviewedAt?: T;
+  aiAssisted?: T;
+  aiGenerationRun?: T;
+  qualityScore?: T;
+  relatedPosts?: T;
+  relatedServices?: T;
+  ctaVariant?: T;
+  faqItems?:
+    | T
+    | {
+        questionNo?: T;
+        answerNo?: T;
+        questionEn?: T;
+        answerEn?: T;
+        id?: T;
+      };
+  lastContentAuditAt?: T;
+  performanceNotes?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -982,6 +1160,7 @@ export interface LeadsSelect<T extends boolean = true> {
   fbclid?: T;
   msclkid?: T;
   landingPage?: T;
+  contentSourcePath?: T;
   referrer?: T;
   marketingConsent?: T;
   updatedAt?: T;
@@ -998,6 +1177,55 @@ export interface WorkOrdersSelect<T extends boolean = true> {
   scheduledAt?: T;
   status?: T;
   workSummary?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "seo-topics_select".
+ */
+export interface SeoTopicsSelect<T extends boolean = true> {
+  topic?: T;
+  primaryKeyword?: T;
+  secondaryKeywords?:
+    | T
+    | {
+        keyword?: T;
+        id?: T;
+      };
+  searchIntent?: T;
+  service?: T;
+  location?: T;
+  season?: T;
+  source?: T;
+  sourceMetrics?: T;
+  topicScore?: T;
+  overlapScore?: T;
+  reasonForSelection?: T;
+  status?: T;
+  checkedAt?: T;
+  relatedPost?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "seo-runs_select".
+ */
+export interface SeoRunsSelect<T extends boolean = true> {
+  jobType?: T;
+  status?: T;
+  startedAt?: T;
+  finishedAt?: T;
+  selectedTopics?: T;
+  rejectedTopics?: T;
+  modelVersion?: T;
+  promptVersion?: T;
+  knowledgeVersion?: T;
+  qualityResult?: T;
+  errorCode?: T;
+  errorMessage?: T;
+  createdPost?: T;
   updatedAt?: T;
   createdAt?: T;
 }

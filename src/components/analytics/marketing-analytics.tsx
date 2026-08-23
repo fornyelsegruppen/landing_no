@@ -58,6 +58,12 @@ function sendMetaCustomEvent(name: string, params?: Record<string, unknown>) {
   window.fbq?.("trackCustom", name, params || {});
 }
 
+export function trackArticleCtaClick(slug: string) {
+  const eventParams = { article_slug: slug };
+  sendGoogleEvent("article_cta_click", eventParams);
+  sendMetaCustomEvent("ArticleCtaClick", eventParams);
+}
+
 export function getMarketingConsentChoice(): ConsentChoice | "unknown" {
   if (typeof window === "undefined") return "unknown";
   const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);

@@ -4,17 +4,22 @@ import { draftMode } from "next/headers";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { MarkdownLite } from "@/components/content/markdown-lite";
+import { ArticleCta } from "@/components/blog/article-cta";
 import { Link, routing } from "@/i18n/routing";
 import {
+  availablePostLocales,
   getPostBySlug,
   getPublishedPosts,
   getRedirectDestination,
   getRedirectForPath,
   localizeContent,
+  postHasLocale,
 } from "@/lib/cms-pages";
 import { resolveMedia } from "@/lib/cms-content";
 import { redirectPathCandidates } from "@/lib/content-paths";
 import { siteConfig, type Locale } from "@/lib/site";
+import { safeContentHref } from "@/lib/safe-content-link";
+import { getSeoServiceHref } from "@/content/seo-landing-pages";
 
 export const revalidate = 60;
 
@@ -26,7 +31,7 @@ export async function generateStaticParams() {
   try {
     const posts = await getPublishedPosts();
     return posts.flatMap((post) =>
-      routing.locales.map((locale) => ({ locale, slug: post.slug })),
+      availablePostLocales(post).map((locale) => ({ locale, slug: post.slug })),
     );
   } catch (error) {
     console.error("Blog static params could not be generated:", error);
@@ -40,6 +45,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!post) return {};
 
   const loc = locale as Locale;
+  if (!routing.locales.includes(loc) || !postHasLocale(post, loc)) {
+    return { robots: { index: false, follow: false } };
+  }
   const localized = localizeContent(post, loc);
   const hero = resolveMedia(post.heroImage, "hero");
   const { isEnabled: isDraftMode } = await draftMode();
@@ -47,6 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const heroUrl = hero
     ? new URL(hero.url, siteConfig.url).toString()
     : undefined;
+  const availableLocales = availablePostLocales(post);
 
   return {
     title: localized.seoTitle,
@@ -54,7 +63,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: postUrl,
       languages: Object.fromEntries(
-        routing.locales.map((language) => [
+        availableLocales.map((language) => [
           language,
           `${siteConfig.url}/${language}/blogg/${slug}`,
         ]),
@@ -90,6 +99,12 @@ function formatDate(value: string, locale: Locale): string {
   }).format(new Date(value));
 }
 
+function relatedDocument<T extends object>(
+  relation: number | string | T,
+): T | null {
+  return typeof relation === "object" && relation !== null ? relation : null;
+}
+
 export default async function BlogPostPage({ params }: Props) {
   const { locale, slug } = await params;
   setRequestLocale(locale);
@@ -108,7 +123,7 @@ export default async function BlogPostPage({ params }: Props) {
   }
 
   const post = await getPostBySlug(slug);
-  if (!post) notFound();
+  if (!post || !postHasLocale(post, loc)) notFound();
 
   const localized = localizeContent(post, loc);
   const hero = resolveMedia(post.heroImage, "hero");
@@ -117,6 +132,31 @@ export default async function BlogPostPage({ params }: Props) {
   const heroUrl = hero
     ? new URL(hero.url, siteConfig.url).toString()
     : undefined;
+  const reviewedDate = post.reviewedAt || post.updatedAt;
+  const faqs = (post.faqItems || [])
+    .map((faq) => ({
+      question: (loc === "no" ? faq.questionNo : faq.questionEn)?.trim() || "",
+      answer: (loc === "no" ? faq.answerNo : faq.answerEn)?.trim() || "",
+    }))
+    .filter((faq) => faq.question && faq.answer);
+  const relatedPosts = (post.relatedPosts || [])
+    .map((relation) => relatedDocument(relation))
+    .filter(
+      (relation): relation is typeof post =>
+        Boolean(relation && relation.slug && postHasLocale(relation, loc)),
+    );
+  const relatedServices = (post.relatedServices || [])
+    .map((relation) => relatedDocument(relation))
+    .filter(
+      (
+        relation,
+      ): relation is {
+        id: number | string;
+        key: string;
+        titleNo: string;
+        titleEn: string;
+      } => Boolean(relation?.key),
+    );
   const schema = {
     "@context": "https://schema.org",
     "@graph": [
@@ -132,11 +172,13 @@ export default async function BlogPostPage({ params }: Props) {
         inLanguage: loc === "no" ? "nb-NO" : "en",
         ...(heroUrl ? { image: heroUrl } : {}),
         author: {
-          "@type": "Organization",
-          "@id": `${siteConfig.url}/#organization`,
-          name: siteConfig.name,
-          url: siteConfig.url,
+          "@type": "Person",
+          name: post.authorName,
+          worksFor: { "@id": `${siteConfig.url}/#organization` },
         },
+        reviewedBy: post.reviewerName
+          ? { "@type": "Person", name: post.reviewerName }
+          : undefined,
         publisher: { "@id": `${siteConfig.url}/#organization` },
       },
       {
@@ -173,6 +215,19 @@ export default async function BlogPostPage({ params }: Props) {
           },
         ],
       },
+      ...(faqs.length
+        ? [
+            {
+              "@type": "FAQPage",
+              "@id": `${postUrl}#faq`,
+              mainEntity: faqs.map((faq) => ({
+                "@type": "Question",
+                name: faq.question,
+                acceptedAnswer: { "@type": "Answer", text: faq.answer },
+              })),
+            },
+          ]
+        : []),
     ],
   };
 
@@ -200,6 +255,17 @@ export default async function BlogPostPage({ params }: Props) {
           >
             {formatDate(date, loc)}
           </time>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            {post.authorName && (
+              <span>{loc === "no" ? "Skrevet av" : "Written by"} {post.authorName}</span>
+            )}
+            {post.reviewerName && (
+              <span>
+                {loc === "no" ? "Faglig kontrollert av" : "Reviewed by"}{" "}
+                {post.reviewerName}, {formatDate(reviewedDate, loc)}
+              </span>
+            )}
+          </div>
           {localized.excerpt && (
             <p className="text-muted-foreground mt-6 text-lg leading-8">
               {localized.excerpt}
@@ -218,8 +284,73 @@ export default async function BlogPostPage({ params }: Props) {
             </div>
           )}
           <div className="mt-10">
-            <MarkdownLite content={localized.content} />
+            <MarkdownLite content={localized.content} locale={loc} />
           </div>
+          {faqs.length > 0 && (
+            <section className="mt-12 border-t border-border pt-10" aria-labelledby="article-faq">
+              <h2 id="article-faq" className="text-2xl font-semibold">
+                {loc === "no" ? "Vanlige spørsmål" : "Frequently asked questions"}
+              </h2>
+              <div className="mt-5 space-y-4">
+                {faqs.map((faq) => (
+                  <details key={faq.question} className="surface-card p-5">
+                    <summary className="cursor-pointer font-semibold">{faq.question}</summary>
+                    <p className="mt-3 leading-7 text-muted-foreground">{faq.answer}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
+          {(relatedPosts.length > 0 || relatedServices.length > 0) && (
+            <section className="mt-12 border-t border-border pt-10" aria-labelledby="related-content">
+              <h2 id="related-content" className="text-2xl font-semibold">
+                {loc === "no" ? "Les videre" : "Continue reading"}
+              </h2>
+              <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+                {relatedPosts.map((related) => (
+                  <li key={String(related.id)}>
+                    <Link className="surface-card block p-5 font-semibold hover:border-accent/40" href={`/blogg/${related.slug}`}>
+                      {localizeContent(related, loc).title}
+                    </Link>
+                  </li>
+                ))}
+                {relatedServices.map((service) => {
+                  const href = getSeoServiceHref(service.key);
+                  if (!href) return null;
+                  return (
+                    <li key={String(service.id)}>
+                      <Link className="surface-card block p-5 font-semibold hover:border-accent/40" href={`/${href}`}>
+                        {loc === "no" ? service.titleNo : service.titleEn}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+          {(post.sources || []).length > 0 && (
+            <section className="mt-12 border-t border-border pt-8" aria-labelledby="article-sources">
+              <h2 id="article-sources" className="text-lg font-semibold">
+                {loc === "no" ? "Kilder" : "Sources"}
+              </h2>
+              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                {(post.sources || []).map((source) => {
+                  const href = safeContentHref(source.url, loc);
+                  return (
+                    <li key={`${source.label}-${source.url}`}>
+                      {href ? (
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-accent">
+                          {source.label}
+                        </a>
+                      ) : source.label}
+                      {source.publisher ? ` — ${source.publisher}` : ""}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+          <ArticleCta locale={loc} slug={slug} variant={post.ctaVariant} />
         </div>
       </article>
     </>

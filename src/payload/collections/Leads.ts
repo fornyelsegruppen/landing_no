@@ -187,6 +187,16 @@ export const Leads: CollectionConfig = {
           admin: { readOnly: true },
         },
         {
+          name: "contentSourcePath",
+          type: "text",
+          label: "Article attribution",
+          access: adminManagedField,
+          admin: {
+            readOnly: true,
+            description: "Last blog article CTA used before this inquiry.",
+          },
+        },
+        {
           name: "referrer",
           type: "textarea",
           access: adminManagedField,

@@ -11,6 +11,7 @@ import * as migration_20260820_210000_correct_calculator_prices from './20260820
 import * as migration_20260823_135227_phase1_platform_foundation from './20260823_135227_phase1_platform_foundation';
 import * as migration_20260823_142839_phase2_accounts_worker_shell from './20260823_142839_phase2_accounts_worker_shell';
 import * as migration_20260823_143838_phase2_default_worker_role from './20260823_143838_phase2_default_worker_role';
+import * as migration_20260823_150443_phase3_blog_foundation from './20260823_150443_phase3_blog_foundation';
 
 export const migrations = [
   {
@@ -76,6 +77,11 @@ export const migrations = [
   {
     up: migration_20260823_143838_phase2_default_worker_role.up,
     down: migration_20260823_143838_phase2_default_worker_role.down,
-    name: '20260823_143838_phase2_default_worker_role'
+    name: '20260823_143838_phase2_default_worker_role',
+  },
+  {
+    up: migration_20260823_150443_phase3_blog_foundation.up,
+    down: migration_20260823_150443_phase3_blog_foundation.down,
+    name: '20260823_150443_phase3_blog_foundation'
   },
 ];

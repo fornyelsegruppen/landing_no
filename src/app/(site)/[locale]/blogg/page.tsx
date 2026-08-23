@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, BookOpen } from "lucide-react";
 import { setRequestLocale } from "next-intl/server";
 import { Link, routing } from "@/i18n/routing";
-import { getPosts, localizeContent } from "@/lib/cms-pages";
+import { getPosts, localizeContent, postHasLocale } from "@/lib/cms-pages";
 import { siteConfig, type Locale } from "@/lib/site";
 
 export const revalidate = 60;
@@ -128,7 +128,7 @@ export default async function BlogIndexPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const loc = locale as Locale;
-  const posts = await getPosts();
+  const posts = (await getPosts()).filter((post) => postHasLocale(post, loc));
 
   return (
     <section className="section-pad">

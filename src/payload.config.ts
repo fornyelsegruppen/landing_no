@@ -21,6 +21,8 @@ import { OperationalJobs } from "./payload/collections/OperationalJobs";
 import { AccessTokens } from "./payload/collections/AccessTokens";
 import { PrivateMedia } from "./payload/collections/PrivateMedia";
 import { WorkOrders } from "./payload/collections/WorkOrders";
+import { SeoTopics } from "./payload/collections/SeoTopics";
+import { SeoRuns } from "./payload/collections/SeoRuns";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -122,6 +124,8 @@ export default buildConfig({
     Redirects,
     Leads,
     WorkOrders,
+    SeoTopics,
+    SeoRuns,
     AuditEvents,
     OperationalJobs,
     AccessTokens,

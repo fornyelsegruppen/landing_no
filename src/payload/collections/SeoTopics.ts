@@ -1,0 +1,100 @@
+import type { CollectionConfig } from "payload";
+import { adminOnly } from "../access/roles";
+
+export const SeoTopics: CollectionConfig = {
+  slug: "seo-topics",
+  labels: { singular: "Temaforslag", plural: "Temaforslag" },
+  admin: {
+    group: "Blogg",
+    useAsTitle: "topic",
+    defaultColumns: [
+      "topic",
+      "primaryKeyword",
+      "searchIntent",
+      "topicScore",
+      "status",
+      "updatedAt",
+    ],
+  },
+  access: {
+    admin: ({ req }) => adminOnly({ req }) === true,
+    create: adminOnly,
+    delete: adminOnly,
+    read: adminOnly,
+    update: adminOnly,
+  },
+  fields: [
+    { name: "topic", type: "text", required: true, index: true },
+    { name: "primaryKeyword", type: "text", required: true, index: true },
+    {
+      name: "secondaryKeywords",
+      type: "array",
+      fields: [{ name: "keyword", type: "text", required: true }],
+    },
+    {
+      name: "searchIntent",
+      type: "select",
+      required: true,
+      options: [
+        { label: "Informasjon", value: "informational" },
+        { label: "Kommersiell", value: "commercial" },
+        { label: "Lokal", value: "local" },
+        { label: "Sammenligning", value: "comparison" },
+      ],
+    },
+    { name: "service", type: "relationship", relationTo: "services" },
+    { name: "location", type: "text", label: "Sted/område" },
+    { name: "season", type: "text", label: "Sesong" },
+    {
+      name: "source",
+      type: "select",
+      required: true,
+      options: [
+        { label: "Search Console", value: "search_console" },
+        { label: "Google Ads", value: "ads" },
+        { label: "Google Trends", value: "trends" },
+        { label: "Anonymisert kundeinnsikt", value: "lead" },
+        { label: "Manuell fagplan", value: "manual" },
+      ],
+    },
+    {
+      name: "sourceMetrics",
+      type: "json",
+      admin: { description: "Kun aggregerte tall; aldri kundedata eller tokens." },
+    },
+    {
+      name: "topicScore",
+      type: "number",
+      min: 0,
+      max: 100,
+      defaultValue: 0,
+      required: true,
+    },
+    {
+      name: "overlapScore",
+      type: "number",
+      min: 0,
+      max: 100,
+      defaultValue: 0,
+      required: true,
+    },
+    { name: "reasonForSelection", type: "textarea", required: true },
+    {
+      name: "status",
+      type: "select",
+      required: true,
+      defaultValue: "candidate",
+      index: true,
+      options: [
+        { label: "Kandidat", value: "candidate" },
+        { label: "Avvist", value: "rejected" },
+        { label: "I kø", value: "queued" },
+        { label: "Utkast laget", value: "drafted" },
+        { label: "Godkjent", value: "approved" },
+        { label: "Publisert", value: "published" },
+      ],
+    },
+    { name: "checkedAt", type: "date" },
+    { name: "relatedPost", type: "relationship", relationTo: "posts" },
+  ],
+};

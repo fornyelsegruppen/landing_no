@@ -27,6 +27,7 @@ import {
 import { CertificationBadges } from "@/components/trust/certification-badges";
 import {
   captureLeadAttribution,
+  readContentSource,
   type LeadAttribution,
 } from "@/lib/lead-attribution";
 
@@ -264,6 +265,7 @@ export function ContactSection() {
     attributionRef.current = captureLeadAttribution(
       window.location.href,
       document.referrer,
+      readContentSource(window.sessionStorage),
     );
   }, []);
 
