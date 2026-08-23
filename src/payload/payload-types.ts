@@ -465,6 +465,11 @@ export interface Post {
       }[]
     | null;
   lastContentAuditAt?: string | null;
+  leadPerformance?: {
+    leads?: number | null;
+    convertedLeads?: number | null;
+    updatedAt?: string | null;
+  };
   searchPerformance?: {
     impressions?: number | null;
     clicks?: number | null;
@@ -476,6 +481,16 @@ export interface Post {
     lastCrawlAt?: string | null;
   };
   performanceNotes?: string | null;
+  /**
+   * Systemets anbefaling er beslutningsstøtte. Administrator må kontrollere og utføre eventuell endring.
+   */
+  contentAudit?: {
+    recommendation?: ('keep' | 'update' | 'merge' | 'redirect') | null;
+    reason?: string | null;
+    generatedAt?: string | null;
+    targetPost?: (number | null) | Post;
+    reviewedAt?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -1689,6 +1704,13 @@ export interface PostsSelect<T extends boolean = true> {
         id?: T;
       };
   lastContentAuditAt?: T;
+  leadPerformance?:
+    | T
+    | {
+        leads?: T;
+        convertedLeads?: T;
+        updatedAt?: T;
+      };
   searchPerformance?:
     | T
     | {
@@ -1702,6 +1724,15 @@ export interface PostsSelect<T extends boolean = true> {
         lastCrawlAt?: T;
       };
   performanceNotes?: T;
+  contentAudit?:
+    | T
+    | {
+        recommendation?: T;
+        reason?: T;
+        generatedAt?: T;
+        targetPost?: T;
+        reviewedAt?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

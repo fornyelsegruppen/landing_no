@@ -2,7 +2,7 @@
 
 **Status:** Aktivt gjennomføringsgrunnlag  
 **Opprettet:** 23. august 2026  
-**System:** Eksisterende Next.js 15 + Payload CMS-applikasjon i `landing_no`  
+**System:** Next.js 16 + Payload CMS-applikasjon i `landing_no`
 **Produksjonsflater:** `takfornyelse.as`, `/admin`, `/user` og sikre kundelenker  
 **Arbeidsregel:** Én fase ferdigstilles, testes og godkjennes før neste fase åpnes
 
@@ -711,7 +711,7 @@ Store endringer skal deles i små, reversible migrasjoner. Eksisterende urelater
 | 7. Tilbud og kontrakt | Fullført | 2026-08-23 | 2026-08-23 | [Fase 7-rapport](./implementation/phase-7-quotes-contracts-signing.md) | Juridisk godkjente vilkår, signaturmetode og full mobil staging-test kreves før flaggene aktiveres |
 | 8. Arbeidsordre og `/user` | Fullført | 2026-08-23 | 2026-08-23 | [Fase 8-rapport](./implementation/phase-8-work-orders-worker-portal.md) | Gamle shellrader, worker-kontoer, privat Blob og komplett mobil staging-test kreves før flagget aktiveres |
 | 9. Avvik og kommunikasjon | Fullført | 2026-08-23 | 2026-08-23 | [Fase 9-rapport](./implementation/phase-9-change-agreements-communications.md) | Juridisk kontroll, Resend/SMS, tidssone og komplett mobil staging-test kreves før flagget aktiveres |
-| 10. Hardening og samlet QA | Ikke startet |  |  |  |  |
+| 10. Hardening og samlet QA | Fullført teknisk | 2026-08-23 | 2026-08-23 | [Fase 10-rapport](./implementation/phase-10-hardening-and-qa.md) | Autentisert visuell QA, restore-øvelse og leverandørtest gjennomføres i staging |
 | 11. Pilot og produksjon | Ikke startet |  |  |  |  |
 
 ## 27. Første handling etter godkjenning

@@ -33,13 +33,17 @@ describe("lead photo tokens", () => {
     expect(verifyLeadPhotoToken("lead-42", token)).toBe(false);
   });
 
-  it("continues to verify legacy tokens", () => {
+  it("rejects legacy tokens unless a temporary future cutoff is explicit", () => {
     const id = "legacy-lead";
     const legacyToken = createHmac("sha256", TEST_SECRET)
       .update(`lead-photos:${id}`)
       .digest("hex")
       .slice(0, 40);
 
+    expect(verifyLeadPhotoToken(id, legacyToken)).toBe(false);
+    vi.stubEnv("LEGACY_LEAD_PHOTO_TOKEN_CUTOFF", "2026-07-28T12:00:00.000Z");
     expect(verifyLeadPhotoToken(id, legacyToken)).toBe(true);
+    vi.setSystemTime(new Date("2026-07-28T12:00:00.000Z"));
+    expect(verifyLeadPhotoToken(id, legacyToken)).toBe(false);
   });
 });

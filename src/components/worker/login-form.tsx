@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function WorkerLoginForm() {
+  const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -28,7 +30,8 @@ export function WorkerLoginForm() {
       return;
     }
 
-    window.location.assign("/user");
+    router.replace("/user");
+    router.refresh();
   }
 
   return (

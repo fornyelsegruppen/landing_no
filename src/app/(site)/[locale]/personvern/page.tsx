@@ -101,13 +101,23 @@ We may use a configured AI provider to prepare an internal summary, missing-info
   return `${body.trim()}\n\n${disclosure}`;
 }
 
+function withOperationalDisclosure(body: string, locale: "no" | "en") {
+  if (/Tilbud, måling og oppdragsoppfølging|Quotes, measurement and job follow-up/i.test(body)) return body;
+  const disclosure = locale === "no"
+    ? `## Tilbud, måling og oppdragsoppfølging
+Når du ber om tilbud, kan adressen brukes til adresseoppslag og et kontrollert takarealestimat fra godkjente kart- eller bildekilder. Estimat, antakelser, kilde og usikkerhet lagres sammen med tilbudsgrunnlaget. Pris beregnes av faste, versjonerte regler; AI bestemmer ikke pris. Administrator må godkjenne tilbud og endringsavtaler før utsending. Ved elektronisk godkjenning lagres dokumentversjon, hash, tidspunkt og pseudonymiserte sikkerhetsbevis. Etter avtaleinngåelse kan vi sende nødvendige planleggingsbekreftelser, påminnelser og ferdigdokumentasjon i valgt kanal. Signerte dokumenter og nødvendig arbeidsdokumentasjon slettes ikke sammen med en ordinær, utløpt henvendelse når vi fortsatt har avtale-, reklamasjons- eller lovpålagt oppbevaringsgrunnlag.`
+    : `## Quotes, measurement and job follow-up
+When you request a quote, the address may be used for address lookup and a controlled roof-area estimate from approved map or imagery sources. The estimate, assumptions, source and uncertainty are stored with the quote basis. Prices are calculated by fixed, versioned rules; AI does not decide prices. An administrator must approve quotes and change agreements before they are sent. Electronic acceptance stores the document version, hash, time and pseudonymised security evidence. After an agreement is made, we may send necessary scheduling confirmations, reminders and completion documentation through the selected channel. Signed documents and necessary work documentation are not deleted with an ordinary expired enquiry while a contract, complaint or statutory retention basis still applies.`;
+  return `${body.trim()}\n\n${disclosure}`;
+}
+
 export default async function PrivacyPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const loc = locale as "no" | "en";
   const content = await getSiteContent();
   const privacy = content.settings.privacy;
-  const privacyBody = withAiDisclosure(withMarketingDisclosure(privacy.body[loc], loc), loc);
+  const privacyBody = withOperationalDisclosure(withAiDisclosure(withMarketingDisclosure(privacy.body[loc], loc), loc), loc);
 
   return (
     <section className="section-pad">

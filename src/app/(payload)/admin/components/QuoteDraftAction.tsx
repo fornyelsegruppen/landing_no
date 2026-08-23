@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { UIFieldClientComponent } from "payload";
 import { useDocumentInfo, useFormFields } from "@payloadcms/ui";
+import { useRouter } from "next/navigation";
 
 export const QuoteDraftAction: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo();
+  const router = useRouter();
   const status = useFormFields(([fields]) => fields.status?.value);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -16,7 +18,7 @@ export const QuoteDraftAction: UIFieldClientComponent = () => {
       const response = await fetch("/api/admin/quotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calculationId: Number(id) }) });
       const result = await response.json() as { quoteId?: number; error?: string };
       if (!response.ok || !result.quoteId) throw new Error(result.error ?? "Kunne ikke opprette tilbud");
-      window.location.href = `/admin/collections/quotes/${result.quoteId}`;
+      router.push(`/admin/collections/quotes/${result.quoteId}`);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Handlingen feilet"); setBusy(false); }
   }
   return <section className="measurement-actions">

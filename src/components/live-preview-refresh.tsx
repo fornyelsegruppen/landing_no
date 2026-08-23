@@ -9,7 +9,8 @@ export function LivePreviewRefresh() {
   const [serverURL, setServerURL] = useState<string>();
 
   useEffect(() => {
-    setServerURL(window.location.origin);
+    const timer = window.setTimeout(() => setServerURL(window.location.origin), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (!serverURL) return null;

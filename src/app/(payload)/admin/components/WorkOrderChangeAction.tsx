@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { UIFieldClientComponent } from "payload";
 import { useDocumentInfo, useFormFields } from "@payloadcms/ui";
+import { useRouter } from "next/navigation";
 
 export const WorkOrderChangeAction: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo(); const status = useFormFields(([fields]) => fields.status?.value); const outcome = useFormFields(([fields]) => fields.priceOutcome?.value);
+  const router = useRouter();
   const [total, setTotal] = useState(""); const [reason, setReason] = useState(""); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState("");
   async function create() {
     if (!id || busy) return; setBusy(true); setNotice("");
@@ -13,7 +15,7 @@ export const WorkOrderChangeAction: UIFieldClientComponent = () => {
       const nok = total.trim() ? Number(total.replace(",", ".")) : undefined;
       const response = await fetch("/api/admin/change-agreements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workOrderId: Number(id), ...(nok !== undefined ? { proposedTotalIncVatOre: Math.round(nok * 100) } : {}), ...(reason.trim() ? { reasonDescription: reason.trim() } : {}) }) });
       const result = await response.json() as { agreementId?: number; error?: string }; if (!response.ok || !result.agreementId) throw new Error(result.error || "Kunne ikke opprette endringsavtale");
-      window.location.href = `/admin/collections/change-agreements/${result.agreementId}`;
+      router.push(`/admin/collections/change-agreements/${result.agreementId}`);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Handlingen feilet"); setBusy(false); }
   }
   if (!id) return null;

@@ -1,7 +1,8 @@
-import { del, list } from "@vercel/blob";
+import { del } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
+import { privateLeadBlobUrls, retainedBySignedContract } from "@/lib/retention/lead-retention";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -52,33 +53,25 @@ export async function GET(request: Request) {
     });
 
     let deleted = 0;
+    let retainedForLegalBasis = 0;
+    let failed = 0;
+    const deletedBlobUrls = new Set<string>();
     for (const lead of old.docs) {
-      await payload.delete({
-        collection: "leads",
-        id: lead.id,
-        overrideAccess: true,
-      });
-      deleted += 1;
+      try {
+        await payload.delete({ collection: "leads", id: lead.id, overrideAccess: true });
+        for (const url of privateLeadBlobUrls(lead.photoUrls)) deletedBlobUrls.add(url);
+        deleted += 1;
+      } catch (error) {
+        if (retainedBySignedContract(error)) retainedForLegalBasis += 1;
+        else { failed += 1; captureException(error, { route: "GET /api/cron/purge-leads", operation: "lead-delete", leadId: lead.id }); }
+      }
     }
 
     let blobsDeleted = 0;
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (process.env.BLOB_READ_WRITE_TOKEN && deletedBlobUrls.size) {
       try {
-        const listed = await list({
-          prefix: "leads/",
-          token: process.env.BLOB_READ_WRITE_TOKEN,
-          limit: 200,
-        });
-        const stale = listed.blobs.filter(
-          (b) => b.uploadedAt && b.uploadedAt < cutoff,
-        );
-        if (stale.length) {
-          await del(
-            stale.map((b) => b.url),
-            { token: process.env.BLOB_READ_WRITE_TOKEN },
-          );
-          blobsDeleted = stale.length;
-        }
+        await del([...deletedBlobUrls], { token: process.env.BLOB_READ_WRITE_TOKEN });
+        blobsDeleted = deletedBlobUrls.size;
       } catch (err) {
         captureException(err, {
           route: "GET /api/cron/purge-leads",
@@ -92,6 +85,8 @@ export async function GET(request: Request) {
       retentionMonths: months,
       cutoff: cutoff.toISOString(),
       leadsDeleted: deleted,
+      retainedForLegalBasis,
+      failures: failed,
       blobsDeleted,
     });
   } catch (err) {

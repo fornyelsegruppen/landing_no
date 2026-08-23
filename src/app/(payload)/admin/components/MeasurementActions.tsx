@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { UIFieldClientComponent } from "payload";
 import { useDocumentInfo, useFormFields } from "@payloadcms/ui";
+import { useRouter } from "next/navigation";
 
 type Point = { latitude: number; longitude: number };
 type Plane = { id: string; polygon: Point[]; angleMinDegrees: number; angleMaxDegrees: number };
@@ -23,6 +24,7 @@ function PolygonPreview({ planes }: { planes: Plane[] }) {
 
 export const MeasurementActions: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo();
+  const router = useRouter();
   const rawPlanes = useFormFields(([fields]) => fields.roofPlanes?.value);
   const confidenceValue = useFormFields(([fields]) => fields.confidence?.value);
   const reasoningValue = useFormFields(([fields]) => fields.confidenceReasoning?.value);
@@ -43,9 +45,9 @@ export const MeasurementActions: UIFieldClientComponent = () => {
       const response = await fetch(`/api/admin/measurements/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await response.json() as { error?: string; measurement?: { id: number }; calculation?: { id: number } };
       if (!response.ok) throw new Error(result.error ?? "Handlingen feilet");
-      if (result.measurement?.id && name === "create_version") window.location.href = `/admin/collections/roof-measurements/${result.measurement.id}`;
-      else if (result.calculation?.id) window.location.href = `/admin/collections/price-calculations/${result.calculation.id}`;
-      else { setNotice("Takmålingen er godkjent."); window.setTimeout(() => window.location.reload(), 500); }
+      if (result.measurement?.id && name === "create_version") router.push(`/admin/collections/roof-measurements/${result.measurement.id}`);
+      else if (result.calculation?.id) router.push(`/admin/collections/price-calculations/${result.calculation.id}`);
+      else { setNotice("Takmålingen er godkjent."); window.setTimeout(() => router.refresh(), 500); }
     } catch (error) { setNotice(error instanceof Error ? error.message : "Handlingen feilet"); }
     finally { setBusy(false); }
   }

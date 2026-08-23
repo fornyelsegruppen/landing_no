@@ -24,6 +24,8 @@ export default async function WorkerHomePage() {
         ? {}
         : { assignedWorker: { equals: user.id } },
   });
+  // Server component: one request-scoped timestamp deliberately groups the returned records.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const today = new Date().toISOString().slice(0, 10);
   const active = result.docs.filter((order) => !["documented", "cancelled"].includes(order.status));

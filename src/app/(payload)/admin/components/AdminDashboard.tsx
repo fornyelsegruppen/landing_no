@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPayload } from "@/lib/payload";
 import { GenerateBlogDraftButton } from "./GenerateBlogDraftButton";
 import { BlogTopicTools } from "./BlogTopicTools";
+import { buildPlatformHealth } from "@/lib/platform/health";
 
 type DashboardCounts = {
   activeWork: number;
@@ -12,12 +13,16 @@ type DashboardCounts = {
   unassignedWork: number;
   aiDrafts: number;
   replyDrafts: number;
+  changeAgreements: number;
+  upcomingWork: number;
+  contentAudits: number;
 };
 
 async function loadCounts(): Promise<DashboardCounts> {
   try {
     const payload = await getPayload();
-    const [newLeads, aiDrafts, replyDrafts, operationalAttention, seoAttention, messageAttention, blockedWork, activeWork, unassignedWork, pendingQuotes, pendingContracts] = await Promise.all([
+    const now = new Date(); const next72Hours = new Date(now.getTime() + 72 * 60 * 60_000);
+    const [newLeads, aiDrafts, replyDrafts, operationalAttention, seoAttention, messageAttention, blockedWork, activeWork, unassignedWork, pendingQuotes, pendingContracts, changeAgreements, upcomingWork, contentAudits] = await Promise.all([
       payload.count({
         collection: "leads",
         where: { status: { equals: "new" } },
@@ -56,6 +61,9 @@ async function loadCounts(): Promise<DashboardCounts> {
       }),
       payload.count({ collection: "quotes", where: { status: { equals: "draft" } } }),
       payload.count({ collection: "contracts", where: { status: { equals: "issued" } } }),
+      payload.count({ collection: "change-agreements", where: { status: { in: ["draft", "approved", "sent", "viewed"] } } }),
+      payload.count({ collection: "work-orders", where: { and: [{ scheduledAt: { greater_than_equal: now.toISOString() } }, { scheduledAt: { less_than_equal: next72Hours.toISOString() } }, { status: { not_in: ["cancelled", "documented"] } }] } }),
+      payload.count({ collection: "posts", where: { and: [{ "contentAudit.recommendation": { in: ["update", "merge", "redirect"] } }, { "contentAudit.reviewedAt": { exists: false } }] } }),
     ]);
 
     return {
@@ -67,6 +75,9 @@ async function loadCounts(): Promise<DashboardCounts> {
       pendingContracts: pendingContracts.totalDocs,
       aiDrafts: aiDrafts.totalDocs,
       replyDrafts: replyDrafts.totalDocs,
+      changeAgreements: changeAgreements.totalDocs,
+      upcomingWork: upcomingWork.totalDocs,
+      contentAudits: contentAudits.totalDocs,
     };
   } catch {
     return {
@@ -78,6 +89,9 @@ async function loadCounts(): Promise<DashboardCounts> {
       pendingContracts: 0,
       aiDrafts: 0,
       replyDrafts: 0,
+      changeAgreements: 0,
+      upcomingWork: 0,
+      contentAudits: 0,
     };
   }
 }
@@ -89,6 +103,7 @@ const cards = [
     label: "Svarutkast til godkjenning",
     href: "/admin/collections/messages",
   },
+  { key: "changeAgreements", label: "Endringsavtaler i arbeid", href: "/admin/collections/change-agreements" },
   {
     key: "aiDrafts",
     label: "Bloggutkast til kontroll",
@@ -113,6 +128,8 @@ const cards = [
 
 export default async function AdminDashboard() {
   const counts = await loadCounts();
+  const health = buildPlatformHealth();
+  const unavailable = Object.values(health.integrations).filter((integration) => integration.readiness !== "ready");
 
   return (
     <section className="platform-dashboard" aria-labelledby="platform-title">
@@ -136,8 +153,8 @@ export default async function AdminDashboard() {
           <h2>Krever oppmerksomhet</h2>
           <p>
             {counts.attention > 0
-              ? `${counts.attention} automatiseringsjobber må kontrolleres.`
-              : "Ingen tekniske jobber krever oppmerksomhet."}
+              ? `${counts.attention} jobber, meldinger eller oppdrag må kontrolleres.`
+              : "Ingen jobber, meldinger eller oppdrag krever oppmerksomhet."}
           </p>
           <Link href="/admin/collections/operational-jobs">Åpne køen</Link>
         </article>
@@ -150,6 +167,24 @@ export default async function AdminDashboard() {
           </p>
           <Link href="/admin/collections/work-orders">Se arbeid</Link>
         </article>
+        <article>
+          <h2>Neste 72 timer</h2>
+          <p>{counts.upcomingWork} planlagte oppdrag i løpet av de neste 72 timene.</p>
+          <Link href="/admin/collections/work-orders">Åpne arbeidsplanen</Link>
+        </article>
+        <article>
+          <h2>Innholdskontroll</h2>
+          <p>{counts.contentAudits} publiserte artikler har anbefaling om oppdatering, sammenslåing eller redirect.</p>
+          <Link href="/admin/collections/posts">Se innholdsrapporten</Link>
+        </article>
+      </div>
+      <div className="platform-dashboard__automation">
+        <h2>Integrasjoner og feature-flagg</h2>
+        <p>{unavailable.length ? `${unavailable.length} integrasjoner er deaktivert eller mangler konfigurasjon. Funksjonene forblir trygt av.` : "Alle konfigurerte integrasjoner rapporterer klar status."}</p>
+        <ul>
+          {unavailable.map((integration) => <li key={integration.name}><strong>{integration.name}</strong>: {integration.readiness}{integration.missing.length ? ` – mangler ${integration.missing.join(", ")}` : ""}</li>)}
+        </ul>
+        <Link href="/api/admin/platform-health">Åpne teknisk helsestatus</Link>
       </div>
       <div className="platform-dashboard__automation">
         <h2>AI-assistert blogg</h2>

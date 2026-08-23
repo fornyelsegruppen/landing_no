@@ -14,5 +14,6 @@ Denne katalogen inneholder fasebevis for [samlet implementeringsplan](../full-pl
 | 7 | [Tilbud, kundelenke, kontrakt og signering](./phase-7-quotes-contracts-signing.md) | Fullført |
 | 8 | [Arbeidsordre og mobil ansattportal](./phase-8-work-orders-worker-portal.md) | Fullført |
 | 9 | [Endringsavtaler og kontrollert kundekommunikasjon](./phase-9-change-agreements-communications.md) | Fullført |
+| 10 | [Hardening, SEO-måling og samlet QA](./phase-10-hardening-and-qa.md) | Fullført teknisk; staginggate åpen |
 
 En fase kan bare markeres fullført når rapporten inneholder leveranser, verifikasjon, kjente avvik og eksplisitt gate-resultat.

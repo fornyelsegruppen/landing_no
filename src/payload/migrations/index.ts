@@ -20,6 +20,7 @@ import * as migration_20260823_173944_phase7_quotes_contracts from './20260823_1
 import * as migration_20260823_175110_phase7_message_attachments from './20260823_175110_phase7_message_attachments';
 import * as migration_20260823_182703_phase8_work_orders from './20260823_182703_phase8_work_orders';
 import * as migration_20260823_194404_phase9_change_agreements_communications from './20260823_194404_phase9_change_agreements_communications';
+import * as migration_20260823_200533_phase10_content_measurement_hardening from './20260823_200533_phase10_content_measurement_hardening';
 
 export const migrations = [
   {
@@ -130,6 +131,11 @@ export const migrations = [
   {
     up: migration_20260823_194404_phase9_change_agreements_communications.up,
     down: migration_20260823_194404_phase9_change_agreements_communications.down,
-    name: '20260823_194404_phase9_change_agreements_communications'
+    name: '20260823_194404_phase9_change_agreements_communications',
+  },
+  {
+    up: migration_20260823_200533_phase10_content_measurement_hardening.up,
+    down: migration_20260823_200533_phase10_content_measurement_hardening.down,
+    name: '20260823_200533_phase10_content_measurement_hardening'
   },
 ];

@@ -258,8 +258,8 @@ export function ContactSection() {
   const turnstileTokenRef = useRef<string | null>(null);
   const attributionRef = useRef<LeadAttribution>({});
   const formStartedRef = useRef(false);
-  photosRef.current = photos;
-  turnstileTokenRef.current = turnstileToken;
+  useEffect(() => { photosRef.current = photos; }, [photos]);
+  useEffect(() => { turnstileTokenRef.current = turnstileToken; }, [turnstileToken]);
 
   useEffect(() => {
     attributionRef.current = captureLeadAttribution(

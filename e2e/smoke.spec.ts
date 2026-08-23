@@ -102,3 +102,22 @@ test("project gallery presents photos in a clear chronological order", async ({
   await expect(paintingProject.getByText("Under arbeid 1 / 1")).toBeVisible();
   await expect(paintingProject.getByText("Etter 1 / 2")).toBeVisible();
 });
+
+test("public pages keep security headers and usable mobile layout", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const response = await page.goto("/no");
+  expect(response?.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(response?.headers()["x-frame-options"]).toBe("DENY");
+  expect(response?.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.keyboard.press("Tab");
+  await expect(page.locator(":focus-visible")).toBeVisible();
+});
+
+test("privacy page describes controlled quotes and job follow-up", async ({ page }) => {
+  await page.goto("/no/personvern");
+  await expect(page.getByRole("heading", { level: 2, name: "Tilbud, måling og oppdragsoppfølging" })).toBeVisible();
+  await expect(page.getByText(/AI bestemmer ikke pris/)).toBeVisible();
+});

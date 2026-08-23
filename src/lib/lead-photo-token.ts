@@ -5,7 +5,7 @@ function requireSecret(): string {
   return resolvePayloadSecret();
 }
 
-/** Legacy forever-token (v1) — kept so already-sent emails keep working. */
+/** Legacy v1 token. Accepted only inside an explicit, temporary migration window. */
 function makeLegacyToken(id: string | number) {
   return createHmac("sha256", requireSecret())
     .update(`lead-photos:${id}`)
@@ -55,6 +55,8 @@ export function verifyLeadPhotoToken(id: string | number, token: string) {
   }
 
   // Legacy tokens never expire (emails already sent).
+  const cutoff = Date.parse(process.env.LEGACY_LEAD_PHOTO_TOKEN_CUTOFF || "");
+  if (!Number.isFinite(cutoff) || cutoff <= Date.now()) return false;
   return tokensMatch(token, makeLegacyToken(id));
 }
 

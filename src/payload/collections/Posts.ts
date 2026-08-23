@@ -256,6 +256,16 @@ export const Posts: CollectionConfig = {
     },
     { name: "lastContentAuditAt", type: "date", label: "Sist innholdskontroll" },
     {
+      name: "leadPerformance",
+      type: "group",
+      label: "Henvendelser fra artikkelen (siste 90 dager)",
+      fields: [
+        { name: "leads", type: "number", label: "Henvendelser", min: 0 },
+        { name: "convertedLeads", type: "number", label: "Konverterte", min: 0 },
+        { name: "updatedAt", type: "date", label: "Sist beregnet" },
+      ],
+    },
+    {
       name: "searchPerformance",
       type: "group",
       label: "Search Console (siste 90 dager)",
@@ -271,6 +281,21 @@ export const Posts: CollectionConfig = {
       ],
     },
     { name: "performanceNotes", type: "textarea", label: "Resultatnotater" },
+    {
+      name: "contentAudit",
+      type: "group",
+      label: "Innholdsanbefaling",
+      admin: { description: "Systemets anbefaling er beslutningsstøtte. Administrator må kontrollere og utføre eventuell endring." },
+      fields: [
+        { name: "recommendation", type: "select", options: [
+          { label: "Behold", value: "keep" }, { label: "Oppdater", value: "update" }, { label: "Slå sammen", value: "merge" }, { label: "Redirect", value: "redirect" },
+        ] },
+        { name: "reason", type: "textarea", label: "Begrunnelse" },
+        { name: "generatedAt", type: "date", label: "Beregnet" },
+        { name: "targetPost", type: "relationship", relationTo: "posts", label: "Valgt målside" },
+        { name: "reviewedAt", type: "date", label: "Kontrollert av administrator" },
+      ],
+    },
     {
       name: "workflowActions",
       type: "ui",

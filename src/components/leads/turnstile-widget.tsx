@@ -32,7 +32,8 @@ export function TurnstileWidget({ onToken }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
-  onTokenRef.current = onToken;
+
+  useEffect(() => { onTokenRef.current = onToken; }, [onToken]);
 
   useEffect(() => {
     if (!SITE_KEY || !containerRef.current) return;

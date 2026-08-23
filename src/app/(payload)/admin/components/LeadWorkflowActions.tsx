@@ -32,7 +32,10 @@ export const LeadWorkflowActions: UIFieldClientComponent = () => {
     setMessages(result.messages);
   }, [id]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function act(action: "generate_reply" | "approve_send" | "retry_send" | "request_information" | "start_measurement" | "close", messageId?: number) {
     if (!id || busy) return;

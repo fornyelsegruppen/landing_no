@@ -231,10 +231,12 @@ export function MarketingAnalytics() {
 
   useEffect(() => {
     const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
-    if (stored === "granted" || stored === "denied") setChoice(stored);
+    const timer = window.setTimeout(() => {
+      if (stored === "granted" || stored === "denied") setChoice(stored);
+    }, 0);
     const openSettings = () => setSettingsOpen(true);
     window.addEventListener(OPEN_CONSENT_EVENT, openSettings);
-    return () => window.removeEventListener(OPEN_CONSENT_EVENT, openSettings);
+    return () => { window.clearTimeout(timer); window.removeEventListener(OPEN_CONSENT_EVENT, openSettings); };
   }, []);
 
   useEffect(() => {
