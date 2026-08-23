@@ -1,7 +1,9 @@
 # Fullføringsaudit mot Definition of Done
 
-Dato: 24. august 2026  
-Teknisk gate-commit: `3b852b3`  
+Dato: 24. august 2026
+
+Teknisk gate-commit: `3b852b3`
+
 PR: `darbasnorvegija4-eng/landing_no#52`
 
 Denne kontrollen bruker kapittel 4 i `full-platform-implementation-master-plan.md` som fasit. `Implementert` betyr at kode og målrettet automatisk test finnes. Det betyr ikke at ekstern staging eller produksjon er godkjent.

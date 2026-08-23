@@ -1,7 +1,9 @@
 # Fase 11 – stagingpilot og produksjonsgate
 
-Dato: 24. august 2026  
-Gren: `codex/master-platform-implementation`  
+Dato: 24. august 2026
+
+Gren: `codex/master-platform-implementation`
+
 Produksjon: ikke endret
 
 ## Resultat så langt
