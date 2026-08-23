@@ -380,9 +380,9 @@ export interface Post {
   seoDescriptionNo?: string | null;
   seoDescriptionEn?: string | null;
   publishedAt?: string | null;
-  editorialStatus: 'draft' | 'ai_qa' | 'human_review' | 'approved' | 'scheduled' | 'published';
+  editorialStatus: 'draft' | 'ai_qa' | 'human_review' | 'rejected' | 'approved' | 'scheduled' | 'published';
   /**
-   * Kan bare lagres når redaksjonell status er Godkjent.
+   * Kan bare lagres når redaksjonell status er Godkjent eller Planlagt.
    */
   scheduledAt?: string | null;
   searchIntent?: ('informational' | 'commercial' | 'local' | 'comparison') | null;
@@ -411,6 +411,31 @@ export interface Post {
   aiAssisted?: boolean | null;
   aiGenerationRun?: (number | null) | SeoRun;
   qualityScore?: number | null;
+  qualityChecks?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  reviewFlags?:
+    | {
+        flag: string;
+        id?: string | null;
+      }[]
+    | null;
+  proposedInternalLinks?:
+    | {
+        href: string;
+        anchor: string;
+        reason: string;
+        id?: string | null;
+      }[]
+    | null;
+  imageBrief?: string | null;
+  imageAlt?: string | null;
   relatedPosts?: (number | Post)[] | null;
   relatedServices?: (number | Service)[] | null;
   ctaVariant?: ('assessment' | 'wash' | 'renewal' | 'new_roof') | null;
@@ -424,6 +449,16 @@ export interface Post {
       }[]
     | null;
   lastContentAuditAt?: string | null;
+  searchPerformance?: {
+    impressions?: number | null;
+    clicks?: number | null;
+    ctr?: number | null;
+    averagePosition?: number | null;
+    updatedAt?: string | null;
+    indexVerdict?: string | null;
+    coverageState?: string | null;
+    lastCrawlAt?: string | null;
+  };
   performanceNotes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -437,7 +472,11 @@ export interface Post {
  */
 export interface SeoRun {
   id: number;
+  idempotencyKey: string;
   jobType: string;
+  triggerSource: 'manual' | 'cron' | 'regenerate';
+  weekKey?: string | null;
+  slot?: string | null;
   status: 'running' | 'completed' | 'failed' | 'attention';
   startedAt: string;
   finishedAt?: string | null;
@@ -470,6 +509,7 @@ export interface SeoRun {
  */
 export interface SeoTopic {
   id: number;
+  fingerprint: string;
   topic: string;
   primaryKeyword: string;
   secondaryKeywords?:
@@ -495,8 +535,35 @@ export interface SeoTopic {
     | number
     | boolean
     | null;
+  /**
+   * Kan opprettes uten AI og må kontrolleres før artikkelgenerering.
+   */
+  proposedBrief?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   topicScore: number;
   overlapScore: number;
+  scoreBreakdown?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  rejectionReasons?:
+    | {
+        reason: string;
+        id?: string | null;
+      }[]
+    | null;
   reasonForSelection: string;
   status: 'candidate' | 'rejected' | 'queued' | 'drafted' | 'approved' | 'published';
   checkedAt?: string | null;
@@ -1099,6 +1166,23 @@ export interface PostsSelect<T extends boolean = true> {
   aiAssisted?: T;
   aiGenerationRun?: T;
   qualityScore?: T;
+  qualityChecks?: T;
+  reviewFlags?:
+    | T
+    | {
+        flag?: T;
+        id?: T;
+      };
+  proposedInternalLinks?:
+    | T
+    | {
+        href?: T;
+        anchor?: T;
+        reason?: T;
+        id?: T;
+      };
+  imageBrief?: T;
+  imageAlt?: T;
   relatedPosts?: T;
   relatedServices?: T;
   ctaVariant?: T;
@@ -1112,6 +1196,18 @@ export interface PostsSelect<T extends boolean = true> {
         id?: T;
       };
   lastContentAuditAt?: T;
+  searchPerformance?:
+    | T
+    | {
+        impressions?: T;
+        clicks?: T;
+        ctr?: T;
+        averagePosition?: T;
+        updatedAt?: T;
+        indexVerdict?: T;
+        coverageState?: T;
+        lastCrawlAt?: T;
+      };
   performanceNotes?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1185,6 +1281,7 @@ export interface WorkOrdersSelect<T extends boolean = true> {
  * via the `definition` "seo-topics_select".
  */
 export interface SeoTopicsSelect<T extends boolean = true> {
+  fingerprint?: T;
   topic?: T;
   primaryKeyword?: T;
   secondaryKeywords?:
@@ -1199,8 +1296,16 @@ export interface SeoTopicsSelect<T extends boolean = true> {
   season?: T;
   source?: T;
   sourceMetrics?: T;
+  proposedBrief?: T;
   topicScore?: T;
   overlapScore?: T;
+  scoreBreakdown?: T;
+  rejectionReasons?:
+    | T
+    | {
+        reason?: T;
+        id?: T;
+      };
   reasonForSelection?: T;
   status?: T;
   checkedAt?: T;
@@ -1213,7 +1318,11 @@ export interface SeoTopicsSelect<T extends boolean = true> {
  * via the `definition` "seo-runs_select".
  */
 export interface SeoRunsSelect<T extends boolean = true> {
+  idempotencyKey?: T;
   jobType?: T;
+  triggerSource?: T;
+  weekKey?: T;
+  slot?: T;
   status?: T;
   startedAt?: T;
   finishedAt?: T;

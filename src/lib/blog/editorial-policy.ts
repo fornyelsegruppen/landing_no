@@ -7,6 +7,7 @@ export type EditorialPost = {
     | "draft"
     | "ai_qa"
     | "human_review"
+    | "rejected"
     | "approved"
     | "scheduled"
     | "published"

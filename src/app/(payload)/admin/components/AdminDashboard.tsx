@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getPayload } from "@/lib/payload";
+import { GenerateBlogDraftButton } from "./GenerateBlogDraftButton";
+import { BlogTopicTools } from "./BlogTopicTools";
 
 type DashboardCounts = {
   activeWork: number;
@@ -8,18 +10,27 @@ type DashboardCounts = {
   pendingContracts: number;
   pendingQuotes: number;
   unassignedWork: number;
+  aiDrafts: number;
 };
 
 async function loadCounts(): Promise<DashboardCounts> {
   try {
     const payload = await getPayload();
-    const [newLeads, attention, activeWork, unassignedWork] = await Promise.all([
+    const [newLeads, aiDrafts, operationalAttention, seoAttention, activeWork, unassignedWork] = await Promise.all([
       payload.count({
         collection: "leads",
         where: { status: { equals: "new" } },
       }),
       payload.count({
+        collection: "posts",
+        where: { editorialStatus: { in: ["ai_qa", "human_review"] } },
+      }),
+      payload.count({
         collection: "operational-jobs",
+        where: { status: { in: ["failed", "attention"] } },
+      }),
+      payload.count({
+        collection: "seo-runs",
         where: { status: { in: ["failed", "attention"] } },
       }),
       payload.count({
@@ -34,11 +45,12 @@ async function loadCounts(): Promise<DashboardCounts> {
 
     return {
       newLeads: newLeads.totalDocs,
-      attention: attention.totalDocs,
+      attention: operationalAttention.totalDocs + seoAttention.totalDocs,
       activeWork: activeWork.totalDocs,
       unassignedWork: unassignedWork.totalDocs,
       pendingQuotes: 0,
       pendingContracts: 0,
+      aiDrafts: aiDrafts.totalDocs,
     };
   } catch {
     return {
@@ -48,6 +60,7 @@ async function loadCounts(): Promise<DashboardCounts> {
       unassignedWork: 0,
       pendingQuotes: 0,
       pendingContracts: 0,
+      aiDrafts: 0,
     };
   }
 }
@@ -58,6 +71,11 @@ const cards = [
     key: "pendingQuotes",
     label: "Tilbud til godkjenning",
     href: "/admin/collections/leads",
+  },
+  {
+    key: "aiDrafts",
+    label: "Bloggutkast til kontroll",
+    href: "/admin/collections/posts",
   },
   {
     key: "pendingContracts",
@@ -110,6 +128,12 @@ export default async function AdminDashboard() {
           </p>
           <Link href="/admin/collections/work-orders">Se arbeid</Link>
         </article>
+      </div>
+      <div className="platform-dashboard__automation">
+        <h2>AI-assistert blogg</h2>
+        <p>Oppretter bare utkast. Publisering krever faglig kontroll og eksplisitt godkjenning.</p>
+        <GenerateBlogDraftButton />
+        <BlogTopicTools />
       </div>
     </section>
   );

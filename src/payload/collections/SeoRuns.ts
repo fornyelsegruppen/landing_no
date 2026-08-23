@@ -18,7 +18,20 @@ export const SeoRuns: CollectionConfig = {
     update: adminOnly,
   },
   fields: [
+    { name: "idempotencyKey", type: "text", required: true, unique: true, index: true },
     { name: "jobType", type: "text", required: true, index: true },
+    {
+      name: "triggerSource",
+      type: "select",
+      required: true,
+      options: [
+        { label: "Manuell", value: "manual" },
+        { label: "Tidsplan", value: "cron" },
+        { label: "Regenerering", value: "regenerate" },
+      ],
+    },
+    { name: "weekKey", type: "text", index: true },
+    { name: "slot", type: "text" },
     {
       name: "status",
       type: "select",

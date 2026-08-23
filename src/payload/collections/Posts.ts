@@ -136,6 +136,7 @@ export const Posts: CollectionConfig = {
         { label: "Utkast", value: "draft" },
         { label: "AI-kontroll", value: "ai_qa" },
         { label: "Menneskelig kontroll", value: "human_review" },
+        { label: "Avvist", value: "rejected" },
         { label: "Godkjent", value: "approved" },
         { label: "Planlagt", value: "scheduled" },
         { label: "Publisert", value: "published" },
@@ -197,6 +198,25 @@ export const Posts: CollectionConfig = {
       min: 0,
       max: 100,
     },
+    { name: "qualityChecks", type: "json", label: "Kvalitetskontroll" },
+    {
+      name: "reviewFlags",
+      type: "array",
+      label: "Kontrollpunkter",
+      fields: [{ name: "flag", type: "textarea", required: true }],
+    },
+    {
+      name: "proposedInternalLinks",
+      type: "array",
+      label: "Foreslåtte internlenker",
+      fields: [
+        { name: "href", type: "text", required: true },
+        { name: "anchor", type: "text", required: true },
+        { name: "reason", type: "textarea", required: true },
+      ],
+    },
+    { name: "imageBrief", type: "textarea", label: "Bildebehov" },
+    { name: "imageAlt", type: "text", label: "Foreslått alt-tekst" },
     {
       name: "relatedPosts",
       type: "relationship",
@@ -235,6 +255,28 @@ export const Posts: CollectionConfig = {
       ],
     },
     { name: "lastContentAuditAt", type: "date", label: "Sist innholdskontroll" },
+    {
+      name: "searchPerformance",
+      type: "group",
+      label: "Search Console (siste 90 dager)",
+      fields: [
+        { name: "impressions", type: "number", label: "Visninger", min: 0 },
+        { name: "clicks", type: "number", label: "Klikk", min: 0 },
+        { name: "ctr", type: "number", label: "CTR", min: 0 },
+        { name: "averagePosition", type: "number", label: "Gjennomsnittsposisjon", min: 0 },
+        { name: "updatedAt", type: "date", label: "Sist hentet" },
+        { name: "indexVerdict", type: "text", label: "Indekseringsvurdering" },
+        { name: "coverageState", type: "text", label: "Dekningsstatus" },
+        { name: "lastCrawlAt", type: "date", label: "Siste Google-gjennomgang" },
+      ],
+    },
     { name: "performanceNotes", type: "textarea", label: "Resultatnotater" },
+    {
+      name: "workflowActions",
+      type: "ui",
+      admin: {
+        components: { Field: "/components/BlogWorkflowActions" },
+      },
+    },
   ],
 };

@@ -24,6 +24,7 @@ export const SeoTopics: CollectionConfig = {
     update: adminOnly,
   },
   fields: [
+    { name: "fingerprint", type: "text", required: true, unique: true, index: true },
     { name: "topic", type: "text", required: true, index: true },
     { name: "primaryKeyword", type: "text", required: true, index: true },
     {
@@ -63,6 +64,12 @@ export const SeoTopics: CollectionConfig = {
       admin: { description: "Kun aggregerte tall; aldri kundedata eller tokens." },
     },
     {
+      name: "proposedBrief",
+      type: "json",
+      label: "Foreslått artikkelbrief",
+      admin: { description: "Kan opprettes uten AI og må kontrolleres før artikkelgenerering." },
+    },
+    {
       name: "topicScore",
       type: "number",
       min: 0,
@@ -77,6 +84,12 @@ export const SeoTopics: CollectionConfig = {
       max: 100,
       defaultValue: 0,
       required: true,
+    },
+    { name: "scoreBreakdown", type: "json", label: "Poenggrunnlag" },
+    {
+      name: "rejectionReasons",
+      type: "array",
+      fields: [{ name: "reason", type: "text", required: true }],
     },
     { name: "reasonForSelection", type: "textarea", required: true },
     {

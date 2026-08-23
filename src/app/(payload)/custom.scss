@@ -62,6 +62,93 @@
   margin-top: 0;
 }
 
+.platform-dashboard__automation,
+.blog-workflow-actions {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 0.75rem;
+  margin-top: 1rem;
+  padding: 1.1rem;
+}
+
+.platform-dashboard__automation h2,
+.blog-workflow-actions h3 {
+  margin-top: 0;
+}
+
+.blog-generate-action button,
+.blog-workflow-actions button {
+  background: var(--theme-success-500);
+  border: 0;
+  border-radius: 0.5rem;
+  color: var(--theme-elevation-0);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+}
+
+.blog-generate-action button:disabled,
+.blog-workflow-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.blog-generate-action .is-error,
+.blog-workflow-actions .is-danger {
+  color: var(--theme-error-500);
+}
+
+.blog-workflow-actions__inputs,
+.blog-workflow-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.blog-workflow-actions__inputs label {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 0.35rem;
+}
+
+.blog-workflow-actions__inputs input {
+  background: var(--theme-input-bg);
+  border: 1px solid var(--theme-elevation-250);
+  border-radius: 0.4rem;
+  color: inherit;
+  min-height: 2.6rem;
+  padding: 0.5rem;
+}
+
+.blog-topic-tools {
+  border-top: 1px solid var(--theme-elevation-150);
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.blog-topic-tools__actions,
+.blog-topic-tools form {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.blog-topic-tools label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.blog-topic-tools button,
+.blog-topic-tools select,
+.blog-topic-tools input {
+  min-height: 2.5rem;
+}
+
 @media (max-width: 900px) {
   .platform-dashboard__cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
