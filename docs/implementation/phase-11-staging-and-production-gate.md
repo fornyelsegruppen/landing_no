@@ -51,3 +51,5 @@ Følgende kan ikke sannferdig godkjennes i den lokale kodefasen og blokkerer pro
 Vercels prosjektoversikt viste dessuten `57,6 %` feilrate for det eksisterende produksjonsprosjektet i det viste seks-timersvinduet. Årsak og normal baseline må avklares i en personvernbevisst logggjennomgang før piloten starter; dette tallet er ikke brukt som bevis for en bestemt kodefeil.
 
 Gate 11 er derfor med hensikt lukket. Neste sikre handling er å opprette separat staging og gjennomføre runbooken. Produksjonsbranch, produksjonsdatabase og levende feature-flagg er ikke endret.
+
+Krav-for-krav-status er dokumentert i `docs/implementation/completion-audit-2026-08-23.md` slik at ingen lokal test kan forveksles med full produksjonsgodkjenning.
