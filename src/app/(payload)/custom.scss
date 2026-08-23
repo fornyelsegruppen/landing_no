@@ -226,3 +226,33 @@
     grid-template-columns: 1fr;
   }
 }
+.measurement-actions {
+  margin-block: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: .5rem;
+  background: var(--theme-elevation-50);
+}
+
+.measurement-actions svg {
+  display: block;
+  width: min(100%, 42rem);
+  min-height: 12rem;
+  margin-block: 1rem;
+  color: var(--theme-text);
+  background: var(--theme-bg);
+  border: 1px solid var(--theme-elevation-150);
+}
+
+.measurement-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+
+.measurement-actions button {
+  padding: .65rem 1rem;
+  border: 1px solid var(--theme-elevation-300);
+  border-radius: .35rem;
+  cursor: pointer;
+}

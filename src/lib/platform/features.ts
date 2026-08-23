@@ -38,7 +38,7 @@ export function readFeatureFlags(
 }
 
 export type IntegrationName =
-  "ai" | "email" | "sms" | "maps" | "signature" | "searchData" | "jobs";
+  "ai" | "email" | "sms" | "maps" | "imagery" | "signature" | "searchData" | "jobs";
 
 export type IntegrationReadiness =
   "ready" | "configuration_required" | "disabled";
@@ -102,6 +102,15 @@ export function readIntegrationStatus(
       provider: "kartverket-address",
       missing: [],
     },
+    imagery: {
+      name: "imagery",
+      readiness: configured(environment, "NORGE_I_BILDER_TOKEN") && configured(environment, "MAP_TERMS_ACCEPTED_AT") ? "ready" : "configuration_required",
+      provider: "norge-i-bilder",
+      missing: [
+        ...(!configured(environment, "NORGE_I_BILDER_TOKEN") ? ["NORGE_I_BILDER_TOKEN"] : []),
+        ...(!configured(environment, "MAP_TERMS_ACCEPTED_AT") ? ["MAP_TERMS_ACCEPTED_AT"] : []),
+      ],
+    },
     signature: {
       name: "signature",
       readiness: tokenSecretReady ? "ready" : "configuration_required",
@@ -129,7 +138,7 @@ export function readIntegrationStatus(
 
 const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   aiDrafts: ["ai"],
-  roofMeasurement: ["maps"],
+  roofMeasurement: ["maps", "imagery"],
   customerQuotes: ["email", "signature"],
   contractSigning: ["signature", "email"],
   workerPortal: [],

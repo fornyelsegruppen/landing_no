@@ -24,6 +24,9 @@ import { WorkOrders } from "./payload/collections/WorkOrders";
 import { SeoTopics } from "./payload/collections/SeoTopics";
 import { SeoRuns } from "./payload/collections/SeoRuns";
 import { Messages } from "./payload/collections/Messages";
+import { RoofMeasurements } from "./payload/collections/RoofMeasurements";
+import { PriceRules } from "./payload/collections/PriceRules";
+import { PriceCalculations } from "./payload/collections/PriceCalculations";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -125,6 +128,9 @@ export default buildConfig({
     Redirects,
     Leads,
     Messages,
+    RoofMeasurements,
+    PriceRules,
+    PriceCalculations,
     WorkOrders,
     SeoTopics,
     SeoRuns,

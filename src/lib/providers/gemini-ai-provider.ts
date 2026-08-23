@@ -44,6 +44,10 @@ export class GeminiAiProvider implements AiProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
+      const attachments = input.attachments ?? [];
+      if (attachments.length > 3 || attachments.some((item) => item.dataBase64.length > 14_000_000)) {
+        throw new TypeError("AI image attachment limit exceeded");
+      }
       const response = await this.request(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`,
         {
@@ -56,7 +60,10 @@ export class GeminiAiProvider implements AiProvider {
           signal: controller.signal,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: input.system }] },
-            contents: [{ role: "user", parts: [{ text: input.prompt }] }],
+            contents: [{ role: "user", parts: [
+              { text: input.prompt },
+              ...attachments.map((attachment) => ({ inlineData: { mimeType: attachment.mimeType, data: attachment.dataBase64 } })),
+            ] }],
             generationConfig: {
               temperature: 0.25,
               responseFormat: {

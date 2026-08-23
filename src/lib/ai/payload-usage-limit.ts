@@ -23,7 +23,7 @@ async function usageSince(payload: Payload, start: Date) {
       where: {
         and: [
           { startedAt: { greater_than_equal: start.toISOString() } },
-          { type: { equals: "lead.ai.draft" } },
+          { type: { in: ["lead.ai.draft", "roof.ai.proposal", "price.ai.explanation"] } },
         ],
       },
     }),

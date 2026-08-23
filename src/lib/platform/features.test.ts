@@ -49,6 +49,19 @@ describe("platform feature configuration", () => {
     expect(() => assertFeatureReady("seoScheduler", environment)).not.toThrow();
   });
 
+  it("does not enable automatic roof measurement without licensed imagery access", () => {
+    expect(featureReadiness("roofMeasurement", { FEATURE_ROOF_MEASUREMENT: "true" })).toEqual({
+      enabled: true,
+      ready: false,
+      unavailable: ["imagery"],
+    });
+    expect(() => assertFeatureReady("roofMeasurement", {
+      FEATURE_ROOF_MEASUREMENT: "true",
+      NORGE_I_BILDER_TOKEN: "configured",
+      MAP_TERMS_ACCEPTED_AT: "2026-08-23T00:00:00Z",
+    })).not.toThrow();
+  });
+
   it("distinguishes disabled from missing configuration", () => {
     expect(() => assertFeatureReady("aiDrafts", {})).toThrowError(
       new FeatureUnavailableError("aiDrafts", "disabled"),

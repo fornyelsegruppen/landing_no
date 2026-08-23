@@ -1,0 +1,107 @@
+import type { CollectionBeforeChangeHook, CollectionConfig } from "payload";
+import { adminOnly } from "../access/roles";
+import { prepareMeasurement } from "@/lib/measurements/proposal";
+
+const lockedFields = ["normalizedAddress", "latitude", "longitude", "buildingIdentifier", "roofPlanes", "source", "capturedAt"] as const;
+
+export const protectApprovedMeasurement: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
+  if (operation === "update" && originalDoc?.status === "approved") {
+    const changed = lockedFields.some((field) => field in data && JSON.stringify(data[field]) !== JSON.stringify(originalDoc[field]));
+    if (changed) throw new Error("An approved measurement is immutable. Create a new version instead.");
+  }
+  return data;
+};
+
+function relationId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
+  return null;
+}
+
+export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
+  if (data.status !== "approved" || originalDoc?.status === "approved") return data;
+  const merged = { ...originalDoc, ...data };
+  const leadId = relationId(merged.lead);
+  if (!leadId) throw new Error("Measurement approval requires a lead");
+  const lead = await req.payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true, req });
+  const rules = await req.payload.count({ collection: "price-rules", overrideAccess: true, req, where: { and: [
+    { serviceKey: { equals: lead.inquiryType } }, { status: { equals: "approved" } },
+  ] } });
+  const prepared = prepareMeasurement({
+    proposal: {
+      buildingIdentifier: merged.buildingIdentifier ?? null,
+      confidence: merged.confidence,
+      confidenceReasoning: merged.confidenceReasoning,
+      roofPlanes: merged.roofPlanes,
+    },
+    addressResolved: Boolean(merged.addressSourceId),
+    imageryLicensed: merged.imageryLicensed === true,
+    hasApprovedPriceRule: rules.totalDocs > 0,
+  });
+  if (!prepared.gate.allowed) throw new Error(`Measurement approval blocked: ${prepared.gate.reasons.join(", ")}`);
+  data.horizontalAreaTenths = prepared.calculation?.horizontalAreaTenths ?? 0;
+  data.actualAreaMinTenths = prepared.calculation?.actualAreaMinTenths ?? 0;
+  data.actualAreaMaxTenths = prepared.calculation?.actualAreaMaxTenths ?? 0;
+  data.calculationSnapshot = prepared.calculation;
+  data.inputHash = prepared.inputHash;
+  data.blockingReasons = [];
+  data.approvedBy = req.user?.id;
+  data.approvedAt = new Date().toISOString();
+  return data;
+};
+
+export const RoofMeasurements: CollectionConfig = {
+  slug: "roof-measurements",
+  labels: { singular: "Takmåling", plural: "Takmålinger" },
+  admin: {
+    group: "Henvendelser",
+    useAsTitle: "reference",
+    defaultColumns: ["reference", "lead", "version", "confidence", "status", "actualAreaMaxTenths", "updatedAt"],
+    description: "Versjonerte takmålinger. AI kan foreslå; geometri og pris beregnes av kode og må godkjennes av administrator.",
+  },
+  access: { admin: ({ req }) => adminOnly({ req }) === true, create: adminOnly, read: adminOnly, update: adminOnly, delete: adminOnly },
+  hooks: { beforeChange: [protectApprovedMeasurement, enforceMeasurementApproval] },
+  fields: [
+    { name: "reference", type: "text", required: true, unique: true, index: true },
+    { name: "lead", type: "relationship", relationTo: "leads", required: true, index: true },
+    { name: "version", type: "number", required: true, min: 1, index: true },
+    { name: "supersedes", type: "relationship", relationTo: "roof-measurements", index: true },
+    { name: "normalizedAddress", type: "text", required: true },
+    { name: "addressSourceId", type: "text" },
+    { name: "latitude", type: "number", required: true },
+    { name: "longitude", type: "number", required: true },
+    { name: "buildingIdentifier", type: "text" },
+    { name: "source", type: "text", required: true, defaultValue: "Kartverket / manuell kontroll" },
+    { name: "sourceUrl", type: "text" },
+    { name: "license", type: "text", required: true, defaultValue: "CC BY 4.0 / særvilkår for ortofoto" },
+    { name: "credits", type: "text", required: true, defaultValue: "© Kartverket" },
+    { name: "imageryLicensed", type: "checkbox", required: true, defaultValue: false, label: "Lisensgrunnlag kontrollert", admin: { description: "Skal bare aktiveres når kilden kan brukes kommersielt og korrekt kreditering er registrert." } },
+    { name: "capturedAt", type: "date", required: true },
+    { name: "mapImage", type: "relationship", relationTo: "private-media" },
+    {
+      name: "roofPlanes", type: "json", required: true,
+      admin: { description: "Polygonpunkter (lat/lon) og vinkelintervall per takflate. Redigering oppretter ny versjon via kontrollen under." },
+    },
+    { name: "horizontalAreaTenths", type: "number", required: true, admin: { readOnly: true, description: "0,1 m²" } },
+    { name: "actualAreaMinTenths", type: "number", required: true, admin: { readOnly: true, description: "0,1 m²" } },
+    { name: "actualAreaMaxTenths", type: "number", required: true, admin: { readOnly: true, description: "0,1 m²" } },
+    { name: "calculationSnapshot", type: "json", required: true, admin: { readOnly: true } },
+    { name: "inputHash", type: "text", required: true, index: true, admin: { readOnly: true } },
+    {
+      name: "confidence", type: "select", required: true, options: [
+        { label: "Høy", value: "high" }, { label: "Middels", value: "medium" }, { label: "Lav", value: "low" },
+      ],
+    },
+    { name: "confidenceReasoning", type: "textarea", required: true },
+    {
+      name: "status", type: "select", required: true, defaultValue: "draft", index: true, options: [
+        { label: "Utkast", value: "draft" }, { label: "Må kontrolleres", value: "review_required" },
+        { label: "Blokkert", value: "blocked" }, { label: "Godkjent", value: "approved" }, { label: "Erstattet", value: "superseded" },
+      ],
+    },
+    { name: "blockingReasons", type: "json", admin: { readOnly: true } },
+    { name: "approvedBy", type: "relationship", relationTo: "users", admin: { readOnly: true } },
+    { name: "approvedAt", type: "date", admin: { readOnly: true } },
+    { name: "measurementActions", type: "ui", admin: { components: { Field: "/components/MeasurementActions" } } },
+  ],
+};

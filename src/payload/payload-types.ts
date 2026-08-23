@@ -78,6 +78,9 @@ export interface Config {
     redirects: Redirect;
     leads: Lead;
     messages: Message;
+    'roof-measurements': RoofMeasurement;
+    'price-rules': PriceRule;
+    'price-calculations': PriceCalculation;
     'work-orders': WorkOrder;
     'seo-topics': SeoTopic;
     'seo-runs': SeoRun;
@@ -103,6 +106,9 @@ export interface Config {
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     messages: MessagesSelect<false> | MessagesSelect<true>;
+    'roof-measurements': RoofMeasurementsSelect<false> | RoofMeasurementsSelect<true>;
+    'price-rules': PriceRulesSelect<false> | PriceRulesSelect<true>;
+    'price-calculations': PriceCalculationsSelect<false> | PriceCalculationsSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
     'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
@@ -726,6 +732,185 @@ export interface Message {
   createdAt: string;
 }
 /**
+ * Versjonerte takmålinger. AI kan foreslå; geometri og pris beregnes av kode og må godkjennes av administrator.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-measurements".
+ */
+export interface RoofMeasurement {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  version: number;
+  supersedes?: (number | null) | RoofMeasurement;
+  normalizedAddress: string;
+  addressSourceId?: string | null;
+  latitude: number;
+  longitude: number;
+  buildingIdentifier?: string | null;
+  source: string;
+  sourceUrl?: string | null;
+  license: string;
+  credits: string;
+  /**
+   * Skal bare aktiveres når kilden kan brukes kommersielt og korrekt kreditering er registrert.
+   */
+  imageryLicensed: boolean;
+  capturedAt: string;
+  mapImage?: (number | null) | PrivateMedia;
+  /**
+   * Polygonpunkter (lat/lon) og vinkelintervall per takflate. Redigering oppretter ny versjon via kontrollen under.
+   */
+  roofPlanes:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * 0,1 m²
+   */
+  horizontalAreaTenths: number;
+  /**
+   * 0,1 m²
+   */
+  actualAreaMinTenths: number;
+  /**
+   * 0,1 m²
+   */
+  actualAreaMaxTenths: number;
+  calculationSnapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  inputHash: string;
+  confidence: 'high' | 'medium' | 'low';
+  confidenceReasoning: string;
+  status: 'draft' | 'review_required' | 'blocked' | 'approved' | 'superseded';
+  blockingReasons?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Customer, contract and work files. Access must always be authorized server-side.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "private-media".
+ */
+export interface PrivateMedia {
+  id: number;
+  classification: 'customer' | 'measurement' | 'contract' | 'work';
+  ownerType?: string | null;
+  ownerId?: string | null;
+  /**
+   * Required when the file is an image shown in UI.
+   */
+  alt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * Kun godkjente, versjonerte regler kan brukes. Markedsføringspriser er ikke automatisk bindende prisregler.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "price-rules".
+ */
+export interface PriceRule {
+  id: number;
+  reference: string;
+  version: number;
+  serviceKey: 'takvask' | 'takvask_impregnering' | 'impregnering' | 'takmaling' | 'nytt_tak';
+  unitPriceExVatOre: number;
+  vatBasisPoints: number;
+  minimumExVatOre: number;
+  toleranceBasisPoints: number;
+  maximumExVatOre?: number | null;
+  validFrom: string;
+  validTo?: string | null;
+  termsVersion: string;
+  notes?: string | null;
+  status: 'draft' | 'approved' | 'retired';
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Uforanderlige beregningsspor. AI kan bare forklare tall som allerede er beregnet her.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "price-calculations".
+ */
+export interface PriceCalculation {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  measurement: number | RoofMeasurement;
+  priceRule: number | PriceRule;
+  inputSnapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  outputSnapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  inputHash: string;
+  subtotalExVatOre: number;
+  vatOre: number;
+  totalIncVatOre: number;
+  maximumTotalIncVatOre?: number | null;
+  status: 'draft' | 'ready' | 'blocked' | 'superseded';
+  blockingReasons?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Grunnskall for tildelte oppdrag. Arbeidsflyt og dokumentasjon utvides i arbeidsordrefasen.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -862,33 +1047,6 @@ export interface AccessToken {
   createdAt: string;
 }
 /**
- * Customer, contract and work files. Access must always be authorized server-side.
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "private-media".
- */
-export interface PrivateMedia {
-  id: number;
-  classification: 'customer' | 'measurement' | 'contract' | 'work';
-  ownerType?: string | null;
-  ownerId?: string | null;
-  /**
-   * Required when the file is an image shown in UI.
-   */
-  alt?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-}
-/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -955,6 +1113,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'messages';
         value: number | Message;
+      } | null)
+    | ({
+        relationTo: 'roof-measurements';
+        value: number | RoofMeasurement;
+      } | null)
+    | ({
+        relationTo: 'price-rules';
+        value: number | PriceRule;
+      } | null)
+    | ({
+        relationTo: 'price-calculations';
+        value: number | PriceCalculation;
       } | null)
     | ({
         relationTo: 'work-orders';
@@ -1371,6 +1541,86 @@ export interface MessagesSelect<T extends boolean = true> {
   providerMessageId?: T;
   failureCode?: T;
   failureMessage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-measurements_select".
+ */
+export interface RoofMeasurementsSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  version?: T;
+  supersedes?: T;
+  normalizedAddress?: T;
+  addressSourceId?: T;
+  latitude?: T;
+  longitude?: T;
+  buildingIdentifier?: T;
+  source?: T;
+  sourceUrl?: T;
+  license?: T;
+  credits?: T;
+  imageryLicensed?: T;
+  capturedAt?: T;
+  mapImage?: T;
+  roofPlanes?: T;
+  horizontalAreaTenths?: T;
+  actualAreaMinTenths?: T;
+  actualAreaMaxTenths?: T;
+  calculationSnapshot?: T;
+  inputHash?: T;
+  confidence?: T;
+  confidenceReasoning?: T;
+  status?: T;
+  blockingReasons?: T;
+  approvedBy?: T;
+  approvedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "price-rules_select".
+ */
+export interface PriceRulesSelect<T extends boolean = true> {
+  reference?: T;
+  version?: T;
+  serviceKey?: T;
+  unitPriceExVatOre?: T;
+  vatBasisPoints?: T;
+  minimumExVatOre?: T;
+  toleranceBasisPoints?: T;
+  maximumExVatOre?: T;
+  validFrom?: T;
+  validTo?: T;
+  termsVersion?: T;
+  notes?: T;
+  status?: T;
+  approvedBy?: T;
+  approvedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "price-calculations_select".
+ */
+export interface PriceCalculationsSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  measurement?: T;
+  priceRule?: T;
+  inputSnapshot?: T;
+  outputSnapshot?: T;
+  inputHash?: T;
+  subtotalExVatOre?: T;
+  vatOre?: T;
+  totalIncVatOre?: T;
+  maximumTotalIncVatOre?: T;
+  status?: T;
+  blockingReasons?: T;
   updatedAt?: T;
   createdAt?: T;
 }

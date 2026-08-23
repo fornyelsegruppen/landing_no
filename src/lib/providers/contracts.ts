@@ -11,6 +11,10 @@ export type AiGenerateRequest = {
   schemaName: string;
   schema?: Record<string, unknown>;
   correlationId: string;
+  attachments?: Array<{
+    mimeType: "image/jpeg" | "image/png" | "image/webp";
+    dataBase64: string;
+  }>;
 };
 
 export type AiGenerateResult = {

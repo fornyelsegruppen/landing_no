@@ -14,6 +14,8 @@ import * as migration_20260823_143838_phase2_default_worker_role from './2026082
 import * as migration_20260823_150443_phase3_blog_foundation from './20260823_150443_phase3_blog_foundation';
 import * as migration_20260823_160853_phase4_ai_content_engine from './20260823_160853_phase4_ai_content_engine';
 import * as migration_20260823_163755_phase5_lead_inbox_messages from './20260823_163755_phase5_lead_inbox_messages';
+import * as migration_20260823_171411_phase6_measurement_pricing from './20260823_171411_phase6_measurement_pricing';
+import * as migration_20260823_172422_phase6_measurement_license_evidence from './20260823_172422_phase6_measurement_license_evidence';
 
 export const migrations = [
   {
@@ -94,6 +96,16 @@ export const migrations = [
   {
     up: migration_20260823_163755_phase5_lead_inbox_messages.up,
     down: migration_20260823_163755_phase5_lead_inbox_messages.down,
-    name: '20260823_163755_phase5_lead_inbox_messages'
+    name: '20260823_163755_phase5_lead_inbox_messages',
+  },
+  {
+    up: migration_20260823_171411_phase6_measurement_pricing.up,
+    down: migration_20260823_171411_phase6_measurement_pricing.down,
+    name: '20260823_171411_phase6_measurement_pricing',
+  },
+  {
+    up: migration_20260823_172422_phase6_measurement_license_evidence.up,
+    down: migration_20260823_172422_phase6_measurement_license_evidence.down,
+    name: '20260823_172422_phase6_measurement_license_evidence'
   },
 ];

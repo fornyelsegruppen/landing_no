@@ -7,6 +7,18 @@ const adminManagedField = {
 
 export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ id, req }) => {
   await req.payload.delete({
+    collection: "price-calculations",
+    overrideAccess: true,
+    req,
+    where: { lead: { equals: id } },
+  });
+  await req.payload.delete({
+    collection: "roof-measurements",
+    overrideAccess: true,
+    req,
+    where: { lead: { equals: id } },
+  });
+  await req.payload.delete({
     collection: "messages",
     overrideAccess: true,
     req,
