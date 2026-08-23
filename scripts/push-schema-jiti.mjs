@@ -10,12 +10,13 @@ process.env.NODE_ENV = "development";
 process.env.PAYLOAD_FORCE_DRIZZLE_PUSH = "true";
 
 const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const jiti = require("jiti")(import.meta.url, {
   esmResolve: true,
   interopDefault: true,
+  tsconfigPaths: path.resolve(__dirname, "../tsconfig.json"),
 });
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config = jiti(path.resolve(__dirname, "../src/payload.config.ts")).default;
 
 const { getPayload } = await import("payload");

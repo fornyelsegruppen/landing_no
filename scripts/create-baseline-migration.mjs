@@ -17,12 +17,13 @@ process.env.NODE_ENV = "production";
 process.env.PAYLOAD_MIGRATING = "true";
 
 const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const jiti = require("jiti")(import.meta.url, {
   esmResolve: true,
   interopDefault: true,
+  tsconfigPaths: path.resolve(__dirname, "../tsconfig.json"),
 });
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.resolve(__dirname, "../src/payload/migrations");
 
 const configModule = jiti(path.resolve(__dirname, "../src/payload.config.ts"));
