@@ -78,7 +78,7 @@ jobs:
         run: node scripts/push-schema-jiti.mjs --baseline-current-migrations
 
       - name: Seed deterministic public smoke content
-        run: npm run db:seed && npm run db:seed-copy
+        run: node scripts/seed-cms-sql.mjs && node scripts/seed-page-copy.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
