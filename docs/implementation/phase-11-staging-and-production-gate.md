@@ -38,12 +38,16 @@ Kodebasen er teknisk klargjort for intern staging og kontrollert feature-for-fea
 
 Følgende kan ikke sannferdig godkjennes i den lokale kodefasen og blokkerer produksjon:
 
-- Vercel stagingprosjekt og separat PostgreSQL-/Neon-database er ikke tilkoblet denne arbeidskopien;
+- Vercel-prosjektet `landing-no` er bekreftet koblet til `darbasnorvegija4-eng/landing_no`, med `main` som produksjonsgren og automatisk previewstøtte;
+- `DATABASE_URL`, `PAYLOAD_SECRET`, `NEXT_PUBLIC_SITE_URL`, `RESEND_API_KEY` og e-postadressene er bare konfigurert for produksjon. Preview har derfor ikke separat database, autentiseringssecret eller sikker testlevering;
+- en separat PostgreSQL-/Neon-stagingdatabase og egne preview-secrets er ikke opprettet eller tilkoblet;
 - produksjonssnapshot, Blob-inventar og restore-øvelse er ikke utført;
 - autentisert visuell QA på `/admin`, `/user`, mobil og sikre kundelenker er ikke signert;
 - ekte testlevering for Resend, Search Console, lisensiert ortofoto og eventuelt SMS er ikke dokumentert;
 - 20–30 ekte leadpilot og sammenligning mot fysisk kontrollmåling er ikke gjennomført;
 - prisregler, kontrakt/angrerett, signaturbevis, databehandlere og meldingstekster mangler registrert eier-/juridisk godkjenning;
 - produkteier har ikke gitt eksplisitt produksjons-go for noen feature.
+
+Vercels prosjektoversikt viste dessuten `57,6 %` feilrate for det eksisterende produksjonsprosjektet i det viste seks-timersvinduet. Årsak og normal baseline må avklares i en personvernbevisst logggjennomgang før piloten starter; dette tallet er ikke brukt som bevis for en bestemt kodefeil.
 
 Gate 11 er derfor med hensikt lukket. Neste sikre handling er å opprette separat staging og gjennomføre runbooken. Produksjonsbranch, produksjonsdatabase og levende feature-flagg er ikke endret.

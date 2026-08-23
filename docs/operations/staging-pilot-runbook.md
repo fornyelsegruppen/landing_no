@@ -6,7 +6,7 @@ Ingen risikofunksjon aktiveres i produksjon før dens rad i go/no-go-registeret 
 
 ## A. Intern staging
 
-1. Opprett separat Vercel preview/staging og separat PostgreSQL-database.
+1. Bruk eksisterende Vercel previewmekanisme, men opprett separat PostgreSQL-/Neon-database og egne Preview-secrets. Produksjonens `DATABASE_URL` eller `PAYLOAD_SECRET` skal aldri gjenbrukes.
 2. Bruk staging-spesifikke secrets. Hold e-post/SMS i test/log-modus og annonserings-ID-er tomme.
 3. Restore anonymisert produksjonslik kopi etter `backup-restore-runbook.md`.
 4. Kjør migrasjoner, `npm run typecheck`, `npm run lint`, alle tester og `npm run build` på stagingcommit.
@@ -41,6 +41,8 @@ Ingen risikofunksjon aktiveres i produksjon før dens rad i go/no-go-registeret 
 |---|---|
 | Staging-URL | Ikke opprettet |
 | Commit | Fylles ved deploy |
+| Vercel-prosjekt | `darbasnorvegija4-8212s-projects/landing-no` bekreftet; preview støttes |
+| Preview database/secrets | Ikke opprettet; kritiske variabler er Production-only |
 | Stagingdatabase/snapshot | Ikke opprettet |
 | Restore-test | Ikke utført |
 | Automatisk QA | Lokal teknisk QA bestått; gjentas i staging |
@@ -49,4 +51,3 @@ Ingen risikofunksjon aktiveres i produksjon før dens rad i go/no-go-registeret 
 | Takmåling mot fasit | Ikke startet |
 | Juridisk godkjenning | Ikke registrert |
 | Produksjonseier | Ikke godkjent |
-
