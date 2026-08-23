@@ -60,6 +60,8 @@ describe("historical draft migration enum compatibility", () => {
 
       INSERT INTO services (icon, _status, created_at, updated_at)
       VALUES ('home', 'published', now(), now());
+      INSERT INTO projects (_status, created_at, updated_at)
+      VALUES ('published', now(), now());
     `);
   });
 
@@ -75,5 +77,49 @@ describe("historical draft migration enum compatibility", () => {
       `SELECT version_icon::text AS icon FROM _services_v WHERE parent_id = 1`,
     );
     expect(result.rows).toEqual([{ icon: "home" }]);
+  }, 30_000);
+
+  it("copies a stage label into an enum-backed version field", async () => {
+    const blocks = sqlBlocks(migration);
+    await database.exec(blocks[1] as string);
+    await database.exec(`
+      CREATE TYPE enum_projects_stages_label AS ENUM ('before');
+      CREATE TYPE enum__projects_v_version_stages_label AS ENUM ('before');
+      CREATE TABLE projects_stages (
+        id varchar PRIMARY KEY,
+        _order integer NOT NULL,
+        _parent_id integer NOT NULL,
+        label enum_projects_stages_label,
+        caption_no varchar,
+        caption_en varchar,
+        image_id integer,
+        image_url varchar
+      );
+      CREATE TABLE _projects_v_version_stages (
+        id serial PRIMARY KEY,
+        _order integer NOT NULL,
+        _parent_id integer NOT NULL,
+        label enum__projects_v_version_stages_label,
+        caption_no varchar,
+        caption_en varchar,
+        image_id integer,
+        image_url varchar,
+        _uuid varchar
+      );
+      INSERT INTO projects_stages
+        (id, _order, _parent_id, label, caption_no)
+      VALUES ('stage-1', 1, 1, 'before', 'Før');
+    `);
+
+    const stageBackfill = migration.match(
+      /DO \$stage_backfill\$([\s\S]*?)\$stage_backfill\$;/,
+    );
+    expect(stageBackfill?.[0]).toBeTruthy();
+    await database.exec(stageBackfill?.[0] as string);
+
+    const result = await database.query<{ label: string }>(
+      `SELECT label::text AS label FROM _projects_v_version_stages`,
+    );
+    expect(result.rows).toEqual([{ label: "before" }]);
   }, 30_000);
 });

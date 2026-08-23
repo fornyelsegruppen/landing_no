@@ -495,28 +495,56 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   `);
 
   await db.execute(sql`
-    INSERT INTO "_projects_v_version_stages"
-      ("_order", "_parent_id", "label", "caption_no", "caption_en",
-       "image_id", "image_url", "_uuid")
-    SELECT
-      source."_order",
-      version."id",
-      source."label"::text,
-      source."caption_no",
-      source."caption_en",
-      source."image_id",
-      source."image_url",
-      source."id"
-    FROM "projects_stages" AS source
-    INNER JOIN "_projects_v" AS version
-      ON version."parent_id" = source."_parent_id"
-      AND version."latest" IS TRUE
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM "_projects_v_version_stages" AS existing
-      WHERE existing."_parent_id" = version."id"
-        AND existing."_uuid" = source."id"
-    );
+    DO $stage_backfill$
+    DECLARE
+      label_expression text;
+    BEGIN
+      SELECT
+        CASE
+          WHEN target_type.typtype = 'e'
+          THEN format(
+            'source."label"::text::%s',
+            format_type(target_attribute.atttypid, target_attribute.atttypmod)
+          )
+          ELSE 'source."label"::text'
+        END
+      INTO label_expression
+      FROM pg_attribute AS target_attribute
+      INNER JOIN pg_type AS target_type
+        ON target_type.oid = target_attribute.atttypid
+      WHERE target_attribute.attrelid =
+          to_regclass('public._projects_v_version_stages')
+        AND target_attribute.attname = 'label'
+        AND target_attribute.attnum > 0
+        AND NOT target_attribute.attisdropped;
+
+      EXECUTE format(
+        'INSERT INTO "_projects_v_version_stages"
+          ("_order", "_parent_id", "label", "caption_no", "caption_en",
+           "image_id", "image_url", "_uuid")
+         SELECT
+           source."_order",
+           version."id",
+           %s,
+           source."caption_no",
+           source."caption_en",
+           source."image_id",
+           source."image_url",
+           source."id"
+         FROM "projects_stages" AS source
+         INNER JOIN "_projects_v" AS version
+           ON version."parent_id" = source."_parent_id"
+           AND version."latest" IS TRUE
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM "_projects_v_version_stages" AS existing
+           WHERE existing."_parent_id" = version."id"
+             AND existing."_uuid" = source."id"
+         )',
+        label_expression
+      );
+    END
+    $stage_backfill$;
 
     INSERT INTO "_products_v_version_badges_no"
       ("_order", "_parent_id", "label", "_uuid")
