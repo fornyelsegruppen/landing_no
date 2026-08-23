@@ -12,7 +12,7 @@ export type FeatureFlagName = (typeof featureFlagNames)[number];
 export type FeatureFlags = Record<FeatureFlagName, boolean>;
 export type Environment = Readonly<Record<string, string | undefined>>;
 
-const environmentKeys: Record<FeatureFlagName, string> = {
+export const featureEnvironmentKeys: Record<FeatureFlagName, string> = {
   aiDrafts: "FEATURE_AI_DRAFTS",
   roofMeasurement: "FEATURE_ROOF_MEASUREMENT",
   customerQuotes: "FEATURE_CUSTOMER_QUOTES",
@@ -32,7 +32,7 @@ export function readFeatureFlags(
   return Object.fromEntries(
     featureFlagNames.map((name) => [
       name,
-      parseBooleanFlag(environment[environmentKeys[name]]),
+      parseBooleanFlag(environment[featureEnvironmentKeys[name]]),
     ]),
   ) as FeatureFlags;
 }

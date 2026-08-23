@@ -3,6 +3,7 @@ import { getPayload } from "@/lib/payload";
 import { GenerateBlogDraftButton } from "./GenerateBlogDraftButton";
 import { BlogTopicTools } from "./BlogTopicTools";
 import { buildPlatformHealth } from "@/lib/platform/health";
+import { buildReleaseGate } from "@/lib/platform/release-gate";
 
 type DashboardCounts = {
   activeWork: number;
@@ -129,7 +130,9 @@ const cards = [
 export default async function AdminDashboard() {
   const counts = await loadCounts();
   const health = buildPlatformHealth();
+  const releaseGate = buildReleaseGate();
   const unavailable = Object.values(health.integrations).filter((integration) => integration.readiness !== "ready");
+  const blockedReleaseFeatures = Object.entries(releaseGate.features).filter(([, decision]) => decision.status === "no_go");
 
   return (
     <section className="platform-dashboard" aria-labelledby="platform-title">
@@ -185,6 +188,14 @@ export default async function AdminDashboard() {
           {unavailable.map((integration) => <li key={integration.name}><strong>{integration.name}</strong>: {integration.readiness}{integration.missing.length ? ` – mangler ${integration.missing.join(", ")}` : ""}</li>)}
         </ul>
         <Link href="/api/admin/platform-health">Åpne teknisk helsestatus</Link>
+      </div>
+      <div className="platform-dashboard__automation">
+        <h2>Produksjonsgate</h2>
+        <p>{releaseGate.productionReady ? "Alle aktiverte funksjoner har dokumentert go." : "Produksjonsgaten er lukket. Deaktiverte funksjoner forblir trygt av, og aktiverte funksjoner må ha komplett stagingbevis."}</p>
+        <ul>
+          {blockedReleaseFeatures.map(([name, decision]) => <li key={name}><strong>{name}</strong>: mangler {[...decision.unavailableIntegrations, ...decision.missingEvidence].join(", ")}</li>)}
+        </ul>
+        <Link href="/api/admin/platform-health">Åpne go/no-go-status</Link>
       </div>
       <div className="platform-dashboard__automation">
         <h2>AI-assistert blogg</h2>
