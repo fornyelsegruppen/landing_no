@@ -300,7 +300,7 @@ try {
         'Takfornyelse', '+47 47 73 58 88', 'post@takfornyelse.as',
         'Lyngveien 28', '1182', 'Oslo', '916 693 168', 'Fornyelse Gruppen AS',
         $1, $2, $3,
-        2500, 750, 50, 500, 150,
+        2500, 421.25, 50, 500, 150,
         '2.000.000+', 10, '100+', 'Google',
         now(), now()
       )`,
