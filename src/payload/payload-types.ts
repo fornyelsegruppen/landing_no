@@ -83,6 +83,7 @@ export interface Config {
     'price-calculations': PriceCalculation;
     quotes: Quote;
     contracts: Contract;
+    'change-agreements': ChangeAgreement;
     'contract-terms': ContractTerm;
     'work-orders': WorkOrder;
     'seo-topics': SeoTopic;
@@ -114,6 +115,7 @@ export interface Config {
     'price-calculations': PriceCalculationsSelect<false> | PriceCalculationsSelect<true>;
     quotes: QuotesSelect<false> | QuotesSelect<true>;
     contracts: ContractsSelect<false> | ContractsSelect<true>;
+    'change-agreements': ChangeAgreementsSelect<false> | ChangeAgreementsSelect<true>;
     'contract-terms': ContractTermsSelect<false> | ContractTermsSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
@@ -618,6 +620,7 @@ export interface Lead {
   name: string;
   email?: string | null;
   phone?: string | null;
+  preferredChannel?: ('email' | 'sms') | null;
   address: string;
   houseNumber?: string | null;
   postal: string;
@@ -711,6 +714,11 @@ export interface Message {
     | 'quote'
     | 'contract'
     | 'customer_question'
+    | 'change_agreement'
+    | 'change_confirmation'
+    | 'measurement_confirmation'
+    | 'schedule_confirmation'
+    | 'completion'
     | 'reminder';
   channel: 'email' | 'sms';
   subject: string;
@@ -1006,22 +1014,50 @@ export interface Contract {
   createdAt: string;
 }
 /**
- * Versjonerte vilkår. Produksjonsgodkjenning krever dokumentert juridisk referanse.
+ * Versjonerte pris-/omfangsendringer som krever admin og skriftlig kundegodkjenning.
  *
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "contract-terms".
+ * via the `definition` "change-agreements".
  */
-export interface ContractTerm {
+export interface ChangeAgreement {
   id: number;
-  version: string;
-  title: string;
-  contractText: string;
-  withdrawalInstructions: string;
-  withdrawalFormUrl: string;
-  status: 'draft' | 'approved' | 'retired';
-  legalReviewReference?: string | null;
+  reference: string;
+  workOrder: number | WorkOrder;
+  contract: number | Contract;
+  version: number;
+  supersedes?: (number | null) | ChangeAgreement;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  documentHash: string;
+  reasonCode: 'over_tolerance' | 'over_maximum' | 'scope_change';
+  reasonDescription: string;
+  beforeTotalIncVatOre: number;
+  afterTotalIncVatOre: number;
+  validUntil: string;
+  status: 'draft' | 'approved' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'revoked' | 'superseded';
   approvedBy?: (number | null) | User;
   approvedAt?: string | null;
+  sentAt?: string | null;
+  viewedAt?: string | null;
+  acceptanceEvidence?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  acceptedDocument?: (number | null) | PrivateMedia;
+  acceptedAt?: string | null;
+  declinedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1080,6 +1116,7 @@ export interface WorkOrder {
     | number
     | boolean
     | null;
+  approvedChangeAgreement?: (number | null) | ChangeAgreement;
   precheckCompletedAt?: string | null;
   startedAt?: string | null;
   afterPhotos?: (number | PrivateMedia)[] | null;
@@ -1098,6 +1135,26 @@ export interface WorkOrder {
     | number
     | boolean
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Versjonerte vilkår. Produksjonsgodkjenning krever dokumentert juridisk referanse.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contract-terms".
+ */
+export interface ContractTerm {
+  id: number;
+  version: string;
+  title: string;
+  contractText: string;
+  withdrawalInstructions: string;
+  withdrawalFormUrl: string;
+  status: 'draft' | 'approved' | 'retired';
+  legalReviewReference?: string | null;
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1307,6 +1364,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'contracts';
         value: number | Contract;
+      } | null)
+    | ({
+        relationTo: 'change-agreements';
+        value: number | ChangeAgreement;
       } | null)
     | ({
         relationTo: 'contract-terms';
@@ -1665,6 +1726,7 @@ export interface LeadsSelect<T extends boolean = true> {
   name?: T;
   email?: T;
   phone?: T;
+  preferredChannel?: T;
   address?: T;
   houseNumber?: T;
   postal?: T;
@@ -1860,6 +1922,35 @@ export interface ContractsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "change-agreements_select".
+ */
+export interface ChangeAgreementsSelect<T extends boolean = true> {
+  reference?: T;
+  workOrder?: T;
+  contract?: T;
+  version?: T;
+  supersedes?: T;
+  snapshot?: T;
+  documentHash?: T;
+  reasonCode?: T;
+  reasonDescription?: T;
+  beforeTotalIncVatOre?: T;
+  afterTotalIncVatOre?: T;
+  validUntil?: T;
+  status?: T;
+  approvedBy?: T;
+  approvedAt?: T;
+  sentAt?: T;
+  viewedAt?: T;
+  acceptanceEvidence?: T;
+  acceptedDocument?: T;
+  acceptedAt?: T;
+  declinedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "contract-terms_select".
  */
 export interface ContractTermsSelect<T extends boolean = true> {
@@ -1906,6 +1997,7 @@ export interface WorkOrdersSelect<T extends boolean = true> {
   actualVatOre?: T;
   actualTotalIncVatOre?: T;
   blockingReasons?: T;
+  approvedChangeAgreement?: T;
   precheckCompletedAt?: T;
   startedAt?: T;
   afterPhotos?: T;

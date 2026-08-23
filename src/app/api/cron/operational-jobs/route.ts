@@ -8,6 +8,7 @@ import { ResendEmailProvider } from "@/lib/providers/resend-email-provider";
 import { createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
 import { featureReadiness } from "@/lib/platform/features";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
+import { ChannelUnavailableError, CommunicationCancelledError, processWorkOrderCommunicationJob } from "@/lib/work-orders/communications";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
       overrideAccess: true,
       where: {
         and: [
-          { type: { in: ["message.delivery", "lead.ai.draft"] } },
+          { type: { in: ["message.delivery", "lead.ai.draft", "work-order.communication"] } },
           { status: { in: ["pending", "retry"] } },
           { availableAt: { less_than_equal: now.toISOString() } },
         ],
@@ -49,18 +50,24 @@ export async function GET(request: Request) {
           const provider = new ResendEmailProvider();
           if (provider.health().status !== "ready") throw new Error("Email provider requires configuration");
           await deliverMessage(payload, provider, messageId, job.correlationId);
-        } else {
+        } else if (job.type === "lead.ai.draft") {
           const leadId = numericPayloadId(job.payload, "leadId");
           if (!leadId) throw new TypeError("AI job has no lead reference");
           if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
           await assertPayloadAiUsageAvailable(payload);
           await createLeadAiReply(payload, new GeminiAiProvider(), leadId, job.correlationId);
+        } else {
+          await processWorkOrderCommunicationJob(payload, job.payload, job.correlationId);
         }
         await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: { status: "completed", completedAt: new Date().toISOString(), result: { processed: true }, lastErrorCode: null, lastErrorMessage: null } });
         completed.push(job.id);
       } catch (error) {
+        if (error instanceof CommunicationCancelledError) {
+          await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: { status: "cancelled", completedAt: new Date().toISOString(), lastErrorCode: "STATE_CHANGED", lastErrorMessage: error.message } });
+          continue;
+        }
         const sanitized = sanitizeJobError(error);
-        const exhausted = attempts >= (job.maxAttempts || 3) || /requires configuration|daily request limit/i.test(error instanceof Error ? error.message : "");
+        const exhausted = error instanceof ChannelUnavailableError || attempts >= (job.maxAttempts || 3) || /requires configuration|daily request limit/i.test(error instanceof Error ? error.message : "");
         await payload.update({
           collection: "operational-jobs",
           id: job.id,

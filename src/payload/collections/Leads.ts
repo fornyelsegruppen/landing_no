@@ -67,6 +67,16 @@ export const Leads: CollectionConfig = {
     { name: "email", type: "email", access: adminManagedField },
     { name: "phone", type: "text", access: adminManagedField },
     {
+      name: "preferredChannel",
+      type: "select",
+      label: "Foretrukket kanal",
+      defaultValue: "email",
+      options: [
+        { label: "E-post", value: "email" },
+        { label: "SMS", value: "sms" },
+      ],
+    },
+    {
       name: "address",
       type: "text",
       required: true,

@@ -80,3 +80,29 @@ export function assessPrecheck(input: {
     blockingReasons,
   };
 }
+
+export function assessAcceptedChangePrecheck(input: {
+  actualAreaTenths: number;
+  agreedAreaTenths: number;
+  agreedSubtotalExVatOre: number;
+  agreedTotalIncVatOre: number;
+  unitPriceExVatOre: number;
+  vatBasisPoints: number;
+  hmsSafe: boolean;
+  scopeChangedAgain: boolean;
+}): PrecheckResult {
+  safeInteger("Actual area", input.actualAreaTenths, true);
+  safeInteger("Agreed area", input.agreedAreaTenths, true);
+  const reductionExVatOre = input.actualAreaTenths < input.agreedAreaTenths
+    ? Math.round((input.unitPriceExVatOre * (input.agreedAreaTenths - input.actualAreaTenths)) / 10)
+    : 0;
+  const actualSubtotalExVatOre = Math.max(0, input.agreedSubtotalExVatOre - reductionExVatOre);
+  const actualVatOre = Math.round((actualSubtotalExVatOre * input.vatBasisPoints) / 10_000);
+  const actualTotalIncVatOre = actualSubtotalExVatOre + actualVatOre;
+  const blockingReasons: string[] = [];
+  let outcome: PrecheckResult["outcome"] = actualTotalIncVatOre < input.agreedTotalIncVatOre ? "lower" : "within_contract";
+  if (!input.hmsSafe) { outcome = "hms_blocked"; blockingReasons.push("HMS eller adkomst er ikke bekreftet trygg."); }
+  else if (input.scopeChangedAgain) { outcome = "scope_change"; blockingReasons.push("Arbeidsomfanget har endret seg etter kundens godkjenning."); }
+  else if (input.actualAreaTenths > input.agreedAreaTenths) { outcome = "over_tolerance"; blockingReasons.push("Kontrollmålt areal er høyere enn den godkjente endringsavtalen."); }
+  return { decision: blockingReasons.length ? "blocked" : "ready", outcome, actualSubtotalExVatOre, actualVatOre, actualTotalIncVatOre, allowedAreaMaxTenths: input.agreedAreaTenths, blockingReasons };
+}

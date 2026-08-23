@@ -1,5 +1,7 @@
-import type { CollectionBeforeChangeHook, CollectionConfig } from "payload";
+import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionConfig } from "payload";
 import { assertWorkOrderTransition, type WorkOrderStatus } from "@/lib/work-orders/workflow";
+import { enqueueCompletionCommunication, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { adminOnly, assignedWorkerOrAdmin, userIsAdmin } from "../access/roles";
 
 function relationId(value: unknown) {
@@ -78,6 +80,15 @@ export const protectWorkOrder: CollectionBeforeChangeHook = async ({ data, origi
   return data;
 };
 
+export const scheduleWorkOrderCommunications: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
+  const scheduleChanged = operation === "create" || doc.scheduledAt !== previousDoc?.scheduledAt || doc.status !== previousDoc?.status;
+  if (!scheduleChanged) return doc;
+  const correlationId = correlationIdFromHeaders(req.headers);
+  await syncWorkOrderCommunicationJobs(req.payload, doc, correlationId);
+  if (doc.status === "documented" && previousDoc?.status !== "documented") await enqueueCompletionCommunication(req.payload, doc, correlationId);
+  return doc;
+};
+
 export const WorkOrders: CollectionConfig = {
   slug: "work-orders",
   labels: { singular: "Oppdrag", plural: "Arbeid" },
@@ -88,7 +99,7 @@ export const WorkOrders: CollectionConfig = {
     description: "Tildeling, kontrollmåling, HMS, prisbekreftelse og før-/etterdokumentasjon for signerte oppdrag.",
   },
   access: { admin: ({ req }) => userIsAdmin(req.user), create: adminOnly, delete: adminOnly, read: assignedWorkerOrAdmin, update: adminOnly },
-  hooks: { beforeChange: [protectWorkOrder] },
+  hooks: { beforeChange: [protectWorkOrder], afterChange: [scheduleWorkOrderCommunications] },
   fields: [
     { name: "reference", type: "text", label: "Referanse", required: true, unique: true, index: true },
     { name: "lead", type: "relationship", relationTo: "leads", label: "Henvendelse", required: true, index: true, admin: { readOnly: true } },
@@ -121,6 +132,7 @@ export const WorkOrders: CollectionConfig = {
     { name: "actualVatOre", type: "number", admin: { readOnly: true } },
     { name: "actualTotalIncVatOre", type: "number", admin: { readOnly: true } },
     { name: "blockingReasons", type: "json", admin: { readOnly: true } },
+    { name: "approvedChangeAgreement", type: "relationship", relationTo: "change-agreements", label: "Godkjent endringsavtale", admin: { readOnly: true } },
     { name: "precheckCompletedAt", type: "date", admin: { readOnly: true } },
     { name: "startedAt", type: "date", admin: { readOnly: true } },
     { name: "afterPhotos", type: "relationship", relationTo: "private-media", hasMany: true, label: "Etterbilder", admin: { readOnly: true } },
@@ -128,5 +140,6 @@ export const WorkOrders: CollectionConfig = {
     { name: "completedAt", type: "date", admin: { readOnly: true } },
     { name: "documentationSubmittedAt", type: "date", admin: { readOnly: true } },
     { name: "eventTimeline", type: "json", label: "Tidslinje", admin: { readOnly: true, description: "Systemstyrte hendelser uten kundeopplysninger." } },
+    { name: "changeAgreementAction", type: "ui", admin: { components: { Field: "/components/WorkOrderChangeAction" } } },
   ],
 };

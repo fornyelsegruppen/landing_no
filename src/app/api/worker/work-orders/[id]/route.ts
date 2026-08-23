@@ -7,7 +7,8 @@ import { getPayload } from "@/lib/payload";
 import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/features";
 import { quoteSnapshotSchema } from "@/lib/quotes/document";
 import { appendTimeline, loadAuthorizedWorkOrder, relationId } from "@/lib/work-orders/access";
-import { assessPrecheck } from "@/lib/work-orders/precheck";
+import { assessAcceptedChangePrecheck, assessPrecheck } from "@/lib/work-orders/precheck";
+import { changeAgreementSnapshotSchema } from "@/lib/change-agreements/document";
 
 const simpleActionSchema = z.object({ action: z.enum(["on_way", "arrive", "begin_precheck", "start", "mark_completed"]) });
 const precheckSchema = z.object({
@@ -78,7 +79,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (rule.status !== "approved" || rule.version !== snapshot.pricing.ruleVersion || rule.unitPriceExVatOre !== snapshot.pricing.unitPriceExVatOre || rule.vatBasisPoints !== snapshot.pricing.vatBasisPoints) {
         throw new Error("The signed price rule no longer matches the calculation basis");
       }
-      const assessment = assessPrecheck({
+      let assessment = assessPrecheck({
         actualAreaTenths: parsed.data.actualAreaTenths,
         hmsSafe: parsed.data.safetyStatus === "safe",
         scopeChanged: parsed.data.scopeChanged,
@@ -91,6 +92,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         },
         rule: { unitPriceExVatOre: rule.unitPriceExVatOre, vatBasisPoints: rule.vatBasisPoints, minimumExVatOre: rule.minimumExVatOre },
       });
+      const acceptedChangeId = relationId(order.approvedChangeAgreement);
+      if (acceptedChangeId) {
+        const acceptedChange = await payload.findByID({ collection: "change-agreements", id: acceptedChangeId, depth: 0, overrideAccess: true });
+        const changeSnapshot = changeAgreementSnapshotSchema.parse(acceptedChange.snapshot);
+        if (acceptedChange.status !== "accepted" || changeSnapshot.workOrderId !== order.id || changeSnapshot.contractDocumentHash !== order.contractDocumentHash) throw new Error("The approved change agreement is invalid");
+        assessment = assessAcceptedChangePrecheck({ actualAreaTenths: parsed.data.actualAreaTenths, agreedAreaTenths: changeSnapshot.after.areaTenths, agreedSubtotalExVatOre: changeSnapshot.after.subtotalExVatOre, agreedTotalIncVatOre: changeSnapshot.after.totalIncVatOre, unitPriceExVatOre: rule.unitPriceExVatOre, vatBasisPoints: rule.vatBasisPoints, hmsSafe: parsed.data.safetyStatus === "safe", scopeChangedAgain: parsed.data.scopeChanged });
+      }
       data = {
         status: assessment.decision,
         beforePhotos: beforePhotoIds,

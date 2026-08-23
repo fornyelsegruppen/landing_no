@@ -710,7 +710,7 @@ Store endringer skal deles i små, reversible migrasjoner. Eksisterende urelater
 | 6. Takmåling og pris | Fullført | 2026-08-23 | 2026-08-23 | [Fase 6-rapport](./implementation/phase-6-roof-measurement-and-pricing.md) | Lisensiert ortofoto, godkjente prisregler og staging-kontroll kreves før flagget aktiveres |
 | 7. Tilbud og kontrakt | Fullført | 2026-08-23 | 2026-08-23 | [Fase 7-rapport](./implementation/phase-7-quotes-contracts-signing.md) | Juridisk godkjente vilkår, signaturmetode og full mobil staging-test kreves før flaggene aktiveres |
 | 8. Arbeidsordre og `/user` | Fullført | 2026-08-23 | 2026-08-23 | [Fase 8-rapport](./implementation/phase-8-work-orders-worker-portal.md) | Gamle shellrader, worker-kontoer, privat Blob og komplett mobil staging-test kreves før flagget aktiveres |
-| 9. Avvik og kommunikasjon | Ikke startet |  |  |  |  |
+| 9. Avvik og kommunikasjon | Fullført | 2026-08-23 | 2026-08-23 | [Fase 9-rapport](./implementation/phase-9-change-agreements-communications.md) | Juridisk kontroll, Resend/SMS, tidssone og komplett mobil staging-test kreves før flagget aktiveres |
 | 10. Hardening og samlet QA | Ikke startet |  |  |  |  |
 | 11. Pilot og produksjon | Ikke startet |  |  |  |  |
 

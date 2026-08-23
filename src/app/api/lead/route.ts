@@ -227,6 +227,7 @@ export async function POST(request: Request) {
         language: locale,
         message: message || "",
         ...(email ? { email } : {}),
+        preferredChannel: email ? "email" : "sms",
         address: address || "Ikke oppgitt",
         ...(approxSqm && Number.isFinite(approxSqm) ? { approxSqm } : {}),
         ...(photoUrls.length ? { photoUrls: photoUrls.join("\n") } : {}),

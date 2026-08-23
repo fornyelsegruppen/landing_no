@@ -29,6 +29,7 @@ import { PriceRules } from "./payload/collections/PriceRules";
 import { PriceCalculations } from "./payload/collections/PriceCalculations";
 import { Quotes } from "./payload/collections/Quotes";
 import { Contracts } from "./payload/collections/Contracts";
+import { ChangeAgreements } from "./payload/collections/ChangeAgreements";
 import { ContractTerms } from "./payload/collections/ContractTerms";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
@@ -136,6 +137,7 @@ export default buildConfig({
     PriceCalculations,
     Quotes,
     Contracts,
+    ChangeAgreements,
     ContractTerms,
     WorkOrders,
     SeoTopics,
