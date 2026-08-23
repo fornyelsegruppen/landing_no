@@ -16,6 +16,10 @@ import { Pages } from "./payload/collections/Pages";
 import { Posts } from "./payload/collections/Posts";
 import { Redirects } from "./payload/collections/Redirects";
 import { SiteSettings } from "./payload/collections/SiteSettings";
+import { AuditEvents } from "./payload/collections/AuditEvents";
+import { OperationalJobs } from "./payload/collections/OperationalJobs";
+import { AccessTokens } from "./payload/collections/AccessTokens";
+import { PrivateMedia } from "./payload/collections/PrivateMedia";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -113,6 +117,10 @@ export default buildConfig({
     Posts,
     Redirects,
     Leads,
+    AuditEvents,
+    OperationalJobs,
+    AccessTokens,
+    PrivateMedia,
   ],
   globals: [SiteSettings],
   editor: lexicalEditor(),
@@ -127,6 +135,7 @@ export default buildConfig({
       enabled: Boolean(blobToken),
       collections: {
         media: true,
+        "private-media": true,
       },
       token: blobToken,
       // Bypass Vercel 4.5MB serverless body limit — upload goes client → Blob.
