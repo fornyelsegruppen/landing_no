@@ -75,7 +75,7 @@ jobs:
         run: npm run test:ci:migrations
 
       - name: Bootstrap empty PostgreSQL schema
-        run: node scripts/push-schema-jiti.mjs
+        run: node scripts/push-schema-jiti.mjs --baseline-current-migrations
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
