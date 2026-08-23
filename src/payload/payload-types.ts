@@ -1026,7 +1026,7 @@ export interface ContractTerm {
   createdAt: string;
 }
 /**
- * Grunnskall for tildelte oppdrag. Arbeidsflyt og dokumentasjon utvides i arbeidsordrefasen.
+ * Tildeling, kontrollmåling, HMS, prisbekreftelse og før-/etterdokumentasjon for signerte oppdrag.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "work-orders".
@@ -1034,11 +1034,70 @@ export interface ContractTerm {
 export interface WorkOrder {
   id: number;
   reference: string;
-  lead?: (number | null) | Lead;
+  lead: number | Lead;
+  quote: number | Quote;
+  contract: number | Contract;
+  contractDocumentHash: string;
   assignedWorker?: (number | null) | User;
   scheduledAt?: string | null;
-  status: 'unassigned' | 'assigned' | 'scheduled';
-  workSummary?: string | null;
+  status:
+    | 'unassigned'
+    | 'assigned'
+    | 'scheduled'
+    | 'on_way'
+    | 'arrived'
+    | 'precheck'
+    | 'ready'
+    | 'blocked'
+    | 'in_progress'
+    | 'completed'
+    | 'documented'
+    | 'cancelled';
+  workSummary: string;
+  beforePhotos?: (number | PrivateMedia)[] | null;
+  roofType?: ('betongstein' | 'teglstein' | 'metall' | 'skifer' | 'shingel' | 'annet') | null;
+  actualAreaTenths?: number | null;
+  measurementMethod?: ('laser' | 'målebånd' | 'tegning' | 'kart_kontrollert' | 'annet') | null;
+  slopeBasis?: string | null;
+  visibleCondition?: string | null;
+  safetyStatus?: ('safe' | 'blocked') | null;
+  safetyNotes?: string | null;
+  scopeChanged?: boolean | null;
+  scopeChangeDetails?: string | null;
+  precheckDecision?: ('ready' | 'blocked') | null;
+  priceOutcome?:
+    ('lower' | 'within_contract' | 'over_tolerance' | 'over_maximum' | 'scope_change' | 'hms_blocked') | null;
+  allowedAreaMaxTenths?: number | null;
+  actualSubtotalExVatOre?: number | null;
+  actualVatOre?: number | null;
+  actualTotalIncVatOre?: number | null;
+  blockingReasons?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  precheckCompletedAt?: string | null;
+  startedAt?: string | null;
+  afterPhotos?: (number | PrivateMedia)[] | null;
+  completionNotes?: string | null;
+  completedAt?: string | null;
+  documentationSubmittedAt?: string | null;
+  /**
+   * Systemstyrte hendelser uten kundeopplysninger.
+   */
+  eventTimeline?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1823,10 +1882,37 @@ export interface ContractTermsSelect<T extends boolean = true> {
 export interface WorkOrdersSelect<T extends boolean = true> {
   reference?: T;
   lead?: T;
+  quote?: T;
+  contract?: T;
+  contractDocumentHash?: T;
   assignedWorker?: T;
   scheduledAt?: T;
   status?: T;
   workSummary?: T;
+  beforePhotos?: T;
+  roofType?: T;
+  actualAreaTenths?: T;
+  measurementMethod?: T;
+  slopeBasis?: T;
+  visibleCondition?: T;
+  safetyStatus?: T;
+  safetyNotes?: T;
+  scopeChanged?: T;
+  scopeChangeDetails?: T;
+  precheckDecision?: T;
+  priceOutcome?: T;
+  allowedAreaMaxTenths?: T;
+  actualSubtotalExVatOre?: T;
+  actualVatOre?: T;
+  actualTotalIncVatOre?: T;
+  blockingReasons?: T;
+  precheckCompletedAt?: T;
+  startedAt?: T;
+  afterPhotos?: T;
+  completionNotes?: T;
+  completedAt?: T;
+  documentationSubmittedAt?: T;
+  eventTimeline?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -46,5 +46,6 @@ export const Contracts: CollectionConfig = {
     { name: "signatureEvidence", type: "json", admin: { readOnly: true } },
     { name: "signedDocument", type: "relationship", relationTo: "private-media", admin: { readOnly: true } },
     { name: "signedAt", type: "date", admin: { readOnly: true } },
+    { name: "workOrderAction", type: "ui", admin: { components: { Field: "/components/ContractWorkOrderAction" } } },
   ],
 };

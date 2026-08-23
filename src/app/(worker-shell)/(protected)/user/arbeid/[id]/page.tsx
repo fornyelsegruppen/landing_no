@@ -1,62 +1,69 @@
+import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
+import { WorkerOrderActions } from "@/components/worker/worker-order-actions";
 import { requireInternalUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
+import { documentHash, quoteDisplayModel, type ContractSnapshot } from "@/lib/quotes/document";
 
-export default async function WorkerOrderPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+function relationId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
+  return null;
+}
+
+function relationIds(value: unknown) {
+  return Array.isArray(value) ? value.map(relationId).filter((id): id is number => id !== null) : [];
+}
+
+export default async function WorkerOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireInternalUser();
   const { id } = await params;
+  if (!/^\d+$/.test(id)) notFound();
   const payload = await getPayload();
-  const result = await payload.find({
-    collection: "work-orders",
-    limit: 1,
-    where: {
-      and: [
-        { id: { equals: id } },
-        ...(user.role === "admin"
-          ? []
-          : [{ assignedWorker: { equals: user.id } }]),
-      ],
-    },
-  });
+  const result = await payload.find({ collection: "work-orders", limit: 1, depth: 0, where: { and: [
+    { id: { equals: id } }, ...(user.role === "admin" ? [] : [{ assignedWorker: { equals: user.id } }]),
+  ] } });
   const order = result.docs[0];
-
-  // The same 404 is returned for a missing order and another worker's order.
   if (!order) notFound();
+  const contractId = relationId(order.contract);
+  if (!contractId) throw new Error("Oppdraget mangler signert kontrakt");
+  const contract = await payload.findByID({ collection: "contracts", id: contractId, depth: 0, overrideAccess: true });
+  const leadId = relationId(order.lead);
+  const lead = leadId ? await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true }) : null;
+  const customerPhotoCount = typeof lead?.photoUrls === "string" ? lead.photoUrls.split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 15).length : 0;
+  const snapshot = contract.snapshot as ContractSnapshot;
+  if (documentHash(snapshot) !== order.contractDocumentHash || contract.documentHash !== order.contractDocumentHash) {
+    throw new Error("Kontraktsgrunnlaget stemmer ikke med arbeidsordren");
+  }
+  const display = quoteDisplayModel(snapshot.quote);
+  const phoneHref = snapshot.customer.phone ? `tel:${snapshot.customer.phone.replace(/[^+\d]/g, "")}` : null;
+  const mapHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(snapshot.customer.address)}`;
 
-  return (
-    <article className="rounded-2xl border border-white/10 bg-background-elevated p-5 sm:p-7">
-      <p className="text-sm font-semibold text-accent">Oppdrag</p>
-      <h1 className="mt-1 text-3xl font-bold">{order.reference}</h1>
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div>
-          <dt className="text-sm text-muted-foreground">Status</dt>
-          <dd className="mt-1 font-semibold">{order.status}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-muted-foreground">Planlagt</dt>
-          <dd className="mt-1 font-semibold">
-            {order.scheduledAt
-              ? new Intl.DateTimeFormat("nb-NO", {
-                  dateStyle: "long",
-                  timeStyle: "short",
-                }).format(new Date(order.scheduledAt))
-              : "Ikke planlagt"}
-          </dd>
-        </div>
+  return <>
+    <Link className="text-sm font-semibold text-accent" href="/user">← Mine oppdrag</Link>
+    <article className="mt-4 rounded-2xl border border-white/10 bg-background-elevated p-5 sm:p-7">
+      <p className="text-sm font-semibold text-accent">Oppdrag {order.reference}</p>
+      <h1 className="mt-1 text-3xl font-bold">{snapshot.customer.name}</h1>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <a className="min-h-12 rounded-xl border border-white/15 p-3 font-semibold hover:border-accent" href={mapHref} rel="noreferrer" target="_blank">Naviger til {snapshot.customer.address}</a>
+        {phoneHref ? <a className="min-h-12 rounded-xl border border-white/15 p-3 font-semibold hover:border-accent" href={phoneHref}>Ring {snapshot.customer.phone}</a> : <p className="rounded-xl border border-white/10 p-3 text-muted-foreground">Telefon ikke registrert</p>}
+      </div>
+      <dl className="mt-6 grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-2">
+        <Info label="Planlagt" value={order.scheduledAt ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "long", timeStyle: "short" }).format(new Date(order.scheduledAt)) : "Ikke planlagt"} />
+        <Info label="Tjeneste" value={display.service} />
+        <Info label="Estimert areal" value={`${display.estimatedAreaMin.toLocaleString("nb-NO")}–${display.estimatedAreaMax.toLocaleString("nb-NO")} m²`} />
+        <Info label="Toleranse" value={`${display.tolerancePercent.toLocaleString("nb-NO")} %`} />
+        <Info label="Kontraktspris" value={display.totalIncVatNok.toLocaleString("nb-NO", { style: "currency", currency: "NOK" })} />
+        <Info label="Maksimalpris" value={display.maximumTotalIncVatNok == null ? "Ikke registrert" : display.maximumTotalIncVatNok.toLocaleString("nb-NO", { style: "currency", currency: "NOK" })} />
       </dl>
-      {order.workSummary ? (
-        <section className="mt-6 border-t border-white/10 pt-5">
-          <h2 className="font-bold">Arbeidsbeskrivelse</h2>
-          <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{order.workSummary}</p>
-        </section>
-      ) : null}
-      <p className="mt-8 rounded-xl bg-white/5 p-4 text-sm text-muted-foreground">
-        Før-kontroll, bilder og statusknapper blir aktivert i arbeidsordrefasen. Ingen arbeid kan startes fra dette grunnskallet.
-      </p>
+      <section className="mt-6 border-t border-white/10 pt-5"><h2 className="font-bold">Arbeidsbeskrivelse</h2><p className="mt-2 whitespace-pre-wrap text-muted-foreground">{order.workSummary}</p></section>
+      {customerPhotoCount ? <section className="mt-6 border-t border-white/10 pt-5"><h2 className="font-bold">Kundens bilder</h2><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: customerPhotoCount }, (_, index) => <a href={`/api/worker/work-orders/${order.id}/lead-photo?index=${index}`} key={index} rel="noreferrer" target="_blank"><Image alt={`Kundens takbilde ${index + 1}`} className="aspect-square w-full rounded-xl border border-white/10 object-cover" height={320} src={`/api/worker/work-orders/${order.id}/lead-photo?index=${index}`} unoptimized width={320} /></a>)}</div></section> : null}
     </article>
-  );
+    <WorkerOrderActions orderId={order.id} initialStatus={order.status} initialBeforePhotoIds={relationIds(order.beforePhotos)} initialAfterPhotoIds={relationIds(order.afterPhotos)} initialBlockingReasons={Array.isArray(order.blockingReasons) ? order.blockingReasons.filter((value): value is string => typeof value === "string") : []} initialActualTotalIncVatOre={order.actualTotalIncVatOre} />
+  </>;
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return <div><dt className="text-sm text-muted-foreground">{label}</dt><dd className="mt-1 font-semibold">{value}</dd></div>;
 }

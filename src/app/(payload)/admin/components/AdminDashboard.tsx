@@ -17,7 +17,7 @@ type DashboardCounts = {
 async function loadCounts(): Promise<DashboardCounts> {
   try {
     const payload = await getPayload();
-    const [newLeads, aiDrafts, replyDrafts, operationalAttention, seoAttention, messageAttention, activeWork, unassignedWork] = await Promise.all([
+    const [newLeads, aiDrafts, replyDrafts, operationalAttention, seoAttention, messageAttention, blockedWork, activeWork, unassignedWork, pendingQuotes, pendingContracts] = await Promise.all([
       payload.count({
         collection: "leads",
         where: { status: { equals: "new" } },
@@ -44,21 +44,27 @@ async function loadCounts(): Promise<DashboardCounts> {
       }),
       payload.count({
         collection: "work-orders",
-        where: { status: { in: ["assigned", "scheduled"] } },
+        where: { status: { equals: "blocked" } },
+      }),
+      payload.count({
+        collection: "work-orders",
+        where: { status: { in: ["assigned", "scheduled", "on_way", "arrived", "precheck", "ready", "in_progress", "completed"] } },
       }),
       payload.count({
         collection: "work-orders",
         where: { status: { equals: "unassigned" } },
       }),
+      payload.count({ collection: "quotes", where: { status: { equals: "draft" } } }),
+      payload.count({ collection: "contracts", where: { status: { equals: "issued" } } }),
     ]);
 
     return {
       newLeads: newLeads.totalDocs,
-      attention: operationalAttention.totalDocs + seoAttention.totalDocs + messageAttention.totalDocs,
+      attention: operationalAttention.totalDocs + seoAttention.totalDocs + messageAttention.totalDocs + blockedWork.totalDocs,
       activeWork: activeWork.totalDocs,
       unassignedWork: unassignedWork.totalDocs,
-      pendingQuotes: 0,
-      pendingContracts: 0,
+      pendingQuotes: pendingQuotes.totalDocs,
+      pendingContracts: pendingContracts.totalDocs,
       aiDrafts: aiDrafts.totalDocs,
       replyDrafts: replyDrafts.totalDocs,
     };
@@ -89,9 +95,14 @@ const cards = [
     href: "/admin/collections/posts",
   },
   {
+    key: "pendingQuotes",
+    label: "Tilbud til godkjenning",
+    href: "/admin/collections/quotes",
+  },
+  {
     key: "pendingContracts",
     label: "Kontrakter til signering",
-    href: "/admin/collections/leads",
+    href: "/admin/collections/contracts",
   },
   {
     key: "activeWork",

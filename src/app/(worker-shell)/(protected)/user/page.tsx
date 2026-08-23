@@ -6,6 +6,12 @@ function relationId(value: number | { id: number } | null | undefined) {
   return typeof value === "object" && value ? value.id : value;
 }
 
+const statusLabels: Record<string, string> = {
+  unassigned: "Ikke tildelt", assigned: "Tildelt", scheduled: "Planlagt", on_way: "På vei", arrived: "Ankommet",
+  precheck: "Før-kontroll", ready: "Klar til start", blocked: "Blokkert", in_progress: "Startet", completed: "Må dokumenteres",
+  documented: "Dokumentasjon levert", cancelled: "Avbrutt",
+};
+
 export default async function WorkerHomePage() {
   const user = await requireInternalUser();
   const payload = await getPayload();
@@ -20,21 +26,22 @@ export default async function WorkerHomePage() {
   });
   const now = Date.now();
   const today = new Date().toISOString().slice(0, 10);
+  const active = result.docs.filter((order) => !["documented", "cancelled"].includes(order.status));
 
   const groups = [
     {
       title: "Mine oppdrag i dag",
-      documents: result.docs.filter((order) => order.scheduledAt?.slice(0, 10) === today),
+      documents: active.filter((order) => order.scheduledAt?.slice(0, 10) === today),
     },
     {
       title: "Kommende oppdrag",
-      documents: result.docs.filter(
+      documents: active.filter(
         (order) => order.scheduledAt && new Date(order.scheduledAt).getTime() > now && order.scheduledAt.slice(0, 10) !== today,
       ),
     },
     {
       title: "Oppdrag som må ferdigstilles",
-      documents: result.docs.filter((order) => !order.scheduledAt),
+      documents: active.filter((order) => !order.scheduledAt || ["arrived", "precheck", "blocked", "ready", "in_progress", "completed"].includes(order.status) || (order.scheduledAt && new Date(order.scheduledAt).getTime() < now && order.scheduledAt.slice(0, 10) !== today)),
     },
   ];
 
@@ -63,7 +70,7 @@ export default async function WorkerHomePage() {
                         : "Tidspunkt ikke satt"}
                     </span>
                     <span className="mt-2 inline-block rounded-full bg-accent/15 px-2 py-1 text-xs text-accent">
-                      {order.status}
+                      {statusLabels[order.status] ?? order.status}
                     </span>
                     <span className="sr-only">Tildelt bruker {relationId(order.assignedWorker)}</span>
                   </Link>
