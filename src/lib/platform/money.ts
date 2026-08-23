@@ -43,9 +43,7 @@ export function lineTotal(
     throw new TypeError("Quantity must be non-negative thousandths");
   }
 
-  return nok(
-    Math.round((unitPrice.amountMinor * quantityThousandths) / 1_000),
-  );
+  return nok(Math.round((unitPrice.amountMinor * quantityThousandths) / 1_000));
 }
 
 export function formatNok(money: Money, locale = "nb-NO") {

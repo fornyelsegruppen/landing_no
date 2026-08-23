@@ -10,7 +10,7 @@ export type SafeAuditMetadata = Record<
 >;
 
 export type AuditEventInput = {
-  actorId?: string | number;
+  actorId?: number;
   action: string;
   entityType: string;
   entityId: string | number;
@@ -22,7 +22,7 @@ export type AuditEventInput = {
 };
 
 export type AuditEventData = {
-  actor?: string | number;
+  actor?: number;
   action: string;
   entityType: string;
   entityId: string;
@@ -90,7 +90,9 @@ export function prepareAuditEvent(input: AuditEventInput): AuditEventData {
     ...(input.before !== undefined
       ? { beforeHash: snapshotHash(input.before) }
       : {}),
-    ...(input.after !== undefined ? { afterHash: snapshotHash(input.after) } : {}),
+    ...(input.after !== undefined
+      ? { afterHash: snapshotHash(input.after) }
+      : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 }

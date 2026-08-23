@@ -3,6 +3,7 @@ import { headers as getHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
+import { userIsAdmin } from "@/payload/access/roles";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -14,6 +15,9 @@ export async function GET(request: Request) {
     const { user } = await payload.auth({ headers: headerStore });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!userIsAdmin(user)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (!process.env.BLOB_READ_WRITE_TOKEN) {

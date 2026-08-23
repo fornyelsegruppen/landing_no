@@ -38,7 +38,9 @@ export const AuditEvents: CollectionConfig = {
     {
       name: "changedFields",
       type: "json",
-      admin: { description: "Field names only; never raw before/after values." },
+      admin: {
+        description: "Field names only; never raw before/after values.",
+      },
     },
     { name: "beforeHash", type: "text" },
     { name: "afterHash", type: "text" },

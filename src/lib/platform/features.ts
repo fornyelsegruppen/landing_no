@@ -38,18 +38,10 @@ export function readFeatureFlags(
 }
 
 export type IntegrationName =
-  | "ai"
-  | "email"
-  | "sms"
-  | "maps"
-  | "signature"
-  | "searchData"
-  | "jobs";
+  "ai" | "email" | "sms" | "maps" | "signature" | "searchData" | "jobs";
 
 export type IntegrationReadiness =
-  | "ready"
-  | "configuration_required"
-  | "disabled";
+  "ready" | "configuration_required" | "disabled";
 
 export type IntegrationStatus = {
   name: IntegrationName;

@@ -23,9 +23,9 @@ describe("operational job policy", () => {
     expect(canTransition(operationalJobTransitions, "completed", "retry")).toBe(
       false,
     );
-    expect(canTransition(operationalJobTransitions, "cancelled", "pending")).toBe(
-      false,
-    );
+    expect(
+      canTransition(operationalJobTransitions, "cancelled", "pending"),
+    ).toBe(false);
   });
 
   it("does not copy a provider error message into the job record", () => {

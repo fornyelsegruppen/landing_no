@@ -17,7 +17,9 @@ const transitions: TransitionMap<State> = {
 describe("state transition validation", () => {
   it("permits an explicit transition", () => {
     expect(canTransition(transitions, "approved", "sent")).toBe(true);
-    expect(() => assertTransition(transitions, "approved", "sent")).not.toThrow();
+    expect(() =>
+      assertTransition(transitions, "approved", "sent"),
+    ).not.toThrow();
   });
 
   it("rejects skipped and terminal transitions", () => {

@@ -2,6 +2,7 @@
   "name": "takfornying",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "npm run build:migrate && next build",
@@ -60,6 +61,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.6",
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
