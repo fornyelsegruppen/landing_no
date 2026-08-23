@@ -22,7 +22,7 @@ export default defineConfig({
   ],
   webServer: {
     command: isCI
-      ? "npm run build && npm run start -- --hostname 127.0.0.1"
+      ? "npm run start -- --hostname 127.0.0.1"
       : "npm run dev -- --hostname 127.0.0.1",
     url: baseURL,
     reuseExistingServer: !isCI,

@@ -80,7 +80,10 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: PostgreSQL build and public browser smoke
+      - name: Build production application against PostgreSQL
+        run: npm run build
+
+      - name: Public browser smoke against production build
         run: npm run test:e2e
 
       - name: Upload Playwright trace on failure
