@@ -9,7 +9,7 @@ Ingen risikofunksjon aktiveres i produksjon før dens rad i go/no-go-registeret 
 1. Bruk eksisterende Vercel previewmekanisme, men opprett separat PostgreSQL-/Neon-database og egne Preview-secrets. Produksjonens `DATABASE_URL` eller `PAYLOAD_SECRET` skal aldri gjenbrukes.
 2. Bruk staging-spesifikke secrets. Hold e-post/SMS i test/log-modus og annonserings-ID-er tomme.
 3. Restore anonymisert produksjonslik kopi etter `backup-restore-runbook.md`.
-4. Kjør migrasjoner, `npm run typecheck`, `npm run lint`, alle tester og `npm run build` på stagingcommit.
+4. For en helt tom stagingdatabase: kjør `npm run db:push` én gang for eksplisitt bootstrap. For en restore: aldri kjør schema push. Kjør deretter migrasjoner, `npm run typecheck`, `npm run lint`, alle tester og `npm run build` på stagingcommit.
 5. Opprett separate testkontoer for administrator og medarbeider.
 6. Kjør én komplett anonymisert reise: bloggutkast → faglig godkjenning → publisering → attribuert henvendelse → måling → låst pris → godkjent tilbud → signert kontrakt → tildelt oppdrag → førkontroll → arbeid → etterdokumentasjon.
 7. Kjør negative tester for feil rolle, annen medarbeiders oppdrag, utløpt/tilbakekalt token og privat media.

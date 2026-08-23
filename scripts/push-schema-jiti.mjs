@@ -17,7 +17,10 @@ const jiti = require("jiti")(import.meta.url, {
   tsconfigPaths: path.resolve(__dirname, "../tsconfig.json"),
 });
 
-const config = jiti(path.resolve(__dirname, "../src/payload.config.ts")).default;
+const configModule = await jiti.import(
+  path.resolve(__dirname, "../src/payload.config.ts"),
+);
+const config = configModule.default ?? configModule;
 
 const { getPayload } = await import("payload");
 const payload = await getPayload({ config });
