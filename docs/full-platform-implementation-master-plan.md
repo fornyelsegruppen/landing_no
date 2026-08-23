@@ -701,7 +701,7 @@ Store endringer skal deles i små, reversible migrasjoner. Eksisterende urelater
 
 | Fase | Status | Start | Ferdig | Bevis/PR | Åpne blokkere |
 |---|---|---|---|---|---|
-| 0. Baseline og beslutninger | Ikke startet |  |  |  |  |
+| 0. Baseline og beslutninger | Pågår | 2026-08-23 |  | [Backupmanifest](./pre-master-backup-2026-08-23.md) | Produksjonsdata-backup og forretningsbeslutninger |
 | 1. Plattformfundament | Ikke startet |  |  |  |  |
 | 2. Kontoer og panelskall | Ikke startet |  |  |  |  |
 | 3. Bloggfundament | Ikke startet |  |  |  |  |

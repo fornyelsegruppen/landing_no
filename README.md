@@ -190,5 +190,6 @@ than mass-pinning or automatically forcing upgrades.
 ## Planning documents
 
 - [Full platform implementation master plan](docs/full-platform-implementation-master-plan.md)
+- [Pre-implementation backup and recovery manifest](docs/pre-master-backup-2026-08-23.md)
 - [AI-assisted SEO blog roadmap](docs/seo-blog-automation-roadmap.md)
 - [Simplified admin and worker panel roadmap](docs/takfornyelse-admin-user-panel-roadmap.md)
