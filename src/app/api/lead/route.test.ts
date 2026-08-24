@@ -24,13 +24,14 @@ vi.mock("@/lib/monitoring", () => ({ captureException: vi.fn() }));
 
 import { POST } from "./route";
 
-function request() {
+function request(email?: string) {
   return new Request("http://localhost/api/lead", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: "Test Kunde",
       phone: "47 73 58 88",
+      ...(email ? { email } : {}),
       postal: "1182",
       type: "takvask",
       locale: "no",
@@ -61,12 +62,16 @@ describe("public lead durability", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ok: true, id: 55 });
     expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "leads",
+      data: expect.objectContaining({ nextAction: expect.stringContaining("Ring kunden") }),
+    }));
   });
 
   it("keeps the saved lead when AI job enqueueing fails", async () => {
     process.env.FEATURE_AI_DRAFTS = "true";
     mocks.enqueueAi.mockRejectedValueOnce(new Error("AI queue unavailable"));
-    const response = await POST(request());
+    const response = await POST(request("kunde@example.test"));
     expect(response.status).toBe(200);
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.enqueueAi).toHaveBeenCalledWith(expect.anything(), 55, expect.any(String));

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { Resend } from "resend";
 import { getPayload } from "@/lib/payload";
@@ -18,6 +18,7 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { createReceiptMessage, deliverMessage, enqueueLeadAiJob } from "@/lib/messages/message-engine";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { readFeatureFlags } from "@/lib/platform/features";
+import { processOperationalJobs } from "@/lib/jobs/operational-job-processor";
 
 const optionalAttributionText = (max: number) =>
   z.string().trim().max(max).optional();
@@ -248,12 +249,15 @@ export async function POST(request: Request) {
         ...(referrer ? { referrer } : {}),
         ...(marketingConsent ? { marketingConsent } : {}),
         status: "new",
-        nextAction: "Kontroller henvendelsen og eventuelt svarutkast.",
-        nextActionAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString(),
+        nextAction: email
+          ? "Kontroller henvendelsen og eventuelt svarutkast."
+          : "Ring kunden. Automatisk e-postløp er ikke tilgjengelig uten e-postadresse.",
+        nextActionAt: new Date(email ? Date.now() + 2 * 60 * 60_000 : Date.now()).toISOString(),
       },
       overrideAccess: true,
     });
 
+    const immediateJobIds: number[] = [];
     try {
       const receipt = await createReceiptMessage(payload, created.id, correlationId);
       if (!receipt.skipped && !receipt.duplicate) {
@@ -261,17 +265,29 @@ export async function POST(request: Request) {
         if (provider.health().status === "ready") {
           await deliverMessage(payload, provider, receipt.message.id, correlationId);
         }
+        if (typeof receipt.job?.id === "number") immediateJobIds.push(receipt.job.id);
       }
     } catch (error) {
       captureException(error, { route: "POST /api/lead", operation: "receipt-outbox", correlationId });
     }
 
-    if (readFeatureFlags().aiDrafts) {
+    if (readFeatureFlags().aiDrafts && email) {
       try {
-        await enqueueLeadAiJob(payload, created.id, correlationId);
+        const aiJob = await enqueueLeadAiJob(payload, created.id, correlationId);
+        if (typeof aiJob?.id === "number") immediateJobIds.push(aiJob.id);
       } catch (error) {
         captureException(error, { route: "POST /api/lead", operation: "ai-draft-outbox", correlationId });
       }
+    }
+
+    if (immediateJobIds.length) {
+      after(async () => {
+        try {
+          await processOperationalJobs(payload, { jobIds: immediateJobIds, limit: immediateJobIds.length, rescueStale: false });
+        } catch (error) {
+          captureException(error, { route: "POST /api/lead", operation: "immediate-operational-jobs", correlationId });
+        }
+      });
     }
 
     const photoToken = makeLeadPhotoToken(created.id);

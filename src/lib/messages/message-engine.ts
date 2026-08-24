@@ -5,6 +5,7 @@ import { sanitizeJobError } from "@/lib/jobs/job-policy";
 import { generateLeadReplyDraft } from "@/lib/leads/lead-ai";
 import { assertMessageCanDeliver } from "./message-policy";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
+import { buildBrandedEmailHtml } from "./email-template";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -123,6 +124,7 @@ export async function createReceiptMessage(payload: Payload, leadId: number, cor
       channel: "email",
       subject: copy.subject,
       bodyText: copy.text,
+      bodyHtml: buildBrandedEmailHtml({ subject: copy.subject, text: copy.text }),
       status: "queued",
       idempotencyKey,
       aiAssisted: false,
@@ -130,8 +132,8 @@ export async function createReceiptMessage(payload: Payload, leadId: number, cor
       queuedAt: now,
     },
   });
-  await enqueueMessageJob(payload, message.id, correlationId);
-  return { skipped: false as const, duplicate: false as const, message };
+  const job = await enqueueMessageJob(payload, message.id, correlationId);
+  return { skipped: false as const, duplicate: false as const, message, job };
 }
 
 export async function createLeadAiReply(payload: Payload, provider: AiProvider, leadId: number, correlationId: string) {
@@ -210,7 +212,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       to: lead.email,
       subject: message.subject,
       text: message.bodyText,
-      ...(message.bodyHtml ? { html: message.bodyHtml } : {}),
+      html: message.bodyHtml || buildBrandedEmailHtml({ subject: message.subject, text: message.bodyText }),
       replyTo: process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
       idempotencyKey: message.idempotencyKey,
       correlationId,

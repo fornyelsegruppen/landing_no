@@ -1,0 +1,163 @@
+import type { Payload, Where } from "payload";
+import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
+import { createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
+import { featureReadiness } from "@/lib/platform/features";
+import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
+import { createEmailProvider } from "@/lib/providers/email-provider";
+import { ChannelUnavailableError, CommunicationCancelledError, processWorkOrderCommunicationJob } from "@/lib/work-orders/communications";
+import { nextRetryDelayMs, sanitizeJobError } from "./job-policy";
+
+type ProcessorOptions = {
+  jobIds?: number[];
+  limit?: number;
+  now?: Date;
+  rescueStale?: boolean;
+};
+
+function numericPayloadId(value: unknown, key: "messageId" | "leadId") {
+  if (!value || typeof value !== "object") return null;
+  const id = (value as Record<string, unknown>)[key];
+  return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+async function rescueStaleJobs(payload: Payload, now: Date) {
+  const staleBefore = new Date(now.getTime() - 15 * 60_000).toISOString();
+  const stale = await payload.find({
+    collection: "operational-jobs",
+    depth: 0,
+    limit: 50,
+    overrideAccess: true,
+    where: {
+      and: [
+        { status: { equals: "running" } },
+        { startedAt: { less_than_equal: staleBefore } },
+      ],
+    },
+  });
+  for (const job of stale.docs) {
+    await payload.update({
+      collection: "operational-jobs",
+      id: job.id,
+      overrideAccess: true,
+      data: {
+        status: "retry",
+        availableAt: now.toISOString(),
+        lastErrorCode: "STALE_JOB_RECOVERED",
+        lastErrorMessage: "En avbrutt jobb ble returnert til sikker retry-kø.",
+      },
+    });
+  }
+  return stale.docs.map((job) => job.id);
+}
+
+export async function processOperationalJobs(payload: Payload, options: ProcessorOptions = {}) {
+  const now = options.now || new Date();
+  const rescued = options.rescueStale === false ? [] : await rescueStaleJobs(payload, now);
+  const filters: Where[] = [
+    { type: { in: ["message.delivery", "lead.ai.draft", "work-order.communication"] } },
+    { status: { in: ["pending", "retry"] } },
+    { availableAt: { less_than_equal: now.toISOString() } },
+  ];
+  if (options.jobIds?.length) filters.push({ id: { in: options.jobIds } });
+
+  const jobs = await payload.find({
+    collection: "operational-jobs",
+    depth: 0,
+    limit: Math.min(Math.max(options.limit || 10, 1), 50),
+    sort: "availableAt",
+    overrideAccess: true,
+    where: { and: filters },
+  });
+
+  const completed: number[] = [];
+  const attention: number[] = [];
+  const retried: number[] = [];
+  const cancelled: number[] = [];
+
+  for (const job of jobs.docs) {
+    const attempts = (job.attempts || 0) + 1;
+    await payload.update({
+      collection: "operational-jobs",
+      id: job.id,
+      overrideAccess: true,
+      data: { status: "running", attempts, startedAt: now.toISOString() },
+    });
+    try {
+      if (job.type === "message.delivery") {
+        const messageId = numericPayloadId(job.payload, "messageId");
+        if (!messageId) throw new TypeError("Delivery job has no message reference");
+        const provider = createEmailProvider();
+        if (provider.health().status !== "ready") throw new Error("Email provider requires configuration");
+        await deliverMessage(payload, provider, messageId, job.correlationId);
+      } else if (job.type === "lead.ai.draft") {
+        const leadId = numericPayloadId(job.payload, "leadId");
+        if (!leadId) throw new TypeError("AI job has no lead reference");
+        const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+        if (lead.status === "converted" || lead.status === "closed") {
+          await payload.update({
+            collection: "operational-jobs",
+            id: job.id,
+            overrideAccess: true,
+            data: { status: "cancelled", completedAt: new Date().toISOString(), result: { processed: false, reason: "lead-terminal-state" } },
+          });
+          cancelled.push(job.id);
+          continue;
+        }
+        if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
+        await assertPayloadAiUsageAvailable(payload);
+        await createLeadAiReply(payload, new GeminiAiProvider(), leadId, job.correlationId);
+      } else {
+        await processWorkOrderCommunicationJob(payload, job.payload, job.correlationId);
+      }
+
+      await payload.update({
+        collection: "operational-jobs",
+        id: job.id,
+        overrideAccess: true,
+        data: { status: "completed", completedAt: new Date().toISOString(), result: { processed: true }, lastErrorCode: null, lastErrorMessage: null },
+      });
+      completed.push(job.id);
+    } catch (error) {
+      if (error instanceof CommunicationCancelledError) {
+        await payload.update({
+          collection: "operational-jobs",
+          id: job.id,
+          overrideAccess: true,
+          data: { status: "cancelled", completedAt: new Date().toISOString(), lastErrorCode: "STATE_CHANGED", lastErrorMessage: error.message },
+        });
+        cancelled.push(job.id);
+        continue;
+      }
+      const sanitized = sanitizeJobError(error);
+      const exhausted = error instanceof ChannelUnavailableError
+        || attempts >= (job.maxAttempts || 3)
+        || /requires configuration|daily request limit/i.test(error instanceof Error ? error.message : "");
+      await payload.update({
+        collection: "operational-jobs",
+        id: job.id,
+        overrideAccess: true,
+        data: {
+          status: exhausted ? "attention" : "retry",
+          availableAt: new Date(now.getTime() + nextRetryDelayMs(attempts)).toISOString(),
+          lastErrorCode: sanitized.code,
+          lastErrorMessage: sanitized.message,
+        },
+      });
+      if (exhausted && job.type === "message.delivery") {
+        const messageId = numericPayloadId(job.payload, "messageId");
+        if (messageId) {
+          await payload.update({
+            collection: "messages",
+            id: messageId,
+            overrideAccess: true,
+            data: { status: "attention", failureCode: sanitized.code, failureMessage: sanitized.message },
+          });
+        }
+      }
+      if (exhausted) attention.push(job.id);
+      else retried.push(job.id);
+    }
+  }
+
+  return { completed, attention, retried, cancelled, rescued };
+}
