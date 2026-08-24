@@ -1,5 +1,6 @@
 import type { Payload, Where } from "payload";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
+import { prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
 import { createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
 import { featureReadiness } from "@/lib/platform/features";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
@@ -83,6 +84,7 @@ export async function processOperationalJobs(payload: Payload, options: Processo
       data: { status: "running", attempts, startedAt: now.toISOString() },
     });
     try {
+      let jobResult: Record<string, unknown> = { processed: true };
       if (job.type === "message.delivery") {
         const messageId = numericPayloadId(job.payload, "messageId");
         if (!messageId) throw new TypeError("Delivery job has no message reference");
@@ -106,6 +108,20 @@ export async function processOperationalJobs(payload: Payload, options: Processo
         if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
         await assertPayloadAiUsageAvailable(payload);
         await createLeadAiReply(payload, new GeminiAiProvider(), leadId, job.correlationId);
+        const measurementReady = featureReadiness("roofMeasurement").ready;
+        const quotesReady = featureReadiness("customerQuotes").ready;
+        if (measurementReady && quotesReady) {
+          const preparedPackage = await prepareAutomaticLeadPackage(payload, leadId);
+          jobResult = { processed: true, package: preparedPackage };
+        } else {
+          jobResult = {
+            processed: true,
+            package: {
+              status: "skipped",
+              reason: "roof-measurement-or-customer-quotes-not-ready",
+            },
+          };
+        }
       } else {
         await processWorkOrderCommunicationJob(payload, job.payload, job.correlationId);
       }
@@ -114,7 +130,7 @@ export async function processOperationalJobs(payload: Payload, options: Processo
         collection: "operational-jobs",
         id: job.id,
         overrideAccess: true,
-        data: { status: "completed", completedAt: new Date().toISOString(), result: { processed: true }, lastErrorCode: null, lastErrorMessage: null },
+        data: { status: "completed", completedAt: new Date().toISOString(), result: jobResult, lastErrorCode: null, lastErrorMessage: null },
       });
       completed.push(job.id);
     } catch (error) {

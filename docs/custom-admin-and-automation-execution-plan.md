@@ -6,7 +6,7 @@
 **Produksjon:** Skal ikke endres før siste gate og eksplisitt eiergodkjenning  
 **Styrende regel:** Én vertikal fase om gangen; kode, brukerflate, test og dokumentasjon godkjennes samlet
 
-**Gjennomføringsstatus:** R0, R1 og R2 er fullført i isolert staging. R3 er teknisk fullført, men ekte Resend-levering og webhook venter på to Preview-secrets. R4 starter etter at denne eksterne gaten er lukket eller eksplisitt flyttet til R10. Produksjon er fortsatt urørt.
+**Gjennomføringsstatus:** R0, R1 og R2 er fullført i isolert staging. R3 er teknisk fullført og ekte profilert e-post er verifisert; webhook-leveringskvittering er fortsatt en ekstern gate. R4 og den sentrale `Godkjenn og send`-delen av R5 er teknisk implementert og venter på autentisert staging-E2E. Produksjon er fortsatt urørt.
 
 ## 1. Formål
 

@@ -12,9 +12,12 @@ import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { userIsAdmin } from "@/payload/access/roles";
+import { approveAndSendPreparedLeadPackage, prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("generate_reply") }),
+  z.object({ action: z.literal("prepare_package") }),
+  z.object({ action: z.literal("approve_package") }),
   z.object({ action: z.literal("approve_send"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("retry_send"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("request_information") }),
@@ -81,6 +84,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       assertFeatureReady("aiDrafts");
       const generated = await createLeadAiReply(payload, new GeminiAiProvider(), leadId, correlationId);
       result = { messageId: generated.message.id, duplicate: generated.duplicate };
+    } else if (parsed.data.action === "prepare_package") {
+      assertFeatureReady("roofMeasurement");
+      assertFeatureReady("customerQuotes");
+      result = await prepareAutomaticLeadPackage(payload, leadId);
+    } else if (parsed.data.action === "approve_package") {
+      assertFeatureReady("customerQuotes");
+      assertFeatureReady("contractSigning");
+      result = await approveAndSendPreparedLeadPackage(payload, leadId, user.id, correlationId);
     } else if (parsed.data.action === "approve_send" || parsed.data.action === "retry_send") {
       const message = await payload.findByID({ collection: "messages", id: parsed.data.messageId, depth: 0, overrideAccess: true });
       if (relationId(message.lead) !== leadId) return NextResponse.json({ error: "Message does not belong to lead" }, { status: 409 });

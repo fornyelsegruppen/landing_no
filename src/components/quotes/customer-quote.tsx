@@ -24,6 +24,7 @@ export function CustomerQuote(props: {
   const [notice, setNotice] = useState("");
   const [signed, setSigned] = useState(props.contractStatus === "signed");
   const [declined, setDeclined] = useState(props.quoteStatus === "declined");
+  const [declineOpen, setDeclineOpen] = useState(false);
   const [earlyStart, setEarlyStart] = useState(false);
 
   useEffect(() => {
@@ -81,10 +82,29 @@ export function CustomerQuote(props: {
     setPending(false); if (response.ok) { form.reset(); setNotice("Spørsmålet er sendt. Vi følger opp så snart som mulig."); } else setNotice("Spørsmålet kunne ikke sendes. Ring oss gjerne.");
   }
 
-  async function decline() {
-    if (!window.confirm("Vil du avslå dette tilbudet?")) return; setPending(true);
-    const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "decline" }) });
-    setPending(false); if (response.ok) { setDeclined(true); setNotice("Tilbudet er avslått."); } else setNotice("Kunne ikke registrere avslaget.");
+  async function decline(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPending(true);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "decline", reason: form.get("reason"), comment: form.get("comment") || undefined }),
+      });
+      if (response.ok) {
+        setDeclined(true);
+        setDeclineOpen(false);
+        setNotice("Takk for tilbakemeldingen. Vi har registrert avslaget og sendt deg en bekreftelse.");
+      } else {
+        setNotice("Kunne ikke registrere avslaget. Prøv igjen eller kontakt oss direkte.");
+      }
+    } catch {
+      setNotice("Kunne ikke registrere avslaget. Kontroller forbindelsen og prøv igjen.");
+    } finally {
+      setPending(false);
+    }
   }
 
   const d = props.display;
@@ -126,7 +146,28 @@ export function CustomerQuote(props: {
         <button className="mt-6 min-h-14 w-full rounded-xl bg-accent px-5 text-base font-black text-black hover:bg-accent-hover disabled:opacity-50" disabled={pending || !hasSignature} type="submit">{pending ? "Signerer …" : "Bestilling med forpliktelse til å betale og signer"}</button>
       </form>
       <form className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7" onSubmit={sendQuestion}><h2 className="text-xl font-bold">Har du spørsmål?</h2><textarea className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-white/5 p-4" maxLength={2000} name="message" required /><button className="mt-3 min-h-12 rounded-lg border border-white/20 px-5 font-bold" disabled={pending} type="submit">Send spørsmål</button></form>
-      <button className="mt-8 min-h-12 text-sm text-muted-foreground underline" disabled={pending} onClick={decline} type="button">Jeg ønsker å avslå tilbudet</button>
+      {!declineOpen ? <button className="mt-8 min-h-12 text-sm text-muted-foreground underline" disabled={pending} onClick={() => setDeclineOpen(true)} type="button">Jeg ønsker å avslå tilbudet</button> : (
+        <form className="mt-8 rounded-2xl border border-white/15 bg-white/5 p-5 sm:p-7" onSubmit={decline}>
+          <h2 className="text-xl font-bold">Før du avslår</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Fortell gjerne hva som gjorde at tilbudet ikke passer. Det hjelper oss å følge opp på en bedre måte.</p>
+          <label className="mt-5 block font-semibold" htmlFor="declineReason">Hva er hovedårsaken?</label>
+          <select className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-[#12151c] px-4" id="declineReason" name="reason" required defaultValue="">
+            <option disabled value="">Velg årsak</option>
+            <option value="price">Prisen passer ikke</option>
+            <option value="timing">Tidspunktet passer ikke</option>
+            <option value="chose_other">Jeg har valgt en annen leverandør</option>
+            <option value="unsure">Jeg er fortsatt usikker</option>
+            <option value="scope">Tilbudet dekker ikke det jeg trenger</option>
+            <option value="other">Annen årsak</option>
+          </select>
+          <label className="mt-5 block font-semibold" htmlFor="declineComment">Kommentar (valgfritt)</label>
+          <textarea className="mt-2 min-h-24 w-full rounded-lg border border-white/20 bg-[#12151c] p-4" id="declineComment" maxLength={1500} name="comment" />
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button className="min-h-12 rounded-lg border border-red-400/50 px-5 font-bold text-red-200 disabled:opacity-50" disabled={pending} type="submit">{pending ? "Registrerer …" : "Bekreft at jeg avslår"}</button>
+            <button className="min-h-12 rounded-lg border border-white/20 px-5" disabled={pending} onClick={() => setDeclineOpen(false)} type="button">Avbryt</button>
+          </div>
+        </form>
+      )}
     </> : null}
     <footer className="mt-12 border-t border-white/10 pt-6 text-sm text-muted-foreground"><p>{props.supplier.name} · Org.nr. {props.supplier.orgNumber}</p><p>{props.supplier.address} · {props.supplier.email} · {props.supplier.phone}</p></footer>
   </main>;

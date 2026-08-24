@@ -45,7 +45,7 @@ export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({ d
   data.calculationSnapshot = prepared.calculation;
   data.inputHash = prepared.inputHash;
   data.blockingReasons = [];
-  data.approvedBy = req.user?.id;
+  data.approvedBy = data.approvedBy ?? req.user?.id;
   data.approvedAt = new Date().toISOString();
   return data;
 };

@@ -8,6 +8,7 @@ describe("admin case next action", () => {
     expect(caseActionRequiresConfirmation("create_quote")).toBe(true);
     expect(caseActionRequiresConfirmation("approve_quote")).toBe(true);
     expect(caseActionRequiresConfirmation("issue_quote")).toBe(true);
+    expect(caseActionRequiresConfirmation("approve_package")).toBe(true);
     expect(caseActionRequiresConfirmation("generate_reply")).toBe(false);
     expect(caseActionRequiresConfirmation("approve_message")).toBe(false);
   });
@@ -15,14 +16,17 @@ describe("admin case next action", () => {
   it.each([
     [{ leadStatus: "new" }, "generate_reply"],
     [{ leadStatus: "draft_ready", message: { id: 1, status: "draft" } }, "approve_message"],
+    [{ leadStatus: "draft_ready", aiRecommendedNextAction: "start_measurement", message: { id: 1, status: "draft", category: "ai_reply" } }, "prepare_package"],
     [{ leadStatus: "new", message: { id: 2, status: "failed" } }, "retry_message"],
-    [{ leadStatus: "measuring", message: { id: 1, status: "sent" } }, "measurement_required"],
+    [{ leadStatus: "measuring", message: { id: 1, status: "sent" } }, "prepare_package"],
+    [{ leadStatus: "measuring", message: { id: 1, status: "cancelled" }, measurement: { id: 3, status: "review_required" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "draft" }, contract: { id: 6, status: "draft" } }, "approve_package"],
     [{ leadStatus: "measuring", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "review_required" } }, "approve_measurement"],
     [{ leadStatus: "measuring", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" } }, "calculate_price"],
     [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "ready" } }, "create_quote"],
     [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "draft" } }, "approve_quote"],
     [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "approved" } }, "issue_quote"],
     [{ leadStatus: "waiting_customer", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "sent" } }, "wait_customer"],
+    [{ leadStatus: "waiting_customer", message: { id: 1, status: "sent" }, quote: { id: 5, status: "declined" } }, "follow_up_decline"],
     [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed" } }, "create_work_order"],
     [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed" }, workOrder: { id: 7, status: "unassigned" } }, "assign_worker"],
     [{ leadStatus: "closed" }, "none"],

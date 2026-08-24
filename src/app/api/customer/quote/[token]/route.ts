@@ -20,7 +20,11 @@ export const maxDuration = 60;
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("question"), message: z.string().trim().min(5).max(2_000) }),
-  z.object({ action: z.literal("decline") }),
+  z.object({
+    action: z.literal("decline"),
+    reason: z.enum(["price", "timing", "chose_other", "unsure", "scope", "other"]),
+    comment: z.string().trim().max(1_500).optional(),
+  }),
   z.object({
     action: z.literal("sign"), signerName: z.string().trim().min(3).max(160),
     signatureData: z.string().min(100).max(1_500_000), expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -70,10 +74,73 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     }
 
     if (parsed.data.action === "decline") {
+      if (view.quoteStatus === "declined") return NextResponse.json({ ok: true, status: "declined", idempotent: true });
       if (!["sent", "viewed"].includes(view.quoteStatus)) throw new Error("Quote cannot be declined in its current state");
-      await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "declined", declinedAt: new Date().toISOString() } });
+      const now = new Date().toISOString();
+      const reasonLabels = {
+        price: "Prisen passer ikke",
+        timing: "Tidspunktet passer ikke",
+        chose_other: "Har valgt en annen leverandør",
+        unsure: "Er fortsatt usikker",
+        scope: "Tilbudet dekker ikke ønsket behov",
+        other: "Annen årsak",
+      } as const;
+      const reasonText = reasonLabels[parsed.data.reason];
+      const feedback = parsed.data.comment
+        ? `${reasonText}\n\nKundens kommentar:\n${parsed.data.comment}`
+        : reasonText;
+      await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "declined", declinedAt: now } });
       if (view.contractStatus === "issued") await payload.update({ collection: "contracts", id: view.contractId, overrideAccess: true, data: { status: "declined" } });
-      await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "closed", closedAt: new Date().toISOString(), nextAction: "Kunden avslo tilbudet." } });
+      await payload.create({ collection: "messages", overrideAccess: true, data: {
+        lead: leadId,
+        direction: "inbound",
+        category: "follow_up",
+        channel: "email",
+        subject: `Tilbud ${view.quoteReference} ble avslått`,
+        bodyText: feedback,
+        status: "delivered",
+        idempotencyKey: `quote-decline-feedback:${view.quoteId}`,
+        aiAssisted: false,
+        deliveredAt: now,
+      } });
+      await payload.update({
+        collection: "leads",
+        id: leadId,
+        overrideAccess: true,
+        data: {
+          status: "waiting_customer",
+          closedAt: null,
+          nextAction: `Kunden avslo ${view.quoteReference}: ${reasonText}. Vurder personlig oppfølging eller lukk saken.`,
+          nextActionAt: now,
+        },
+      });
+      const acknowledgement = await payload.create({ collection: "messages", overrideAccess: true, data: {
+        lead: leadId,
+        direction: "outbound",
+        category: "follow_up",
+        channel: "email",
+        subject: `Takk for tilbakemeldingen om ${view.quoteReference}`,
+        bodyText: `Hei,\n\nTakk for at du ga beskjed. Vi har registrert at du ikke ønsker å gå videre med tilbud ${view.quoteReference} nå. Dersom det gjelder pris, tidspunkt eller innhold, kan du svare på denne e-posten – vi ser gjerne om det finnes en bedre løsning for deg.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`,
+        status: "queued",
+        idempotencyKey: `quote-decline-acknowledgement:${view.quoteId}`,
+        aiAssisted: false,
+        approvedAt: now,
+        queuedAt: now,
+      } });
+      await enqueueMessageJob(payload, acknowledgement.id, correlationId);
+      const provider = createEmailProvider();
+      if (provider.health().status === "ready") {
+        try {
+          await deliverMessage(payload, provider, acknowledgement.id, correlationId);
+          await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: {
+            status: "waiting_customer",
+            nextAction: `Kunden avslo ${view.quoteReference}: ${reasonText}. Vurder personlig oppfølging eller lukk saken.`,
+            nextActionAt: now,
+          } });
+        } catch (error) {
+          captureException(error, { route: "POST /api/customer/quote/[token]", operation: "decline-acknowledgement", correlationId });
+        }
+      }
       return NextResponse.json({ ok: true, status: "declined" });
     }
 

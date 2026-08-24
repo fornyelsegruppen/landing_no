@@ -21,7 +21,7 @@ describe("admin v2 dashboard", () => {
   });
 
   it("loads deterministic dashboard counts", async () => {
-    const totals = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41];
+    const totals = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43];
     const count = vi.fn().mockImplementation(async () => ({ totalDocs: totals.shift() }));
     const result = await loadAdminDashboard(
       { count } as unknown as Pick<Payload, "count">,
@@ -34,16 +34,16 @@ describe("admin v2 dashboard", () => {
         newLeads: 2,
         aiDrafts: 3,
         replyDrafts: 5,
-        attention: 48,
-        activeWork: 19,
-        unassignedWork: 23,
-        pendingQuotes: 29,
-        pendingContracts: 31,
-        changeAgreements: 37,
-        upcomingWork: 41,
+        attention: 67,
+        activeWork: 23,
+        unassignedWork: 29,
+        pendingQuotes: 31,
+        pendingContracts: 37,
+        changeAgreements: 41,
+        upcomingWork: 43,
       },
     });
-    expect(count).toHaveBeenCalledTimes(13);
+    expect(count).toHaveBeenCalledTimes(14);
   });
 
   it("does not disguise database failures as zero counts", async () => {

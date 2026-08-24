@@ -52,7 +52,26 @@ describe("customer quote signing route", () => {
 
   it("does not reveal an invalid or revoked customer relationship", async () => {
     mocks.load.mockResolvedValue(null);
-    const response = await POST(request({ action: "decline" }), { params: Promise.resolve({ token: "x".repeat(43) }) });
+    const response = await POST(request({ action: "decline", reason: "price" }), { params: Promise.resolve({ token: "x".repeat(43) }) });
     expect(response.status).toBe(404);
+  });
+
+  it("keeps a declined quote for administrator follow-up and acknowledges the customer", async () => {
+    const response = await POST(request({ action: "decline", reason: "price", comment: "For dyrt akkurat nå" }), { params: Promise.resolve({ token: "d".repeat(43) }) });
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "leads",
+      data: expect.objectContaining({ status: "waiting_customer", closedAt: null }),
+    }));
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "messages",
+      data: expect.objectContaining({ direction: "inbound", category: "follow_up", bodyText: expect.stringContaining("For dyrt") }),
+    }));
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "messages",
+      data: expect.objectContaining({ direction: "outbound", status: "queued" }),
+    }));
+    expect(mocks.enqueue).toHaveBeenCalled();
+    expect(mocks.deliver).toHaveBeenCalled();
   });
 });

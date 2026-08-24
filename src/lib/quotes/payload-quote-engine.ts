@@ -12,7 +12,12 @@ const serviceNames: Record<string, string> = {
   takmaling: "Takmaling", nytt_tak: "Nytt tak",
 };
 
-export async function createQuoteDraft(payload: Payload, calculationId: number, now = new Date()) {
+export async function createQuoteDraft(
+  payload: Payload,
+  calculationId: number,
+  now = new Date(),
+  options: { allowPendingMeasurement?: boolean } = {},
+) {
   const calculation = await payload.findByID({ collection: "price-calculations", id: calculationId, depth: 0, overrideAccess: true });
   if (calculation.status !== "ready") throw new Error("Price calculation is not ready");
   const leadId = idOf(calculation.lead);
@@ -25,7 +30,14 @@ export async function createQuoteDraft(payload: Payload, calculationId: number, 
     payload.find({ collection: "contract-terms", depth: 0, limit: 1, sort: "-approvedAt", overrideAccess: true, where: { status: { equals: "approved" } } }),
     payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { lead: { equals: leadId } } }),
   ]);
-  if (measurement.status !== "approved") throw new Error("Roof measurement must be approved");
+  const pendingMeasurementAllowed = options.allowPendingMeasurement === true
+    && ["draft", "review_required"].includes(measurement.status);
+  if (measurement.status !== "approved" && !pendingMeasurementAllowed) {
+    throw new Error("Roof measurement must be approved");
+  }
+  if (pendingMeasurementAllowed && Array.isArray(measurement.blockingReasons) && measurement.blockingReasons.length > 0) {
+    throw new Error("A blocked roof measurement cannot be used for a quote draft");
+  }
   if (rule.status !== "approved") throw new Error("Price rule must be approved");
   const terms = termsResult.docs[0];
   if (!terms || !terms.legalReviewReference || terms.legalReviewReference !== process.env.LEGAL_REVIEW_REFERENCE) {

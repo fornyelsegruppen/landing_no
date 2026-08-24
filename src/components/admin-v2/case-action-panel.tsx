@@ -10,6 +10,8 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 function requestFor(action: CaseNextAction, leadId: number) {
   switch (action.kind) {
     case "generate_reply": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "generate_reply" } };
+    case "prepare_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "prepare_package" } };
+    case "approve_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_package" } };
     case "approve_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId } };
     case "retry_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "retry_send", messageId: action.targetId } };
     case "approve_measurement": return { endpoint: `/api/admin/measurements/${action.targetId}`, body: { action: "approve" } };

@@ -75,6 +75,7 @@ export async function loadAdminDashboard(
       operationalAttention,
       seoAttention,
       messageAttention,
+      dueLeadAttention,
       blockedWork,
       activeWork,
       unassignedWork,
@@ -89,6 +90,10 @@ export async function loadAdminDashboard(
       payload.count({ collection: "operational-jobs", where: { status: { in: ["failed", "attention"] } } }),
       payload.count({ collection: "seo-runs", where: { status: { in: ["failed", "attention"] } } }),
       payload.count({ collection: "messages", where: { status: { in: ["failed", "attention"] } } }),
+      payload.count({ collection: "leads", where: { and: [
+        { status: { equals: "waiting_customer" } },
+        { nextActionAt: { less_than_equal: now.toISOString() } },
+      ] } }),
       payload.count({ collection: "work-orders", where: { status: { equals: "blocked" } } }),
       payload.count({ collection: "work-orders", where: { status: { in: ["assigned", "scheduled", "on_way", "arrived", "precheck", "ready", "in_progress", "completed"] } } }),
       payload.count({ collection: "work-orders", where: { status: { equals: "unassigned" } } }),
@@ -116,6 +121,7 @@ export async function loadAdminDashboard(
           countTotal(operationalAttention) +
           countTotal(seoAttention) +
           countTotal(messageAttention) +
+          countTotal(dueLeadAttention) +
           countTotal(blockedWork),
         changeAgreements: countTotal(changeAgreements),
         newLeads: countTotal(newLeads),
@@ -261,15 +267,20 @@ export async function loadAdminQueue(
       return result.docs.map((doc) => referenceItem("work-orders", doc));
     }
     case "attention": {
-      const [work, messages, operations] = await Promise.all([
+      const [work, messages, operations, leads] = await Promise.all([
         payload.find({ ...common, collection: "work-orders", where: { status: { equals: "blocked" } } }),
         payload.find({ ...common, collection: "messages", where: { status: { in: ["failed", "attention"] } } }),
         payload.find({ ...common, collection: "operational-jobs", where: { status: { in: ["failed", "attention"] } } }),
+        payload.find({ ...common, collection: "leads", where: { and: [
+          { status: { equals: "waiting_customer" } },
+          { nextActionAt: { less_than_equal: now.toISOString() } },
+        ] } }),
       ]);
       return [
         ...work.docs.map((doc) => referenceItem("work-orders", doc)),
         ...messages.docs.map((doc) => genericItem("messages", doc)),
         ...operations.docs.map((doc) => genericItem("operational-jobs", doc)),
+        ...leads.docs.map(leadItem),
       ].slice(0, 30);
     }
   }

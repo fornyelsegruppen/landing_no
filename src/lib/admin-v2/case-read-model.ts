@@ -2,6 +2,7 @@ import type { Payload, Where } from "payload";
 
 export type CaseNextActionKind =
   | "approve_measurement"
+  | "approve_package"
   | "approve_message"
   | "approve_quote"
   | "assign_worker"
@@ -9,8 +10,10 @@ export type CaseNextActionKind =
   | "create_quote"
   | "create_work_order"
   | "generate_reply"
+  | "follow_up_decline"
   | "issue_quote"
   | "measurement_required"
+  | "prepare_package"
   | "none"
   | "retry_message"
   | "wait_customer";
@@ -21,7 +24,7 @@ export type CaseNextAction = {
 };
 
 export function caseActionRequiresConfirmation(kind: CaseNextActionKind) {
-  return ["calculate_price", "create_quote", "approve_quote", "issue_quote"].includes(kind);
+  return ["approve_package", "calculate_price", "create_quote", "approve_quote", "issue_quote"].includes(kind);
 }
 
 type StatusRecord = {
@@ -31,10 +34,11 @@ type StatusRecord = {
 };
 
 export type CaseActionInput = {
+  aiRecommendedNextAction?: string;
   contract?: StatusRecord;
   leadStatus?: string;
   measurement?: StatusRecord;
-  message?: StatusRecord & { direction?: string };
+  message?: StatusRecord & { category?: string; direction?: string };
   price?: StatusRecord;
   quote?: StatusRecord;
   workOrder?: StatusRecord;
@@ -42,16 +46,28 @@ export type CaseActionInput = {
 
 export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.leadStatus === "closed") return { kind: "none" };
+  if (input.quote?.status === "declined") return { kind: "follow_up_decline", targetId: input.quote.id };
   if (input.message && ["failed", "attention"].includes(input.message.status || "")) {
     return { kind: "retry_message", targetId: input.message.id };
   }
-  if (input.message?.status === "draft") {
+  const measurementAiDraft = input.message?.status === "draft"
+    && input.message.category === "ai_reply"
+    && input.aiRecommendedNextAction === "start_measurement";
+  if (input.message?.status === "draft" && !measurementAiDraft) {
     return { kind: "approve_message", targetId: input.message.id };
   }
   if (!input.message || input.message.direction === "inbound") {
     return { kind: "generate_reply" };
   }
-  if (!input.measurement) return { kind: "measurement_required" };
+  if (!input.measurement) return { kind: "prepare_package" };
+  if (
+    ["draft", "review_required"].includes(input.measurement.status || "")
+    && input.price
+    && input.quote?.status === "draft"
+    && input.contract?.status === "draft"
+  ) {
+    return { kind: "approve_package", targetId: input.quote.id };
+  }
   if (["draft", "review_required"].includes(input.measurement.status || "")) {
     return { kind: "approve_measurement", targetId: input.measurement.id };
   }
@@ -346,10 +362,14 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   }));
 
   const nextAction = deriveCaseNextAction({
+    aiRecommendedNextAction: lead.qualification && typeof lead.qualification === "object"
+      ? stringValue((lead.qualification as Record<string, unknown>).recommendedNextAction)
+      : undefined,
     leadStatus: stringValue(lead.status),
     message: currentMessageRaw ? {
       id: numericId(currentMessageRaw.id),
       status: stringValue(currentMessageRaw.status),
+      category: stringValue(currentMessageRaw.category),
       direction: stringValue(currentMessageRaw.direction),
       createdAt: stringValue(currentMessageRaw.createdAt),
     } : undefined,

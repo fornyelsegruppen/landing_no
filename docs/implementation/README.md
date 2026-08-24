@@ -29,8 +29,8 @@ En historisk fase kan bare markeres fullført når rapporten inneholder leverans
 | R1 | [Custom admin-skall på `/admin-v2`](./phase-r1-custom-admin-shell.md) | Fullført i staging |
 | R2 | [Samlet saksflate og handlingsinnboks](./phase-r2-unified-case-workspace.md) | Fullført i staging |
 | R3 | [Profilert kommunikasjon og rask jobbkjøring](./phase-r3-branded-communications-and-fast-jobs.md) | Teknisk fullført; ekstern leveringsgate åpen |
-| R4 | Automatisk kvalifisering, byggvalg og måleutkast | Ikke startet |
-| R5 | Tilbud, kundespørsmål og administrativ godkjenning | Ikke startet |
+| R4 | [Automatisk kvalifisering og komplett sakspakke](./phase-r4-automatic-package-preparation.md) | Teknisk fullført; staging-E2E gjenstår |
+| R5 | Tilbud, kundespørsmål og administrativ godkjenning | Delvis implementert i R4; staging-E2E gjenstår |
 | R6 | Kontrakt, selskapsaksept og arbeidsordre | Ikke startet |
 | R7 | Planlegging, varsler og ansattreise | Ikke startet |
 | R8 | Ferdigstilling, dokumentregister og fakturaflyt | Ikke startet |
