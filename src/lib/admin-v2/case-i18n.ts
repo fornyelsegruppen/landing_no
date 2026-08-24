@@ -42,6 +42,7 @@ const copy = {
     actionDone: "Handlingen er fullført.",
     actionFailed: "Handlingen kunne ikke fullføres.",
     processing: "Behandler …",
+    confirmEconomicAction: "Bekreft at du har kontrollert grunnlaget og vil utføre denne økonomiske handlingen.",
     noMessages: "Ingen kundemeldinger ennå.",
     noDocuments: "Ingen varige dokumenter registrert ennå.",
     actionLabels: {
@@ -100,6 +101,7 @@ const copy = {
     actionDone: "Veiksmas atliktas.",
     actionFailed: "Veiksmo atlikti nepavyko.",
     processing: "Vykdoma …",
+    confirmEconomicAction: "Patvirtinkite, kad patikrinote duomenis ir norite atlikti šį finansinį veiksmą.",
     noMessages: "Žinučių klientui dar nėra.",
     noDocuments: "Nuolatinių dokumentų dar nėra.",
     actionLabels: {
@@ -158,6 +160,7 @@ const copy = {
     actionDone: "The action is complete.",
     actionFailed: "The action could not be completed.",
     processing: "Processing …",
+    confirmEconomicAction: "Confirm that you reviewed the basis and want to perform this financial action.",
     noMessages: "No customer messages yet.",
     noDocuments: "No durable documents registered yet.",
     actionLabels: {

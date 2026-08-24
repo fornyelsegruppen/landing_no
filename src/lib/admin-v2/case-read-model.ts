@@ -20,6 +20,10 @@ export type CaseNextAction = {
   targetId?: number;
 };
 
+export function caseActionRequiresConfirmation(kind: CaseNextActionKind) {
+  return ["calculate_price", "create_quote", "approve_quote", "issue_quote"].includes(kind);
+}
+
 type StatusRecord = {
   createdAt?: string;
   id: number;

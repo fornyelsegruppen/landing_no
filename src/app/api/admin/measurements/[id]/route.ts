@@ -5,6 +5,9 @@ import { calculatePrice, type PriceRuleSnapshot } from "@/lib/measurements/prici
 import { prepareMeasurement } from "@/lib/measurements/proposal";
 import { nextMeasurementVersion } from "@/lib/measurements/versioning";
 import { userIsAdmin } from "@/payload/access/roles";
+import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
+import { recordAuditEvent } from "@/lib/audit/audit-event";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
@@ -45,6 +48,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
     if (!prepared.gate.allowed) return NextResponse.json({ error: "Measurement is blocked", reasons: prepared.gate.reasons }, { status: 409 });
     const updated = await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "approved", approvedBy: user.id, approvedAt: new Date().toISOString(), blockingReasons: [] } });
+    await recordAuditEvent(createPayloadAuditWriter(payload), {
+      actorId: user.id,
+      action: "measurement.approved",
+      entityType: "roof-measurement",
+      entityId: updated.id,
+      correlationId: correlationIdFromHeaders(request.headers),
+      changedFields: ["status", "approvedBy", "approvedAt"],
+    });
     return NextResponse.json({ measurement: updated });
   }
 
@@ -70,6 +81,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     delete createData.updatedAt;
     const created = await payload.create({ collection: "roof-measurements", overrideAccess: true, data: createData as never });
     await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "superseded" } });
+    await recordAuditEvent(createPayloadAuditWriter(payload), {
+      actorId: user.id,
+      action: "measurement.version-created",
+      entityType: "roof-measurement",
+      entityId: created.id,
+      correlationId: correlationIdFromHeaders(request.headers),
+      changedFields: ["version", "roofPlanes", "confidence", "status"],
+    });
     return NextResponse.json({ measurement: created, gate: prepared.gate }, { status: 201 });
   }
 
@@ -91,5 +110,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     totalIncVatOre: calculated.totalIncVatOre, maximumTotalIncVatOre: calculated.maximumTotalIncVatOre,
     status: "ready", blockingReasons: [],
   } });
+  await recordAuditEvent(createPayloadAuditWriter(payload), {
+    actorId: user.id,
+    action: "price.calculated",
+    entityType: "price-calculation",
+    entityId: created.id,
+    correlationId: correlationIdFromHeaders(request.headers),
+    changedFields: ["measurement", "priceRule", "subtotalExVatOre", "vatOre", "totalIncVatOre", "maximumTotalIncVatOre", "status"],
+  });
   return NextResponse.json({ calculation: created }, { status: 201 });
 }

@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
-import { deriveCaseNextAction, loadAdminCase } from "./case-read-model";
+import { caseActionRequiresConfirmation, deriveCaseNextAction, loadAdminCase } from "./case-read-model";
 
 describe("admin case next action", () => {
+  it("requires confirmation for every financial action", () => {
+    expect(caseActionRequiresConfirmation("calculate_price")).toBe(true);
+    expect(caseActionRequiresConfirmation("create_quote")).toBe(true);
+    expect(caseActionRequiresConfirmation("approve_quote")).toBe(true);
+    expect(caseActionRequiresConfirmation("issue_quote")).toBe(true);
+    expect(caseActionRequiresConfirmation("generate_reply")).toBe(false);
+    expect(caseActionRequiresConfirmation("approve_message")).toBe(false);
+  });
+
   it.each([
     [{ leadStatus: "new" }, "generate_reply"],
     [{ leadStatus: "draft_ready", message: { id: 1, status: "draft" } }, "approve_message"],

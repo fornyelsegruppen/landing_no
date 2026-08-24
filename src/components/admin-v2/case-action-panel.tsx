@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { CaseNextAction } from "@/lib/admin-v2/case-read-model";
+import { caseActionRequiresConfirmation, type CaseNextAction } from "@/lib/admin-v2/case-read-model";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
@@ -31,6 +31,7 @@ export function CaseActionPanel({ action, leadId, locale }: { action: CaseNextAc
 
   async function run() {
     if (!request || busy) return;
+    if (caseActionRequiresConfirmation(action.kind) && !window.confirm(copy.confirmEconomicAction)) return;
     setBusy(true);
     setNotice("");
     try {
