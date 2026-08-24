@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { performLogout } from "@/lib/auth/logout";
+import { getWorkerCopy, type PanelLocale } from "@/lib/panel-i18n";
 
-export function LogoutButton() {
+export function LogoutButton({ locale }: { locale: PanelLocale }) {
+  const copy = getWorkerCopy(locale);
   const [pending, setPending] = useState(false);
 
   async function logout() {
@@ -20,7 +22,7 @@ export function LogoutButton() {
       onClick={logout}
       type="button"
     >
-      {pending ? "Logger ut …" : "Logg ut"}
+      {pending ? copy.loggingOut : copy.logout}
     </button>
   );
 }

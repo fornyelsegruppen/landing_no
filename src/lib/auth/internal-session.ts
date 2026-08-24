@@ -6,12 +6,17 @@ import {
   userIsActive,
   type UserRole,
 } from "@/payload/access/roles";
+import {
+  normalizePanelLocale,
+  type PanelLocale,
+} from "@/lib/panel-i18n";
 
 export type InternalUser = {
   active: true;
   displayName?: string | null;
   email: string;
   id: number;
+  interfaceLanguage: PanelLocale;
   role: UserRole;
 };
 
@@ -32,6 +37,9 @@ export async function getInternalUser(): Promise<InternalUser | null> {
         : null,
     email: typeof user.email === "string" ? user.email : "",
     id: Number(user.id),
+    interfaceLanguage: normalizePanelLocale(
+      "interfaceLanguage" in user ? user.interfaceLanguage : null,
+    ),
     role,
   };
 }

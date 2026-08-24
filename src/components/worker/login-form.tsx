@@ -2,9 +2,11 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getWorkerCopy, type PanelLocale } from "@/lib/panel-i18n";
 
-export function WorkerLoginForm() {
+export function WorkerLoginForm({ locale }: { locale: PanelLocale }) {
   const router = useRouter();
+  const copy = getWorkerCopy(locale);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -25,7 +27,7 @@ export function WorkerLoginForm() {
     }).catch(() => null);
 
     if (!response?.ok) {
-      setError("Innloggingen mislyktes. Kontroller opplysningene eller kontakt administrator.");
+      setError(copy.loginFailed);
       setPending(false);
       return;
     }
@@ -38,7 +40,7 @@ export function WorkerLoginForm() {
     <form className="mt-8 space-y-5" onSubmit={submit}>
       <div>
         <label className="mb-2 block text-sm font-semibold" htmlFor="email">
-          E-post
+          {copy.email}
         </label>
         <input
           autoComplete="username"
@@ -51,7 +53,7 @@ export function WorkerLoginForm() {
       </div>
       <div>
         <label className="mb-2 block text-sm font-semibold" htmlFor="password">
-          Passord
+          {copy.password}
         </label>
         <input
           autoComplete="current-password"
@@ -72,7 +74,7 @@ export function WorkerLoginForm() {
         disabled={pending}
         type="submit"
       >
-        {pending ? "Logger inn …" : "Logg inn"}
+        {pending ? copy.loggingIn : copy.login}
       </button>
     </form>
   );

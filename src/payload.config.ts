@@ -2,6 +2,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { vercelBlobStorage } from "@payloadcms/storage-vercel-blob";
+import { en } from "@payloadcms/translations/languages/en";
+import { lt } from "@payloadcms/translations/languages/lt";
+import { nb } from "@payloadcms/translations/languages/nb";
 import { buildConfig } from "payload";
 import sharp from "sharp";
 
@@ -101,6 +104,10 @@ export default buildConfig({
   serverURL,
   csrf: trustedOrigins,
   cors: trustedOrigins,
+  i18n: {
+    fallbackLanguage: "nb",
+    supportedLanguages: { nb, lt, en },
+  },
   admin: {
     user: Users.slug,
     components: {

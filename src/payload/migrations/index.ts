@@ -23,6 +23,7 @@ import * as migration_20260823_194404_phase9_change_agreements_communications fr
 import * as migration_20260823_200533_phase10_content_measurement_hardening from "./20260823_200533_phase10_content_measurement_hardening";
 import * as migration_20260824_082135_phase11_stock_images from "./20260824_082135_phase11_stock_images";
 import * as migration_20260824_094425_phase11_stock_image_fallback from "./20260824_094425_phase11_stock_image_fallback";
+import * as migration_20260824_130000_phase12_panel_languages from "./20260824_130000_phase12_panel_languages";
 
 export const migrations = [
   {
@@ -149,5 +150,10 @@ export const migrations = [
     up: migration_20260824_094425_phase11_stock_image_fallback.up,
     down: migration_20260824_094425_phase11_stock_image_fallback.down,
     name: "20260824_094425_phase11_stock_image_fallback",
+  },
+  {
+    up: migration_20260824_130000_phase12_panel_languages.up,
+    down: migration_20260824_130000_phase12_panel_languages.down,
+    name: "20260824_130000_phase12_panel_languages",
   },
 ];

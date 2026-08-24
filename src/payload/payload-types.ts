@@ -180,6 +180,10 @@ export interface User {
    */
   displayName?: string | null;
   phone?: string | null;
+  /**
+   * Gjelder bare /user. Kundetekster, tilbud og kontrakter forblir på norsk.
+   */
+  interfaceLanguage: 'nb' | 'lt' | 'en';
   role: 'admin' | 'worker';
   /**
    * Slå av for å stanse innlogging og tilbakekalle aktive sesjoner.
@@ -1487,6 +1491,7 @@ export interface PayloadMigration {
 export interface UsersSelect<T extends boolean = true> {
   displayName?: T;
   phone?: T;
+  interfaceLanguage?: T;
   role?: T;
   active?: T;
   updatedAt?: T;

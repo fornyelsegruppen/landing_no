@@ -4,6 +4,7 @@ import { GenerateBlogDraftButton } from "./GenerateBlogDraftButton";
 import { BlogTopicTools } from "./BlogTopicTools";
 import { buildPlatformHealth } from "@/lib/platform/health";
 import { buildReleaseGate } from "@/lib/platform/release-gate";
+import { getAdminCopy, normalizePanelLocale } from "@/lib/panel-i18n";
 
 type DashboardCounts = {
   activeWork: number;
@@ -98,36 +99,36 @@ async function loadCounts(): Promise<DashboardCounts> {
 }
 
 const cards = [
-  { key: "newLeads", label: "Nye henvendelser", href: "/admin/collections/leads" },
+  { key: "newLeads", href: "/admin/collections/leads" },
   {
     key: "replyDrafts",
-    label: "Svarutkast til godkjenning",
     href: "/admin/collections/messages",
   },
-  { key: "changeAgreements", label: "Endringsavtaler i arbeid", href: "/admin/collections/change-agreements" },
+  { key: "changeAgreements", href: "/admin/collections/change-agreements" },
   {
     key: "aiDrafts",
-    label: "Bloggutkast til kontroll",
     href: "/admin/collections/posts",
   },
   {
     key: "pendingQuotes",
-    label: "Tilbud til godkjenning",
     href: "/admin/collections/quotes",
   },
   {
     key: "pendingContracts",
-    label: "Kontrakter til signering",
     href: "/admin/collections/contracts",
   },
   {
     key: "activeWork",
-    label: "Aktive oppdrag",
     href: "/admin/collections/work-orders",
   },
 ] as const;
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  i18n,
+}: {
+  i18n?: { language?: string };
+}) {
+  const copy = getAdminCopy(normalizePanelLocale(i18n?.language));
   const counts = await loadCounts();
   const health = buildPlatformHealth();
   const releaseGate = buildReleaseGate();
@@ -137,69 +138,69 @@ export default async function AdminDashboard() {
   return (
     <section className="platform-dashboard" aria-labelledby="platform-title">
       <div className="platform-dashboard__header">
-        <p className="platform-dashboard__eyebrow">Takfornyelse Control</p>
-        <h1 id="platform-title">Oversikt</h1>
-        <p>Det viktigste som krever handling akkurat nå.</p>
+        <p className="platform-dashboard__eyebrow">{copy.control}</p>
+        <h1 id="platform-title">{copy.overview}</h1>
+        <p>{copy.overviewIntro}</p>
       </div>
 
       <div className="platform-dashboard__cards">
         {cards.map((card) => (
           <Link className="platform-dashboard__card" href={card.href} key={card.key}>
             <strong>{counts[card.key]}</strong>
-            <span>{card.label}</span>
+            <span>{copy.cards[card.key]}</span>
           </Link>
         ))}
       </div>
 
       <div className="platform-dashboard__queues">
         <article>
-          <h2>Krever oppmerksomhet</h2>
+          <h2>{copy.attention}</h2>
           <p>
             {counts.attention > 0
-              ? `${counts.attention} jobber, meldinger eller oppdrag må kontrolleres.`
-              : "Ingen jobber, meldinger eller oppdrag krever oppmerksomhet."}
+              ? copy.attentionSome(counts.attention)
+              : copy.attentionNone}
           </p>
-          <Link href="/admin/collections/operational-jobs">Åpne køen</Link>
+          <Link href="/admin/collections/operational-jobs">{copy.openQueue}</Link>
         </article>
         <article>
-          <h2>Kommende arbeid</h2>
+          <h2>{copy.upcomingWork}</h2>
           <p>
             {counts.unassignedWork > 0
-              ? `${counts.unassignedWork} oppdrag mangler tildelt ansatt.`
-              : "Ingen oppdrag mangler tildeling."}
+              ? copy.unassignedSome(counts.unassignedWork)
+              : copy.unassignedNone}
           </p>
-          <Link href="/admin/collections/work-orders">Se arbeid</Link>
+          <Link href="/admin/collections/work-orders">{copy.seeWork}</Link>
         </article>
         <article>
-          <h2>Neste 72 timer</h2>
-          <p>{counts.upcomingWork} planlagte oppdrag i løpet av de neste 72 timene.</p>
-          <Link href="/admin/collections/work-orders">Åpne arbeidsplanen</Link>
+          <h2>{copy.next72}</h2>
+          <p>{copy.next72Text(counts.upcomingWork)}</p>
+          <Link href="/admin/collections/work-orders">{copy.openSchedule}</Link>
         </article>
         <article>
-          <h2>Innholdskontroll</h2>
-          <p>{counts.contentAudits} publiserte artikler har anbefaling om oppdatering, sammenslåing eller redirect.</p>
-          <Link href="/admin/collections/posts">Se innholdsrapporten</Link>
+          <h2>{copy.contentReview}</h2>
+          <p>{copy.contentReviewText(counts.contentAudits)}</p>
+          <Link href="/admin/collections/posts">{copy.seeContentReport}</Link>
         </article>
       </div>
       <div className="platform-dashboard__automation">
-        <h2>Integrasjoner og feature-flagg</h2>
-        <p>{unavailable.length ? `${unavailable.length} integrasjoner er deaktivert eller mangler konfigurasjon. Funksjonene forblir trygt av.` : "Alle konfigurerte integrasjoner rapporterer klar status."}</p>
+        <h2>{copy.integrations}</h2>
+        <p>{unavailable.length ? copy.integrationsMissing(unavailable.length) : copy.integrationsReady}</p>
         <ul>
-          {unavailable.map((integration) => <li key={integration.name}><strong>{integration.name}</strong>: {integration.readiness}{integration.missing.length ? ` – mangler ${integration.missing.join(", ")}` : ""}</li>)}
+          {unavailable.map((integration) => <li key={integration.name}><strong>{integration.name}</strong>: {integration.readiness}{integration.missing.length ? ` – ${copy.missing} ${integration.missing.join(", ")}` : ""}</li>)}
         </ul>
-        <Link href="/api/admin/platform-health">Åpne teknisk helsestatus</Link>
+        <Link href="/api/admin/platform-health">{copy.openHealth}</Link>
       </div>
       <div className="platform-dashboard__automation">
-        <h2>Produksjonsgate</h2>
-        <p>{releaseGate.productionReady ? "Alle aktiverte funksjoner har dokumentert go." : "Produksjonsgaten er lukket. Deaktiverte funksjoner forblir trygt av, og aktiverte funksjoner må ha komplett stagingbevis."}</p>
+        <h2>{copy.productionGate}</h2>
+        <p>{releaseGate.productionReady ? copy.gateReady : copy.gateBlocked}</p>
         <ul>
-          {blockedReleaseFeatures.map(([name, decision]) => <li key={name}><strong>{name}</strong>: mangler {[...decision.unavailableIntegrations, ...decision.missingEvidence].join(", ")}</li>)}
+          {blockedReleaseFeatures.map(([name, decision]) => <li key={name}><strong>{name}</strong>: {copy.missing} {[...decision.unavailableIntegrations, ...decision.missingEvidence].join(", ")}</li>)}
         </ul>
-        <Link href="/api/admin/platform-health">Åpne go/no-go-status</Link>
+        <Link href="/api/admin/platform-health">{copy.openGate}</Link>
       </div>
       <div className="platform-dashboard__automation">
-        <h2>AI-assistert blogg</h2>
-        <p>Oppretter bare utkast. Publisering krever faglig kontroll og eksplisitt godkjenning.</p>
+        <h2>{copy.aiBlog}</h2>
+        <p>{copy.aiBlogIntro}</p>
         <GenerateBlogDraftButton />
         <BlogTopicTools />
       </div>

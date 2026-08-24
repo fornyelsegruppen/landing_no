@@ -15,7 +15,10 @@ export const Users: CollectionConfig = {
     tokenExpiration: 60 * 60 * 8,
     useSessions: true,
   },
-  labels: { singular: "Ansatt", plural: "Ansatte" },
+  labels: {
+    singular: { nb: "Ansatt", lt: "Darbuotojas", en: "Employee" },
+    plural: { nb: "Ansatte", lt: "Darbuotojai", en: "Employees" },
+  },
   admin: {
     group: "Ansatte",
     useAsTitle: "email",
@@ -79,6 +82,26 @@ export const Users: CollectionConfig = {
       name: "phone",
       type: "text",
       label: "Telefon",
+    },
+    {
+      name: "interfaceLanguage",
+      type: "select",
+      required: true,
+      defaultValue: "nb",
+      label: {
+        nb: "Språk i ansattportalen",
+        lt: "Darbuotojo portalo kalba",
+        en: "Employee portal language",
+      },
+      options: [
+        { label: "Norsk", value: "nb" },
+        { label: "Lietuvių", value: "lt" },
+        { label: "English", value: "en" },
+      ],
+      admin: {
+        description:
+          "Gjelder bare /user. Kundetekster, tilbud og kontrakter forblir på norsk.",
+      },
     },
     {
       name: "role",

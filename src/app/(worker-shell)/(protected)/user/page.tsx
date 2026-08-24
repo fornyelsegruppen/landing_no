@@ -1,19 +1,16 @@
 import Link from "next/link";
 import { requireInternalUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
+import { getWorkerCopy, panelDateLocale } from "@/lib/panel-i18n";
 
 function relationId(value: number | { id: number } | null | undefined) {
   return typeof value === "object" && value ? value.id : value;
 }
 
-const statusLabels: Record<string, string> = {
-  unassigned: "Ikke tildelt", assigned: "Tildelt", scheduled: "Planlagt", on_way: "På vei", arrived: "Ankommet",
-  precheck: "Før-kontroll", ready: "Klar til start", blocked: "Blokkert", in_progress: "Startet", completed: "Må dokumenteres",
-  documented: "Dokumentasjon levert", cancelled: "Avbrutt",
-};
-
 export default async function WorkerHomePage() {
   const user = await requireInternalUser();
+  const copy = getWorkerCopy(user.interfaceLanguage);
+  const dateLocale = panelDateLocale(user.interfaceLanguage);
   const payload = await getPayload();
   const result = await payload.find({
     collection: "work-orders",
@@ -32,26 +29,26 @@ export default async function WorkerHomePage() {
 
   const groups = [
     {
-      title: "Mine oppdrag i dag",
+      title: copy.today,
       documents: active.filter((order) => order.scheduledAt?.slice(0, 10) === today),
     },
     {
-      title: "Kommende oppdrag",
+      title: copy.upcoming,
       documents: active.filter(
         (order) => order.scheduledAt && new Date(order.scheduledAt).getTime() > now && order.scheduledAt.slice(0, 10) !== today,
       ),
     },
     {
-      title: "Oppdrag som må ferdigstilles",
+      title: copy.toFinish,
       documents: active.filter((order) => !order.scheduledAt || ["arrived", "precheck", "blocked", "ready", "in_progress", "completed"].includes(order.status) || (order.scheduledAt && new Date(order.scheduledAt).getTime() < now && order.scheduledAt.slice(0, 10) !== today)),
     },
   ];
 
   return (
     <div>
-      <p className="text-sm font-semibold text-accent">Ansattportal</p>
-      <h1 className="mt-1 text-3xl font-bold">Hei, {user.displayName || "kollega"}</h1>
-      <p className="mt-2 text-muted-foreground">Du ser bare oppdrag som er tildelt deg.</p>
+      <p className="text-sm font-semibold text-accent">{copy.portal}</p>
+      <h1 className="mt-1 text-3xl font-bold">{copy.greeting}, {user.displayName || copy.colleague}</h1>
+      <p className="mt-2 text-muted-foreground">{copy.assignedOnly}</p>
 
       <div className="mt-8 space-y-8">
         {groups.map((group) => (
@@ -68,19 +65,19 @@ export default async function WorkerHomePage() {
                     <strong className="block">{order.reference}</strong>
                     <span className="mt-1 block text-sm text-muted-foreground">
                       {order.scheduledAt
-                        ? new Intl.DateTimeFormat("nb-NO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(order.scheduledAt))
-                        : "Tidspunkt ikke satt"}
+                        ? new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(order.scheduledAt))
+                        : copy.timeNotSet}
                     </span>
                     <span className="mt-2 inline-block rounded-full bg-accent/15 px-2 py-1 text-xs text-accent">
-                      {statusLabels[order.status] ?? order.status}
+                      {copy.status[order.status as keyof typeof copy.status] ?? order.status}
                     </span>
-                    <span className="sr-only">Tildelt bruker {relationId(order.assignedWorker)}</span>
+                    <span className="sr-only">{copy.assignedUser} {relationId(order.assignedWorker)}</span>
                   </Link>
                 ))}
               </div>
             ) : (
               <p className="mt-3 rounded-xl border border-dashed border-white/15 p-5 text-sm text-muted-foreground">
-                Ingen oppdrag i denne listen.
+                {copy.noJobs}
               </p>
             )}
           </section>

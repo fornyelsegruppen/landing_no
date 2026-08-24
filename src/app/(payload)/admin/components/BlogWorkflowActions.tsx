@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import type { UIFieldClientComponent } from "payload";
-import { useDocumentInfo, useFormFields } from "@payloadcms/ui";
+import { useDocumentInfo, useFormFields, useTranslation } from "@payloadcms/ui";
+import { getAdminBlogCopy } from "@/lib/admin-blog-i18n";
 
 export const BlogWorkflowActions: UIFieldClientComponent = () => {
+  const { i18n } = useTranslation();
+  const copy = getAdminBlogCopy(i18n.language);
   const { id } = useDocumentInfo();
   const status = useFormFields(([fields]) => fields.editorialStatus?.value);
   const [reviewerName, setReviewerName] = useState("");
@@ -44,15 +47,15 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
         error?: string;
         photographer?: string;
       };
-      if (!response.ok) throw new Error(body.error || "Handlingen feilet");
+      if (!response.ok) throw new Error(body.error || copy.actionFailed);
       setMessage(
         action === "stock-image"
-          ? `Pexels-bildet${body.photographer ? ` av ${body.photographer}` : ""} er valgt. Siden oppdateres …`
-          : "Handlingen er fullført. Siden oppdateres …",
+          ? copy.stockDone(body.photographer)
+          : copy.actionDone,
       );
       window.setTimeout(() => window.location.reload(), 500);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Handlingen feilet");
+      setMessage(error instanceof Error ? error.message : copy.actionFailed);
     } finally {
       setBusy(false);
     }
@@ -60,7 +63,7 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
 
   if (!id) {
     return (
-      <p>Lagre utkastet før redaksjonelle handlinger blir tilgjengelige.</p>
+      <p>{copy.saveFirst}</p>
     );
   }
 
@@ -69,26 +72,21 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
       className="blog-workflow-actions"
       aria-labelledby="blog-workflow-title"
     >
-      <h3 id="blog-workflow-title">Redaksjonelle handlinger</h3>
+      <h3 id="blog-workflow-title">{copy.editorialActions}</h3>
       <p>
-        Nåværende status: <strong>{String(status || "draft")}</strong>. AI kan
-        aldri publisere uten godkjenning her.
+        {copy.currentStatus}: <strong>{String(status || "draft")}</strong>. {copy.aiNeverPublishes}
       </p>
-      <p>
-        Etter at du har lest og kontrollert artikkelen, bruker du
-        <strong> Kontroller og publiser</strong>. Navnet ditt og kontrolldatoen
-        registreres automatisk.
-      </p>
+      <p>{copy.reviewHelp}</p>
       <div className="blog-workflow-actions__inputs">
         <label>
-          Faglig kontrollør
+          {copy.reviewer}
           <input
             value={reviewerName}
             onChange={(event) => setReviewerName(event.target.value)}
           />
         </label>
         <label>
-          Planlagt publisering
+          {copy.scheduled}
           <input
             type="datetime-local"
             value={scheduledAt}
@@ -96,11 +94,11 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
           />
         </label>
         <label>
-          Stockbildesøk (engelsk, valgfritt)
+          {copy.stockSearch}
           <input
             value={stockQuery}
             onChange={(event) => setStockQuery(event.target.value)}
-            placeholder="f.eks. mossy tiled roof house"
+            placeholder={copy.stockPlaceholder}
           />
         </label>
       </div>
@@ -110,19 +108,19 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
           disabled={busy}
           onClick={() => act("stock-image")}
         >
-          Finn / bytt gratis bilde
+          {copy.stockImage}
         </button>
         <button type="button" disabled={busy} onClick={() => act("approve")}>
-          Godkjenn
+          {copy.approve}
         </button>
         <button type="button" disabled={busy} onClick={() => act("schedule")}>
-          Planlegg
+          {copy.schedule}
         </button>
         <button type="button" disabled={busy} onClick={() => act("publish")}>
-          Kontroller og publiser
+          {copy.publish}
         </button>
         <button type="button" disabled={busy} onClick={() => act("regenerate")}>
-          Regenerer utkast
+          {copy.regenerate}
         </button>
         <button
           type="button"
@@ -130,7 +128,7 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
           className="is-danger"
           onClick={() => act("reject")}
         >
-          Avvis
+          {copy.reject}
         </button>
       </div>
       {message ? <p role="status">{message}</p> : null}
