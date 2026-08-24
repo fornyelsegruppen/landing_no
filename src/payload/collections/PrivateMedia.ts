@@ -24,6 +24,10 @@ export const PrivateMedia: CollectionConfig = {
     // create this protected metadata record without a second public upload.
     filesRequiredOnCreate: false,
     disableLocalStorage: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    // Prevent Payload from treating persisted private Blob metadata as an
+    // image re-upload merely because the default focal point is present.
+    focalPoint: false,
+    crop: false,
   },
   fields: [
     {

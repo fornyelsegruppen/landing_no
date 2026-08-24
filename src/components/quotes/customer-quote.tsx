@@ -58,16 +58,21 @@ export function CustomerQuote(props: {
   async function submitSign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!canvasRef.current || !hasSignature || pending) { setNotice("Tegn signaturen før du fortsetter."); return; }
     const form = new FormData(event.currentTarget); setPending(true); setNotice("");
-    const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      action: "sign", signerName: form.get("signerName"), signatureData: canvasRef.current.toDataURL("image/png"), expectedDocumentHash: props.documentHash,
-      paymentObligationAccepted: form.get("payment") === "on", termsAccepted: form.get("terms") === "on",
-      withdrawalInformationReceived: form.get("withdrawal") === "on", earlyStartRequested: earlyStart,
-      earlyStartLossAcknowledged: earlyStart ? form.get("earlyLoss") === "on" : false,
-    }) });
-    const result = await response.json() as { error?: string };
-    if (response.ok) { setSigned(true); setNotice("Kontrakten er signert. Du får en kopi på e-post."); }
-    else setNotice(result.error ?? "Signeringen kunne ikke fullføres.");
-    setPending(false);
+    try {
+      const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        action: "sign", signerName: form.get("signerName"), signatureData: canvasRef.current.toDataURL("image/png"), expectedDocumentHash: props.documentHash,
+        paymentObligationAccepted: form.get("payment") === "on", termsAccepted: form.get("terms") === "on",
+        withdrawalInformationReceived: form.get("withdrawal") === "on", earlyStartRequested: earlyStart,
+        earlyStartLossAcknowledged: earlyStart ? form.get("earlyLoss") === "on" : false,
+      }) });
+      const result = await response.json() as { error?: string };
+      if (response.ok) { setSigned(true); setNotice("Kontrakten er signert. Du får en kopi på e-post."); }
+      else setNotice(result.error ?? "Signeringen kunne ikke fullføres.");
+    } catch {
+      setNotice("Signeringen kunne ikke fullføres. Kontroller forbindelsen og prøv igjen.");
+    } finally {
+      setPending(false);
+    }
   }
 
   async function sendQuestion(event: FormEvent<HTMLFormElement>) {
