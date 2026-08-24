@@ -34,4 +34,20 @@ describe("blog quality gates", () => {
     expect(result.passed).toBe(false);
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "high_overlap" }));
   });
+
+  it("blocks invented internal routes and warns about homepage-only sources", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        internalLinks: [{ href: "/tjenester/takvask", anchor: "takvask", reason: "Tjeneste" }],
+        sources: [{ label: "SINTEF", url: "https://www.sintef.no", publisher: "SINTEF" }],
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "invalid_internal_link", severity: "blocker" }),
+      expect.objectContaining({ code: "source_homepage_only", severity: "warning" }),
+    ]));
+  });
 });

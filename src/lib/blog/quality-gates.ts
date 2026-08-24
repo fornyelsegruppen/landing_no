@@ -20,10 +20,12 @@ export type ArticleQualityResult = {
 };
 
 const allowedPriceFragments = [
-  "99 kr/m2 + mva",
-  "138 kr/m2 + mva",
-  "337 kr/m2 + mva",
+  "99 kr/m² + mva",
+  "138 kr/m² + mva",
+  "337 kr/m² + mva",
 ];
+
+const allowedInternalPaths = new Set<string>(approvedBlogKnowledge.internalPaths);
 
 function words(value: string): string[] {
   return value.toLocaleLowerCase("nb-NO").match(/[a-zæøå0-9]+/g) || [];
@@ -40,7 +42,7 @@ function add(
 }
 
 function unapprovedPrices(content: string) {
-  const matches = content.match(/\b\d[\d ]{0,8}\s*kr(?:\/m2)?(?:\s*\+\s*mva)?/gi) || [];
+  const matches = content.match(/\b\d[\d ]{0,8}\s*kr(?:\/m(?:2|²))?(?:\s*\+\s*mva)?/gi) || [];
   return matches.filter(
     (match) =>
       !allowedPriceFragments.some((approved) =>
@@ -116,6 +118,18 @@ export function evaluateArticleQuality(
 
   if (!article.internalLinks.some((link) => link.href !== "/")) {
     add(issues, "seo", "missing_internal_link", "blocker", "Minst én relevant intern lenke mangler.");
+  }
+  if (article.internalLinks.some((link) => !allowedInternalPaths.has(link.href))) {
+    add(issues, "seo", "invalid_internal_link", "blocker", "Utkastet foreslår en intern lenke som ikke finnes i godkjent ruteliste.");
+  }
+  if (article.sources.some((source) => {
+    try {
+      return new URL(source.url).pathname === "/";
+    } catch {
+      return true;
+    }
+  })) {
+    add(issues, "facts", "source_homepage_only", "warning", "Minst én kilde peker bare til utgiverens forside og må erstattes med en presis kildeside.");
   }
   if (!lower.includes(topic.primaryKeyword.toLocaleLowerCase("nb-NO").split(" ")[0] || "")) {
     add(issues, "seo", "topic_mismatch", "warning", "Artikkelen kan ha svak kobling til primærtemaet.");

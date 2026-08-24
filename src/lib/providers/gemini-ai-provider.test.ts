@@ -36,6 +36,7 @@ describe("Gemini AI provider", () => {
     expect(String(url)).not.toContain("secret-test-key");
     expect(String(options?.body)).not.toContain("secret-test-key");
     expect((options?.headers as Record<string, string>)["x-goog-api-key"]).toBe("secret-test-key");
-    expect(String(options?.body)).toContain("responseFormat");
+    expect(String(options?.body)).toContain('"responseMimeType":"application/json"');
+    expect(String(options?.body)).toContain('"responseJsonSchema"');
   });
 });

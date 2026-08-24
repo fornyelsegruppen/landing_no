@@ -1,4 +1,4 @@
-export const blogKnowledgeVersion = "takfornyelse-blog-2026-08-23-v1";
+export const blogKnowledgeVersion = "takfornyelse-blog-2026-08-24-v2";
 
 export const approvedBlogKnowledge = {
   company: "Takfornyelse, en del av Fornyelse Gruppen AS",
@@ -17,9 +17,18 @@ export const approvedBlogKnowledge = {
     "nytt tak",
   ],
   packagePrices: [
-    "Basic fra 99 kr/m2 + mva",
-    "Standard fra 138 kr/m2 + mva",
-    "Premium fra 337 kr/m2 + mva",
+    "Basic fra 99 kr/m² + mva",
+    "Standard fra 138 kr/m² + mva",
+    "Premium fra 337 kr/m² + mva",
+  ],
+  internalPaths: [
+    "/takvask",
+    "/takvask-og-impregnering",
+    "/takmaling",
+    "/takfornying",
+    "/nytt-tak",
+    "/priser",
+    "/blogg",
   ],
   priceDisclaimer:
     "Endelig pris avhenger av takets størrelse, tilstand, hellingsgrad, adkomst, materialtype og geografiske beliggenhet. Kunden får et skriftlig tilbud før arbeidet starter.",

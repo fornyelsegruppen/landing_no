@@ -24,7 +24,7 @@ export class GeminiAiProvider implements AiProvider {
     private readonly request: typeof fetch = fetch,
   ) {
     this.apiKey = environment.GEMINI_API_KEY?.trim() || "";
-    this.model = environment.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
+    this.model = environment.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
   }
 
   health(): ProviderHealth {
@@ -66,18 +66,19 @@ export class GeminiAiProvider implements AiProvider {
             ] }],
             generationConfig: {
               temperature: 0.25,
-              responseFormat: {
-                text: {
-                  mimeType: "application/json",
-                  schema: input.schema || generatedArticleJsonSchema,
-                },
-              },
+              responseMimeType: "application/json",
+              responseJsonSchema: input.schema || generatedArticleJsonSchema,
             },
           }),
         },
       );
       const result = (await response.json()) as GeminiResponse;
       if (!response.ok) {
+        console.error("[gemini] Request failed", {
+          httpStatus: response.status,
+          providerStatus: result.error?.status || "unknown",
+          providerMessage: (result.error?.message || "unknown").slice(0, 500),
+        });
         throw new Error(`Gemini request failed (${response.status}): ${result.error?.status || "unknown"}`);
       }
       const text = result.candidates?.[0]?.content?.parts

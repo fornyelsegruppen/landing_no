@@ -74,6 +74,18 @@ Den 24. august 2026 ble første isolerte Vercel Preview etablert uten endring av
 
 Staging avdekket og fikk rettet en reell Neon-kompatibilitetsfeil: den gamle strengbaserte fjerningen av `channel_binding=require` kunne også fjerne URL-ens `?`-skilletegn. Gjeldende `node-postgres` støtter parameteren, så database-URL-en beholdes nå intakt i runtime-, migrasjons- og seedbanene. 95 testfiler / 259 tester og ESLint besto etter rettingen.
 
+Den 24. august 2026 ble den første avgrensede AI-piloten aktivert bare i Preview:
+
+- `GEMINI_API_KEY` er lagret som sensitiv Preview-variabel og ble aldri lagt i Git eller dokumentasjon;
+- `FEATURE_AI_DRAFTS=true` gjelder bare Preview, mens automatisk SEO-scheduler og automatisk publisering fortsatt er avslått;
+- Preview bruker `gemini-3.5-flash-lite` med grense på 10 forespørsler per dag og 100 per måned;
+- piloten avdekket at `gemini-2.5-flash-lite` ikke lenger er tilgjengelig for nye brukere, og standardmodellen ble oppdatert;
+- Gemini REST-integrasjonen bruker nå dokumentert `responseMimeType` og `responseJsonSchema` for strukturert JSON;
+- første fullførte utkast ble lagret som `AI-kontroll`/`Draft` med kvalitetsscore 86 og ble ikke publisert;
+- etter første faglige inspeksjon ble kvalitetssperrene strammet inn: pakkeprisene må bruke identisk `kr/m² + mva`-format, interne lenker må finnes i godkjent ruteliste, og en kilde som bare peker til utgiverens forside blir markert;
+- andre utkast brukte gyldige `/takvask`- og `/priser`-lenker, en presis Arbeidstilsynet-kilde og identiske pakkepriser. Det forblir upublisert til menneskelig fagkontroll;
+- siste QA-deployment med inspector-referanse `6nxYEad7YdCKVDoryu4Cm1Cttaqs` ble `READY` og peker via det stabile stagingendepunktet.
+
 Vercel Hobby tillater bare cronplaner som kjører høyst daglig. De planlagte fem- og trettiminuttersjobbene ble derfor ikke registrert i Preview; Preview-kilden ble distribuert uten cronaktivering mens alle automatiske funksjoner er avslått. Før produksjon må cron-kjøringen flyttes til godkjent kø/scheduler eller Vercel-planen endres. Ingen betalt plan ble valgt.
 
 ## Gjenstående eksterne porter
