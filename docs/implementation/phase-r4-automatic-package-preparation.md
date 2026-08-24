@@ -3,7 +3,7 @@
 **Dato:** 25. august 2026  
 **Miljø:** isolert Preview/staging  
 **Produksjon:** urørt  
-**Status:** kode og automatiske tester fullført; autentisert staging-E2E gjenstår
+**Status:** automatisk pakkeopprettelse verifisert i autentisert staging; utsending og komplett kunde-E2E gjenstår
 
 ## Formål
 
@@ -67,16 +67,29 @@ Kunden kan velge årsak og skrive en kommentar. Systemet:
 | Full Vitest-regresjon | 113 filer, 338 tester bestått |
 | Produksjonskompilering | Kode kompilert og TypeScript bestått; lokal sluttinnsamling blokkeres av kjent manglende Windows ARM64 `@libsql`-optional binary |
 
+## Autentisert stagingbevis – sak 6
+
+En lagret staginghenvendelse for `Takvask + impregnering` ble etterbehandlet i custom admin.
+
+- Første forsøk ble korrekt blokkert fordi godkjent prisregel manglet. Systemet fant ikke på en pris.
+- En isolert testregel ble opprettet som `STAGING-TEST-TAKVASK-IMPREGNERING-138-V1`, 138 kr/m² eks. mva., 25 % mva. og 15 % toleranse. Notatet markerer uttrykkelig at regelen bare gjelder staging og ikke er juridisk godkjent produksjonspris.
+- Kartverket normaliserte adressen til `Lyngveien 28A, 1182 OSLO`.
+- Ett høy-confidence OSM-bygg ble valgt.
+- Måling `TM-6-V1` ble opprettet med 86,7 m² horisontalt og 93,5–102,3 m² estimert takareal.
+- Prisgrunnlaget ga 17 647 NOK inkl. mva. og 20 294 NOK maksimalpris.
+- Tilbud `T-6-V1` og kontrakt `K-6-V1` ble opprettet som utkast.
+- Det tidligere AI-svarutkastet ble satt til `cancelled`.
+- Custom admin viser én bekreftelsespliktig handling: `Godkjenn og send hele tilbudspakken`.
+- Handlingen ble med vilje ikke utført i denne kontrollen; ingen tilbudsmelding ble sendt til kunden.
+
 ## Staging-gate
 
-Fasen kan først lukkes etter en autentisert stagingreise med en ny, syntetisk henvendelse:
+Den automatiske opprettelsen i punkt 1–3 er nå bevist for sak 6. Fasen kan først lukkes etter resten av den autentiserte stagingreisen:
 
-1. mottaksbekreftelse mottas én gang;
-2. Gemini-oppsummering vises;
-3. måling, pris, tilbud og kontrakt opprettes automatisk;
-4. admin kontrollerer tall og bruker én godkjenningshandling;
-5. kunden mottar tilbudslenken;
-6. spørsmål, signering og avslag med årsak prøves hver for seg;
-7. avslått sak vises i oppmerksomhetskø og kan lukkes uten datatap.
+1. admin kontrollerer tall og bruker én godkjenningshandling;
+2. kunden mottar tilbudslenken;
+3. spørsmål, signering og avslag med årsak prøves hver for seg;
+4. avslått sak vises i oppmerksomhetskø og kan lukkes uten datatap;
+5. minst tre kjente referansetak sammenlignes med kontrollmål før produksjon.
 
 Produksjonsaktivering er fortsatt ikke godkjent.
