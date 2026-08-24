@@ -4,7 +4,7 @@ import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
-import { ResendEmailProvider } from "@/lib/providers/resend-email-provider";
+import { createEmailProvider } from "@/lib/providers/email-provider";
 import { createLeadAiReply, deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
 import { assertMessageCanQueue } from "@/lib/messages/message-policy";
 import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/features";
@@ -102,7 +102,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         },
       });
       await enqueueMessageJob(payload, queued.id, correlationId);
-      const provider = new ResendEmailProvider();
+      const provider = createEmailProvider();
       if (provider.health().status === "ready") {
         try {
           await deliverMessage(payload, provider, queued.id, correlationId);

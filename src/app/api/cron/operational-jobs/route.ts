@@ -4,7 +4,7 @@ import { captureException } from "@/lib/monitoring";
 import { cronRequestAuthorized } from "@/lib/security/cron-auth";
 import { sanitizeJobError } from "@/lib/jobs/job-policy";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
-import { ResendEmailProvider } from "@/lib/providers/resend-email-provider";
+import { createEmailProvider } from "@/lib/providers/email-provider";
 import { createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
 import { featureReadiness } from "@/lib/platform/features";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         if (job.type === "message.delivery") {
           const messageId = numericPayloadId(job.payload, "messageId");
           if (!messageId) throw new TypeError("Delivery job has no message reference");
-          const provider = new ResendEmailProvider();
+          const provider = createEmailProvider();
           if (provider.health().status !== "ready") throw new Error("Email provider requires configuration");
           await deliverMessage(payload, provider, messageId, job.correlationId);
         } else if (job.type === "lead.ai.draft") {

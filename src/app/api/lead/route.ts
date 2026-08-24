@@ -16,7 +16,7 @@ import { captureException } from "@/lib/monitoring";
 import { contactMethodSchema } from "@/lib/lead-contact-validation";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { createReceiptMessage, deliverMessage, enqueueLeadAiJob } from "@/lib/messages/message-engine";
-import { ResendEmailProvider } from "@/lib/providers/resend-email-provider";
+import { createEmailProvider } from "@/lib/providers/email-provider";
 import { readFeatureFlags } from "@/lib/platform/features";
 
 const optionalAttributionText = (max: number) =>
@@ -257,7 +257,7 @@ export async function POST(request: Request) {
     try {
       const receipt = await createReceiptMessage(payload, created.id, correlationId);
       if (!receipt.skipped && !receipt.duplicate) {
-        const provider = new ResendEmailProvider();
+        const provider = createEmailProvider();
         if (provider.health().status === "ready") {
           await deliverMessage(payload, provider, receipt.message.id, correlationId);
         }
