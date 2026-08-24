@@ -64,23 +64,28 @@ export async function createPrivateMedia(
   );
 
   const storedFilename = decodeURIComponent(path.posix.basename(blob.pathname));
+  // Keep this as a named value instead of an inline literal. Payload's Next
+  // build narrows upload metadata when focal controls are disabled and would
+  // otherwise reject these runtime-supported fields as excess properties.
+  const privateMediaData = {
+    ...metadata,
+    filename: storedFilename,
+    mimeType: file.mimeType,
+    filesize: data.byteLength,
+    url: blob.url,
+    // Payload 3.88 defaults new upload documents to a 50/50 focal point even
+    // when focal controls are disabled. Supplying the same values prevents it
+    // from treating an already-stored private Blob as a requested remote-file
+    // re-upload.
+    focalX: 50,
+    focalY: 50,
+  };
+
   try {
     return await payload.create({
       collection: "private-media",
       overrideAccess: true,
-      data: {
-        ...metadata,
-        filename: storedFilename,
-        mimeType: file.mimeType,
-        filesize: data.byteLength,
-        url: blob.url,
-        // Payload 3.88 defaults new upload documents to a 50/50 focal point
-        // even when focal controls are disabled. Supplying the same values
-        // prevents it from treating an already-stored private Blob as a
-        // requested remote-file re-upload.
-        focalX: 50,
-        focalY: 50,
-      },
+      data: privateMediaData,
     });
   } catch (error) {
     await del(blob.url, { token }).catch(() => undefined);

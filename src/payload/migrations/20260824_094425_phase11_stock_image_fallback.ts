@@ -1,6 +1,6 @@
 import { MigrateUpArgs, MigrateDownArgs, sql } from "@payloadcms/db-postgres";
 
-export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
+export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
    ALTER TABLE "posts" ADD COLUMN "stock_image_provider" varchar;
   ALTER TABLE "posts" ADD COLUMN "stock_image_asset_id" varchar;
@@ -22,11 +22,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   ALTER TABLE "_posts_v" ADD COLUMN "version_stock_image_selected_at" timestamp(3) with time zone;`);
 }
 
-export async function down({
-  db,
-  payload,
-  req,
-}: MigrateDownArgs): Promise<void> {
+export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
    ALTER TABLE "posts" DROP COLUMN "stock_image_provider";
   ALTER TABLE "posts" DROP COLUMN "stock_image_asset_id";
