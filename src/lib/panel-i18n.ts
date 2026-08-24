@@ -60,6 +60,12 @@ const workerCopies = {
     workflow: "Arbeidsflyt",
     controlPrice: "Kontrollpris",
     actionFailed: "Handlingen feilet",
+    featureUnavailable:
+      "Ansattfunksjonen er midlertidig utilgjengelig. Kontakt administrator.",
+    processing: "Registrerer …",
+    requestTimedOut:
+      "Tilkoblingen brukte for lang tid. Kontroller nettet og prøv igjen.",
+    uploading: "Laster opp …",
     registered: "Registrert.",
     uploadFailed: "Opplasting feilet",
     imageUploadFailed: "Bildet kunne ikke lastes opp",
@@ -150,6 +156,12 @@ const workerCopies = {
     workflow: "Darbo eiga",
     controlPrice: "Patikrinta kaina",
     actionFailed: "Veiksmas nepavyko",
+    featureUnavailable:
+      "Darbuotojo funkcija laikinai nepasiekiama. Kreipkitės į administratorių.",
+    processing: "Išsaugoma …",
+    requestTimedOut:
+      "Ryšys užtruko per ilgai. Patikrinkite internetą ir bandykite dar kartą.",
+    uploading: "Įkeliama …",
     registered: "Išsaugota.",
     uploadFailed: "Įkelti nepavyko",
     imageUploadFailed: "Nuotraukos įkelti nepavyko",
@@ -240,6 +252,12 @@ const workerCopies = {
     workflow: "Workflow",
     controlPrice: "Verified price",
     actionFailed: "Action failed",
+    featureUnavailable:
+      "The employee function is temporarily unavailable. Contact an administrator.",
+    processing: "Saving …",
+    requestTimedOut:
+      "The connection took too long. Check your internet connection and try again.",
+    uploading: "Uploading …",
     registered: "Saved.",
     uploadFailed: "Upload failed",
     imageUploadFailed: "The image could not be uploaded",
@@ -308,30 +326,39 @@ const adminCopies = {
       activeWork: "Aktive oppdrag",
     },
     attention: "Krever oppmerksomhet",
-    attentionSome: (count: number) => `${count} jobber, meldinger eller oppdrag må kontrolleres.`,
-    attentionNone: "Ingen jobber, meldinger eller oppdrag krever oppmerksomhet.",
+    attentionSome: (count: number) =>
+      `${count} jobber, meldinger eller oppdrag må kontrolleres.`,
+    attentionNone:
+      "Ingen jobber, meldinger eller oppdrag krever oppmerksomhet.",
     openQueue: "Åpne køen",
     upcomingWork: "Kommende arbeid",
-    unassignedSome: (count: number) => `${count} oppdrag mangler tildelt ansatt.`,
+    unassignedSome: (count: number) =>
+      `${count} oppdrag mangler tildelt ansatt.`,
     unassignedNone: "Ingen oppdrag mangler tildeling.",
     seeWork: "Se arbeid",
     next72: "Neste 72 timer",
-    next72Text: (count: number) => `${count} planlagte oppdrag i løpet av de neste 72 timene.`,
+    next72Text: (count: number) =>
+      `${count} planlagte oppdrag i løpet av de neste 72 timene.`,
     openSchedule: "Åpne arbeidsplanen",
     contentReview: "Innholdskontroll",
-    contentReviewText: (count: number) => `${count} publiserte artikler har anbefaling om oppdatering, sammenslåing eller redirect.`,
+    contentReviewText: (count: number) =>
+      `${count} publiserte artikler har anbefaling om oppdatering, sammenslåing eller redirect.`,
     seeContentReport: "Se innholdsrapporten",
     integrations: "Integrasjoner og feature-flagg",
-    integrationsMissing: (count: number) => `${count} integrasjoner er deaktivert eller mangler konfigurasjon. Funksjonene forblir trygt av.`,
-    integrationsReady: "Alle konfigurerte integrasjoner rapporterer klar status.",
+    integrationsMissing: (count: number) =>
+      `${count} integrasjoner er deaktivert eller mangler konfigurasjon. Funksjonene forblir trygt av.`,
+    integrationsReady:
+      "Alle konfigurerte integrasjoner rapporterer klar status.",
     missing: "mangler",
     openHealth: "Åpne teknisk helsestatus",
     productionGate: "Produksjonsgate",
     gateReady: "Alle aktiverte funksjoner har dokumentert go.",
-    gateBlocked: "Produksjonsgaten er lukket. Deaktiverte funksjoner forblir trygt av, og aktiverte funksjoner må ha komplett stagingbevis.",
+    gateBlocked:
+      "Produksjonsgaten er lukket. Deaktiverte funksjoner forblir trygt av, og aktiverte funksjoner må ha komplett stagingbevis.",
     openGate: "Åpne go/no-go-status",
     aiBlog: "AI-assistert blogg",
-    aiBlogIntro: "Oppretter bare utkast. Publisering krever faglig kontroll og eksplisitt godkjenning.",
+    aiBlogIntro:
+      "Oppretter bare utkast. Publisering krever faglig kontroll og eksplisitt godkjenning.",
   },
   lt: {
     control: "Takfornyelse valdymas",
@@ -347,30 +374,38 @@ const adminCopies = {
       activeWork: "Aktyvūs darbai",
     },
     attention: "Reikia dėmesio",
-    attentionSome: (count: number) => `Reikia patikrinti ${count} užduočių, žinučių ar darbų.`,
-    attentionNone: "Nėra užduočių, žinučių ar darbų, kuriuos reikėtų patikrinti.",
+    attentionSome: (count: number) =>
+      `Reikia patikrinti ${count} užduočių, žinučių ar darbų.`,
+    attentionNone:
+      "Nėra užduočių, žinučių ar darbų, kuriuos reikėtų patikrinti.",
     openQueue: "Atidaryti eilę",
     upcomingWork: "Artimiausi darbai",
-    unassignedSome: (count: number) => `${count} darbams nepriskirtas darbuotojas.`,
+    unassignedSome: (count: number) =>
+      `${count} darbams nepriskirtas darbuotojas.`,
     unassignedNone: "Visiems darbams priskirti darbuotojai.",
     seeWork: "Peržiūrėti darbus",
     next72: "Kitos 72 valandos",
-    next72Text: (count: number) => `Per artimiausias 72 valandas suplanuota darbų: ${count}.`,
+    next72Text: (count: number) =>
+      `Per artimiausias 72 valandas suplanuota darbų: ${count}.`,
     openSchedule: "Atidaryti darbų planą",
     contentReview: "Turinio patikra",
-    contentReviewText: (count: number) => `${count} paskelbtiems straipsniams rekomenduojama atnaujinti, sujungti arba nukreipti.`,
+    contentReviewText: (count: number) =>
+      `${count} paskelbtiems straipsniams rekomenduojama atnaujinti, sujungti arba nukreipti.`,
     seeContentReport: "Peržiūrėti turinio ataskaitą",
     integrations: "Integracijos ir funkcijų jungikliai",
-    integrationsMissing: (count: number) => `${count} integracijos išjungtos arba nesukonfigūruotos. Atitinkamos funkcijos lieka saugiai išjungtos.`,
+    integrationsMissing: (count: number) =>
+      `${count} integracijos išjungtos arba nesukonfigūruotos. Atitinkamos funkcijos lieka saugiai išjungtos.`,
     integrationsReady: "Visos sukonfigūruotos integracijos parengtos.",
     missing: "trūksta",
     openHealth: "Atidaryti techninę būklę",
     productionGate: "Publikavimo patikra",
     gateReady: "Visos įjungtos funkcijos turi patvirtinimą.",
-    gateBlocked: "Publikavimas užblokuotas. Išjungtos funkcijos lieka išjungtos, o įjungtoms reikia visų testavimo įrodymų.",
+    gateBlocked:
+      "Publikavimas užblokuotas. Išjungtos funkcijos lieka išjungtos, o įjungtoms reikia visų testavimo įrodymų.",
     openGate: "Atidaryti paleidimo būseną",
     aiBlog: "DI palaikomas tinklaraštis",
-    aiBlogIntro: "Kuriami tik juodraščiai. Publikuoti galima tik po specialisto patikros ir aiškaus patvirtinimo.",
+    aiBlogIntro:
+      "Kuriami tik juodraščiai. Publikuoti galima tik po specialisto patikros ir aiškaus patvirtinimo.",
   },
   en: {
     control: "Takfornyelse Control",
@@ -386,30 +421,37 @@ const adminCopies = {
       activeWork: "Active jobs",
     },
     attention: "Needs attention",
-    attentionSome: (count: number) => `${count} jobs, messages or work orders need review.`,
+    attentionSome: (count: number) =>
+      `${count} jobs, messages or work orders need review.`,
     attentionNone: "No jobs, messages or work orders need attention.",
     openQueue: "Open queue",
     upcomingWork: "Upcoming work",
-    unassignedSome: (count: number) => `${count} work orders have no assigned employee.`,
+    unassignedSome: (count: number) =>
+      `${count} work orders have no assigned employee.`,
     unassignedNone: "All work orders have an assignee.",
     seeWork: "View work",
     next72: "Next 72 hours",
-    next72Text: (count: number) => `${count} work orders are scheduled in the next 72 hours.`,
+    next72Text: (count: number) =>
+      `${count} work orders are scheduled in the next 72 hours.`,
     openSchedule: "Open work schedule",
     contentReview: "Content review",
-    contentReviewText: (count: number) => `${count} published articles are recommended for an update, merge or redirect.`,
+    contentReviewText: (count: number) =>
+      `${count} published articles are recommended for an update, merge or redirect.`,
     seeContentReport: "View content report",
     integrations: "Integrations and feature flags",
-    integrationsMissing: (count: number) => `${count} integrations are disabled or missing configuration. Their features remain safely off.`,
+    integrationsMissing: (count: number) =>
+      `${count} integrations are disabled or missing configuration. Their features remain safely off.`,
     integrationsReady: "All configured integrations report ready.",
     missing: "missing",
     openHealth: "Open technical health",
     productionGate: "Production gate",
     gateReady: "All enabled features have documented approval.",
-    gateBlocked: "The production gate is closed. Disabled features remain safely off and enabled features need complete staging evidence.",
+    gateBlocked:
+      "The production gate is closed. Disabled features remain safely off and enabled features need complete staging evidence.",
     openGate: "Open go/no-go status",
     aiBlog: "AI-assisted blog",
-    aiBlogIntro: "Only drafts are created. Publishing requires professional review and explicit approval.",
+    aiBlogIntro:
+      "Only drafts are created. Publishing requires professional review and explicit approval.",
   },
 } as const;
 
