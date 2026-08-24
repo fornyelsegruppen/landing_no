@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
-    const query = [lead.address.trim(), lead.postal, lead.city].filter(Boolean).join(", ");
+    const query = [lead.address.trim(), lead.postal, lead.city].filter(Boolean).join(" ");
     const addresses = await new KartverketAddressProvider().searchAddress(query);
     if (!addresses.length) {
       return NextResponse.json({

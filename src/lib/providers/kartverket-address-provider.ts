@@ -34,7 +34,9 @@ export class KartverketAddressProvider implements MapProvider {
   }
 
   async searchAddress(query: string): Promise<AddressCandidate[]> {
-    const normalized = query.trim().replace(/\s+/g, " ");
+    // Kartverket's free-text search returns zero hits for otherwise valid
+    // addresses when postal/city parts are comma-separated.
+    const normalized = query.trim().replace(/[;,]+/g, " ").replace(/\s+/g, " ");
     if (normalized.length < 4 || normalized.length > 180) return [];
     const url = new URL(this.endpoint);
     url.searchParams.set("sok", normalized);
