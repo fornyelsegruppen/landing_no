@@ -28,7 +28,7 @@ En historisk fase kan bare markeres fullført når rapporten inneholder leverans
 | R0 | [Baseline, rollback, route- og beslutningskontrakt](./phase-r0-operational-baseline-and-rollback.md) | Fullført for stagingutvikling |
 | R1 | [Custom admin-skall på `/admin-v2`](./phase-r1-custom-admin-shell.md) | Fullført i staging |
 | R2 | [Samlet saksflate og handlingsinnboks](./phase-r2-unified-case-workspace.md) | Fullført i staging |
-| R3 | Profilert kommunikasjon og rask jobbkjøring | Neste fase |
+| R3 | [Profilert kommunikasjon og rask jobbkjøring](./phase-r3-branded-communications-and-fast-jobs.md) | Teknisk fullført; ekstern leveringsgate åpen |
 | R4 | Automatisk kvalifisering, byggvalg og måleutkast | Ikke startet |
 | R5 | Tilbud, kundespørsmål og administrativ godkjenning | Ikke startet |
 | R6 | Kontrakt, selskapsaksept og arbeidsordre | Ikke startet |
