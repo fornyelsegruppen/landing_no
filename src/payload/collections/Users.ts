@@ -16,8 +16,18 @@ export const Users: CollectionConfig = {
     useSessions: true,
   },
   labels: {
-    singular: { nb: "Ansatt", lt: "Darbuotojas", en: "Employee" },
-    plural: { nb: "Ansatte", lt: "Darbuotojai", en: "Employees" },
+    singular: ({ i18n }) =>
+      i18n.language === "lt"
+        ? "Darbuotojas"
+        : i18n.language === "en"
+          ? "Employee"
+          : "Ansatt",
+    plural: ({ i18n }) =>
+      i18n.language === "lt"
+        ? "Darbuotojai"
+        : i18n.language === "en"
+          ? "Employees"
+          : "Ansatte",
   },
   admin: {
     group: "Ansatte",
