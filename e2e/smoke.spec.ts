@@ -126,3 +126,11 @@ test("privacy page describes controlled quotes and job follow-up", async ({ page
     "AI bestemmer ikke pris",
   );
 });
+
+test("anonymous visitors cannot read the custom admin dashboard", async ({ page }) => {
+  await page.goto("/admin-v2");
+
+  await expect(page).toHaveURL(/\/admin\/login\?redirect=(%2F|%252F)admin-v2$/i);
+  await expect(page.getByText("New enquiries", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Naujos užklausos", { exact: true })).toHaveCount(0);
+});
