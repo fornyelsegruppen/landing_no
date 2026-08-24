@@ -98,3 +98,5 @@ Gate 6 er teknisk bestått. Produksjonsflagget for automatisk takmåling forblir
 - `FEATURE_ROOF_MEASUREMENT` skal først slås på etter denne kontrollen.
 
 Lisensiert Norge i bilder-tilgang er nå en valgfri presisjonsforbedring, ikke en blokkering for det kontrollerte gratisløpet.
+
+På Vercel Hobby påvirkes ikke interaktiv takmåling av cron-grensen: adresse- og byggoppslag kjøres umiddelbart ved administratorklikk. Eksisterende publiserings- og driftskøer kjøres én gang daglig for å overholde gratisplanens begrensning.
