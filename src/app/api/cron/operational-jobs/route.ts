@@ -53,6 +53,15 @@ export async function GET(request: Request) {
         } else if (job.type === "lead.ai.draft") {
           const leadId = numericPayloadId(job.payload, "leadId");
           if (!leadId) throw new TypeError("AI job has no lead reference");
+          const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+          if (lead.status === "converted" || lead.status === "closed") {
+            await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: {
+              status: "cancelled",
+              completedAt: new Date().toISOString(),
+              result: { processed: false, reason: "lead-terminal-state" },
+            } });
+            continue;
+          }
           if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
           await assertPayloadAiUsageAvailable(payload);
           await createLeadAiReply(payload, new GeminiAiProvider(), leadId, job.correlationId);

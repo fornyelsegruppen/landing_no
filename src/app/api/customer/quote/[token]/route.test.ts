@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildContractSnapshot, buildQuoteSnapshot, documentHash } from "@/lib/quotes/document";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(), remove: vi.fn(), load: vi.fn(), enqueue: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(), remove: vi.fn(), load: vi.fn(), enqueue: vi.fn(), deliver: vi.fn(), provider: { health: vi.fn(() => ({ status: "ready" })) } }));
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ create: mocks.create, update: mocks.update, find: mocks.find, findByID: mocks.findByID, delete: mocks.remove })) }));
 vi.mock("@/lib/quotes/customer-view", () => ({ loadCustomerQuote: mocks.load }));
-vi.mock("@/lib/messages/message-engine", () => ({ enqueueMessageJob: mocks.enqueue }));
+vi.mock("@/lib/messages/message-engine", () => ({ enqueueMessageJob: mocks.enqueue, deliverMessage: mocks.deliver }));
+vi.mock("@/lib/providers/email-provider", () => ({ createEmailProvider: () => mocks.provider }));
 vi.mock("@/lib/rate-limit", () => ({ clientIp: () => "192.0.2.1", rateLimit: vi.fn(async () => ({ success: true, remaining: 10 })) }));
 vi.mock("@/lib/platform/features", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/platform/features")>();
@@ -28,7 +29,7 @@ describe("customer quote signing route", () => {
     process.env.PAYLOAD_SECRET = "test-secret-at-least-32-characters-long";
     mocks.create.mockReset().mockImplementation(async ({ collection }: { collection: string }) => collection === "private-media" ? { id: 77 } : { id: 88 });
     mocks.update.mockReset().mockImplementation(async ({ collection, where }: { collection: string; where?: unknown }) => collection === "contracts" && where ? { docs: [{ id: 2, status: "signed" }], errors: [] } : { id: 1 });
-    mocks.find.mockReset().mockResolvedValue({ docs: [] }); mocks.findByID.mockReset(); mocks.remove.mockReset(); mocks.enqueue.mockReset();
+    mocks.find.mockReset().mockResolvedValue({ docs: [] }); mocks.findByID.mockReset(); mocks.remove.mockReset(); mocks.enqueue.mockReset(); mocks.deliver.mockReset(); mocks.provider.health.mockClear();
     mocks.load.mockReset().mockResolvedValue({ ...baseView });
   });
 
@@ -39,6 +40,7 @@ describe("customer quote signing route", () => {
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "private-media", file: expect.objectContaining({ mimetype: "application/pdf" }) }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "messages", data: expect.objectContaining({ attachments: [77], idempotencyKey: "contract-signed:2" }) }));
     expect(mocks.enqueue).toHaveBeenCalledWith(expect.anything(), 88, expect.any(String));
+    expect(mocks.deliver).toHaveBeenCalledWith(expect.anything(), mocks.provider, 88, expect.any(String));
   });
 
   it("is idempotent after the same contract is already signed", async () => {

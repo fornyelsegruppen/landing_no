@@ -139,6 +139,9 @@ export async function createLeadAiReply(payload: Payload, provider: AiProvider, 
   const duplicate = await findMessageByKey(payload, idempotencyKey);
   if (duplicate) return { duplicate: true as const, message: duplicate };
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+  if (lead.status === "converted" || lead.status === "closed") {
+    throw new TypeError("AI draft cannot be generated for a converted or closed lead");
+  }
   const generated = await generateLeadReplyDraft({
     provider,
     correlationId,

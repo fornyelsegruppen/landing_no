@@ -123,4 +123,13 @@ describe("message engine", () => {
     expect(state.leads[0]?.status).toBe("new");
     expect(state.messages).toHaveLength(0);
   });
+
+  it("does not generate an AI draft for a converted lead", async () => {
+    const state = repository();
+    state.leads[0]!.status = "converted";
+    await expect(createLeadAiReply(state.payload, new DeterministicAiProvider(validAiReply), 1, "stale-ai-job"))
+      .rejects.toThrow("converted or closed");
+    expect(state.messages).toHaveLength(0);
+    expect(state.leads[0]?.status).toBe("converted");
+  });
 });

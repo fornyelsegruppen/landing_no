@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { enqueueMessageJob } from "@/lib/messages/message-engine";
+import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
+import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { resolvePayloadSecret } from "@/lib/payload-secret";
@@ -12,6 +13,7 @@ import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { hashOpaqueToken } from "@/lib/security/opaque-token";
 import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
+import { createEmailProvider } from "@/lib/providers/email-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -115,6 +117,16 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         approvedAt: evidence.signedAt, queuedAt: evidence.signedAt,
       } });
       await enqueueMessageJob(payload, message.id, correlationId);
+      const provider = createEmailProvider();
+      if (provider.health().status === "ready") {
+        try {
+          await deliverMessage(payload, provider, message.id, correlationId);
+        } catch (error) {
+          // Contract signing is durable even when delivery is temporarily down;
+          // the queued outbox job remains available for a later retry.
+          captureException(error, { route: "POST /api/customer/quote/[token]", operation: "contract-confirmation", correlationId });
+        }
+      }
     }
     return NextResponse.json({ ok: true, status: "signed", pdfUrl: `/api/customer/quote/${encodeURIComponent(token)}/pdf` });
   } catch (error) {
