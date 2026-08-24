@@ -126,6 +126,7 @@ export type AdminCase = {
     nextActionAt?: string;
     phone?: string;
     postal?: string;
+    qualification?: unknown;
     status?: string;
   };
   measurement?: CaseEntity & {
@@ -388,6 +389,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       postal: stringValue(lead.postal),
       inquiryType: stringValue(lead.inquiryType),
       message: stringValue(lead.message),
+      qualification: lead.qualification,
       status: stringValue(lead.status),
       assignedTo: relationName(lead.assignedTo),
       nextAction: stringValue(lead.nextAction),

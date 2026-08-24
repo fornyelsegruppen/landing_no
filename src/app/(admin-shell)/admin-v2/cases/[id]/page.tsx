@@ -62,7 +62,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">{copy.case} #{caseData.lead.id}</p>
-            <h1 className="mt-2 truncate text-3xl font-bold tracking-tight sm:text-4xl">{caseData.lead.name}</h1>
+            <h1 className="mt-2 break-words text-2xl font-bold tracking-tight sm:text-4xl">{caseData.lead.name}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3"><Status value={caseData.lead.status} /><span className="text-sm text-muted-foreground">{serviceNames[caseData.lead.inquiryType || ""] || caseData.lead.inquiryType || "—"}</span></div>
           </div>
           <div className="grid gap-1 text-sm lg:text-right">
@@ -97,6 +97,13 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
             </dl>
             {caseData.lead.message ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4 whitespace-pre-wrap text-sm text-white/85">{caseData.lead.message}</div> : null}
             {caseData.lead.status !== "closed" ? <div className="mt-5 border-t border-white/10 pt-4"><CloseCaseButton leadId={caseData.lead.id} locale={user.interfaceLanguage} /></div> : null}
+          </Section>
+
+          <Section id="ai-section" title={copy.ai}>
+            {caseData.lead.qualification ? (
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-white/10 bg-black/20 p-4 text-xs leading-relaxed text-white/75">{JSON.stringify(caseData.lead.qualification, null, 2)}</pre>
+            ) : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.lead.nextAction ? <div className="mt-4 rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.nextAction}</p><p className="mt-2 text-sm">{caseData.lead.nextAction}</p></div> : null}
           </Section>
 
           <Section id="measurement-section" title={copy.measurement}>
