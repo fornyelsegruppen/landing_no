@@ -38,7 +38,10 @@ export const protectWorkOrder: CollectionBeforeChangeHook = async ({ data, origi
     if (worker.role !== "worker" || worker.active !== true) throw new Error("Work orders may only be assigned to an active worker");
   }
 
-  if (!originalDoc) return data;
+  // Payload may provide a pre-create `originalDoc` containing defaults. It is
+  // not a persisted work order and must not trigger update-only immutability
+  // checks after this hook has derived the locked contract relationships.
+  if (operation === "create" || !originalDoc) return data;
   const immutable = ["contract", "quote", "lead", "contractDocumentHash"];
   if (immutable.some((field) => field in data && JSON.stringify(data[field]) !== JSON.stringify(originalDoc[field]))) {
     throw new Error("The signed contract relationship is immutable");

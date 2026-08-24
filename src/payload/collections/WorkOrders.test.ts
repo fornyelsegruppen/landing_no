@@ -10,7 +10,7 @@ function request() {
 
 describe("work-order collection invariants", () => {
   it("creates work only from a signed accepted contract and active worker", async () => {
-    const result = await protectWorkOrder({ operation: "create", req: request(), data: { contract: 4, assignedWorker: 8, scheduledAt: "2026-09-01T08:00:00Z" } } as never) as Record<string, unknown>;
+    const result = await protectWorkOrder({ operation: "create", req: request(), data: { contract: 4, assignedWorker: 8, scheduledAt: "2026-09-01T08:00:00Z" }, originalDoc: { status: "unassigned" } } as never) as Record<string, unknown>;
     expect(result).toMatchObject({ quote: 3, lead: 2, contractDocumentHash: "h".repeat(64), status: "scheduled" });
   });
 
