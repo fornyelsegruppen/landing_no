@@ -235,7 +235,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
         await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
       }
     }
-    const followUp = message.category === "receipt"
+    const followUp = ["receipt", "contract", "change_confirmation"].includes(message.category)
       ? {}
       : message.category === "information_request" || analysis.recommendedNextAction === "request_information"
         ? {

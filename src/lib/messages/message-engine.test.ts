@@ -93,6 +93,27 @@ describe("message engine", () => {
     expect(state.jobs[0]).toMatchObject({ status: "pending", attempts: 0 });
   });
 
+  it("does not regress a converted lead when sending a signed contract copy", async () => {
+    const state = repository();
+    state.leads[0]!.status = "converted";
+    await state.payload.create({ collection: "messages", overrideAccess: true, data: {
+      lead: 1,
+      direction: "outbound",
+      category: "contract",
+      channel: "email",
+      subject: "Signert kontrakt K-1-V1",
+      bodyText: "Kontrakten er signert.",
+      status: "queued",
+      idempotencyKey: "contract-signed:1",
+      aiAssisted: false,
+    } });
+
+    await deliverMessage(state.payload, new LogEmailProvider(), 1, "contract-confirmation");
+
+    expect(state.messages[0]?.status).toBe("sent");
+    expect(state.leads[0]?.status).toBe("converted");
+  });
+
   it("keeps the lead when AI validation fails", async () => {
     const state = repository();
     await expect(createLeadAiReply(state.payload, new DeterministicAiProvider({ invalid: true }), 1, "ai-fail")).rejects.toThrow();
