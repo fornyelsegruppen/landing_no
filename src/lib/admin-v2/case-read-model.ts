@@ -35,6 +35,7 @@ type StatusRecord = {
 
 export type CaseActionInput = {
   aiRecommendedNextAction?: string;
+  canPreparePackage?: boolean;
   contract?: StatusRecord;
   leadStatus?: string;
   measurement?: StatusRecord;
@@ -52,7 +53,7 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   }
   const measurementAiDraft = input.message?.status === "draft"
     && input.message.category === "ai_reply"
-    && input.aiRecommendedNextAction === "start_measurement";
+    && input.canPreparePackage === true;
   if (input.message?.status === "draft" && !measurementAiDraft) {
     return { kind: "approve_message", targetId: input.message.id };
   }
@@ -365,6 +366,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     aiRecommendedNextAction: lead.qualification && typeof lead.qualification === "object"
       ? stringValue((lead.qualification as Record<string, unknown>).recommendedNextAction)
       : undefined,
+    canPreparePackage: Boolean(stringValue(lead.address) && !/^ikke oppgitt$/i.test(stringValue(lead.address) || ""))
+      && stringValue(lead.inquiryType) !== "usikker",
     leadStatus: stringValue(lead.status),
     message: currentMessageRaw ? {
       id: numericId(currentMessageRaw.id),

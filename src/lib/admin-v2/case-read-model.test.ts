@@ -16,7 +16,7 @@ describe("admin case next action", () => {
   it.each([
     [{ leadStatus: "new" }, "generate_reply"],
     [{ leadStatus: "draft_ready", message: { id: 1, status: "draft" } }, "approve_message"],
-    [{ leadStatus: "draft_ready", aiRecommendedNextAction: "start_measurement", message: { id: 1, status: "draft", category: "ai_reply" } }, "prepare_package"],
+    [{ leadStatus: "draft_ready", canPreparePackage: true, message: { id: 1, status: "draft", category: "ai_reply" } }, "prepare_package"],
     [{ leadStatus: "new", message: { id: 2, status: "failed" } }, "retry_message"],
     [{ leadStatus: "measuring", message: { id: 1, status: "sent" } }, "prepare_package"],
     [{ leadStatus: "measuring", message: { id: 1, status: "cancelled" }, measurement: { id: 3, status: "review_required" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "draft" }, contract: { id: 6, status: "draft" } }, "approve_package"],
