@@ -68,7 +68,9 @@ Den 24. august 2026 ble første isolerte Vercel Preview etablert uten endring av
 - Vercel Preview-build med inspector-referanse `8ZRfUkgudrJHDw1dev9XDrocsV2W` ble `READY`: migrasjoner, TypeScript, produksjonskompilering og 59 statiske sider besto;
 - `/no`, `/admin` og `/user/login` returnerer `200`; anonym tilgang til `/api/admin/platform-health` returnerer korrekt `401`;
 - offentlig staging svarer med `X-Robots-Tag: noindex`, korrekt staging-canonical, HSTS, CSP-report-only, `X-Frame-Options: DENY` og `X-Content-Type-Options: nosniff`;
-- første visuelle kontroll av norsk forside og første-admin-skjerm besto.
+- første visuelle kontroll av norsk forside og første-admin-skjerm besto;
+- første staging-bruker ble opprettet 24. august 2026, og kontroll i Payload bekreftet aktiv rolle `Administrator`;
+- autentisert desktop-QA bekreftet tilgang uten feil til dashboard, blogg, henvendelser, tilbud, kontrakter og arbeidsordre. Alle testkøene var tomme, og ingen ekstern e-post eller SMS ble sendt.
 
 Staging avdekket og fikk rettet en reell Neon-kompatibilitetsfeil: den gamle strengbaserte fjerningen av `channel_binding=require` kunne også fjerne URL-ens `?`-skilletegn. Gjeldende `node-postgres` støtter parameteren, så database-URL-en beholdes nå intakt i runtime-, migrasjons- og seedbanene. 95 testfiler / 259 tester og ESLint besto etter rettingen.
 
@@ -79,7 +81,7 @@ Vercel Hobby tillater bare cronplaner som kjører høyst daglig. De planlagte fe
 Følgende kan fortsatt ikke sannferdig godkjennes og blokkerer produksjon:
 
 - produksjonssnapshot, Blob-inventar og dokumentert restore-øvelse er ikke utført;
-- første staging-admin og staging-arbeider er ikke opprettet, så autentisert mobil QA på `/admin`, `/user` og sikre kundelenker er ikke signert;
+- staging-arbeider er ikke opprettet, og autentisert mobil QA på `/admin`, `/user` og sikre kundelenker er derfor ikke ferdig signert;
 - ekte testlevering for Resend, Search Console, lisensiert ortofoto og eventuelt SMS er ikke dokumentert;
 - 20–30 ekte leadpilot og sammenligning mot fysisk kontrollmåling er ikke gjennomført;
 - prisregler, kontrakt/angrerett, signaturbevis, databehandlere og meldingstekster mangler registrert eier-/juridisk godkjenning;
@@ -87,6 +89,6 @@ Følgende kan fortsatt ikke sannferdig godkjennes og blokkerer produksjon:
 
 Vercels prosjektoversikt viste dessuten `57,6 %` feilrate for det eksisterende produksjonsprosjektet i det viste seks-timersvinduet. Årsak og normal baseline må avklares i en personvernbevisst logggjennomgang før piloten starter; dette tallet er ikke brukt som bevis for en bestemt kodefeil.
 
-Gate 11 er derfor fortsatt med hensikt lukket. Neste sikre handling er å opprette første staging-admin og staging-arbeider, gjennomføre autentisert desktop-/mobil-QA og deretter restore-øvelsen. Produksjonsbranch, produksjonsdatabase og levende feature-flagg er ikke endret.
+Gate 11 er derfor fortsatt med hensikt lukket. Neste sikre handling er å opprette en staging-arbeider, gjennomføre autentisert mobil-QA for begge panelene og deretter restore-øvelsen. Produksjonsbranch, produksjonsdatabase og levende feature-flagg er ikke endret.
 
 Krav-for-krav-status er dokumentert i `docs/implementation/completion-audit-2026-08-23.md` slik at ingen lokal test kan forveksles med full produksjonsgodkjenning.
