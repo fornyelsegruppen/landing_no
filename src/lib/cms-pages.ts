@@ -31,6 +31,7 @@ export type CmsContentDocument = {
 };
 
 export type CmsPostDocument = CmsContentDocument & {
+  imageAlt?: string | null;
   heroImage?:
     | number
     | string
@@ -47,6 +48,17 @@ export type CmsPostDocument = CmsContentDocument & {
         stockPhotographerUrl?: string | null;
       }
     | null;
+  stockImage?: {
+    provider?: string | null;
+    assetId?: string | null;
+    imageUrl?: string | null;
+    sourceUrl?: string | null;
+    photographer?: string | null;
+    photographerUrl?: string | null;
+    licenseUrl?: string | null;
+    query?: string | null;
+    selectedAt?: string | null;
+  } | null;
   authorName?: string | null;
   reviewerName?: string | null;
   reviewedAt?: string | null;

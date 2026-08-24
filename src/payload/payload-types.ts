@@ -460,6 +460,20 @@ export interface Post {
     | null;
   imageBrief?: string | null;
   imageAlt?: string | null;
+  /**
+   * Fylles automatisk fra Pexels. Et manuelt opplastet hovedbilde overstyrer dette bildet.
+   */
+  stockImage?: {
+    provider?: string | null;
+    assetId?: string | null;
+    imageUrl?: string | null;
+    sourceUrl?: string | null;
+    photographer?: string | null;
+    photographerUrl?: string | null;
+    licenseUrl?: string | null;
+    query?: string | null;
+    selectedAt?: string | null;
+  };
   relatedPosts?: (number | Post)[] | null;
   relatedServices?: (number | Service)[] | null;
   ctaVariant?: ('assessment' | 'wash' | 'renewal' | 'new_roof') | null;
@@ -1707,6 +1721,19 @@ export interface PostsSelect<T extends boolean = true> {
       };
   imageBrief?: T;
   imageAlt?: T;
+  stockImage?:
+    | T
+    | {
+        provider?: T;
+        assetId?: T;
+        imageUrl?: T;
+        sourceUrl?: T;
+        photographer?: T;
+        photographerUrl?: T;
+        licenseUrl?: T;
+        query?: T;
+        selectedAt?: T;
+      };
   relatedPosts?: T;
   relatedServices?: T;
   ctaVariant?: T;

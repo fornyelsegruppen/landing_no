@@ -71,14 +71,18 @@ export async function POST(
         entityType: "post",
         entityId: post.id,
         correlationId,
-        changedFields: ["heroImage"],
-        before: { heroImage: post.heroImage },
-        after: { heroImage: result.media.id, provider: "pexels" },
+        changedFields: ["heroImage", "stockImage"],
+        before: { heroImage: post.heroImage, stockImage: post.stockImage },
+        after: {
+          heroImage: result.media?.id || null,
+          stockImage: result.post.stockImage,
+          provider: "pexels",
+        },
       });
       return NextResponse.json({
         ok: true,
         postId: result.post.id,
-        mediaId: result.media.id,
+        mediaId: result.media?.id || null,
         query: result.query,
         photographer: result.selected.photographer,
       });

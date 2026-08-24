@@ -61,9 +61,68 @@ describe("blog stock images", () => {
         collection: "posts",
         id: 9,
         draft: true,
-        data: { heroImage: 41 },
+        data: expect.objectContaining({
+          heroImage: 41,
+          stockImage: expect.objectContaining({
+            provider: "pexels",
+            assetId: "123",
+            imageUrl: "https://images.pexels.com/photos/123/roof.jpeg",
+            photographer: "Test Photographer",
+          }),
+        }),
       }),
     );
-    expect(result.media.id).toBe(41);
+    expect(result.media?.id).toBe(41);
+  });
+
+  it("keeps an approved remote Pexels image when media storage is unavailable", async () => {
+    const selected = {
+      id: 456,
+      width: 2400,
+      height: 1350,
+      pageUrl: "https://www.pexels.com/photo/roof-456/",
+      photographer: "Roof Photographer",
+      photographerUrl: "https://www.pexels.com/@roof/",
+      alt: "House roof",
+      imageUrl: "https://images.pexels.com/photos/456/roof.jpeg",
+    };
+    const search = vi.fn(async () => [selected]);
+    const download = vi.fn(async () => ({
+      data: Buffer.from([4, 5, 6]),
+      mimetype: "image/jpeg",
+      name: "pexels-456.jpg",
+      size: 3,
+    }));
+    const create = vi.fn(async () => {
+      throw new Error("Blob upload unavailable");
+    });
+    const update = vi.fn(async (input) => ({ id: 12, ...input.data }));
+    const warn = vi.fn();
+
+    const result = await attachPexelsStockImageToPost({
+      payload: { create, update, logger: { warn } } as unknown as Payload,
+      post: {
+        id: 12,
+        titleNo: "Sjekk taket etter vinteren",
+        ctaVariant: "assessment",
+      },
+      provider: { search, download } as unknown as PexelsStockImageProvider,
+    });
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          heroImage: null,
+          stockImage: expect.objectContaining({
+            provider: "pexels",
+            assetId: "456",
+            imageUrl: selected.imageUrl,
+            sourceUrl: selected.pageUrl,
+          }),
+        }),
+      }),
+    );
+    expect(result.media).toBeNull();
   });
 });

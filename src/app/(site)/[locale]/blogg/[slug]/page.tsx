@@ -27,6 +27,18 @@ type Props = {
   params: Promise<{ locale: string; slug: string }>;
 };
 
+function approvedPexelsImageUrl(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "images.pexels.com"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateStaticParams() {
   try {
     const posts = await getPublishedPosts();
@@ -49,7 +61,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { robots: { index: false, follow: false } };
   }
   const localized = localizeContent(post, loc);
-  const hero = resolveMedia(post.heroImage, "hero");
+  const uploadedHero = resolveMedia(post.heroImage, "hero");
+  const remoteStockUrl = approvedPexelsImageUrl(post.stockImage?.imageUrl);
+  const hero =
+    uploadedHero ||
+    (remoteStockUrl
+      ? {
+          url: remoteStockUrl,
+          alt: post.imageAlt?.trim() || localized.title,
+        }
+      : null);
   const { isEnabled: isDraftMode } = await draftMode();
   const postUrl = `${siteConfig.url}/${locale}/blogg/${slug}`;
   const heroUrl = hero
@@ -126,10 +147,23 @@ export default async function BlogPostPage({ params }: Props) {
   if (!post || !postHasLocale(post, loc)) notFound();
 
   const localized = localizeContent(post, loc);
-  const hero = resolveMedia(post.heroImage, "hero");
+  const uploadedHero = resolveMedia(post.heroImage, "hero");
+  const remoteStockUrl = approvedPexelsImageUrl(post.stockImage?.imageUrl);
+  const hero =
+    uploadedHero ||
+    (remoteStockUrl
+      ? {
+          url: remoteStockUrl,
+          alt: post.imageAlt?.trim() || localized.title,
+        }
+      : null);
   const heroDocument =
     post.heroImage && typeof post.heroImage === "object"
       ? post.heroImage
+      : null;
+  const remoteStockAttribution =
+    !uploadedHero && post.stockImage?.provider === "pexels"
+      ? post.stockImage
       : null;
   const stockAttribution =
     heroDocument?.stockProvider === "pexels"
@@ -143,7 +177,18 @@ export default async function BlogPostPage({ params }: Props) {
             ? safeContentHref(heroDocument.stockSourceUrl, loc)
             : "https://www.pexels.com/",
         }
-      : null;
+      : remoteStockAttribution
+        ? {
+            photographer:
+              remoteStockAttribution.photographer?.trim() || "Pexels-fotograf",
+            photographerUrl: remoteStockAttribution.photographerUrl
+              ? safeContentHref(remoteStockAttribution.photographerUrl, loc)
+              : null,
+            sourceUrl: remoteStockAttribution.sourceUrl
+              ? safeContentHref(remoteStockAttribution.sourceUrl, loc)
+              : "https://www.pexels.com/",
+          }
+        : null;
   const date = post.publishedAt || post.createdAt;
   const postUrl = `${siteConfig.url}/${locale}/blogg/${slug}`;
   const heroUrl = hero

@@ -165,7 +165,12 @@ export const Posts: CollectionConfig = {
         { label: "Sammenligning", value: "comparison" },
       ],
     },
-    { name: "primaryKeyword", type: "text", label: "Primært søkeord", index: true },
+    {
+      name: "primaryKeyword",
+      type: "text",
+      label: "Primært søkeord",
+      index: true,
+    },
     {
       name: "secondaryKeywords",
       type: "array",
@@ -189,7 +194,12 @@ export const Posts: CollectionConfig = {
     { name: "authorName", type: "text", label: "Forfatter" },
     { name: "reviewerName", type: "text", label: "Faglig kontrollør" },
     { name: "reviewedAt", type: "date", label: "Faglig kontrollert" },
-    { name: "aiAssisted", type: "checkbox", label: "AI-assistert", defaultValue: false },
+    {
+      name: "aiAssisted",
+      type: "checkbox",
+      label: "AI-assistert",
+      defaultValue: false,
+    },
     { name: "aiGenerationRun", type: "relationship", relationTo: "seo-runs" },
     {
       name: "qualityScore",
@@ -217,6 +227,27 @@ export const Posts: CollectionConfig = {
     },
     { name: "imageBrief", type: "textarea", label: "Bildebehov" },
     { name: "imageAlt", type: "text", label: "Foreslått alt-tekst" },
+    {
+      name: "stockImage",
+      type: "group",
+      label: "Valgt lisensiert stockbilde",
+      admin: {
+        description:
+          "Fylles automatisk fra Pexels. Et manuelt opplastet hovedbilde overstyrer dette bildet.",
+        readOnly: true,
+      },
+      fields: [
+        { name: "provider", type: "text" },
+        { name: "assetId", type: "text" },
+        { name: "imageUrl", type: "text" },
+        { name: "sourceUrl", type: "text" },
+        { name: "photographer", type: "text" },
+        { name: "photographerUrl", type: "text" },
+        { name: "licenseUrl", type: "text" },
+        { name: "query", type: "text" },
+        { name: "selectedAt", type: "date" },
+      ],
+    },
     {
       name: "relatedPosts",
       type: "relationship",
@@ -248,20 +279,39 @@ export const Posts: CollectionConfig = {
       type: "array",
       label: "Spørsmål og svar",
       fields: [
-        { name: "questionNo", type: "text", required: true, label: "Spørsmål (NO)" },
-        { name: "answerNo", type: "textarea", required: true, label: "Svar (NO)" },
+        {
+          name: "questionNo",
+          type: "text",
+          required: true,
+          label: "Spørsmål (NO)",
+        },
+        {
+          name: "answerNo",
+          type: "textarea",
+          required: true,
+          label: "Svar (NO)",
+        },
         { name: "questionEn", type: "text", label: "Question (EN, optional)" },
         { name: "answerEn", type: "textarea", label: "Answer (EN, optional)" },
       ],
     },
-    { name: "lastContentAuditAt", type: "date", label: "Sist innholdskontroll" },
+    {
+      name: "lastContentAuditAt",
+      type: "date",
+      label: "Sist innholdskontroll",
+    },
     {
       name: "leadPerformance",
       type: "group",
       label: "Henvendelser fra artikkelen (siste 90 dager)",
       fields: [
         { name: "leads", type: "number", label: "Henvendelser", min: 0 },
-        { name: "convertedLeads", type: "number", label: "Konverterte", min: 0 },
+        {
+          name: "convertedLeads",
+          type: "number",
+          label: "Konverterte",
+          min: 0,
+        },
         { name: "updatedAt", type: "date", label: "Sist beregnet" },
       ],
     },
@@ -273,11 +323,20 @@ export const Posts: CollectionConfig = {
         { name: "impressions", type: "number", label: "Visninger", min: 0 },
         { name: "clicks", type: "number", label: "Klikk", min: 0 },
         { name: "ctr", type: "number", label: "CTR", min: 0 },
-        { name: "averagePosition", type: "number", label: "Gjennomsnittsposisjon", min: 0 },
+        {
+          name: "averagePosition",
+          type: "number",
+          label: "Gjennomsnittsposisjon",
+          min: 0,
+        },
         { name: "updatedAt", type: "date", label: "Sist hentet" },
         { name: "indexVerdict", type: "text", label: "Indekseringsvurdering" },
         { name: "coverageState", type: "text", label: "Dekningsstatus" },
-        { name: "lastCrawlAt", type: "date", label: "Siste Google-gjennomgang" },
+        {
+          name: "lastCrawlAt",
+          type: "date",
+          label: "Siste Google-gjennomgang",
+        },
       ],
     },
     { name: "performanceNotes", type: "textarea", label: "Resultatnotater" },
@@ -285,15 +344,34 @@ export const Posts: CollectionConfig = {
       name: "contentAudit",
       type: "group",
       label: "Innholdsanbefaling",
-      admin: { description: "Systemets anbefaling er beslutningsstøtte. Administrator må kontrollere og utføre eventuell endring." },
+      admin: {
+        description:
+          "Systemets anbefaling er beslutningsstøtte. Administrator må kontrollere og utføre eventuell endring.",
+      },
       fields: [
-        { name: "recommendation", type: "select", options: [
-          { label: "Behold", value: "keep" }, { label: "Oppdater", value: "update" }, { label: "Slå sammen", value: "merge" }, { label: "Redirect", value: "redirect" },
-        ] },
+        {
+          name: "recommendation",
+          type: "select",
+          options: [
+            { label: "Behold", value: "keep" },
+            { label: "Oppdater", value: "update" },
+            { label: "Slå sammen", value: "merge" },
+            { label: "Redirect", value: "redirect" },
+          ],
+        },
         { name: "reason", type: "textarea", label: "Begrunnelse" },
         { name: "generatedAt", type: "date", label: "Beregnet" },
-        { name: "targetPost", type: "relationship", relationTo: "posts", label: "Valgt målside" },
-        { name: "reviewedAt", type: "date", label: "Kontrollert av administrator" },
+        {
+          name: "targetPost",
+          type: "relationship",
+          relationTo: "posts",
+          label: "Valgt målside",
+        },
+        {
+          name: "reviewedAt",
+          type: "date",
+          label: "Kontrollert av administrator",
+        },
       ],
     },
     {

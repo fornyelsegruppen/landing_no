@@ -38,28 +38,49 @@ export async function attachPexelsStockImageToPost(input: {
   if (!selected)
     throw new TypeError("Fant ingen egnet Pexels-bilde for dette søket");
   const file = await provider.download(selected);
-  const media = await input.payload.create({
-    collection: "media",
-    overrideAccess: true,
-    file,
-    data: {
-      alt: input.post.imageAlt?.trim() || selected.alt || input.post.titleNo,
-      stockProvider: "pexels",
-      stockAssetId: String(selected.id),
-      stockSourceUrl: selected.pageUrl,
-      stockPhotographer: selected.photographer,
-      stockPhotographerUrl: selected.photographerUrl,
-      stockLicenseUrl: pexelsLicenseUrl,
-      stockRetrievedAt: new Date().toISOString(),
-      stockQuery: query,
-    },
-  });
+  const selectedAt = new Date().toISOString();
+  let media: Awaited<ReturnType<Payload["create"]>> | null = null;
+  try {
+    media = await input.payload.create({
+      collection: "media",
+      overrideAccess: true,
+      file,
+      data: {
+        alt: input.post.imageAlt?.trim() || selected.alt || input.post.titleNo,
+        stockProvider: "pexels",
+        stockAssetId: String(selected.id),
+        stockSourceUrl: selected.pageUrl,
+        stockPhotographer: selected.photographer,
+        stockPhotographerUrl: selected.photographerUrl,
+        stockLicenseUrl: pexelsLicenseUrl,
+        stockRetrievedAt: selectedAt,
+        stockQuery: query,
+      },
+    });
+  } catch {
+    input.payload.logger.warn(
+      `Pexels image ${selected.id} could not be persisted to media storage; using the approved remote asset instead.`,
+    );
+  }
   const post = await input.payload.update({
     collection: "posts",
     id: input.post.id,
     draft: true,
     overrideAccess: true,
-    data: { heroImage: media.id },
+    data: {
+      ...(media ? { heroImage: media.id } : { heroImage: null }),
+      stockImage: {
+        provider: "pexels",
+        assetId: String(selected.id),
+        imageUrl: selected.imageUrl,
+        sourceUrl: selected.pageUrl,
+        photographer: selected.photographer,
+        photographerUrl: selected.photographerUrl,
+        licenseUrl: pexelsLicenseUrl,
+        query,
+        selectedAt,
+      },
+    },
   });
   return { post, media, selected, query };
 }
