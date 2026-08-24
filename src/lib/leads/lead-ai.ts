@@ -84,11 +84,21 @@ export async function generateLeadReplyDraft(input: {
       "Vær profesjonell, varm og konkret for norske boligeiere over 30 år.",
       "Ikke oppgi pris, garanti, bindende vurdering, oppstartsdato eller lovnader.",
       "Ikke anta fakta som ikke finnes i den minimerte konteksten.",
+      "Når hasExactAddress er true, er approximateRoofArea valgfritt og skal ikke registreres som manglende; anbefal start_measurement dersom det ikke finnes et reelt risikoflagg.",
+      "Et tomt customerQuestion-felt er ikke manglende informasjon.",
       "Be bare om informasjon som faktisk mangler. Administrator må godkjenne før utsending.",
     ].join("\n"),
     prompt: `Analyser denne anonymiserte henvendelsen og lag strukturert svarutkast:\n${JSON.stringify(context)}`,
   });
-  const result = leadAiSchema.parse(generated.data);
+  const parsed = leadAiSchema.parse(generated.data);
+  const result = input.lead.hasAddress && input.lead.inquiryType !== "usikker" && parsed.riskFlags.length === 0
+    ? {
+        ...parsed,
+        missingInformation: parsed.missingInformation.filter((item) =>
+          !/(?:approximate.?roof.?area|takareal|roof.?size|customer.?question)/i.test(item)),
+        recommendedNextAction: "start_measurement" as const,
+      }
+    : parsed;
   if (input.lead.inquiryType !== "usikker" && result.serviceCategory !== input.lead.inquiryType) {
     throw new TypeError("AI reply changed the customer-selected service");
   }

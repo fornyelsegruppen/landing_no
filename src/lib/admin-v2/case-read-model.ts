@@ -196,6 +196,24 @@ function relationName(value: unknown) {
   return stringValue(record.displayName) || stringValue(record.name) || stringValue(record.email) || stringValue(record.reference);
 }
 
+function qualificationForAdmin(value: unknown) {
+  if (!value || typeof value !== "object") return value;
+  const qualification = value as Record<string, unknown>;
+  const preparation = qualification.packagePreparation;
+  if (!preparation || typeof preparation !== "object" || (preparation as Record<string, unknown>).status !== "ready_for_admin_review") {
+    return value;
+  }
+  const missing = Array.isArray(qualification.missingInformation)
+    ? qualification.missingInformation.filter((item) =>
+        typeof item !== "string" || !/(?:approximate.?roof.?area|takareal|roof.?size|customer.?question)/i.test(item))
+    : qualification.missingInformation;
+  return {
+    ...qualification,
+    missingInformation: missing,
+    recommendedNextAction: "start_measurement",
+  };
+}
+
 function entity(collection: string, raw: unknown): CaseEntity {
   const record = asRecord(raw);
   const id = numericId(record.id);
@@ -412,7 +430,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       postal: stringValue(lead.postal),
       inquiryType: stringValue(lead.inquiryType),
       message: stringValue(lead.message),
-      qualification: lead.qualification,
+      qualification: qualificationForAdmin(lead.qualification),
       status: stringValue(lead.status),
       assignedTo: relationName(lead.assignedTo),
       nextAction: stringValue(lead.nextAction),

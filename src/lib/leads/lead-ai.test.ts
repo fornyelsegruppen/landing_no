@@ -25,4 +25,18 @@ describe("lead AI privacy and quality", () => {
     await expect(generateLeadReplyDraft({ provider: new DeterministicAiProvider({ ...valid, replyDraft: "Takk for henvendelsen. Vi har sett på opplysningene, og prisen blir 20 000 kr for arbeidet dersom alt går som planlagt." }), lead: { inquiryType: "takvask", hasAddress: false, photoCount: 0 }, correlationId: "lead-test-price" })).rejects.toThrow(/price/);
     await expect(generateLeadReplyDraft({ provider: new DeterministicAiProvider({ ...valid, serviceCategory: "nytt_tak" }), lead: { inquiryType: "takvask", hasAddress: false, photoCount: 0 }, correlationId: "lead-test-service" })).rejects.toThrow(/selected service/);
   });
+
+  it("does not treat roof area or an empty question as required when an exact address is available", async () => {
+    const generated = await generateLeadReplyDraft({
+      provider: new DeterministicAiProvider({
+        ...valid,
+        missingInformation: ["approximateRoofArea", "customerQuestion"],
+        recommendedNextAction: "request_information",
+      }),
+      lead: { inquiryType: "takvask", hasAddress: true, photoCount: 0 },
+      correlationId: "lead-address-ready",
+    });
+    expect(generated.result.missingInformation).toEqual([]);
+    expect(generated.result.recommendedNextAction).toBe("start_measurement");
+  });
 });
