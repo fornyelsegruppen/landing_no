@@ -106,6 +106,8 @@ describe("message engine", () => {
       status: "queued",
       idempotencyKey: "contract-signed:1",
       aiAssisted: false,
+      approvedAt: new Date().toISOString(),
+      queuedAt: new Date().toISOString(),
     } });
 
     await deliverMessage(state.payload, new LogEmailProvider(), 1, "contract-confirmation");
