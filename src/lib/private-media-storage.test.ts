@@ -51,6 +51,8 @@ describe("private media storage", () => {
         mimeType: "application/pdf",
         filesize: 4,
         url: expect.stringContaining(".private.blob.vercel-storage.com/"),
+        focalX: 50,
+        focalY: 50,
       }),
     }));
   });
