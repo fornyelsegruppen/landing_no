@@ -1,6 +1,6 @@
 # Fase R6 – selskapsaksept og enhetlige PDF-dokumenter
 
-**Status:** Implementert og automatisk verifisert 25. august 2026; autentisert staging-E2E gjenstår  
+**Status:** Implementert, deployet og delvis staging-verifisert 25. august 2026; administratorens faktiske medsignering gjenstår  
 **Produksjon:** Urørt
 
 ## Beslutning
@@ -39,6 +39,11 @@ Kommersielt snapshot og dokumenthash forblir uendret. Etter kundesignering kan b
 - `npm run lint`: bestått.
 - `npm test`: 114 testfiler og 344 tester bestått.
 - Enhetstester dekker separat selskapsbevis, to signaturer i endelig PDF, arbeidsordreblokkering før selskapsaksept, riktig neste handling og endelig e-postvedlegg.
+- Vercel Preview `dpl_234owmDaLF3Xa1j8fDc89rnMyPd4` kjørte migrasjonen og bygget 64 sider samt den nye signeringsruten.
+- Stagingaliaset peker på denne Preview-versjonen.
+- Visuell stagingkontroll av dynamisk tilbuds-PDF bekreftet mørk letterhead, riktig logo, gul skillelinje, tydelig dokumenttittel, leverandør-/kundeinformasjon og mørk footer.
+- Eksisterende kundesignert stagingavtale viser nå tydelig at kundens signatur er mottatt og at endelig kopi først sendes etter Takfornyelses medsignering.
+- LT-admin viste lokaliserte lead-, tilbuds-, melding-, kontrakt- og tidslinjestatuser samt klikkbare tidslinjeelementer.
 
 ## Gjenstående stagingkontroll
 
@@ -50,4 +55,3 @@ Kommersielt snapshot og dokumenthash forblir uendret. Etter kundesignering kan b
 6. Kontroller endelig PDF visuelt: logo, letterhead, footer, kontaktinformasjon, begge navn, begge signaturer og begge tidspunkt.
 7. Kontroller at kunden mottar nøyaktig én profilert e-post med endelig PDF.
 8. Kontroller at neste handling først nå blir `Opprett arbeidsordre`.
-
