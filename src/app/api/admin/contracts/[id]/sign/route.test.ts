@@ -4,11 +4,13 @@ import { buildContractSnapshot, buildQuoteSnapshot, createSignatureEvidence, doc
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(),
   createMedia: vi.fn(), deleteMedia: vi.fn(), enqueue: vi.fn(), deliver: vi.fn(),
+  readMedia: vi.fn(),
   provider: { health: vi.fn(() => ({ status: "ready" })) },
 }));
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ auth: mocks.auth, create: mocks.create, update: mocks.update, find: mocks.find, findByID: mocks.findByID })) }));
 vi.mock("@/payload/access/roles", () => ({ userIsAdmin: vi.fn(() => true) }));
 vi.mock("@/lib/private-media-storage", () => ({ createPrivateMedia: mocks.createMedia, deletePrivateMedia: mocks.deleteMedia }));
+vi.mock("@/lib/private-media-content", () => ({ readPrivateMediaContent: mocks.readMedia }));
 vi.mock("@/lib/messages/message-engine", () => ({ enqueueMessageJob: mocks.enqueue, deliverMessage: mocks.deliver }));
 vi.mock("@/lib/providers/email-provider", () => ({ createEmailProvider: () => mocks.provider }));
 vi.mock("@/lib/quotes/quote-pdf", () => ({ buildQuoteContractPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
@@ -28,8 +30,9 @@ describe("supplier contract signing", () => {
     process.env.PAYLOAD_SECRET = "test-secret-at-least-32-characters-long";
     mocks.auth.mockReset().mockResolvedValue({ user: { id: 9, role: "admin" } });
     mocks.findByID.mockReset().mockImplementation(async ({ collection }: { collection: string }) => collection === "contracts"
-      ? { id: 3, reference: "K-1-V1", quote: 2, status: "signed", documentHash: documentHash(contractSnapshot), snapshot: contractSnapshot, signatureEvidence: customerEvidence, signedAt: customerEvidence.signedAt }
-      : { id: 2, lead: 1, status: "accepted" });
+      ? { id: 3, reference: "K-1-V1", quote: 2, status: "signed", documentHash: documentHash(contractSnapshot), snapshot: contractSnapshot, signatureEvidence: customerEvidence, customerSignatureImage: 30, signedAt: customerEvidence.signedAt }
+      : collection === "private-media" ? { id: 30 } : { id: 2, lead: 1, status: "accepted" });
+    mocks.readMedia.mockReset().mockResolvedValue({ data: Buffer.from(signatureData.split(",")[1], "base64"), filename: "signature.png", contentType: "image/png" });
     mocks.createMedia.mockReset().mockResolvedValueOnce({ id: 31 }).mockResolvedValueOnce({ id: 32 });
     mocks.update.mockReset().mockResolvedValue({ id: 3 });
     mocks.find.mockReset().mockResolvedValue({ docs: [] });

@@ -9,6 +9,7 @@ import { getPayload } from "@/lib/payload";
 import { resolvePayloadSecret } from "@/lib/payload-secret";
 import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
+import { extractSignaturePngFromPdf } from "@/lib/pdf/extract-signature";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { clientIp } from "@/lib/rate-limit";
 import { createCompanySignatureEvidence, type ContractSnapshot, type SignatureEvidenceRecord } from "@/lib/quotes/document";
@@ -74,7 +75,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const media = await payload.findByID({ collection: "private-media", id: customerSignatureImageId, depth: 0, overrideAccess: true });
       const content = await readPrivateMediaContent(media);
       customerSignatureData = `data:image/png;base64,${content.data.toString("base64")}`;
+    } else {
+      const legacySignedDocumentId = relationId(contract.signedDocument);
+      if (legacySignedDocumentId) {
+        const legacyDocument = await payload.findByID({ collection: "private-media", id: legacySignedDocumentId, depth: 0, overrideAccess: true });
+        const legacyContent = await readPrivateMediaContent(legacyDocument);
+        const extracted = await extractSignaturePngFromPdf(legacyContent.data);
+        if (extracted) customerSignatureData = `data:image/png;base64,${extracted.toString("base64")}`;
+      }
     }
+    if (!customerSignatureData) throw new TypeError("Customer signature image is unavailable. Reissue the contract for customer signing before counter-signing.");
 
     const signatureBytes = Buffer.from(parsed.data.signatureData.split(",")[1] ?? "", "base64");
     companySignatureMedia = await createPrivateMedia(payload, {

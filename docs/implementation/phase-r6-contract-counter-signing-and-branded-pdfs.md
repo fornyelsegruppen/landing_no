@@ -11,6 +11,7 @@
 
 - Kunden signerer med fullt navn, tegnet PNG-signatur og automatisk tidspunkt.
 - Kundens rå signatur lagres som beskyttet kontraktsfil, ikke i offentlig media eller logg.
+- For eldre kundesignerte stagingavtaler hentes den eksakte signaturgrafikken kontrollert fra den varige gamle PDF-en; hvis den ikke kan gjenfinnes, blokkeres medsignering fremfor å lage et mangelfullt sluttdokument.
 - Etter kundesignering viser custom admin `Kunden har signert – venter på vår signatur` og tilbyr navn-, signatur- og signeringsknapp.
 - Administratorens signatur bindes til innlogget bruker, dokumenthash, navn, tidspunkt og HMAC-minimert nettverksbevis.
 - Endelig PDF genereres med kunde- og leverandørsignatur side ved side i kontraktens egen signaturdel.
@@ -37,7 +38,7 @@ Kommersielt snapshot og dokumenthash forblir uendret. Etter kundesignering kan b
 
 - `npm run typecheck`: bestått.
 - `npm run lint`: bestått.
-- `npm test`: 114 testfiler og 344 tester bestått.
+- `npm test`: 116 testfiler og 346 tester bestått.
 - Enhetstester dekker separat selskapsbevis, to signaturer i endelig PDF, arbeidsordreblokkering før selskapsaksept, riktig neste handling og endelig e-postvedlegg.
 - Vercel Preview `dpl_234owmDaLF3Xa1j8fDc89rnMyPd4` kjørte migrasjonen og bygget 64 sider samt den nye signeringsruten.
 - Stagingaliaset peker på denne Preview-versjonen.
