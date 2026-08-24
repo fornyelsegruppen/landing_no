@@ -2,6 +2,8 @@
 
 Dato: 24. august 2026
 
+> **Revidert etter full stagingreise:** Denne audit-tabellen vurderte hovedsakelig kode og automatiske tester. Den skal leses som audit av teknisk fundament, ikke som bevis på ferdig operativ løsning. Nye krav og observerte gap er styrende dokumentert i [fase R0–R10](../custom-admin-and-automation-execution-plan.md).
+
 Teknisk gate-commit: `3b852b3`
 
 PR: `darbasnorvegija4-eng/landing_no#52`
@@ -30,7 +32,23 @@ Denne kontrollen bruker kapittel 4 i `full-platform-implementation-master-plan.m
 | Stagingpilot er godkjent før produksjon | release-gate og staging-runbook | Ikke oppfylt | Preview DB/secrets, manuell QA, 20–30 leads og eiergodkjenning |
 | Tester, lint, typecheck, build og E2E består | [GitHub gate 32669148448](https://github.com/fornyelsegruppen/landing_no/actions/runs/32669148448): 95 filer/259 tester, audit, lint, typecheck, PostgreSQL-build og 7/7 offentlig Chromium-E2E bestått | Delvis | Autentisert admin/worker/kundelenke-E2E på separat staging mangler |
 
-## Konklusjon
+## Operativt tillegg etter stagingtesten
+
+Følgende krav ble gjenåpnet selv om underliggende collections og tester finnes:
+
+| Krav | Observert stagingstatus | Ny gate |
+|---|---|---|
+| Enkel daglig admin | Payload virker, men arbeidsreisen er for oppstykket | R1–R2 |
+| Umiddelbar profilert kundekvittering | Mottakskvitteringen er ikke ferdig branded HTML | R3 |
+| Nær-sanntids AI og jobbkjøring | Operativ cron kjører for sjelden for kundereisen | R3–R4 |
+| Automatisk takmåleutkast | Administrator må fortsatt starte og velge målingen manuelt | R4 |
+| Kundespørsmål | Lagres, men mangler komplett varsel-/svarutkastflyt | R5 |
+| Endelig avtale | Kundesignatur mangler separat selskapsaksept/motsignering | R6 |
+| Dokument og faktura | Mangler samlet register og kontrollert fakturastatus | R8 |
+| Blogg i enkel admin | Virker i Payload, men ikke i custom operativ portal | R9 |
+| Produksjonsbevis | Ekte e-post, restore, juridisk kontroll og pilot mangler | R10 |
+
+## Opprinnelig konklusjon for teknisk fundament
 
 Alle planlagte domenefunksjoner er implementert bak avslåtte feature-flagg og automatiske kontroller er grønne. Hele Definition of Done er likevel ikke oppfylt før de fem eksterne bevisgruppene under foreligger:
 
@@ -40,4 +58,4 @@ Alle planlagte domenefunksjoner er implementert bak avslåtte feature-flagg og a
 4. leverandør-, pris- og juridisk godkjenning;
 5. begrenset ekte pilot og eksplisitt produkteier-go.
 
-Produksjonsmerge og featureaktivering skal forbli blokkert til dette dokumentet kan oppdateres med direkte bevis for alle `Delvis` og `Ikke oppfylt`-rader.
+Produksjonsmerge og featureaktivering skal forbli blokkert til alle R0–R10-gater og alle `Delvis`/`Ikke oppfylt`-rader har direkte bevis.

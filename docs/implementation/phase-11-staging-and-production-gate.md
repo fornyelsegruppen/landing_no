@@ -104,3 +104,18 @@ Vercels prosjektoversikt viste dessuten `57,6 %` feilrate for det eksisterende p
 Gate 11 er derfor fortsatt med hensikt lukket. Neste sikre handling er å opprette en staging-arbeider, gjennomføre autentisert mobil-QA for begge panelene og deretter restore-øvelsen. Produksjonsbranch, produksjonsdatabase og levende feature-flagg er ikke endret.
 
 Krav-for-krav-status er dokumentert i `docs/implementation/completion-audit-2026-08-23.md` slik at ingen lokal test kan forveksles med full produksjonsgodkjenning.
+
+## Tillegg – komplett kontrollert stagingreise 24. august 2026
+
+Etter rapporten over ble en anonym kontrollreise gjennomført fra offentlig skjema via admin, kundetilbud/signering, arbeidsordre og ansattportal til ferdigdokumentasjon. Kjerneflyten og worker-tilgangen virket, men reisen avdekket følgende operative gap:
+
+- Payload-admin er teknisk funksjonell, men for oppstykket for daglig administrasjon;
+- kundens mottaksbekreftelse er ikke den ferdige profilerte HTML-malen;
+- lead-AI og andre operasjonelle jobber blir ikke behandlet nær sanntid når daglig Hobby-cron er eneste scheduler;
+- gratis takmåling finnes, men admin må fortsatt starte oppslaget, velge bygg og opprette måleutkast;
+- kundespørsmål lagres, men mangler komplett adminvarsel og kontrollert AI-svarutkast;
+- kundesignering markerer kontrakten signert uten separat selskapsaksept;
+- dokumenter og fakturastatus er ikke samlet i en enkel operativ kø;
+- staging bruker fortsatt loggdriver i stedet for ekte e-postlevering.
+
+Disse funnene opphever ikke kode- og testbeviset fra fase 0–11, men gjenåpner den operative produksjonsgaten. Videre arbeid styres av [fase R0–R10](../custom-admin-and-automation-execution-plan.md). Neste sikre handling er Gate R0 og deretter custom admin-skall på `/admin-v2`; ikke produksjonsaktivering.

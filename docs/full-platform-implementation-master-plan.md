@@ -6,6 +6,8 @@
 **Produksjonsflater:** `takfornyelse.as`, `/admin`, `/user` og sikre kundelenker  
 **Arbeidsregel:** Én fase ferdigstilles, testes og godkjennes før neste fase åpnes
 
+> **Revisjon 24. august 2026:** Fase 0–11 etablerte og testet det tekniske fundamentet, men stagingreisen viste at den operative administrasjonen og flere automatiske overganger ikke er ferdige. [Gjennomføringsplan for operativ admin og automatisert kundereise](./custom-admin-and-automation-execution-plan.md) er nå styrende for resterende arbeid (fase R0–R10). Historiske faserapporter beholdes som kode- og testbevis, ikke som påstand om at hele kundereisen er produksjonsklar.
+
 ## 1. Mandat
 
 Dette er hovedplanen for å implementere den avtalte løsningen i én samlet plattform:
@@ -22,7 +24,8 @@ Planen skal brukes som operativ sjekkliste gjennom hele implementeringen. De tid
 
 | Nivå | Dokument | Formål |
 |---|---|---|
-| 1 | Dette dokumentet | Samlet rekkefølge, avhengigheter, kvalitetsporter og ferdigdefinisjon |
+| 1 | Dette dokumentet | Overordnet mandat, arkitekturprinsipper og samlet ferdigdefinisjon |
+| 1 | [Operativ admin og automatisert kundereise](./custom-admin-and-automation-execution-plan.md) | Gjeldende rekkefølge R0–R10, gaplukking, tester og produksjonsporter |
 | 2 | [Admin- og brukerpanel](./takfornyelse-admin-user-panel-roadmap.md) | Detaljert UI, roller, arbeidsflyter, måling, tilbud og arbeid |
 | 2 | [AI-assistert SEO-blogg](./seo-blog-automation-roadmap.md) | Temavalg, artikkelmodell, kvalitetskontroll, publisering og måling |
 | 2 | `knowledge/FornyelseGruppen/02 Agent 24-7/Automatisk tilbud kontrakt og ordreplattform - roadmap.md` | Forretningsregler for tilbud, kontrakt, ordre, kommunikasjon og kontroll |
@@ -54,27 +57,30 @@ flowchart LR
     Q --> C
 ```
 
-Alt skal ligge i samme Payload/Postgres-løsning. Det skal ikke bygges et separat kontrollsenter, en ekstra CRM-database eller en egen mobilapp i denne leveransen.
+Alt skal ligge i samme Next.js/Payload/Postgres-løsning. Den operative adminflaten bygges som et eget, enkelt grensesnitt i samme applikasjon. Payload-admin beholdes som teknisk backoffice på `/system-admin`; det skal ikke bygges et separat kontrollsenter, en ekstra CRM-database eller en egen mobilapp.
 
 ## 4. Fullført løsning – Definition of Done
 
 Hele oppgaven er ferdig først når alle punktene under er dokumentert bestått:
 
-- administrator kan drive blogg, henvendelser, tilbud, kontrakter, oppdrag og ansatte fra `/admin`;
+- administrator kan drive blogg, henvendelser, tilbud, kontrakter, oppdrag, dokument-/fakturastatus og ansatte fra en Takfornyelse-designet `/admin` uten å bruke Payload-collections;
+- administrator kan åpne én samlet sak med kunde, AI, måling, pris, tilbud, meldinger, kontrakt, arbeid, dokumenter og revisjonsspor;
 - ansatte kan logge inn på `/user`, men bare lese og endre egne oppdrag;
 - to relevante norske blogginnlegg kan opprettes som utkast per uke uten automatisk publisering;
 - et blogginnlegg kan gjennomgås, forhåndsvises, planlegges, publiseres og måles;
-- en kundehenvendelse mottas sikkert, vises i admin og får mottaksbekreftelse;
+- en kundehenvendelse mottas sikkert, vises i admin og får en umiddelbar profilert HTML-/tekstbekreftelse;
 - AI kan oppsummere henvendelsen og lage svarutkast, men kan ikke sende tilbud på egen hånd;
+- en komplett adresse starter automatisk adresse-/byggoppslag og oppretter måleutkast eller tydelig kontrolloppgave etter confidence-regler;
 - et egnet tak kan måles som kontrollert estimat med polygon, areal, vinkelgrunnlag, confidence og kilde;
 - alle areal- og prisberegninger utføres deterministisk og kan reproduseres fra låste inputdata;
 - administrator kan korrigere måling, velge prisregel og godkjenne tilbud;
 - kunden kan lese, godta eller avslå tilbudet og signere riktig dokumentversjon fra telefon;
-- signert kontrakt blir låst, sporbar og kan lastes ned;
+- kundesignert kontrakt venter på eksplisitt selskapsaksept, og endelig tosidig godkjent PDF blir låst, sporbar og kan lastes ned;
 - signert oppdrag kan tildeles en ansatt;
 - den ansatte må gjennomføre før-kontroll før arbeidet kan startes;
 - avvik over avtalt ramme blokkerer oppstart og krever skriftlig endringsgodkjenning;
-- påminnelser og ferdigmelding sendes idempotent og leveringsfeil blir synlige i admin;
+- umiddelbare meldinger behandles hendelsesdrevet, tidsstyrte påminnelser sendes presist og idempotent, og leveringsfeil blir synlige i admin;
+- administrator kan se tilbud, kontrakter, endringer, ferdigrapport og fakturautkast/-referanse i samme dokumentregister;
 - tilgangskontroll, personvern, audit log, backup og gjenoppretting er testet;
 - migrasjoner er prøvd mot en produksjonslik databasekopi;
 - staging-piloten er godkjent før produksjonsaktivering;
@@ -88,6 +94,7 @@ En funksjon som bare virker lokalt uten tilgangskontroll, feilhåndtering, migra
 
 - eksisterende offentlige nettside og kontaktskjema;
 - Payload som CMS og administrasjonsgrunnlag;
+- custom operativ admin og separat teknisk Payload-backoffice i samme applikasjon;
 - roller `admin` og `worker`;
 - bloggtemakø, AI-utkast, QA, planlegging og rapportering;
 - leads, private bilder, AI-oppsummering og svarutkast;
@@ -95,6 +102,7 @@ En funksjon som bare virker lokalt uten tilgangskontroll, feilhåndtering, migra
 - versjonert prisbok og deterministisk prisberegning;
 - tilbud, PDF, kontrakt, signaturbevis og endringsavtale;
 - arbeidsordre, ansattflyt, før-/etterbilder og ferdigstilling;
+- samlet dokumentregister og kontrollert fakturautkast/-status;
 - e-post og nødvendige påminnelser;
 - adaptere for AI, kart, e-post, eventuell SMS og signering;
 - sikkerhet, logging, overvåking, retention og testautomatisering.
@@ -102,7 +110,8 @@ En funksjon som bare virker lokalt uten tilgangskontroll, feilhåndtering, migra
 ### 5.2 Utsatt
 
 - Google Ads- og Meta-styring i admin;
-- regnskap, faktura, betaling, lønn og timeregistrering;
+- offisiell regnskapsføring, betaling, lønn og timeregistrering;
+- utsending av en offisiell faktura uten godkjent nummerering, bokføringsprosess eller regnskapsintegrasjon;
 - avansert ruteoptimalisering;
 - flere interne roller enn `admin` og `worker`;
 - egen native mobilapp;
@@ -116,9 +125,9 @@ En funksjon som bare virker lokalt uten tilgangskontroll, feilhåndtering, migra
 
 Følgende skal gjenbrukes og beskyttes mot regresjon:
 
-- Next.js 15, React 19 og TypeScript;
+- Next.js 16, React 19 og TypeScript;
 - Payload CMS 3 med PostgreSQL i produksjon og SQLite lokalt;
-- eksisterende `/admin` og collections for `users`, `leads`, `posts`, `media` og nettstedinnhold;
+- eksisterende Payload `/admin` og collections for `users`, `leads`, `posts`, `media` og nettstedinnhold; Payload blir teknisk backoffice etter kontrollert route-cutover;
 - Payload drafts/versioning for blogg;
 - Vercel Blob for media;
 - eksisterende lead-API, bildeopplasting, rate limiting, honeypot/Turnstile, samtykke og UTM-attribusjon;
@@ -698,7 +707,9 @@ For hver fase brukes samme arbeidsmåte:
 
 Store endringer skal deles i små, reversible migrasjoner. Eksisterende urelaterte brukerendringer skal bevares. Produksjonsdeploy er en egen, eksplisitt handling etter Gate 10/11, ikke en automatisk konsekvens av at kode er skrevet.
 
-## 26. Fremdriftslogg
+## 26. Historisk fremdriftslogg for teknisk fundament
+
+Tabellen under viser hva som ble implementert og automatisk testet i den første gjennomføringen. `Fullført` betyr her teknisk fasegate, ikke at den reelle operatør- og kundereisen er produksjonsklar. Gjeldende fremdrift føres i fase R0–R10 i den [nye gjennomføringsplanen](./custom-admin-and-automation-execution-plan.md).
 
 | Fase | Status | Start | Ferdig | Bevis/PR | Åpne blokkere |
 |---|---|---|---|---|---|
@@ -713,16 +724,16 @@ Store endringer skal deles i små, reversible migrasjoner. Eksisterende urelater
 | 8. Arbeidsordre og `/user` | Fullført | 2026-08-23 | 2026-08-23 | [Fase 8-rapport](./implementation/phase-8-work-orders-worker-portal.md) | Gamle shellrader, worker-kontoer, privat Blob og komplett mobil staging-test kreves før flagget aktiveres |
 | 9. Avvik og kommunikasjon | Fullført | 2026-08-23 | 2026-08-23 | [Fase 9-rapport](./implementation/phase-9-change-agreements-communications.md) | Juridisk kontroll, Resend/SMS, tidssone og komplett mobil staging-test kreves før flagget aktiveres |
 | 10. Hardening og samlet QA | Fullført teknisk | 2026-08-23 | 2026-08-23 | [Fase 10-rapport](./implementation/phase-10-hardening-and-qa.md) | Autentisert visuell QA, restore-øvelse og leverandørtest gjennomføres i staging |
-| 11. Pilot og produksjon | Teknisk klargjort; gate lukket | 2026-08-23 |  | [Fase 11-rapport](./implementation/phase-11-staging-and-production-gate.md) | Separat staging, restore, ekte pilot og eier-/juridisk godkjenning mangler |
+| 11. Pilot og produksjon | Staging opprettet; operativ gate gjenåpnet | 2026-08-23 |  | [Fase 11-rapport](./implementation/phase-11-staging-and-production-gate.md) | Custom admin, rask jobbkjøring, automatisk måleutkast, selskapsaksept, restore, ekte e-post/pilot og eier-/juridisk godkjenning gjenstår |
 
 ## 27. Første handling etter godkjenning
 
-Start med fase 0, ikke med nye UI-skjermer:
+Start med Gate R0 i [gjennomføringsplanen for operativ admin og automatisert kundereise](./custom-admin-and-automation-execution-plan.md):
 
-1. kjør full teknisk baseline;
-2. inventer nåværende Payload-modeller og produksjonsmigrasjoner;
-3. opprett beslutningsregister med sikre standardvalg og eksplisitte produksjonsblokkere;
-4. lag konkrete implementeringsoppgaver for fase 1;
-5. først deretter begynn kodeendringer.
+1. ta en fersk teknisk baseline og identifiser rollbackpunktet;
+2. bekreft route-, rolle-, dokument- og fakturaavgrensningen;
+3. lag anonymisert E2E-bevis for dagens stagingreise;
+4. bygg deretter custom admin-skallet på `/admin-v2` som fase R1;
+5. flytt én komplett arbeidsflyt om gangen inn i det nye grensesnittet og lukk hver gate før neste fase.
 
-Denne rekkefølgen er den raskeste trygge veien til en komplett løsning fordi feil i roller, datamodell, prisversjoner eller audit ellers måtte bygges om i alle senere moduler.
+Backendregler og brukerflate utvikles som vertikale leveranser. Produksjon forblir urørt til R10, pilot og eksplisitt produkteiergodkjenning er bestått.

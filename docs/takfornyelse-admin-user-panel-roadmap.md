@@ -1,29 +1,35 @@
 # Takfornyelse.as – forenklet admin- og brukerpanel
 
-**Status:** Planlagt og avgrenset for implementering  
-**Teknisk grunnlag:** Eksisterende Next.js 15 + Payload CMS 3-applikasjon  
-**Administrasjon:** `https://takfornyelse.as/admin`  
+**Status:** Revidert etter stagingtest – detaljspesifikasjon for operativ portal
+**Teknisk grunnlag:** Eksisterende Next.js 16 + Payload CMS 3-applikasjon
+**Administrasjon:** custom portal på `https://takfornyelse.as/admin`
+**Teknisk backoffice:** Payload på `https://takfornyelse.as/system-admin` etter cutover
 **Ansattportal:** `https://takfornyelse.as/user`  
 **Kontoer:** Kun `admin` og `worker`  
 **Primærspråk:** Norsk bokmål
 
 **Samlet gjennomføringsplan:** [Takfornyelse.as – samlet implementeringsplan](./full-platform-implementation-master-plan.md)
 
+**Gjeldende faseplan:** [Operativ admin og automatisert kundereise](./custom-admin-and-automation-execution-plan.md). Ved konflikt gjelder denne nyere faseplanen.
+
 ## 1. Beslutning
 
-Takfornyelse.as skal ikke kobles til et separat Laravel-/Filament-basert kontrollsenter i denne fasen. Eksisterende applikasjon, database, innlogging, medielagring og Payload-admin skal utvides.
+Takfornyelse.as skal ikke kobles til et separat Laravel-/Filament-basert kontrollsenter. Den eksisterende applikasjonen, databasen, innloggingen og medielagringen gjenbrukes. Det bygges derimot en egen, forenklet operativ adminflate i samme Next.js-applikasjon. Payload beholdes som teknisk backoffice og fallback, ikke som administratorens normale arbeidsflate.
 
-Løsningen skal ha nøyaktig to interne flater:
+Løsningen skal ha to operative interne flater:
 
-1. `/admin` – full administrasjon for én eller flere administratorer.
+1. `/admin` – custom full administrasjon for én eller flere administratorer.
 2. `/user` – enkel mobil arbeidsflate for ansatte som bare ser egne oppdrag.
+
+I tillegg beholdes `/system-admin` som begrenset teknisk backoffice og fallback. Den regnes ikke som en daglig operativ flate.
 
 Kundens tilbuds- og signeringslenke er en del av kundereisen, ikke en tredje intern administrasjonspanel.
 
 ```text
 takfornyelse.as
 ├── /                         offentlig nettside
-├── /admin                    full administrasjon
+├── /admin                    custom operativ administrasjon
+├── /system-admin             teknisk Payload-backoffice
 ├── /user                     ansattens egne oppdrag
 ├── /tilbud/[token]           kundens tilbud og signering
 ├── /ordre/[token]            enkel ordrestatus for kunden ved behov
@@ -56,7 +62,7 @@ Eksisterende Takfornyelse.as har allerede:
 - e-post og PDF for nye henvendelser;
 - norsk og engelsk offentlig nettsted.
 
-Disse delene skal utvides, ikke erstattes.
+Disse delene og datamodellene skal gjenbrukes. Den generiske Payload-brukerflaten erstattes ikke teknisk, men flyttes ut av den daglige arbeidsreisen.
 
 ## 4. Bevisst enkel arkitektur
 
@@ -64,9 +70,10 @@ Disse delene skal utvides, ikke erstattes.
 flowchart LR
     A[Offentlig skjema] --> B[Eksisterende /api/lead]
     B --> C[(Samme Payload/Postgres-database)]
-    C --> D[/admin]
+    C --> D[Custom /admin]
     C --> E[/user]
     C --> F[Kundens tilbudslenke]
+    C --> K[Payload /system-admin]
     D --> G[Blogg, AI-utkast og publisering]
     D --> H[Henvendelse, måling, tilbud og kontrakt]
     D --> I[Oppdrag og ansatt]
@@ -80,6 +87,8 @@ Det skal ikke bygges:
 - synkronisering mellom Payload og et annet CRM;
 - separat innlogging for blogg og ordre;
 - native iOS-/Android-app i første fase.
+
+Under utvikling bygges custom admin på `/admin-v2`, mens Payload fortsatt ligger på `/admin`. Først etter godkjent samlet E2E byttes rutene kontrollert slik at custom admin blir `/admin` og Payload blir `/system-admin`.
 
 ## 5. Kontoer og tilgang
 
@@ -126,29 +135,38 @@ Ansatt kan:
 - Kundens tilbuds-/signeringslenke skal være tidsbegrenset og kunne tilbakekalles.
 - En eventuell engangslenke til en midlertidig ansatt er ikke del av første MVP.
 
-## 6. Forenklet `/admin`
+## 6. Forenklet custom `/admin`
 
-Adminmenyen skal bare inneholde:
+Adminmenyen skal inneholde arbeidsområdene administratoren faktisk bruker:
 
 ```text
 Oversikt
 Henvendelser
+Tilbud
+Kontrakter
 Arbeid
+Dokumenter og faktura
+Kundemeldinger
 Blogg
 Ansatte
 Innstillinger
 ```
 
-Ingen egen meny for annonser, økonomi, avansert analyse eller andre virksomheter i denne fasen.
+Dette er filtrerte arbeidsflater over samme saksdata, ikke nye separate CRM-systemer. Ingen egen meny for annonser, full regnskapsføring, avansert analyse eller andre virksomheter bygges i denne fasen.
 
 ### 6.1 Oversikt
 
-Øverst vises fire tall:
+Øverst vises handlingskøer og nøkkeltall:
 
 - nye henvendelser;
 - tilbud som venter på godkjenning;
 - kontrakter som venter på signatur;
-- aktive oppdrag.
+- aktive oppdrag;
+- kundespørsmål som venter på svar;
+- signerte avtaler uten selskapsaksept eller planlegging;
+- dokument-/fakturautkast som mangler handling;
+- mislykkede meldinger og automatiseringsjobber;
+- blogginnlegg som venter på kontroll.
 
 Under vises to handlingslister:
 
@@ -169,7 +187,24 @@ Under vises to handlingslister:
 - signert oppdrag uten ansatt;
 - oppdrag uten fullført dokumentasjon.
 
-### 6.2 Henvendelser
+### 6.2 Samlet saksflate
+
+Alle lister skal åpne én samlet kundesak. Administratoren skal ikke måtte kjenne navnene på Payload-collections eller åpne lead, måling, tilbud, kontrakt, arbeidsordre og melding i separate faner.
+
+Saksflaten viser:
+
+- kunde, adresse, samtykke, kontaktkanal og kampanjekilde;
+- henvendelse, kundebilder og Gemini-oppsummering;
+- adresseoppslag, byggkandidater, takpolygon, vinkelgrunnlag og confidence;
+- deterministisk areal- og prisberegning med låst regelversjon;
+- tilbud, PDF, kundestatus og spørsmål;
+- kontrakt, kundesignatur, selskapsaksept og dokumenthash;
+- tildeling, dato, workerstatus, før-/etterbilder og avvik;
+- alle kundemeldinger, dokumenter, fakturastatus og audit-hendelser.
+
+Øverst vises status, ansvarlig, frist og én tydelig primærhandling. Primærhandlingen følger saken, for eksempel `Be om informasjon`, `Kontroller måling`, `Godkjenn og send tilbud`, `Aksepter kontrakt`, `Tildel ansatt` eller `Kontroller ferdigdokumentasjon`.
+
+### 6.3 Henvendelser
 
 Listevisningen viser:
 
@@ -208,7 +243,23 @@ Administratorens primærknapper:
 - `Tildel ansatt`;
 - `Avslutt henvendelse`.
 
-### 6.3 Arbeid
+### 6.4 Tilbud
+
+Tilbudskøen viser utkast, venter på kontroll, sendt, åpnet, spørsmål, akseptert, avslått og utløpt. Administrator åpner alltid den samlede saken, sammenligner måling, prislinjer og PDF og bruker én idempotent `Godkjenn og send`-handling. Ingen AI-tekst eller pris sendes uten denne kontrollen.
+
+### 6.5 Kontrakter
+
+Kontraktskøen skiller mellom kundesignering og endelig selskapsaksept. Etter kunden har signert, må en administrator akseptere eksakt dokumenthash på vegne av selskapet. Først da genereres endelig PDF, kunden får varig kopi og arbeidsordre kan opprettes. Juridisk godkjenning av tekst og bevismetode er produksjonsgate.
+
+### 6.6 Dokumenter og faktura
+
+Dokumentvisningen samler tilbud, kontrakt, endringsavtaler, målebekreftelse, ferdigrapport og fakturautkast/-referanse. Administrator skal se status og neste handling, men første versjon bygger ikke skyggebokføring. Offisiell fakturautsending krever godkjent nummerering, oppbevaring og regnskapsprosess eller valgt integrasjon.
+
+### 6.7 Kundemeldinger
+
+Meldingskøen viser utkast, planlagte, sendte, leverte, feilede og kundehenvendelser. Kunden får profilert norsk HTML-e-post med tekstfallback. Umiddelbare meldinger behandles hendelsesdrevet; daglig cron er bare sikkerhetsnett. Gemini kan foreslå svar, men administrator godkjenner alle tilbuds-, kontrakts- og avviksmeldinger.
+
+### 6.8 Arbeid
 
 Arbeid kan vises som enkel liste og enkel kalender.
 
@@ -236,7 +287,7 @@ Administrator kan:
 - sette oppdrag på pause;
 - godkjenne ferdigdokumentasjon.
 
-### 6.4 Blogg
+### 6.9 Blogg
 
 Bloggmodulen bygger videre på eksisterende `posts`.
 
@@ -275,7 +326,7 @@ AI foreslår tema
 
 Ingen AI-artikkel publiseres uten administratorgodkjenning.
 
-### 6.5 Ansatte
+### 6.10 Ansatte
 
 Ansattlisten skal være enkel:
 
@@ -295,7 +346,7 @@ Handlinger:
 
 Det skal ikke bygges lønn, timeliste, kompetansematrise eller resultatmåling i første versjon.
 
-### 6.6 Innstillinger
+### 6.11 Innstillinger
 
 Kun nødvendige innstillinger:
 
@@ -576,6 +627,7 @@ Nødvendige Payload-collections:
 | `contracts` | Kontraktsversjon, dokumenthash og signaturstatus |
 | `work-orders` | Dato, ansatt, arbeidsstatus, kontroll og bilder |
 | `messages` | Utsendelse, kanal, mal og leveringsstatus |
+| `documents` eller tilsvarende samlet read-model | Tilbud, kontrakt, endring, ferdigrapport og fakturareferanse/status |
 | `posts` | Eksisterende blogginnlegg og AI-utkast |
 | `media` | Eksisterende bilder og dokumenter |
 
@@ -588,7 +640,9 @@ Eksisterende ruter beholdes og utvides:
 | Rute | Formål |
 |---|---|
 | `POST /api/lead` | Motta henvendelse |
-| `/admin` | Payload-admin og egne adminvisninger |
+| `/admin-v2` | Custom operativ admin under stagingutvikling |
+| `/admin` | Custom operativ admin etter godkjent cutover |
+| `/system-admin` | Begrenset teknisk Payload-backoffice etter cutover |
 | `/user` | Ansattens oppdragsliste |
 | `/user/arbeid/[id]` | Ansattens oppdragskort |
 | `/tilbud/[token]` | Kundens tilbud, spørsmål og signering |
@@ -661,7 +715,9 @@ Bruk en enkel adapter rundt Gemini slik at modell kan byttes senere uten å endr
 - Ha databehandleravtaler og slettestrategi før produksjon.
 - Gjennomgå kontrakt, angrerett, tidlig oppstart, toleranse og endringsavtale juridisk.
 
-## 18. Implementeringsfaser
+## 18. Historisk implementeringsinndeling
+
+Fase 0–8 under beskriver den opprinnelige tekniske oppbyggingen og beholdes som sporbarhet. Den er ikke gjeldende rekkefølge for resterende arbeid. Custom admin, rask automatisering, selskapsaksept, dokument-/fakturakø og cutover gjennomføres etter R0–R10 i [gjeldende faseplan](./custom-admin-and-automation-execution-plan.md).
 
 ### Fase 0 – lås MVP-reglene
 
@@ -900,7 +956,7 @@ Følgende er gode muligheter, men skal ikke implementeres før kjernefasene fung
 
 - Google Ads- og Meta-styring i admin;
 - avansert markedsanalyse;
-- regnskap, faktura og betaling;
+- offisiell regnskapsføring, betaling og automatisk fakturautsending; dokumentregister, fakturautkast/-referanse og status er inkludert;
 - lønn, timer og medarbeiderprestasjon;
 - ruteoptimalisering;
 - flere interne roller enn admin/worker;
