@@ -249,7 +249,7 @@ Leveranser:
 - routekontrakt for `/admin-v2`, `/admin`, `/system-admin` og `/user`;
 - oppdatert Definition of Done og gapregister;
 - anonymisert E2E-baseline av dagens kunde-, admin- og workerreise;
-- database-/Blob-backup og dokumentert rollbackpunkt;
+- dokumentert backup-/restorekontrakt og et verifisert applikasjonsrollbackpunkt; faktisk produksjonsdatabase-/Blob-snapshot tas først rett før R10-cutover;
 - design- og navigasjonskontrakt for custom admin;
 - avklarte eiere for pris, kontrakt, personvern og faktura.
 

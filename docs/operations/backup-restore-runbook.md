@@ -37,10 +37,13 @@ Restore er ikke bestått hvis bare dumpen finnes. Applikasjonen må starte, migr
 
 | Kontroll | Verdi |
 |---|---|
+| Verifisert applikasjonsrollback | Git-tag `rollback/pre-custom-admin-r1-2026-08-24` → `2e2b8690f83d906d22d6e0a97288e9e0e43ff9a6` |
+| PostgreSQL-/buildbevis for rollbackcommit | GitHub Quality gate `32759538583`, bestått 24. august 2026 |
 | Snapshot-ID og tidspunkt | Ikke utført ennå |
 | Blob-inventar | Ikke utført ennå |
-| Stagingdatabase | Ikke opprettet ennå |
+| Stagingdatabase | Separat Preview-database finnes; produksjonslik restore er ikke utført ennå |
 | Radantall før/etter | Ikke kontrollert ennå |
 | Restore-smoke | Ikke kjørt ennå |
 | Godkjent av | Ikke godkjent ennå |
 
+Applikasjonsrollbacket er tilstrekkelig for å starte isolert R1-utvikling. Det erstatter ikke produksjonssnapshot, Blob-inventar eller restore-øvelse. Disse tre kontrollene er obligatoriske rett før R10-cutover og skal ikke gjennomføres ved å endre eller eksportere levende produksjonsdata uten eksplisitt eiergodkjenning.
