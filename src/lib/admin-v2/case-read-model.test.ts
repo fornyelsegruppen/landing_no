@@ -61,4 +61,24 @@ describe("admin case read model", () => {
     expect(JSON.stringify(result)).not.toContain("tokenHash");
     expect(result?.timeline.map((item) => item.type)).toEqual(expect.arrayContaining(["lead", "message", "measurement", "price", "quote", "contract"]));
   });
+
+  it("does not offer an obsolete draft after a newer equivalent was sent", async () => {
+    const findByID = vi.fn().mockResolvedValue({ id: 1, name: "Test", address: "Testveien", postal: "0001", status: "waiting_customer", createdAt: "2026-08-24T08:00:00.000Z" });
+    const responses = [
+      { docs: [{ id: 2, reference: "TM-1", status: "approved", createdAt: "2026-08-24T09:00:00.000Z" }] },
+      { docs: [{ id: 3, reference: "PB-1", status: "superseded", createdAt: "2026-08-24T10:00:00.000Z" }] },
+      { docs: [{ id: 4, reference: "T-1", status: "viewed", createdAt: "2026-08-24T11:00:00.000Z" }] },
+      { docs: [
+        { id: 6, subject: "Tilbud T-1", category: "quote", bodyText: "Sent", direction: "outbound", channel: "email", status: "sent", createdAt: "2026-08-24T12:00:00.000Z" },
+        { id: 5, subject: "Tilbud T-1", category: "quote", bodyText: "Draft", direction: "outbound", channel: "email", status: "draft", createdAt: "2026-08-24T11:30:00.000Z" },
+      ] },
+      { docs: [] },
+      { docs: [{ id: 7, reference: "K-1", status: "issued", createdAt: "2026-08-24T11:00:00.000Z" }] },
+      { docs: [] },
+    ];
+    const find = vi.fn().mockImplementation(async () => responses.shift());
+    const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
+
+    expect(result?.nextAction.kind).toBe("wait_customer");
+  });
 });

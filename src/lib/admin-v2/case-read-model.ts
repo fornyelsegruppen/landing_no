@@ -209,7 +209,19 @@ function makeTimeline(type: CaseTimelineItem["type"], collection: string, raw: u
 }
 
 function currentMessage(messages: Array<Record<string, unknown>>) {
-  const priority = messages.find((message) => ["failed", "attention", "draft"].includes(stringValue(message.status) || ""));
+  const priority = messages.find((message) => {
+    if (!["failed", "attention", "draft"].includes(stringValue(message.status) || "")) return false;
+    const createdAt = new Date(stringValue(message.createdAt) || 0).getTime();
+    const subject = stringValue(message.subject);
+    const category = stringValue(message.category);
+    const newerEquivalentSucceeded = messages.some((candidate) => {
+      if (candidate.id === message.id) return false;
+      if (!["approved", "queued", "sent", "delivered"].includes(stringValue(candidate.status) || "")) return false;
+      if (stringValue(candidate.subject) !== subject || stringValue(candidate.category) !== category) return false;
+      return new Date(stringValue(candidate.createdAt) || 0).getTime() > createdAt;
+    });
+    return !newerEquivalentSucceeded;
+  });
   if (priority) return priority;
   const latestMessage = messages[0];
   return latestMessage;
