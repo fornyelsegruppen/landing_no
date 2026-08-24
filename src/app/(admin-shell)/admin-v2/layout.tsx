@@ -12,7 +12,7 @@ export default async function AdminV2Layout({ children }: { children: React.Reac
   const copy = getAdminV2Copy(user.interfaceLanguage);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_75%_40%_at_60%_-10%,rgba(232,163,23,0.14),transparent_62%)]">
+    <div className="min-h-dvh bg-background bg-[radial-gradient(ellipse_75%_40%_at_60%_-10%,rgba(232,163,23,0.14),transparent_62%)]">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-background/92 backdrop-blur-xl lg:pl-72">
         <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <Link className="font-bold tracking-tight lg:hidden" href="/admin-v2">
@@ -51,7 +51,7 @@ export default async function AdminV2Layout({ children }: { children: React.Reac
         </details>
       </div>
 
-      <main className="px-4 py-6 sm:px-6 lg:ml-72 lg:px-8 lg:py-8">{children}</main>
+      <main className="min-h-[calc(100dvh-4rem)] bg-background/0 px-4 py-6 sm:px-6 lg:ml-72 lg:px-8 lg:py-8">{children}</main>
     </div>
   );
 }

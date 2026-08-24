@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nb">
-      <body className="min-h-screen bg-background text-foreground antialiased">
+    <html className="min-h-full bg-[#0c0e12] [color-scheme:dark]" lang="nb">
+      <body className="min-h-dvh bg-[#0c0e12] text-foreground antialiased">
         {children}
       </body>
     </html>
