@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   availablePostLocales,
+  prepareAdminPublication,
   prepareEditorialPost,
   validateEditorialPost,
 } from "./editorial-policy";
@@ -57,6 +58,50 @@ describe("blog editorial policy", () => {
       editorialStatus: "published",
       publishedAt: "2026-08-23T12:00:00.000Z",
     });
+  });
+
+  it("lets an administrator review and publish a passed AI draft in one action", () => {
+    expect(
+      prepareAdminPublication(
+        {
+          _status: "draft",
+          editorialStatus: "ai_qa",
+          titleNo: "Norsk",
+          contentNo: "Kontrollert innhold",
+          authorName: "Takfornyelse",
+          aiAssisted: true,
+          qualityScore: 92,
+          qualityChecks: { passed: true },
+        },
+        { _status: "published" },
+        "Administrator",
+        new Date("2026-08-24T10:00:00.000Z"),
+      ),
+    ).toMatchObject({
+      _status: "published",
+      editorialStatus: "published",
+      reviewerName: "Administrator",
+      reviewedAt: "2026-08-24T10:00:00.000Z",
+      publishedAt: "2026-08-24T10:00:00.000Z",
+    });
+  });
+
+  it("still blocks one-click publication when AI quality checks failed", () => {
+    expect(() =>
+      prepareAdminPublication(
+        {
+          _status: "draft",
+          editorialStatus: "ai_qa",
+          titleNo: "Norsk",
+          contentNo: "Innhold",
+          aiAssisted: true,
+          qualityScore: 60,
+          qualityChecks: { passed: false },
+        },
+        { _status: "published" },
+        "Administrator",
+      ),
+    ).toThrow(/kvalitetskontrollen/);
   });
 
   it("preserves the first publication timestamp during later edits", () => {

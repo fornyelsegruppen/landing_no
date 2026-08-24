@@ -1,10 +1,15 @@
 import type { CollectionConfig } from "payload";
 import { validateContentSlug } from "../../lib/content-paths";
-import { prepareEditorialPost } from "../../lib/blog/editorial-policy";
+import {
+  prepareAdminPublication,
+  prepareEditorialPost,
+} from "../../lib/blog/editorial-policy";
+import { reviewerNameForUser } from "../../lib/blog/reviewer";
 import {
   adminOnly,
   adminsAndEditors,
   authenticatedOrPublished,
+  userIsAdmin,
 } from "../access/roles";
 
 export const Posts: CollectionConfig = {
@@ -27,6 +32,10 @@ export const Posts: CollectionConfig = {
           ? `${req.payload.config.serverURL}/api/preview?locale=no&path=${encodeURIComponent(`/no/blogg/${String(data.slug)}`)}`
           : null,
     },
+    preview: (doc, { req }) =>
+      doc.slug
+        ? `${req.payload.config.serverURL}/api/preview?locale=no&path=${encodeURIComponent(`/no/blogg/${String(doc.slug)}`)}`
+        : null,
   },
   access: {
     create: adminOnly,
@@ -41,8 +50,14 @@ export const Posts: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      ({ data, originalDoc }) =>
-        prepareEditorialPost(originalDoc, data) as typeof data,
+      ({ data, originalDoc, req }) =>
+        (data._status === "published" && userIsAdmin(req.user)
+          ? prepareAdminPublication(
+              originalDoc,
+              data,
+              reviewerNameForUser(req.user),
+            )
+          : prepareEditorialPost(originalDoc, data)) as typeof data,
     ],
   },
   fields: [

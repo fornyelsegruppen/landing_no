@@ -10,7 +10,7 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
-  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
@@ -28,7 +28,7 @@ const securityHeaders = [
       "font-src 'self' data:",
       "connect-src 'self' https://*.blob.vercel-storage.com https://challenges.cloudflare.com https://*.upstash.io https://www.google.com https://www.googleadservices.com https://www.googletagmanager.com https://www.facebook.com",
       "frame-src https://challenges.cloudflare.com",
-      "frame-ancestors 'none'",
+      "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
     ].join("; "),

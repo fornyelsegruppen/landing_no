@@ -15,6 +15,7 @@ import { userIsAdmin } from "@/payload/access/roles";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { attachPexelsStockImageToPost } from "@/lib/blog/stock-image";
+import { reviewerNameForUser } from "@/lib/blog/reviewer";
 
 const actionSchema = z.object({
   action: z.enum([
@@ -91,7 +92,10 @@ export async function POST(
       post.qualityChecks && typeof post.qualityChecks === "object"
         ? (post.qualityChecks as { passed?: boolean })
         : {};
-    const reviewerName = parsed.data.reviewerName || post.reviewerName;
+    const reviewerName =
+      parsed.data.reviewerName ||
+      post.reviewerName ||
+      reviewerNameForUser(user);
     assertBlogAction(
       {
         status: post.editorialStatus as BlogEditorialStatus,
@@ -149,7 +153,13 @@ export async function POST(
                 editorialStatus: "scheduled" as const,
                 scheduledAt: parsed.data.scheduledAt,
               }
-            : { _status: "published" as const };
+            : {
+                _status: "published" as const,
+                editorialStatus: "approved" as const,
+                authorName: post.authorName?.trim() || "Takfornyelse",
+                reviewerName,
+                reviewedAt: post.reviewedAt || now,
+              };
     const updated = await payload.update({
       collection: "posts",
       id: post.id,

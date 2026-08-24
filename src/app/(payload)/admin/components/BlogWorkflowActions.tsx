@@ -74,6 +74,11 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
         Nåværende status: <strong>{String(status || "draft")}</strong>. AI kan
         aldri publisere uten godkjenning her.
       </p>
+      <p>
+        Etter at du har lest og kontrollert artikkelen, bruker du
+        <strong> Kontroller og publiser</strong>. Navnet ditt og kontrolldatoen
+        registreres automatisk.
+      </p>
       <div className="blog-workflow-actions__inputs">
         <label>
           Faglig kontrollør
@@ -114,7 +119,7 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
           Planlegg
         </button>
         <button type="button" disabled={busy} onClick={() => act("publish")}>
-          Publiser nå
+          Kontroller og publiser
         </button>
         <button type="button" disabled={busy} onClick={() => act("regenerate")}>
           Regenerer utkast

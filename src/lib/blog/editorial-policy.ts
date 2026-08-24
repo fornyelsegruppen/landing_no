@@ -1,5 +1,6 @@
 export type EditorialPost = {
   _status?: "draft" | "published" | null;
+  aiAssisted?: boolean | null;
   authorName?: string | null;
   contentEn?: string | null;
   contentNo?: string | null;
@@ -18,6 +19,8 @@ export type EditorialPost = {
   titleEn?: string | null;
   titleNo?: string | null;
   publishedAt?: string | null;
+  qualityChecks?: { passed?: boolean | null } | null;
+  qualityScore?: number | null;
 };
 
 function present(value: string | null | undefined) {
@@ -77,4 +80,39 @@ export function prepareEditorialPost(
     publishedAt:
       incoming.publishedAt || original?.publishedAt || now.toISOString(),
   };
+}
+
+export function prepareAdminPublication(
+  original: EditorialPost | null | undefined,
+  incoming: EditorialPost,
+  reviewerName: string,
+  now: Date = new Date(),
+) {
+  const merged = { ...(original ?? {}), ...incoming };
+  if (merged._status !== "published") {
+    return prepareEditorialPost(original, incoming, now);
+  }
+
+  if (
+    merged.aiAssisted === true &&
+    (merged.qualityChecks?.passed !== true || (merged.qualityScore || 0) < 75)
+  ) {
+    throw new TypeError(
+      "AI-utkastet må bestå kvalitetskontrollen før publisering",
+    );
+  }
+
+  const reviewed = {
+    ...incoming,
+    authorName: merged.authorName?.trim() || "Takfornyelse",
+    reviewerName: merged.reviewerName?.trim() || reviewerName,
+    reviewedAt: merged.reviewedAt || now.toISOString(),
+    editorialStatus: ["approved", "scheduled", "published"].includes(
+      merged.editorialStatus || "",
+    )
+      ? merged.editorialStatus
+      : ("approved" as const),
+  };
+
+  return prepareEditorialPost(original, reviewed, now);
 }
