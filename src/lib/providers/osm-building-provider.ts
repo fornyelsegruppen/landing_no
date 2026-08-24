@@ -4,7 +4,7 @@ import type { GeoPoint, MeasurementConfidence } from "../measurements/types";
 import type { ProviderHealth } from "./contracts";
 
 const DEFAULT_ENDPOINT = "https://overpass-api.de/api/interpreter";
-const FALLBACK_ENDPOINT = "https://overpass.kumi.systems/api/interpreter";
+const DEFAULT_MAP_ENDPOINT = "https://api.openstreetmap.org/api/0.6/map";
 const SEARCH_RADIUS_METERS = 60;
 const MAX_POLYGON_POINTS = 30;
 const USER_AGENT = "Takfornyelse-roof-footprint/1.0 (post@takfornyelse.as)";
@@ -51,6 +51,58 @@ type RawPolygon = {
   tags: Record<string, string>;
   geometry: z.infer<typeof geometryPointSchema>[];
 };
+
+function decodeXmlAttribute(value: string) {
+  return value
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+}
+
+function xmlAttributes(value: string) {
+  return Object.fromEntries(Array.from(value.matchAll(/([\w:.-]+)="([^"]*)"/g))
+    .map((match) => [match[1], decodeXmlAttribute(match[2])]));
+}
+
+function parseOsmMapXml(xml: string): z.infer<typeof overpassResponseSchema> {
+  const nodes = new Map<string, z.infer<typeof geometryPointSchema>>();
+  for (const match of xml.matchAll(/<node\b([^>]*)>/g)) {
+    const attributes = xmlAttributes(match[1]);
+    const lat = Number(attributes.lat);
+    const lon = Number(attributes.lon);
+    if (attributes.id && Number.isFinite(lat) && Number.isFinite(lon)) {
+      nodes.set(attributes.id, { lat, lon });
+    }
+  }
+
+  const elements: z.infer<typeof elementSchema>[] = [];
+  for (const match of xml.matchAll(/<way\b([^>]*)>([\s\S]*?)<\/way>/g)) {
+    const wayAttributes = xmlAttributes(match[1]);
+    const body = match[2];
+    const tags = Object.fromEntries(Array.from(body.matchAll(/<tag\b([^>]*)\/?\s*>/g))
+      .map((tagMatch) => xmlAttributes(tagMatch[1]))
+      .filter((tag) => tag.k && tag.v)
+      .map((tag) => [tag.k, tag.v]));
+    if (!tags.building || !wayAttributes.id) continue;
+
+    const geometry = Array.from(body.matchAll(/<nd\b([^>]*)\/?\s*>/g))
+      .map((nodeMatch) => xmlAttributes(nodeMatch[1]).ref)
+      .map((nodeId) => nodes.get(nodeId))
+      .filter((point): point is z.infer<typeof geometryPointSchema> => Boolean(point));
+    if (geometry.length >= 4) {
+      elements.push({
+        type: "way",
+        id: Number(wayAttributes.id),
+        tags,
+        geometry,
+      });
+    }
+  }
+
+  return { elements };
+}
 
 function samePoint(left: GeoPoint, right: GeoPoint) {
   return left.latitude === right.latitude && left.longitude === right.longitude;
@@ -144,7 +196,8 @@ export class OpenStreetMapBuildingProvider {
   constructor(
     private readonly fetcher: typeof fetch = fetch,
     endpoint = process.env.OSM_OVERPASS_ENDPOINT?.trim() || DEFAULT_ENDPOINT,
-    fallbackEndpoint = process.env.OSM_OVERPASS_FALLBACK_ENDPOINT?.trim() || FALLBACK_ENDPOINT,
+    fallbackEndpoint = process.env.OSM_OVERPASS_FALLBACK_ENDPOINT?.trim() || "",
+    private readonly mapEndpoint = process.env.OSM_MAP_ENDPOINT?.trim() || DEFAULT_MAP_ENDPOINT,
   ) {
     this.endpoints = Array.from(new Set([endpoint, fallbackEndpoint].filter(Boolean)));
   }
@@ -158,7 +211,7 @@ export class OpenStreetMapBuildingProvider {
   }
 
   async findBuildings(addressPoint: GeoPoint): Promise<BuildingFootprintCandidate[]> {
-    const query = `[out:json][timeout:12];(way["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude});relation["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude}););out tags geom;`;
+    const query = `[out:json][timeout:7];(way["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude});relation["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude}););out tags geom;`;
     let parsed: z.infer<typeof overpassResponseSchema> | null = null;
     let lastError: unknown;
     for (const endpoint of this.endpoints) {
@@ -171,11 +224,32 @@ export class OpenStreetMapBuildingProvider {
             "User-Agent": USER_AGENT,
           },
           body: new URLSearchParams({ data: query }),
-          signal: AbortSignal.timeout(12_000),
+          signal: AbortSignal.timeout(7_000),
         });
         if (!response.ok) throw new Error(`OpenStreetMap building lookup failed (${response.status})`);
         parsed = overpassResponseSchema.parse(await response.json());
         break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!parsed) {
+      try {
+        const latitudeDelta = SEARCH_RADIUS_METERS / 111_320;
+        const longitudeDelta = SEARCH_RADIUS_METERS
+          / (111_320 * Math.max(Math.cos(addressPoint.latitude * Math.PI / 180), 0.1));
+        const bbox = [
+          addressPoint.longitude - longitudeDelta,
+          addressPoint.latitude - latitudeDelta,
+          addressPoint.longitude + longitudeDelta,
+          addressPoint.latitude + latitudeDelta,
+        ].join(",");
+        const response = await this.fetcher(`${this.mapEndpoint}?bbox=${bbox}`, {
+          headers: { Accept: "application/xml", "User-Agent": USER_AGENT },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) throw new Error(`OpenStreetMap map lookup failed (${response.status})`);
+        parsed = overpassResponseSchema.parse(parseOsmMapXml(await response.text()));
       } catch (error) {
         lastError = error;
       }

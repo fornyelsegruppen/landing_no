@@ -112,4 +112,28 @@ describe("OpenStreetMap building provider", () => {
     await expect(provider.findBuildings(center)).resolves.toHaveLength(1);
     expect(endpoints).toEqual(["https://primary.test", "https://fallback.test"]);
   });
+
+  it("falls back to the core OpenStreetMap bbox endpoint when Overpass is unavailable", async () => {
+    const fetcher = async (input: RequestInfo | URL) => {
+      if (String(input).includes("overpass")) throw new Error("overpass timeout");
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+        <osm version="0.6">
+          <node id="1" lat="59.89995" lon="10.6999" />
+          <node id="2" lat="59.89995" lon="10.7001" />
+          <node id="3" lat="59.90005" lon="10.7001" />
+          <node id="4" lat="59.90005" lon="10.6999" />
+          <way id="654">
+            <nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><nd ref="1"/>
+            <tag k="building" v="house"/>
+          </way>
+        </osm>`, { status: 200, headers: { "Content-Type": "application/xml" } });
+    };
+    const provider = new OpenStreetMapBuildingProvider(
+      fetcher as typeof fetch,
+      "https://overpass.test",
+      "",
+      "https://api.openstreetmap.test/map",
+    );
+    await expect(provider.findBuildings(center)).resolves.toMatchObject([{ id: "way/654" }]);
+  });
 });
