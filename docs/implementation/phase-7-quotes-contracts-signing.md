@@ -85,6 +85,8 @@ Teknisk ferdigstillelse er ikke juridisk produksjonsgodkjenning. Intern signerin
 
 Gate 7 er teknisk bestått. Mobil fullflyt må gjentas i staging fordi lokal, autentisert nettleserkjøring på denne Windows ARM64-maskinen blokkeres av manglende valgfri `libsql`-binær.
 
+> **Revisjon 25. august 2026:** Den opprinnelige kundesignaturen er utvidet med obligatorisk leverandørens medsignering før arbeidsordre. Endelig dokument har begge signaturer i samme signaturdel og bruker felles letterhead/footer. Se [fase R6](./phase-r6-contract-counter-signing-and-branded-pdfs.md).
+
 ## Produksjonsblokkere
 
 - få faktisk kontraktstekst, prisavvik, tidlig oppstart, angrerett og standard angreskjema juridisk vurdert;

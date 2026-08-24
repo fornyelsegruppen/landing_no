@@ -14,6 +14,7 @@ export async function createWorkOrderFromContract(payload: Payload, input: {
 }) {
   const contract = await payload.findByID({ collection: "contracts", id: input.contractId, depth: 0, overrideAccess: true });
   if (contract.status !== "signed") throw new Error("Only a signed contract can become a work order");
+  if (!contract.companySignedAt) throw new Error("The supplier must counter-sign the contract before a work order can be created");
   const quoteId = relationId(contract.quote);
   const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
   if (quote.status !== "accepted") throw new Error("The contract quote is not accepted");

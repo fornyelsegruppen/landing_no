@@ -15,7 +15,18 @@ export const protectContractVersion: CollectionBeforeChangeHook = ({ data, origi
     const changed = immutableFields.some((field) => field in data && JSON.stringify(data[field]) !== JSON.stringify(originalDoc[field]));
     if (changed) throw new Error("An issued or signed contract is immutable. Create a new version.");
   }
-  if (originalDoc.status === "signed" && Object.keys(data).some((key) => key !== "updatedAt")) throw new Error("A signed contract cannot be changed");
+  if (originalDoc.status === "signed") {
+    const counterSignatureFields = new Set([
+      "companySignatureEvidence",
+      "companySignatureImage",
+      "companySignedDocument",
+      "companySignedAt",
+      "companySignedBy",
+      "updatedAt",
+    ]);
+    if (originalDoc.companySignedAt) throw new Error("A contract signed by both parties cannot be changed");
+    if (Object.keys(data).some((key) => !counterSignatureFields.has(key))) throw new Error("Only the supplier counter-signature may be added after the customer has signed");
+  }
   return data;
 };
 
@@ -46,9 +57,15 @@ export const Contracts: CollectionConfig = {
       { label: "Utkast", value: "draft" }, { label: "Utstedt", value: "issued" }, { label: "Signert", value: "signed" },
       { label: "Avslått", value: "declined" }, { label: "Tilbakekalt", value: "revoked" }, { label: "Erstattet", value: "superseded" },
     ] },
-    { name: "signatureEvidence", type: "json", admin: { readOnly: true } },
-    { name: "signedDocument", type: "relationship", relationTo: "private-media", admin: { readOnly: true } },
-    { name: "signedAt", type: "date", admin: { readOnly: true } },
+    { name: "signatureEvidence", type: "json", admin: { readOnly: true, description: "Kundens signaturbevis." } },
+    { name: "customerSignatureImage", type: "relationship", relationTo: "private-media", admin: { readOnly: true } },
+    { name: "signedDocument", type: "relationship", relationTo: "private-media", admin: { readOnly: true, description: "Kundesignert dokument som avventer leverandørens signatur." } },
+    { name: "signedAt", type: "date", admin: { readOnly: true, description: "Tidspunkt kunden signerte." } },
+    { name: "companySignatureEvidence", type: "json", admin: { readOnly: true, description: "Leverandørens signaturbevis." } },
+    { name: "companySignatureImage", type: "relationship", relationTo: "private-media", admin: { readOnly: true } },
+    { name: "companySignedDocument", type: "relationship", relationTo: "private-media", admin: { readOnly: true, description: "Endelig kontrakt signert av begge parter." } },
+    { name: "companySignedAt", type: "date", index: true, admin: { readOnly: true } },
+    { name: "companySignedBy", type: "relationship", relationTo: "users", admin: { readOnly: true } },
     { name: "workOrderAction", type: "ui", admin: { components: { Field: "/components/ContractWorkOrderAction" } } },
   ],
 };

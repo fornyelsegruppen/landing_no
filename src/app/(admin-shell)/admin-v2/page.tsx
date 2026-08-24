@@ -9,6 +9,7 @@ import {
   type AdminQueueKey,
 } from "@/lib/admin-v2/dashboard";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
+import { statusLabel } from "@/lib/admin-v2/labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import { getPayload } from "@/lib/payload";
@@ -140,7 +141,7 @@ export default async function AdminV2Page({ searchParams }: { searchParams: Sear
                     <strong className="block truncate">{item.reference}</strong>
                     {item.subtitle ? <small className="block truncate text-muted-foreground">{item.subtitle}</small> : null}
                   </span>
-                  <span className="text-sm text-muted-foreground">{item.status ? `${copy.status}: ${item.status}` : ""}</span>
+                  <span className="text-sm text-muted-foreground">{item.status ? `${copy.status}: ${statusLabel(user.interfaceLanguage, item.status, { contract: queue === "contract-signing" })}` : ""}</span>
                   <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground sm:justify-end">
                     {item.createdAt ? dateFormatter.format(new Date(item.createdAt)) : ""}
                     <ArrowRight aria-hidden="true" className="size-4 transition group-hover:text-accent" />

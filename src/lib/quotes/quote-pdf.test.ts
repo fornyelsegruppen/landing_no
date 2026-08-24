@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { buildContractSnapshot, buildQuoteSnapshot, documentHash } from "./document";
+import { buildContractSnapshot, buildQuoteSnapshot, createCompanySignatureEvidence, createSignatureEvidence, documentHash } from "./document";
 import { buildQuoteContractPdf } from "./quote-pdf";
 
 describe("quote PDF", () => {
@@ -12,5 +12,17 @@ describe("quote PDF", () => {
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
     expect(pdf.getTitle()).toContain(contract.contractReference);
     expect(documentHash(contract)).toHaveLength(64);
+  });
+
+  it("builds a branded final contract with both signatures in the document", async () => {
+    const quote = buildQuoteSnapshot({ quoteReference: "T-2-V1", leadId: 2, serviceKey: "takvask", serviceDescription: "Takvask", propertyAddress: "Testveien 2", measurement: { id: 2, version: 1, inputHash: "a".repeat(64), horizontalAreaTenths: 1000, actualAreaMinTenths: 1079, actualAreaMaxTenths: 1179, source: "Kartverket", credits: "© Kartverket", capturedAt: "2026-08-23T00:00:00Z", assumptions: ["Kontrolleres på stedet"] }, pricing: { calculationId: 2, inputHash: "b".repeat(64), ruleId: 1, ruleVersion: 1, unitPriceExVatOre: 13800, subtotalExVatOre: 1627020, vatBasisPoints: 2500, vatOre: 406755, totalIncVatOre: 2033775, toleranceBasisPoints: 1000, maximumTotalIncVatOre: 2237153 }, termsVersion: "legal-v1", validUntil: "2099-09-01T00:00:00Z" });
+    const contract = buildContractSnapshot({ contractReference: "K-2-V1", quote, customer: { name: "Test Kunde", address: "Testveien 2" }, terms: { version: "legal-v1", text: "Avtalevilkår.", withdrawalInstructions: "Informasjon om angrerett.", withdrawalFormUrl: "https://example.test/form" } });
+    const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl7nWQAAAAASUVORK5CYII=";
+    const evidence = createSignatureEvidence({ contract, expectedDocumentHash: documentHash(contract), signatureData, signerName: "Test Kunde", paymentObligationAccepted: true, termsAccepted: true, withdrawalInformationReceived: true, earlyStartRequested: false, earlyStartLossAcknowledged: false, ipAddress: "", userAgent: "", securitySalt: "s".repeat(32) });
+    const companyEvidence = createCompanySignatureEvidence({ contract, expectedDocumentHash: documentHash(contract), signatureData, signerName: "Kari Admin", signerUserId: 1, ipAddress: "", userAgent: "", securitySalt: "s".repeat(32) });
+    const bytes = await buildQuoteContractPdf({ contract, signatureData, evidence, companySignatureData: signatureData, companyEvidence });
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+    expect(pdf.getAuthor()).toBe("Fornyelse Gruppen AS");
   });
 });

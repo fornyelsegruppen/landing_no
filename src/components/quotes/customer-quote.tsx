@@ -16,6 +16,7 @@ export function CustomerQuote(props: {
   customerName: string; display: Display; supplier: { name: string; orgNumber: string; address: string; email: string; phone: string };
   terms: { version: string; text: string; withdrawalInstructions: string; withdrawalFormUrl: string };
   signedAt?: string | null;
+  companySignedAt?: string | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -67,7 +68,7 @@ export function CustomerQuote(props: {
         earlyStartLossAcknowledged: earlyStart ? form.get("earlyLoss") === "on" : false,
       }) });
       const result = await response.json() as { error?: string };
-      if (response.ok) { setSigned(true); setNotice("Kontrakten er signert. Du får en kopi på e-post."); }
+      if (response.ok) { setSigned(true); setNotice("Signaturen din er mottatt. Takfornyelse kontrollerer og medsignerer avtalen før den endelige kopien sendes til deg."); }
       else setNotice(result.error ?? "Signeringen kunne ikke fullføres.");
     } catch {
       setNotice("Signeringen kunne ikke fullføres. Kontroller forbindelsen og prøv igjen.");
@@ -115,7 +116,7 @@ export function CustomerQuote(props: {
       <p className="mt-2 text-muted-foreground">Hei {props.customerName}. Her kan du kontrollere tilbudet og kontrakten før du bestemmer deg.</p>
     </header>
     {notice ? <div className="mb-6 rounded-xl border border-accent/40 bg-accent/10 p-4" role="status" aria-live="polite">{notice}</div> : null}
-    {signed ? <section className="mb-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6"><h2 className="text-xl font-bold">Kontrakten er signert</h2><p className="mt-2">Vi kontakter deg om planlagt oppstart. Den signerte kopien er sendt til e-postadressen din.</p><a className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-white px-4 font-bold text-black" href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}>Åpne signert PDF</a></section> : null}
+    {signed ? <section className="mb-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6"><h2 className="text-xl font-bold">{props.companySignedAt ? "Kontrakten er signert av begge parter" : "Signaturen din er mottatt"}</h2><p className="mt-2">{props.companySignedAt ? "Den endelige kontrakten er sendt til e-postadressen din. Vi følger opp planlagt oppstart." : "Takfornyelse kontrollerer og medsignerer avtalen. Du får den endelige kontrakten på e-post når begge parter har signert."}</p><a className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-white px-4 font-bold text-black" href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}>{props.companySignedAt ? "Åpne endelig signert PDF" : "Åpne kundesignert PDF"}</a></section> : null}
     {declined ? <section className="mb-8 rounded-2xl border border-white/15 bg-white/5 p-6"><h2 className="text-xl font-bold">Tilbudet er avslått</h2><p className="mt-2">Takk for tilbakemeldingen. Ta kontakt dersom du ønsker en ny vurdering.</p></section> : null}
 
     <section className="grid gap-6 rounded-2xl border border-white/10 bg-[#12151c] p-5 sm:grid-cols-2 sm:p-7">

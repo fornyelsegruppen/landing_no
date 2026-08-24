@@ -6,6 +6,7 @@ import { useState } from "react";
 import { caseActionRequiresConfirmation, type CaseNextAction } from "@/lib/admin-v2/case-read-model";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import { CompanySignaturePanel } from "./company-signature-panel";
 
 function requestFor(action: CaseNextAction, leadId: number) {
   switch (action.kind) {
@@ -24,12 +25,16 @@ function requestFor(action: CaseNextAction, leadId: number) {
   }
 }
 
-export function CaseActionPanel({ action, leadId, locale }: { action: CaseNextAction; leadId: number; locale: PanelLocale }) {
+export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, leadId, locale }: { action: CaseNextAction; contractDocumentHash?: string; defaultSigner: string; leadId: number; locale: PanelLocale }) {
   const copy = getAdminCaseCopy(locale);
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const request = requestFor(action, leadId);
+
+  if (action.kind === "company_sign_contract" && action.targetId && contractDocumentHash) {
+    return <CompanySignaturePanel contractId={action.targetId} defaultSigner={defaultSigner} documentHash={contractDocumentHash} locale={locale} />;
+  }
 
   async function run() {
     if (!request || busy) return;

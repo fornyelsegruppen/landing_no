@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import { CaseActionPanel, CloseCaseButton } from "@/components/admin-v2/case-action-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
+import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
@@ -19,8 +20,8 @@ const serviceNames: Record<string, string> = {
   usikker: "Usikker – taksjekk",
 };
 
-function Status({ value }: { value?: string }) {
-  return value ? <span className="inline-flex rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-accent">{value}</span> : null;
+function Status({ companySignedAt, contract, locale, value }: { companySignedAt?: string; contract?: boolean; locale: "nb" | "lt" | "en"; value?: string }) {
+  return value ? <span className="inline-flex rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-accent">{statusLabel(locale, value, { contract, companySignedAt })}</span> : null;
 }
 
 function Section({ children, id, title }: { children: React.ReactNode; id: string; title: string }) {
@@ -63,7 +64,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">{copy.case} #{caseData.lead.id}</p>
             <h1 className="mt-2 break-words text-2xl font-bold tracking-tight sm:text-4xl">{caseData.lead.name}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3"><Status value={caseData.lead.status} /><span className="text-sm text-muted-foreground">{serviceNames[caseData.lead.inquiryType || ""] || caseData.lead.inquiryType || "—"}</span></div>
+            <div className="mt-3 flex flex-wrap items-center gap-3"><Status locale={user.interfaceLanguage} value={caseData.lead.status} /><span className="text-sm text-muted-foreground">{serviceNames[caseData.lead.inquiryType || ""] || caseData.lead.inquiryType || "—"}</span></div>
           </div>
           <div className="grid gap-1 text-sm lg:text-right">
             <span className="text-muted-foreground">{copy.responsible}</span>
@@ -79,9 +80,15 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold">{copy.actionLabels[caseData.nextAction.kind]}</h2>
-            {caseData.lead.nextAction ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{caseData.lead.nextAction}</p> : null}
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{copy.actionLabels[caseData.nextAction.kind]}</p>
           </div>
-          <CaseActionPanel action={caseData.nextAction} leadId={caseData.lead.id} locale={user.interfaceLanguage} />
+          <CaseActionPanel
+            action={caseData.nextAction}
+            contractDocumentHash={caseData.contract?.documentHash}
+            defaultSigner={user.displayName || user.email}
+            leadId={caseData.lead.id}
+            locale={user.interfaceLanguage}
+          />
         </div>
       </section>
 
@@ -103,12 +110,12 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
             {caseData.lead.qualification ? (
               <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-white/10 bg-black/20 p-4 text-xs leading-relaxed text-white/75">{JSON.stringify(caseData.lead.qualification, null, 2)}</pre>
             ) : <p className="text-muted-foreground">{copy.missing}</p>}
-            {caseData.lead.nextAction ? <div className="mt-4 rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.nextAction}</p><p className="mt-2 text-sm">{caseData.lead.nextAction}</p></div> : null}
+            <div className="mt-4 rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.nextAction}</p><p className="mt-2 text-sm">{copy.actionLabels[caseData.nextAction.kind]}</p></div>
           </Section>
 
           <Section id="measurement-section" title={copy.measurement}>
             {caseData.measurement ? <>
-              <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{caseData.measurement.reference}</strong>{caseData.measurement.normalizedAddress ? <p className="mt-1 text-sm text-muted-foreground">{caseData.measurement.normalizedAddress}</p> : null}</div><Status value={caseData.measurement.status} /></div>
+              <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{caseData.measurement.reference}</strong>{caseData.measurement.normalizedAddress ? <p className="mt-1 text-sm text-muted-foreground">{caseData.measurement.normalizedAddress}</p> : null}</div><Status locale={user.interfaceLanguage} value={caseData.measurement.status} /></div>
               <dl className="mt-5 grid gap-4 sm:grid-cols-3">
                 <div><dt className="text-xs text-muted-foreground">{copy.area}</dt><dd className="mt-1 font-bold">{area(caseData.measurement.actualAreaMinTenths)}–{area(caseData.measurement.actualAreaMaxTenths)}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">{copy.confidence}</dt><dd className="mt-1 font-bold">{caseData.measurement.confidence || "—"}</dd></div>
@@ -126,12 +133,12 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               <div><dt className="text-xs text-muted-foreground">{copy.priceIncVat}</dt><dd className="mt-1 font-bold text-accent">{nok(caseData.price.totalIncVatOre)}</dd></div>
               <div><dt className="text-xs text-muted-foreground">{copy.maximum}</dt><dd className="mt-1 font-bold">{nok(caseData.price.maximumTotalIncVatOre)}</dd></div>
             </dl> : <p className="text-muted-foreground">{copy.missing}</p>}
-            {caseData.quote ? <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 bg-black/15 p-4"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status value={caseData.quote.status} /><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} /></div> : null}
+            {caseData.quote ? <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 bg-black/15 p-4"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} /></div> : null}
           </Section>
 
           <Section id="messages-section" title={copy.messages}>
             {caseData.messages.length ? <div className="grid gap-3">{caseData.messages.map((message) => <article className="rounded-2xl border border-white/10 bg-black/15 p-4" key={message.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{message.subject}</strong><p className="mt-1 text-xs text-muted-foreground">{message.direction} · {message.category} · {message.channel}</p></div><Status value={message.status} /></div>
+              <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{message.subject}</strong><p className="mt-1 text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
               <p className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap text-sm text-white/80">{message.bodyText}</p>
               {message.failureMessage ? <p className="mt-3 text-sm text-danger">{message.failureMessage}</p> : null}
               <TechnicalLink entity={message} label={copy.technicalDetail} />
@@ -141,15 +148,15 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
 
         <aside className="space-y-6">
           <Section id="contract-section" title={copy.contract}>
-            {caseData.contract ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.contract.reference}</strong><Status value={caseData.contract.status} /></div>{caseData.contract.signedAt ? <p className="mt-3 text-sm text-muted-foreground">{formatDate(caseData.contract.signedAt)}</p> : null}<TechnicalLink entity={caseData.contract} label={copy.technicalDetail} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.contract ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.contract.reference}</strong><Status companySignedAt={caseData.contract.companySignedAt} contract locale={user.interfaceLanguage} value={caseData.contract.status} /></div>{caseData.contract.signedAt ? <p className="mt-3 text-sm text-muted-foreground">{copy.customerSignedAt}: {formatDate(caseData.contract.signedAt)}</p> : null}{caseData.contract.companySignedAt ? <p className="mt-1 text-sm text-muted-foreground">{copy.companySignedAt}: {formatDate(caseData.contract.companySignedAt)}</p> : null}<TechnicalLink entity={caseData.contract} label={copy.technicalDetail} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
           <Section id="work-section" title={copy.work}>
-            {caseData.workOrder ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.workOrder.reference}</strong><Status value={caseData.workOrder.status} /></div><dl className="mt-4 grid gap-3"><div><dt className="text-xs text-muted-foreground">{copy.employee}</dt><dd className="font-semibold">{caseData.workOrder.assignedWorker || copy.unassigned}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.scheduled}</dt><dd className="font-semibold">{formatDate(caseData.workOrder.scheduledAt)}</dd></div></dl><TechnicalLink entity={caseData.workOrder} label={copy.technicalDetail} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.workOrder ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.workOrder.reference}</strong><Status locale={user.interfaceLanguage} value={caseData.workOrder.status} /></div><dl className="mt-4 grid gap-3"><div><dt className="text-xs text-muted-foreground">{copy.employee}</dt><dd className="font-semibold">{caseData.workOrder.assignedWorker || copy.unassigned}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.scheduled}</dt><dd className="font-semibold">{formatDate(caseData.workOrder.scheduledAt)}</dd></div></dl><TechnicalLink entity={caseData.workOrder} label={copy.technicalDetail} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
           <Section id="changes-section" title={copy.changes}>
-            {caseData.changes.length ? <div className="grid gap-3">{caseData.changes.map((change) => <div className="rounded-xl border border-white/10 p-3" key={change.id}><div className="flex justify-between gap-2"><strong>{change.reference}</strong><Status value={change.status} /></div>{change.summary ? <p className="mt-2 text-sm text-muted-foreground">{change.summary}</p> : null}</div>)}</div> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.changes.length ? <div className="grid gap-3">{caseData.changes.map((change) => <div className="rounded-xl border border-white/10 p-3" key={change.id}><div className="flex justify-between gap-2"><strong>{change.reference}</strong><Status locale={user.interfaceLanguage} value={change.status} /></div>{change.summary ? <p className="mt-2 text-sm text-muted-foreground">{change.summary}</p> : null}</div>)}</div> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
           <Section id="documents-section" title={copy.documents}>
@@ -157,7 +164,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="timeline-section" title={copy.timeline}>
-            <ol className="relative ml-2 border-l border-white/10 pl-5">{caseData.timeline.map((item) => <li className="relative pb-5 last:pb-0" key={item.id}><span className="absolute -left-[1.57rem] top-1 size-2.5 rounded-full bg-accent ring-4 ring-background-elevated" /><div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{item.title}</strong><Status value={item.status} /></div><p className="mt-1 text-xs text-muted-foreground">{formatDate(item.at)} · {item.type}</p></li>)}</ol>
+            <ol className="relative ml-2 border-l border-white/10 pl-5">{caseData.timeline.map((item) => <li className="relative pb-5 last:pb-0" key={item.id}><span className="absolute -left-[1.57rem] top-1 size-2.5 rounded-full bg-accent ring-4 ring-background-elevated" />{item.href ? <Link className="block rounded-xl p-2 transition hover:bg-white/5" href={item.href}><div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{item.title}</strong><Status locale={user.interfaceLanguage} value={item.status} /></div><p className="mt-1 text-xs text-muted-foreground">{formatDate(item.at)} · {timelineTypeLabel(user.interfaceLanguage, item.type)}</p></Link> : <div className="p-2"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm">{item.title}</strong><Status locale={user.interfaceLanguage} value={item.status} /></div><p className="mt-1 text-xs text-muted-foreground">{formatDate(item.at)} · {timelineTypeLabel(user.interfaceLanguage, item.type)}</p></div>}</li>)}</ol>
           </Section>
         </aside>
       </div>

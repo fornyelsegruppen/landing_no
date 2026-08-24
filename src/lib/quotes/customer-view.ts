@@ -33,5 +33,7 @@ export async function loadCustomerQuote(payload: Payload, token: string, options
     signedAt: contract.signedAt ?? null,
     signatureEvidence: (contract.signatureEvidence ?? null) as SignatureEvidenceRecord | null,
     signedDocumentId: typeof contract.signedDocument === "number" ? contract.signedDocument : contract.signedDocument?.id ?? null,
+    companySignedAt: contract.companySignedAt ?? null,
+    companySignedDocumentId: typeof contract.companySignedDocument === "number" ? contract.companySignedDocument : contract.companySignedDocument?.id ?? null,
   };
 }

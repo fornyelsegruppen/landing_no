@@ -12,8 +12,9 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
   const view = await loadCustomerQuote(payload, token);
   if (!view) return NextResponse.json({ error: "Not found" }, { status: 404 });
   let bytes: Uint8Array;
-  if (view.signedDocumentId) {
-    const media = await payload.findByID({ collection: "private-media", id: view.signedDocumentId, depth: 0, overrideAccess: true });
+  const signedDocumentId = view.companySignedDocumentId || view.signedDocumentId;
+  if (signedDocumentId) {
+    const media = await payload.findByID({ collection: "private-media", id: signedDocumentId, depth: 0, overrideAccess: true });
     bytes = await readPrivateMediaContent(media).then((file) => new Uint8Array(file.data));
   } else {
     bytes = await buildQuoteContractPdf({ contract: view.snapshot });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildContractSnapshot, buildQuoteSnapshot, createSignatureEvidence, documentHash, quoteDisplayModel } from "./document";
+import { buildContractSnapshot, buildQuoteSnapshot, createCompanySignatureEvidence, createSignatureEvidence, documentHash, quoteDisplayModel } from "./document";
 
 const quote = buildQuoteSnapshot({
   quoteReference: "T-1-V1", leadId: 1, serviceKey: "takvask", serviceDescription: "Takvask",
@@ -47,5 +47,21 @@ describe("locked quote and contract documents", () => {
       userAgent: "",
       securitySalt: "s".repeat(32),
     })).toThrow(/Signature drawing/);
+  });
+
+  it("records the authenticated supplier signer separately from the customer", () => {
+    const evidence = createCompanySignatureEvidence({
+      contract,
+      expectedDocumentHash: documentHash(contract),
+      signatureData,
+      signerName: "Kari Administrator",
+      signerUserId: 12,
+      ipAddress: "192.0.2.2",
+      userAgent: "admin browser",
+      securitySalt: "s".repeat(32),
+      now: new Date("2026-08-25T12:00:00Z"),
+    });
+    expect(evidence).toMatchObject({ signerName: "Kari Administrator", signerUserId: 12, method: "drawn-and-typed" });
+    expect(JSON.stringify(evidence)).not.toContain("192.0.2.2");
   });
 });

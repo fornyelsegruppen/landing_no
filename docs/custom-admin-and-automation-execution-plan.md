@@ -366,6 +366,8 @@ Gate R5:
 
 ### Fase R6 – kontrakt, selskapsaksept og arbeidsordre
 
+**Implementeringsstatus 25. august 2026:** Kode, datamodell, tosidig signering, enhetlig PDF-mal, lokaliserte statusfelt og automatisk sluttkopi er implementert og automatisk testet. Autentisert staging-E2E og visuell eierkontroll gjenstår før fasen lukkes.
+
 **Mål:** Kundens aksept blir til en endelig, tosidig dokumentert avtale og én arbeidsordre.
 
 Leveranser:

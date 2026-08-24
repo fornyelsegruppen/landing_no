@@ -12,7 +12,7 @@ const snapshot = buildQuoteSnapshot({
 describe("work-order creation", () => {
   it("is idempotent for one signed contract", async () => {
     const payload = {
-      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
+      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
       find: vi.fn().mockResolvedValue({ docs: [{ id: 9, reference: "A-K-1-V1" }] }), create: vi.fn(),
     };
     const result = await createWorkOrderFromContract(payload as never, { contractId: 7 });

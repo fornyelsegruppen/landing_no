@@ -31,7 +31,7 @@ En historisk fase kan bare markeres fullført når rapporten inneholder leverans
 | R3 | [Profilert kommunikasjon og rask jobbkjøring](./phase-r3-branded-communications-and-fast-jobs.md) | Teknisk fullført; ekstern leveringsgate åpen |
 | R4 | [Automatisk kvalifisering og komplett sakspakke](./phase-r4-automatic-package-preparation.md) | Automatisk stagingpakke verifisert; utsending/E2E gjenstår |
 | R5 | Tilbud, kundespørsmål og administrativ godkjenning | Delvis implementert i R4; staging-E2E gjenstår |
-| R6 | Kontrakt, selskapsaksept og arbeidsordre | Ikke startet |
+| R6 | [Kontrakt, selskapsaksept og enhetlige PDF-er](./phase-r6-contract-counter-signing-and-branded-pdfs.md) | Implementert; autentisert staging-E2E gjenstår |
 | R7 | Planlegging, varsler og ansattreise | Ikke startet |
 | R8 | Ferdigstilling, dokumentregister og fakturaflyt | Ikke startet |
 | R9 | Blogg i custom admin | Ikke startet |

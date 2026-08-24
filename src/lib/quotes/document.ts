@@ -117,7 +117,18 @@ export type SignatureEvidenceRecord = {
   userAgentEvidenceHash: string;
 };
 
-function validatedPngSignature(dataUrl: string) {
+export type CompanySignatureEvidenceRecord = {
+  documentHash: string;
+  signatureHash: string;
+  signerName: string;
+  signerUserId: number;
+  signedAt: string;
+  method: "drawn-and-typed";
+  ipEvidenceHash: string;
+  userAgentEvidenceHash: string;
+};
+
+export function validatedPngSignature(dataUrl: string) {
   const prefix = "data:image/png;base64,";
   if (!dataUrl.startsWith(prefix) || dataUrl.length > 1_500_000) {
     throw new TypeError("Signature drawing is invalid");
@@ -133,6 +144,37 @@ function validatedPngSignature(dataUrl: string) {
     throw new TypeError("Signature drawing is invalid");
   }
   return bytes;
+}
+
+export function createCompanySignatureEvidence(input: {
+  contract: ContractSnapshot;
+  expectedDocumentHash: string;
+  signatureData: string;
+  signerName: string;
+  signerUserId: number;
+  ipAddress: string;
+  userAgent: string;
+  securitySalt: string;
+  now?: Date;
+}): CompanySignatureEvidenceRecord {
+  const actualHash = documentHash(input.contract);
+  if (actualHash !== input.expectedDocumentHash) throw new Error("Contract document has changed");
+  const signerName = input.signerName.trim();
+  if (signerName.length < 3 || signerName.length > 160) throw new TypeError("Signer name is invalid");
+  if (!Number.isInteger(input.signerUserId) || input.signerUserId < 1) throw new TypeError("Signer user is invalid");
+  validatedPngSignature(input.signatureData);
+  if (input.securitySalt.length < 32) throw new TypeError("Signature evidence secret is too short");
+  const hmac = (value: string) => createHmac("sha256", input.securitySalt).update(value).digest("hex");
+  return {
+    documentHash: actualHash,
+    signatureHash: createHash("sha256").update(input.signatureData).digest("hex"),
+    signerName,
+    signerUserId: input.signerUserId,
+    signedAt: (input.now ?? new Date()).toISOString(),
+    method: "drawn-and-typed",
+    ipEvidenceHash: hmac(input.ipAddress || "unknown"),
+    userAgentEvidenceHash: hmac(input.userAgent || "unknown"),
+  };
 }
 
 export function createSignatureEvidence(input: {

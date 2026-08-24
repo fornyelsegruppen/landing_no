@@ -98,7 +98,7 @@ export async function loadAdminDashboard(
       payload.count({ collection: "work-orders", where: { status: { in: ["assigned", "scheduled", "on_way", "arrived", "precheck", "ready", "in_progress", "completed"] } } }),
       payload.count({ collection: "work-orders", where: { status: { equals: "unassigned" } } }),
       payload.count({ collection: "quotes", where: { status: { equals: "draft" } } }),
-      payload.count({ collection: "contracts", where: { status: { equals: "issued" } } }),
+      payload.count({ collection: "contracts", where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: false } }] } }),
       payload.count({ collection: "change-agreements", where: { status: { in: ["draft", "approved", "sent", "viewed"] } } }),
       payload.count({
         collection: "work-orders",
@@ -242,7 +242,7 @@ export async function loadAdminQueue(
       return result.docs.map((doc) => referenceItem("quotes", doc));
     }
     case "contract-signing": {
-      const result = await payload.find({ ...common, collection: "contracts", where: { status: { equals: "issued" } } });
+      const result = await payload.find({ ...common, collection: "contracts", where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: false } }] } });
       return result.docs.map((doc) => referenceItem("contracts", doc));
     }
     case "active-work": {

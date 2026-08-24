@@ -9,6 +9,7 @@ export const ContractWorkOrderAction: UIFieldClientComponent = () => {
   const { id } = useDocumentInfo();
   const router = useRouter();
   const status = useFormFields(([fields]) => fields.status?.value);
+  const companySignedAt = useFormFields(([fields]) => fields.companySignedAt?.value);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   async function create() {
@@ -23,8 +24,8 @@ export const ContractWorkOrderAction: UIFieldClientComponent = () => {
   }
   return <section className="measurement-actions">
     <h3>Arbeidsordre</h3>
-    <p>Opprett et oppdrag fra denne signerte kontrakten. Ansatt og dato settes på oppdraget.</p>
-    <button type="button" disabled={busy || status !== "signed"} onClick={create}>Opprett eller åpne arbeidsordre</button>
+    <p>Arbeidsordre kan opprettes når både kunden og Takfornyelse har signert.</p>
+    <button type="button" disabled={busy || status !== "signed" || !companySignedAt} onClick={create}>Opprett eller åpne arbeidsordre</button>
     {notice ? <p role="alert">{notice}</p> : null}
   </section>;
 };

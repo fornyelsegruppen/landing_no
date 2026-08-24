@@ -204,7 +204,7 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
     const contractId = relationId(order.contract);
     if (contractId) {
       const contract = await payload.findByID({ collection: "contracts", id: contractId, depth: 0, overrideAccess: true });
-      const signedDocumentId = relationId(contract.signedDocument);
+      const signedDocumentId = relationId(contract.companySignedDocument) || relationId(contract.signedDocument);
       if (signedDocumentId) attachments.push(signedDocumentId);
     }
     for (const photo of (order.afterPhotos || []).slice(0, 4)) { const id = relationId(photo); if (id) attachments.push(id); }

@@ -42,7 +42,7 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
     quoteStatus: view.quoteStatus, quoteReference: view.quoteReference, contractStatus: view.contractStatus,
     contractReference: view.contractReference, documentHash: view.documentHash, display: view.display,
     customerName: view.customerName, supplier: view.snapshot.supplier, terms: view.snapshot.terms,
-    signedAt: view.signedAt, pdfUrl: `/api/customer/quote/${encodeURIComponent(token)}/pdf`,
+    signedAt: view.signedAt, companySignedAt: view.companySignedAt, pdfUrl: `/api/customer/quote/${encodeURIComponent(token)}/pdf`,
   }, { headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
 
@@ -156,6 +156,17 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       ipAddress: clientIp(request), userAgent: request.headers.get("user-agent") ?? "unknown",
       securitySalt: process.env.CUSTOMER_TOKEN_SECRET || resolvePayloadSecret(),
     });
+    const signatureBytes = Buffer.from(parsed.data.signatureData.split(",")[1] ?? "", "base64");
+    const signatureMedia = await createPrivateMedia(payload, {
+      classification: "contract",
+      ownerType: "contract",
+      ownerId: String(view.contractId),
+      alt: `Kundesignatur ${view.contractReference}`,
+    }, {
+      data: signatureBytes,
+      mimeType: "image/png",
+      filename: `kundesignatur-${view.contractReference.toLowerCase()}.png`,
+    });
     const pdfBytes = await buildQuoteContractPdf({ contract: view.snapshot as ContractSnapshot, signatureData: parsed.data.signatureData, evidence });
     const filename = `signert-${view.contractReference.toLowerCase()}.pdf`;
     const media = await createPrivateMedia(payload, {
@@ -163,23 +174,24 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     }, { data: pdfBytes, mimeType: "application/pdf", filename });
     const updated = await payload.update({ collection: "contracts", overrideAccess: true, where: { and: [
       { id: { equals: view.contractId } }, { status: { equals: "issued" } },
-    ] }, data: { status: "signed", signatureEvidence: evidence, signedDocument: media.id, signedAt: evidence.signedAt } });
+    ] }, data: { status: "signed", signatureEvidence: evidence, customerSignatureImage: signatureMedia.id, signedDocument: media.id, signedAt: evidence.signedAt } });
     if (updated.docs.length === 0) {
       await deletePrivateMedia(payload, media);
+      await deletePrivateMedia(payload, signatureMedia);
       const latest = await payload.findByID({ collection: "contracts", id: view.contractId, depth: 0, overrideAccess: true });
       if (latest.status === "signed") return NextResponse.json({ ok: true, status: "signed", idempotent: true });
       throw new Error("Contract signing conflict");
     }
     await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "accepted", acceptedAt: evidence.signedAt } });
     await payload.update({ collection: "access-tokens", id: view.accessRecordId, overrideAccess: true, data: { usedAt: evidence.signedAt } });
-    await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "converted", nextAction: "Opprett og planlegg arbeidsordre.", nextActionAt: new Date().toISOString() } });
+    await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "converted", nextAction: "Kunden har signert. Leverandøren må kontrollere og medsignere kontrakten.", nextActionAt: new Date().toISOString() } });
     const key = `contract-signed:${view.contractId}`;
     const prior = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });
     if (!prior.docs[0]) {
       const message = await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId, direction: "outbound", category: "contract", channel: "email",
-        subject: `Signert kontrakt ${view.contractReference}`,
-        bodyText: `Takk. Kontrakten ${view.contractReference} er signert. Den signerte kopien og angrerettskjemaet er vedlagt. Vi kontakter deg om planlagt oppstart.`,
+        subject: `Vi har mottatt signaturen din – ${view.contractReference}`,
+        bodyText: `Takk. Vi har mottatt signaturen din på kontrakt ${view.contractReference}. Kundesignert kopi og angrerettskjema er vedlagt. Takfornyelse kontrollerer og medsignerer nå avtalen. Når det er gjort, sender vi deg den endelige kontrakten signert av begge parter og følger opp planlagt oppstart.`,
         attachments: [media.id], status: "queued", idempotencyKey: key, aiAssisted: false,
         approvedAt: evidence.signedAt, queuedAt: evidence.signedAt,
       } });

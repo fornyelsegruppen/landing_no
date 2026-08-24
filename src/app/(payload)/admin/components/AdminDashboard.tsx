@@ -62,7 +62,7 @@ async function loadCounts(): Promise<DashboardCounts> {
         where: { status: { equals: "unassigned" } },
       }),
       payload.count({ collection: "quotes", where: { status: { equals: "draft" } } }),
-      payload.count({ collection: "contracts", where: { status: { equals: "issued" } } }),
+      payload.count({ collection: "contracts", where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: false } }] } }),
       payload.count({ collection: "change-agreements", where: { status: { in: ["draft", "approved", "sent", "viewed"] } } }),
       payload.count({ collection: "work-orders", where: { and: [{ scheduledAt: { greater_than_equal: now.toISOString() } }, { scheduledAt: { less_than_equal: next72Hours.toISOString() } }, { status: { not_in: ["cancelled", "documented"] } }] } }),
       payload.count({ collection: "posts", where: { and: [{ "contentAudit.recommendation": { in: ["update", "merge", "redirect"] } }, { "contentAudit.reviewedAt": { exists: false } }] } }),

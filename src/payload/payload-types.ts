@@ -1049,8 +1049,22 @@ export interface Contract {
     | number
     | boolean
     | null;
+  customerSignatureImage?: (number | null) | PrivateMedia;
   signedDocument?: (number | null) | PrivateMedia;
   signedAt?: string | null;
+  companySignatureEvidence?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  companySignatureImage?: (number | null) | PrivateMedia;
+  companySignedDocument?: (number | null) | PrivateMedia;
+  companySignedAt?: string | null;
+  companySignedBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -1994,8 +2008,14 @@ export interface ContractsSelect<T extends boolean = true> {
   termsVersion?: T;
   status?: T;
   signatureEvidence?: T;
+  customerSignatureImage?: T;
   signedDocument?: T;
   signedAt?: T;
+  companySignatureEvidence?: T;
+  companySignatureImage?: T;
+  companySignedDocument?: T;
+  companySignedAt?: T;
+  companySignedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }

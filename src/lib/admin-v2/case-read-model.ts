@@ -7,6 +7,7 @@ export type CaseNextActionKind =
   | "approve_quote"
   | "assign_worker"
   | "calculate_price"
+  | "company_sign_contract"
   | "create_quote"
   | "create_work_order"
   | "generate_reply"
@@ -29,6 +30,7 @@ export function caseActionRequiresConfirmation(kind: CaseNextActionKind) {
 
 type StatusRecord = {
   createdAt?: string;
+  companySignedAt?: string;
   id: number;
   status?: string;
 };
@@ -82,7 +84,10 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.quote?.status === "draft") return { kind: "approve_quote", targetId: input.quote.id };
   if (input.quote?.status === "approved") return { kind: "issue_quote", targetId: input.quote.id };
   if (["sent", "viewed"].includes(input.quote?.status || "")) return { kind: "wait_customer" };
-  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && !input.workOrder) {
+  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && !input.contract.companySignedAt) {
+    return { kind: "company_sign_contract", targetId: input.contract.id };
+  }
+  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && input.contract.companySignedAt && !input.workOrder) {
     return { kind: "create_work_order", targetId: input.contract.id };
   }
   if (input.workOrder?.status === "unassigned") return { kind: "assign_worker", targetId: input.workOrder.id };
@@ -128,7 +133,7 @@ export type CaseTimelineItem = {
 
 export type AdminCase = {
   changes: CaseEntity[];
-  contract?: CaseEntity & { signedAt?: string };
+  contract?: CaseEntity & { companySignedAt?: string; documentHash?: string; signedAt?: string };
   documents: CaseDocument[];
   lead: {
     address: string;
@@ -248,6 +253,20 @@ function makeTimeline(type: CaseTimelineItem["type"], collection: string, raw: u
   };
 }
 
+function makeTimedEvent(type: CaseTimelineItem["type"], collection: string, raw: Record<string, unknown>, field: string, status: string): CaseTimelineItem | null {
+  const at = stringValue(raw[field]);
+  if (!at) return null;
+  const id = numericId(raw.id);
+  return {
+    id: `${type}-${id}-${field}`,
+    type,
+    title: stringValue(raw.reference) || `#${id}`,
+    status,
+    at,
+    href: `/admin/collections/${collection}/${id}`,
+  };
+}
+
 function currentMessage(messages: Array<Record<string, unknown>>) {
   const priority = messages.find((message) => {
     if (!["failed", "attention", "draft"].includes(stringValue(message.status) || "")) return false;
@@ -361,6 +380,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const contract = latestContractRaw ? {
     ...entity("contracts", latestContractRaw),
     signedAt: stringValue(latestContractRaw.signedAt),
+    companySignedAt: stringValue(latestContractRaw.companySignedAt),
+    documentHash: stringValue(latestContractRaw.documentHash),
   } : undefined;
   const workOrder = latestWorkRaw ? {
     ...entity("work-orders", latestWorkRaw),
@@ -416,6 +437,10 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     ...prices.map((item) => makeTimeline("price", "price-calculations", item, stringValue(item.reference) || "Prisberegning")),
     ...quotes.map((item) => makeTimeline("quote", "quotes", item, stringValue(item.reference) || "Tilbud")),
     ...contracts.map((item) => makeTimeline("contract", "contracts", item, stringValue(item.reference) || "Kontrakt")),
+    ...contracts.flatMap((item) => [
+      makeTimedEvent("contract", "contracts", item, "signedAt", "customer_signed"),
+      makeTimedEvent("contract", "contracts", item, "companySignedAt", "fully_signed"),
+    ].filter((event): event is CaseTimelineItem => Boolean(event))),
     ...workOrders.map((item) => makeTimeline("work", "work-orders", item, stringValue(item.reference) || "Arbeid")),
     ...changes.map((item) => makeTimeline("change", "change-agreements", item, stringValue(item.reference) || "Endringsavtale")),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
