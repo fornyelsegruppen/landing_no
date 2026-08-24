@@ -38,8 +38,8 @@ Gi administrator en rask, tydelig og mobiltilpasset Takfornyelse-flate med eksis
 - R1-enhetstester: admin/worker/anonym beslutning, tillatte kønøkler, søkenormalisering, ekte telleraggregering, eksplisitt databasefeil og universelt søk.
 - `npm run lint`: bestått uten advarsler.
 - `npx tsc --noEmit --incremental false`: bestått.
-- GitHub Quality gate `32761858690`: dependency audit, lint, typecheck, 305 tester, migrasjon opp/ned, tom PostgreSQL 16-bootstrap, Linux/PostgreSQL-produksjonsbuild og 7 offentlige Chromium-smoketester bestått på commit `479409d`.
-- Anonym `/admin-v2`-redirect er lagt til den offentlige Chromium-smokesuiten; endelig gate-resultat føres på commit som lukker R1.
+- GitHub Quality gate `32763477323`: dependency audit, lint, typecheck, 305 tester, migrasjon opp/ned, tom PostgreSQL 16-bootstrap, Linux/PostgreSQL-produksjonsbuild og 8 Chromium-smoketester bestått på commit `3833987`.
+- Den åttende Chromium-testen verifiserer at en anonym bruker omdirigeres til admininnlogging og ikke får lese custom dashboard-data.
 
 ### Autentisert staging
 
@@ -75,4 +75,4 @@ Følgende ble kontrollert i faktisk administratorsession mot stagingdatabasen:
 | Eksisterende `/admin` uendret | Bestått; Payload er fortsatt tilgjengelig som fallback |
 | Produksjon uendret | Bestått |
 
-**Beslutning:** R1 kan lukkes når den siste Quality gate for dokumentasjons-/smoketestcommit er grønn. Deretter starter R2 uten produksjonscutover.
+**Beslutning:** Gate R1 er bestått. Fasen er lukket i staging. Deretter starter R2 uten produksjonscutover.
