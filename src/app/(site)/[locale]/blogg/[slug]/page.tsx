@@ -127,6 +127,23 @@ export default async function BlogPostPage({ params }: Props) {
 
   const localized = localizeContent(post, loc);
   const hero = resolveMedia(post.heroImage, "hero");
+  const heroDocument =
+    post.heroImage && typeof post.heroImage === "object"
+      ? post.heroImage
+      : null;
+  const stockAttribution =
+    heroDocument?.stockProvider === "pexels"
+      ? {
+          photographer:
+            heroDocument.stockPhotographer?.trim() || "Pexels-fotograf",
+          photographerUrl: heroDocument.stockPhotographerUrl
+            ? safeContentHref(heroDocument.stockPhotographerUrl, loc)
+            : null,
+          sourceUrl: heroDocument.stockSourceUrl
+            ? safeContentHref(heroDocument.stockSourceUrl, loc)
+            : "https://www.pexels.com/",
+        }
+      : null;
   const date = post.publishedAt || post.createdAt;
   const postUrl = `${siteConfig.url}/${locale}/blogg/${slug}`;
   const heroUrl = hero
@@ -141,9 +158,8 @@ export default async function BlogPostPage({ params }: Props) {
     .filter((faq) => faq.question && faq.answer);
   const relatedPosts = (post.relatedPosts || [])
     .map((relation) => relatedDocument(relation))
-    .filter(
-      (relation): relation is typeof post =>
-        Boolean(relation && relation.slug && postHasLocale(relation, loc)),
+    .filter((relation): relation is typeof post =>
+      Boolean(relation && relation.slug && postHasLocale(relation, loc)),
     );
   const relatedServices = (post.relatedServices || [])
     .map((relation) => relatedDocument(relation))
@@ -255,9 +271,11 @@ export default async function BlogPostPage({ params }: Props) {
           >
             {formatDate(date, loc)}
           </time>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+          <div className="text-muted-foreground mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
             {post.authorName && (
-              <span>{loc === "no" ? "Skrevet av" : "Written by"} {post.authorName}</span>
+              <span>
+                {loc === "no" ? "Skrevet av" : "Written by"} {post.authorName}
+              </span>
             )}
             {post.reviewerName && (
               <span>
@@ -272,44 +290,89 @@ export default async function BlogPostPage({ params }: Props) {
             </p>
           )}
           {hero && (
-            <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-2xl border border-white/10">
-              <Image
-                src={hero.url}
-                alt={hero.alt || localized.title}
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 768px"
-                className="object-cover"
-              />
-            </div>
+            <figure className="mt-8">
+              <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-white/10">
+                <Image
+                  src={hero.url}
+                  alt={hero.alt || localized.title}
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, 768px"
+                  className="object-cover"
+                />
+              </div>
+              {stockAttribution && (
+                <figcaption className="text-muted-foreground mt-2 text-xs">
+                  {loc === "no" ? "Foto" : "Photo"}:{" "}
+                  {stockAttribution.photographerUrl ? (
+                    <a
+                      href={stockAttribution.photographerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-accent underline underline-offset-4"
+                    >
+                      {stockAttribution.photographer}
+                    </a>
+                  ) : (
+                    stockAttribution.photographer
+                  )}{" "}
+                  /{" "}
+                  <a
+                    href={
+                      stockAttribution.sourceUrl || "https://www.pexels.com/"
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-accent underline underline-offset-4"
+                  >
+                    Pexels
+                  </a>
+                </figcaption>
+              )}
+            </figure>
           )}
           <div className="mt-10">
             <MarkdownLite content={localized.content} locale={loc} />
           </div>
           {faqs.length > 0 && (
-            <section className="mt-12 border-t border-border pt-10" aria-labelledby="article-faq">
+            <section
+              className="border-border mt-12 border-t pt-10"
+              aria-labelledby="article-faq"
+            >
               <h2 id="article-faq" className="text-2xl font-semibold">
-                {loc === "no" ? "Vanlige spørsmål" : "Frequently asked questions"}
+                {loc === "no"
+                  ? "Vanlige spørsmål"
+                  : "Frequently asked questions"}
               </h2>
               <div className="mt-5 space-y-4">
                 {faqs.map((faq) => (
                   <details key={faq.question} className="surface-card p-5">
-                    <summary className="cursor-pointer font-semibold">{faq.question}</summary>
-                    <p className="mt-3 leading-7 text-muted-foreground">{faq.answer}</p>
+                    <summary className="cursor-pointer font-semibold">
+                      {faq.question}
+                    </summary>
+                    <p className="text-muted-foreground mt-3 leading-7">
+                      {faq.answer}
+                    </p>
                   </details>
                 ))}
               </div>
             </section>
           )}
           {(relatedPosts.length > 0 || relatedServices.length > 0) && (
-            <section className="mt-12 border-t border-border pt-10" aria-labelledby="related-content">
+            <section
+              className="border-border mt-12 border-t pt-10"
+              aria-labelledby="related-content"
+            >
               <h2 id="related-content" className="text-2xl font-semibold">
                 {loc === "no" ? "Les videre" : "Continue reading"}
               </h2>
               <ul className="mt-5 grid gap-3 sm:grid-cols-2">
                 {relatedPosts.map((related) => (
                   <li key={String(related.id)}>
-                    <Link className="surface-card block p-5 font-semibold hover:border-accent/40" href={`/blogg/${related.slug}`}>
+                    <Link
+                      className="surface-card hover:border-accent/40 block p-5 font-semibold"
+                      href={`/blogg/${related.slug}`}
+                    >
                       {localizeContent(related, loc).title}
                     </Link>
                   </li>
@@ -319,7 +382,10 @@ export default async function BlogPostPage({ params }: Props) {
                   if (!href) return null;
                   return (
                     <li key={String(service.id)}>
-                      <Link className="surface-card block p-5 font-semibold hover:border-accent/40" href={`/${href}`}>
+                      <Link
+                        className="surface-card hover:border-accent/40 block p-5 font-semibold"
+                        href={`/${href}`}
+                      >
                         {loc === "no" ? service.titleNo : service.titleEn}
                       </Link>
                     </li>
@@ -329,20 +395,30 @@ export default async function BlogPostPage({ params }: Props) {
             </section>
           )}
           {(post.sources || []).length > 0 && (
-            <section className="mt-12 border-t border-border pt-8" aria-labelledby="article-sources">
+            <section
+              className="border-border mt-12 border-t pt-8"
+              aria-labelledby="article-sources"
+            >
               <h2 id="article-sources" className="text-lg font-semibold">
                 {loc === "no" ? "Kilder" : "Sources"}
               </h2>
-              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+              <ul className="text-muted-foreground mt-4 list-disc space-y-2 pl-5 text-sm">
                 {(post.sources || []).map((source) => {
                   const href = safeContentHref(source.url, loc);
                   return (
                     <li key={`${source.label}-${source.url}`}>
                       {href ? (
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-accent">
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-accent underline underline-offset-4"
+                        >
                           {source.label}
                         </a>
-                      ) : source.label}
+                      ) : (
+                        source.label
+                      )}
                       {source.publisher ? ` — ${source.publisher}` : ""}
                     </li>
                   );

@@ -41,6 +41,10 @@ export type CmsPostDocument = CmsContentDocument & {
           hero?: { url?: string | null } | null;
           card?: { url?: string | null } | null;
         } | null;
+        stockProvider?: "manual" | "pexels" | null;
+        stockSourceUrl?: string | null;
+        stockPhotographer?: string | null;
+        stockPhotographerUrl?: string | null;
       }
     | null;
   authorName?: string | null;

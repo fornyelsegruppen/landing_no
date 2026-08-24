@@ -26,7 +26,7 @@ Topic score følger vedtatt vekting: tjenesterelevans 25, etterspørsel 20, komm
 
 - Gemini bruker strukturert JSON-output med Zod-validering;
 - API-nøkkelen sendes bare i `x-goog-api-key`, aldri i URL, prompt, database eller logg;
-- modell kan konfigureres, mens sikker standard er `gemini-2.5-flash-lite`;
+- modell kan konfigureres, mens staging bruker `gemini-3.5-flash-lite`;
 - prompt-, modell- og kunnskapsversjon lagres i `seo-runs`;
 - godkjent bedriftskunnskap om tjenester, priser, områder, påstander, sikkerhet og CTA er versjonert;
 - pris, garanti, usikre takråd, språkblanding, søkeordstapping, manglende internlenke og overlapp kontrolleres maskinelt;
@@ -43,6 +43,15 @@ Topic score følger vedtatt vekting: tjenesterelevans 25, etterspørsel 20, komm
 - alle eksplisitte workflow-handlinger skrives til den uforanderlige auditloggen uten artikkel- eller personinnhold;
 - adminoversikten viser AI-utkast og summerer SEO-feil i oppmerksomhetskøen.
 
+### Lisensierte stockbilder
+
+- når `PEXELS_API_KEY` er konfigurert, får nye AI-utkast automatisk et relevant liggende Pexels-bilde;
+- Pexels-søket er begrenset til tak/hus, og nedlasting godtar bare HTTPS fra `images.pexels.com`, støttede bildeformater og maksimalt 12 MB;
+- bilde-ID, søk, kildeside, fotograf, fotografside, lisens og hentetid lagres på medieobjektet;
+- fotograf og Pexels vises som kreditering under bildet på den offentlige artikkelen;
+- administrator kan skrive et eget engelsk bildesøk og bruke **Finn / bytt gratis bilde**, eller erstatte bildet med en vanlig egen opplasting i `Hero image`;
+- feil i bildeberikelsen kan aldri slette eller blokkere et gyldig artikkelutkast, og ingen bildehandling publiserer artikkelen.
+
 ### Innholdsrapport
 
 Når Search Console er konfigurert, kan administrator hente 90 dagers visninger, klikk, CTR og gjennomsnittsposisjon per publisert bloggside. Offisiell URL Inspection brukes for indekseringsvurdering, dekningsstatus og siste crawl. Uten integrasjonen vises en tydelig konfigurasjonsmelding; data blir ikke funnet på ved scraping.
@@ -53,6 +62,8 @@ Offisielt implementeringsgrunnlag:
 - [Gemini generateContent API](https://ai.google.dev/api/generate-content)
 - [Search Console Search Analytics query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query)
 - [Search Console URL Inspection](https://developers.google.com/webmaster-tools/v1/urlInspection.index/inspect)
+- [Pexels API](https://www.pexels.com/api/documentation/)
+- [Pexels-lisens](https://www.pexels.com/license/)
 
 ## Sikker fallback
 
@@ -84,7 +95,7 @@ Gate 4 er bestått. Det lokale native SQLite-avviket påvirker ikke applikasjons
 
 ## Produksjonsblokkere
 
-- `GEMINI_API_KEY`, `CRON_SECRET`, feature flags og eventuelt Search Console servicekonto må legges i hostingens secret store;
+- `GEMINI_API_KEY`, `PEXELS_API_KEY`, `CRON_SECRET`, feature flags og eventuelt Search Console servicekonto må legges i hostingens secret store;
 - Search Console servicekonto må få lesetilgang til riktig `takfornyelse.as`-eiendom;
 - ekte forfatter og faglig kontrollør må fastsettes før første publisering;
 - staging må kjøre migrasjon, autentisert admin-smoke og to pilotutkast før flaggene aktiveres.

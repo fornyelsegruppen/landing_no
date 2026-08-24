@@ -12,12 +12,23 @@ import {
   type ExistingTopic,
   type TopicCandidate,
 } from "./topic-engine";
+import { attachPexelsStockImageToPost } from "./stock-image";
+import { PexelsStockImageProvider } from "@/lib/providers/pexels-stock-image-provider";
 
 type TriggerSource = "manual" | "cron" | "regenerate";
 
-function fingerprint(candidate: Pick<TopicCandidate, "primaryKeyword" | "searchIntent" | "location">) {
+function fingerprint(
+  candidate: Pick<
+    TopicCandidate,
+    "primaryKeyword" | "searchIntent" | "location"
+  >,
+) {
   return createHash("sha256")
-    .update(`${candidate.primaryKeyword}|${candidate.searchIntent}|${candidate.location || ""}`.toLocaleLowerCase("nb-NO"))
+    .update(
+      `${candidate.primaryKeyword}|${candidate.searchIntent}|${candidate.location || ""}`.toLocaleLowerCase(
+        "nb-NO",
+      ),
+    )
     .digest("hex");
 }
 
@@ -48,7 +59,8 @@ async function serviceId(payload: Payload, key: string) {
 
 function suggestedBrief(candidate: TopicCandidate) {
   return {
-    audience: "Boligeiere i Norge over 30 år som vurderer vedlikehold eller fornying av tak.",
+    audience:
+      "Boligeiere i Norge over 30 år som vurderer vedlikehold eller fornying av tak.",
     purpose: candidate.reason,
     requiredSections: [
       "Kort og konkret svar på søkeintensjonen",
@@ -62,7 +74,11 @@ function suggestedBrief(candidate: TopicCandidate) {
   };
 }
 
-async function createTopicCandidate(payload: Payload, candidate: TopicCandidate, existing: ExistingTopic[]) {
+async function createTopicCandidate(
+  payload: Payload,
+  candidate: TopicCandidate,
+  existing: ExistingTopic[],
+) {
   const key = fingerprint(candidate);
   const found = await payload.find({
     collection: "seo-topics",
@@ -81,20 +97,33 @@ async function createTopicCandidate(payload: Payload, candidate: TopicCandidate,
       fingerprint: key,
       topic: candidate.topic,
       primaryKeyword: candidate.primaryKeyword,
-      secondaryKeywords: candidate.secondaryKeywords.map((keyword) => ({ keyword })),
+      secondaryKeywords: candidate.secondaryKeywords.map((keyword) => ({
+        keyword,
+      })),
       searchIntent: candidate.searchIntent,
       ...(relatedServiceId ? { service: relatedServiceId } : {}),
       ...(candidate.location ? { location: candidate.location } : {}),
       ...(candidate.season ? { season: candidate.season } : {}),
       source: candidate.source,
-      sourceMetrics: { kind: candidate.source === "manual" ? "approved-manual-seed" : "aggregated-signal" },
+      sourceMetrics: {
+        kind:
+          candidate.source === "manual"
+            ? "approved-manual-seed"
+            : "aggregated-signal",
+      },
       proposedBrief: suggestedBrief(candidate),
       topicScore: topicScore(candidate.factors),
       overlapScore: overlap,
       scoreBreakdown: candidate.factors,
       reasonForSelection: candidate.reason,
       status: overlap >= 70 ? "rejected" : "candidate",
-      ...(overlap >= 70 ? { rejectionReasons: [{ reason: "Høy overlapp med eksisterende innhold" }] } : {}),
+      ...(overlap >= 70
+        ? {
+            rejectionReasons: [
+              { reason: "Høy overlapp med eksisterende innhold" },
+            ],
+          }
+        : {}),
       checkedAt: new Date().toISOString(),
     },
   });
@@ -107,13 +136,19 @@ export async function ensureManualBlogTopics(payload: Payload) {
   for (const candidate of manualTopicSeeds) {
     if (await createTopicCandidate(payload, candidate, existing)) {
       created += 1;
-      existing.push({ title: candidate.topic, primaryKeyword: candidate.primaryKeyword });
+      existing.push({
+        title: candidate.topic,
+        primaryKeyword: candidate.primaryKeyword,
+      });
     }
   }
   return created;
 }
 
-export async function importSearchSignals(payload: Payload, signals: SearchSignal[]) {
+export async function importSearchSignals(
+  payload: Payload,
+  signals: SearchSignal[],
+) {
   const existing = await existingTopics(payload);
   let accepted = 0;
   let filtered = 0;
@@ -125,7 +160,10 @@ export async function importSearchSignals(payload: Payload, signals: SearchSigna
     }
     if (await createTopicCandidate(payload, candidate, existing)) {
       accepted += 1;
-      existing.push({ title: candidate.topic, primaryKeyword: candidate.primaryKeyword });
+      existing.push({
+        title: candidate.topic,
+        primaryKeyword: candidate.primaryKeyword,
+      });
     }
   }
   return { accepted, filtered, received: signals.length };
@@ -191,7 +229,9 @@ async function nextTopic(payload: Payload) {
 }
 
 async function availableSlug(payload: Payload, requested: string) {
-  const base = requested.replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 120) || "fagartikkel";
+  const base =
+    requested.replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 120) ||
+    "fagartikkel";
   for (let suffix = 0; suffix < 100; suffix += 1) {
     const slug = suffix === 0 ? base : `${base}-${suffix + 1}`;
     const found = await payload.find({
@@ -249,13 +289,15 @@ export async function generateNextPayloadBlogDraft(input: {
     const existing = await existingTopics(input.payload);
     const generated = await generateBlogDraft({
       provider: input.provider,
-      topic: topicFromDocument(topicDocument as unknown as Record<string, unknown>),
+      topic: topicFromDocument(
+        topicDocument as unknown as Record<string, unknown>,
+      ),
       existing,
       correlationId: input.correlationId,
     });
     const primaryService = relationId(topicDocument.service);
     const slug = await availableSlug(input.payload, generated.article.slug);
-    const post = await input.payload.create({
+    let post = await input.payload.create({
       collection: "posts",
       draft: true,
       overrideAccess: true,
@@ -269,16 +311,22 @@ export async function generateNextPayloadBlogDraft(input: {
         editorialStatus: "ai_qa",
         searchIntent: topicDocument.searchIntent,
         primaryKeyword: generated.article.primaryKeyword,
-        secondaryKeywords: generated.article.secondaryKeywords.map((keyword) => ({ keyword })),
+        secondaryKeywords: generated.article.secondaryKeywords.map(
+          (keyword) => ({ keyword }),
+        ),
         ...(primaryService ? { primaryService } : {}),
-        ...(topicDocument.location ? { locationText: topicDocument.location } : {}),
+        ...(topicDocument.location
+          ? { locationText: topicDocument.location }
+          : {}),
         sources: generated.article.sources,
         authorName: "Takfornyelse",
         aiAssisted: true,
         aiGenerationRun: run.id,
         qualityScore: generated.quality.score,
         qualityChecks: generated.quality,
-        reviewFlags: generated.article.claimsForReview.map((flag) => ({ flag })),
+        reviewFlags: generated.article.claimsForReview.map((flag) => ({
+          flag,
+        })),
         proposedInternalLinks: generated.article.internalLinks,
         ctaVariant: generated.article.ctaVariant,
         faqItems: generated.article.faq.map((item) => ({
@@ -290,6 +338,22 @@ export async function generateNextPayloadBlogDraft(input: {
         _status: "draft",
       },
     });
+    const stockProvider = new PexelsStockImageProvider();
+    if (stockProvider.isConfigured()) {
+      try {
+        const stockResult = await attachPexelsStockImageToPost({
+          payload: input.payload,
+          post,
+          provider: stockProvider,
+        });
+        post = stockResult.post;
+      } catch {
+        // Image enrichment must never discard an otherwise valid article draft.
+        input.payload.logger.warn(
+          `Pexels enrichment skipped for draft ${post.id}; an administrator can retry it manually.`,
+        );
+      }
+    }
     await Promise.all([
       input.payload.update({
         collection: "seo-runs",
@@ -320,7 +384,8 @@ export async function generateNextPayloadBlogDraft(input: {
       id: run.id,
       overrideAccess: true,
       data: {
-        status: error instanceof ArticleQualityBlockedError ? "attention" : "failed",
+        status:
+          error instanceof ArticleQualityBlockedError ? "attention" : "failed",
         finishedAt: new Date().toISOString(),
         errorCode: sanitized.code,
         errorMessage: sanitized.message,
@@ -369,13 +434,16 @@ export async function regeneratePayloadBlogPost(input: {
     const topic: TopicCandidate = {
       topic: post.titleNo,
       primaryKeyword: post.primaryKeyword || post.titleNo,
-      secondaryKeywords: (post.secondaryKeywords || []).map((item) => item.keyword),
+      secondaryKeywords: (post.secondaryKeywords || []).map(
+        (item) => item.keyword,
+      ),
       searchIntent: post.searchIntent || "informational",
       source: "manual",
       serviceKey,
       ...(post.locationText ? { location: post.locationText } : {}),
       factors: manualTopicSeeds[0]!.factors,
-      reason: "Regenerering av eksisterende AI-utkast etter administratorhandling.",
+      reason:
+        "Regenerering av eksisterende AI-utkast etter administratorhandling.",
     };
     const existing = (await existingTopics(input.payload)).filter(
       (item) => item.title !== post.titleNo,
@@ -402,13 +470,17 @@ export async function regeneratePayloadBlogPost(input: {
         reviewerName: null,
         reviewedAt: null,
         primaryKeyword: generated.article.primaryKeyword,
-        secondaryKeywords: generated.article.secondaryKeywords.map((keyword) => ({ keyword })),
+        secondaryKeywords: generated.article.secondaryKeywords.map(
+          (keyword) => ({ keyword }),
+        ),
         sources: generated.article.sources,
         aiAssisted: true,
         aiGenerationRun: run.id,
         qualityScore: generated.quality.score,
         qualityChecks: generated.quality,
-        reviewFlags: generated.article.claimsForReview.map((flag) => ({ flag })),
+        reviewFlags: generated.article.claimsForReview.map((flag) => ({
+          flag,
+        })),
         proposedInternalLinks: generated.article.internalLinks,
         ctaVariant: generated.article.ctaVariant,
         faqItems: generated.article.faq.map((item) => ({
@@ -442,7 +514,8 @@ export async function regeneratePayloadBlogPost(input: {
       id: run.id,
       overrideAccess: true,
       data: {
-        status: error instanceof ArticleQualityBlockedError ? "attention" : "failed",
+        status:
+          error instanceof ArticleQualityBlockedError ? "attention" : "failed",
         finishedAt: new Date().toISOString(),
         errorCode: sanitized.code,
         errorMessage: sanitized.message,

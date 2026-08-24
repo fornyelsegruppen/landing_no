@@ -216,6 +216,14 @@ export interface Media {
    * Short description for accessibility / SEO
    */
   alt: string;
+  stockProvider?: ('manual' | 'pexels') | null;
+  stockAssetId?: string | null;
+  stockSourceUrl?: string | null;
+  stockPhotographer?: string | null;
+  stockPhotographerUrl?: string | null;
+  stockLicenseUrl?: string | null;
+  stockRetrievedAt?: string | null;
+  stockQuery?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -1490,6 +1498,14 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  stockProvider?: T;
+  stockAssetId?: T;
+  stockSourceUrl?: T;
+  stockPhotographer?: T;
+  stockPhotographerUrl?: T;
+  stockLicenseUrl?: T;
+  stockRetrievedAt?: T;
+  stockQuery?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

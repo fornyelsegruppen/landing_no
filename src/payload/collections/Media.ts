@@ -49,5 +49,58 @@ export const Media: CollectionConfig = {
         description: "Short description for accessibility / SEO",
       },
     },
+    {
+      name: "stockProvider",
+      type: "select",
+      label: "Bildetekilde",
+      defaultValue: "manual",
+      options: [
+        { label: "Egen opplasting", value: "manual" },
+        { label: "Pexels", value: "pexels" },
+      ],
+      admin: { position: "sidebar", readOnly: true },
+    },
+    {
+      name: "stockAssetId",
+      type: "text",
+      label: "Stockbilde-ID",
+      admin: { readOnly: true },
+    },
+    {
+      name: "stockSourceUrl",
+      type: "text",
+      label: "Kildeside",
+      admin: { readOnly: true },
+    },
+    {
+      name: "stockPhotographer",
+      type: "text",
+      label: "Fotograf",
+      admin: { readOnly: true },
+    },
+    {
+      name: "stockPhotographerUrl",
+      type: "text",
+      label: "Fotografside",
+      admin: { readOnly: true },
+    },
+    {
+      name: "stockLicenseUrl",
+      type: "text",
+      label: "Lisens",
+      admin: { readOnly: true },
+    },
+    {
+      name: "stockRetrievedAt",
+      type: "date",
+      label: "Hentet",
+      admin: { readOnly: true },
+    },
+    {
+      name: "stockQuery",
+      type: "text",
+      label: "Bildesøk",
+      admin: { readOnly: true },
+    },
   ],
 };
