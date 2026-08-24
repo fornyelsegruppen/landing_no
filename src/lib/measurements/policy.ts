@@ -13,7 +13,7 @@ export function evaluateMeasurementGate(
   const reasons: string[] = [];
   if (!input.addressResolved) reasons.push("address_unresolved");
   if (!input.buildingResolved) reasons.push("building_unresolved");
-  if (!input.imageryLicensed) reasons.push("imagery_not_licensed");
+  if (!input.sourceAuthorized) reasons.push("measurement_source_not_authorized");
   if (input.roofPlanes.length === 0) reasons.push("roof_polygon_missing");
   if (input.roofPlanes.some((plane) => !Number.isFinite(plane.angleMinDegrees) || !Number.isFinite(plane.angleMaxDegrees))) {
     reasons.push("roof_angle_unknown");

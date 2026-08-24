@@ -214,6 +214,83 @@
   font-size: 0.85rem;
 }
 
+.automatic-measurement {
+  border-top: 1px solid var(--theme-elevation-150);
+  display: grid;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+.automatic-measurement__result,
+.automatic-measurement__candidates {
+  display: grid;
+  gap: .75rem;
+}
+
+.automatic-measurement fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.automatic-measurement legend {
+  font-weight: 700;
+  margin-bottom: .65rem;
+}
+
+.automatic-measurement__candidates label {
+  align-items: flex-start;
+  background: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  border-radius: .55rem;
+  cursor: pointer;
+  display: flex;
+  gap: .75rem;
+  padding: .8rem;
+}
+
+.automatic-measurement__candidates label.is-selected {
+  border-color: var(--theme-success-500);
+  box-shadow: 0 0 0 1px var(--theme-success-500);
+}
+
+.automatic-measurement__candidates input {
+  margin-top: .2rem;
+}
+
+.automatic-measurement__candidates span,
+.automatic-measurement__candidates small {
+  display: grid;
+  gap: .2rem;
+}
+
+.automatic-measurement__slope {
+  display: grid;
+  gap: .4rem;
+  max-width: 24rem;
+}
+
+.automatic-measurement__slope select {
+  background: var(--theme-input-bg);
+  border: 1px solid var(--theme-elevation-300);
+  border-radius: .4rem;
+  color: var(--theme-text);
+  min-height: 2.8rem;
+  padding-inline: .7rem;
+}
+
+.automatic-measurement__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 2rem;
+}
+
+.automatic-measurement__notice,
+.automatic-measurement__credit {
+  color: var(--theme-elevation-650);
+  font-size: .9rem;
+}
+
 @media (max-width: 900px) {
   .platform-dashboard__cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));

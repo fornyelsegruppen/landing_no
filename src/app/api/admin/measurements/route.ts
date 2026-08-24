@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   const prepared = prepareMeasurement({
     proposal: parsed.data.proposal,
     addressResolved: true,
-    imageryLicensed: parsed.data.imageryLicensed,
+    sourceAuthorized: parsed.data.imageryLicensed,
     hasApprovedPriceRule: rule.totalDocs > 0,
   });
   const prior = await payload.find({

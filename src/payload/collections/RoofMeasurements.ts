@@ -35,7 +35,7 @@ export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({ d
       roofPlanes: merged.roofPlanes,
     },
     addressResolved: Boolean(merged.addressSourceId),
-    imageryLicensed: merged.imageryLicensed === true,
+    sourceAuthorized: merged.imageryLicensed === true,
     hasApprovedPriceRule: rules.totalDocs > 0,
   });
   if (!prepared.gate.allowed) throw new Error(`Measurement approval blocked: ${prepared.gate.reasons.join(", ")}`);
@@ -75,7 +75,7 @@ export const RoofMeasurements: CollectionConfig = {
     { name: "sourceUrl", type: "text" },
     { name: "license", type: "text", required: true, defaultValue: "CC BY 4.0 / særvilkår for ortofoto" },
     { name: "credits", type: "text", required: true, defaultValue: "© Kartverket" },
-    { name: "imageryLicensed", type: "checkbox", required: true, defaultValue: false, label: "Lisensgrunnlag kontrollert", admin: { description: "Skal bare aktiveres når kilden kan brukes kommersielt og korrekt kreditering er registrert." } },
+    { name: "imageryLicensed", type: "checkbox", required: true, defaultValue: false, label: "Datakilde og lisensgrunnlag kontrollert", admin: { description: "Teknisk legacy-feltnavn. Gjelder både åpne bygningskonturer og bilder; aktiveres bare når kilden kan brukes og korrekt kreditering er registrert." } },
     { name: "capturedAt", type: "date", required: true },
     { name: "mapImage", type: "relationship", relationTo: "private-media" },
     {

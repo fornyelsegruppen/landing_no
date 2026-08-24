@@ -38,7 +38,7 @@ export function readFeatureFlags(
 }
 
 export type IntegrationName =
-  "ai" | "email" | "sms" | "maps" | "imagery" | "signature" | "legal" | "searchData" | "jobs";
+  "ai" | "email" | "sms" | "maps" | "buildingFootprints" | "imagery" | "signature" | "legal" | "searchData" | "jobs";
 
 export type IntegrationReadiness =
   "ready" | "configuration_required" | "disabled";
@@ -102,6 +102,12 @@ export function readIntegrationStatus(
       provider: "kartverket-address",
       missing: [],
     },
+    buildingFootprints: {
+      name: "buildingFootprints",
+      readiness: "ready",
+      provider: "openstreetmap-overpass",
+      missing: [],
+    },
     imagery: {
       name: "imagery",
       readiness: configured(environment, "NORGE_I_BILDER_TOKEN") && configured(environment, "MAP_TERMS_ACCEPTED_AT") ? "ready" : "configuration_required",
@@ -144,7 +150,7 @@ export function readIntegrationStatus(
 
 const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   aiDrafts: ["ai"],
-  roofMeasurement: ["maps", "imagery"],
+  roofMeasurement: ["maps", "buildingFootprints"],
   customerQuotes: ["email", "legal"],
   contractSigning: ["signature", "email", "legal"],
   workerPortal: [],

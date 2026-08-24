@@ -53,7 +53,7 @@ describe("anonymized internal staging journey", () => {
         roofPlanes: [{ id: "main", polygon: roofRectangle(12, 10), angleMinDegrees: 27, angleMaxDegrees: 32 }],
       },
       addressResolved: true,
-      imageryLicensed: true,
+      sourceAuthorized: true,
       hasApprovedPriceRule: true,
     });
     expect(measurement.status).toBe("draft");

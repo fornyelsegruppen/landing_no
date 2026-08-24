@@ -15,7 +15,7 @@ export type MeasurementConfidence = "high" | "medium" | "low";
 export type MeasurementInput = {
   addressResolved: boolean;
   buildingResolved: boolean;
-  imageryLicensed: boolean;
+  sourceAuthorized: boolean;
   roofPlanes: RoofPlaneInput[];
   confidence: MeasurementConfidence;
 };

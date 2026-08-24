@@ -472,6 +472,7 @@ Fase 3–4 og fase 5 kan teknisk arbeides parallelt etter fase 2, men i denne gj
 
 - normaliser adresse via Kartverkets adresse-API;
 - hent lovlig bygg-/kart-/ortofotogrunnlag med nødvendig kreditering;
+- bruk Kartverket-adresse + OpenStreetMap/Overpass-bygningskontur som gratis lavvolumsløp, med lisensiert ortofoto som valgfri presisjonsforbedring;
 - opprett `roof-measurements` og redigerbart polygon i admin;
 - la AI foreslå bygg, polygon og vinkelgruppe med confidence og begrunnelse;
 - beregn georeferert horisontalt areal i kode;

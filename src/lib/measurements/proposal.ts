@@ -43,14 +43,14 @@ export type RoofProposal = z.infer<typeof roofProposalSchema>;
 export function prepareMeasurement(input: {
   proposal: unknown;
   addressResolved: boolean;
-  imageryLicensed: boolean;
+  sourceAuthorized: boolean;
   hasApprovedPriceRule: boolean;
 }) {
   const proposal = roofProposalSchema.parse(input.proposal);
   const gate = evaluateMeasurementGate({
     addressResolved: input.addressResolved,
     buildingResolved: Boolean(proposal.buildingIdentifier),
-    imageryLicensed: input.imageryLicensed,
+    sourceAuthorized: input.sourceAuthorized,
     roofPlanes: proposal.roofPlanes,
     confidence: proposal.confidence,
   }, input.hasApprovedPriceRule);

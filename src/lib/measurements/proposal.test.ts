@@ -18,13 +18,13 @@ describe("AI roof proposals", () => {
     ["medium", "review_required", true],
     ["low", "blocked", true],
   ] as const)("handles %s confidence", (confidence, status, review) => {
-    const result = prepareMeasurement({ proposal: { ...base, confidence }, addressResolved: true, imageryLicensed: true, hasApprovedPriceRule: true });
+    const result = prepareMeasurement({ proposal: { ...base, confidence }, addressResolved: true, sourceAuthorized: true, hasApprovedPriceRule: true });
     expect(result.status).toBe(status);
     expect(result.gate.requiresAdminReview).toBe(review);
   });
 
   it("does not permit AI to provide calculated area or price fields", () => {
-    const parsed = prepareMeasurement({ proposal: { ...base, confidence: "high", totalPrice: 1, roofArea: 999 }, addressResolved: true, imageryLicensed: true, hasApprovedPriceRule: true });
+    const parsed = prepareMeasurement({ proposal: { ...base, confidence: "high", totalPrice: 1, roofArea: 999 }, addressResolved: true, sourceAuthorized: true, hasApprovedPriceRule: true });
     expect(parsed.proposal).not.toHaveProperty("totalPrice");
     expect(parsed.calculation?.actualAreaMaxTenths).not.toBe(9990);
   });

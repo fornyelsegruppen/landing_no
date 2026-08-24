@@ -16,8 +16,10 @@ function idOf(value: unknown) {
   if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
   throw new TypeError("Missing relationship");
 }
-function hasLicensedImagery(blockingReasons: unknown) {
-  return !Array.isArray(blockingReasons) || !blockingReasons.includes("imagery_not_licensed");
+function hasAuthorizedSource(blockingReasons: unknown) {
+  return !Array.isArray(blockingReasons)
+    || (!blockingReasons.includes("imagery_not_licensed")
+      && !blockingReasons.includes("measurement_source_not_authorized"));
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -39,7 +41,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (parsed.data.action === "approve") {
     const prepared = prepareMeasurement({
       proposal: { buildingIdentifier: measurement.buildingIdentifier ?? null, confidence: measurement.confidence, confidenceReasoning: measurement.confidenceReasoning, roofPlanes: measurement.roofPlanes },
-      addressResolved: Boolean(measurement.addressSourceId), imageryLicensed: measurement.imageryLicensed && hasLicensedImagery(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
+      addressResolved: Boolean(measurement.addressSourceId), sourceAuthorized: measurement.imageryLicensed && hasAuthorizedSource(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
     });
     if (!prepared.gate.allowed) return NextResponse.json({ error: "Measurement is blocked", reasons: prepared.gate.reasons }, { status: 409 });
     const updated = await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "approved", approvedBy: user.id, approvedAt: new Date().toISOString(), blockingReasons: [] } });
@@ -49,7 +51,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (parsed.data.action === "create_version") {
     const prepared = prepareMeasurement({
       proposal: { buildingIdentifier: measurement.buildingIdentifier ?? null, confidence: parsed.data.confidence, confidenceReasoning: parsed.data.confidenceReasoning, roofPlanes: parsed.data.roofPlanes },
-      addressResolved: Boolean(measurement.addressSourceId), imageryLicensed: measurement.imageryLicensed && hasLicensedImagery(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
+      addressResolved: Boolean(measurement.addressSourceId), sourceAuthorized: measurement.imageryLicensed && hasAuthorizedSource(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
     });
     const versionData = nextMeasurementVersion(measurement as unknown as Record<string, unknown> & { id: number; version: number; lead: unknown; reference: string }, {
       roofPlanes: prepared.proposal.roofPlanes,

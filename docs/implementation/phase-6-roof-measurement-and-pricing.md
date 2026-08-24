@@ -6,7 +6,7 @@ Produksjon: ikke endret
 
 ## Resultat
 
-Det er etablert en versjonert, revisjonssikker måle- og prisflyt. Kartverket normaliserer adresser, AI kan foreslå bygg/polygon/vinkel fra et lisensiert privat målebilde, mens kode alene beregner geometri, skrått areal, mva., toleranse og pris. Administrator må kontrollere og godkjenne målingen. Lav confidence, manglende bygg, ukjent vinkel, manglende lisensgrunnlag eller manglende godkjent prisregel blokkerer godkjenning – også via Payloads vanlige collection-API.
+Det er etablert en versjonert, revisjonssikker måle- og prisflyt. Kartverket normaliserer adresser, OpenStreetMap kan foreslå gratis bygningskonturer, og AI kan valgfritt foreslå bygg/polygon/vinkel fra et lisensiert privat målebilde. Kode alene beregner geometri, skrått areal, mva., toleranse og pris. Administrator må kontrollere og godkjenne målingen. Lav confidence, manglende bygg, ukjent vinkel, manglende dokumentert datakilde eller manglende godkjent prisregel blokkerer godkjenning – også via Payloads vanlige collection-API.
 
 ## Offisielle datakilder og vilkår
 
@@ -14,14 +14,28 @@ Det er etablert en versjonert, revisjonssikker måle- og prisflyt. Kartverket no
 - Åpne Kartverket-produkter er normalt CC BY 4.0 og skal krediteres `© Kartverket`: [vilkår for bruk](https://www.kartverket.no/api-og-data/vilkar-for-bruk).
 - Flyfoto og detaljerte kart har særvilkår. Skjermbilder fra Norgeskart/Norge i bilder kan brukes med korrekt kreditering, men automatisert WMS/WMTS-tilgang behandles separat.
 - Nye Norge i bilder WMS/WMTS-tjenester krever token og tilgang gjennom GeoID/Norge digitalt eller egen avtale: [Norge i bilder-tjenester](https://www.geonorge.no/nib).
+- OpenStreetMap-data kan gjenbrukes under ODbL med synlig kreditering. Den offentlige Overpass-tjenesten brukes bare til lavvolum-oppslag, og endepunktet kan byttes med `OSM_OVERPASS_ENDPOINT`: [OpenStreetMap copyright and license](https://www.openstreetmap.org/copyright).
 
-Systemet bruker derfor aldri skjult nettleserautomatisering eller scraping som produksjonsavhengighet. Automatisk ortofoto er `configuration_required` til `NORGE_I_BILDER_TOKEN` og datert `MAP_TERMS_ACCEPTED_AT` finnes i hostingens secret/config-lager.
+Systemet bruker derfor aldri skjult nettleserautomatisering eller scraping som produksjonsavhengighet. Gratisløpet bruker Kartverket-adresse og OSM-bygningskontur uten ortofoto. Automatisk ortofoto er fortsatt `configuration_required` til `NORGE_I_BILDER_TOKEN` og datert `MAP_TERMS_ACCEPTED_AT` finnes i hostingens secret/config-lager.
+
+## Gratis automatisk måleutkast (24. august 2026)
+
+1. Administrator åpner en lagret henvendelse med full adresse og velger `Finn tak automatisk`.
+2. Kartverket returnerer normalisert adresse og koordinat uten API-nøkkel.
+3. Overpass finner OSM-bygningskonturer innenfor 80 meter. Adressepunkt i konturen rangeres først; nærliggende bygg vises som alternative kandidater.
+4. Administrator ser bygningskategori, horisontalt areal, avstand, confidence, OSM-lenke og velger riktig bygg.
+5. Administrator velger 22/27/32/36/40/45°, eller konservativt 22–32° når vinkelen er ukjent.
+6. Klienten viser foreløpig skrått areal før måleutkastet opprettes. Kilde, URL, ODbL, kreditering, polygon og antakelse lagres i den versjonerte målingen.
+7. Lav confidence blokkeres. Middels confidence krever kontroll. Også høy confidence må godkjennes manuelt før prisberegning.
+
+OSM-konturen er en bygningsprojeksjon, ikke en garanti for eksakt takutstikk, tilbygg eller riktig takkonstruksjon. Den brukes derfor aldri alene som endelig fysisk måling.
 
 ## Leveranser
 
 ### Adresse og bildegrunnlag
 
 - `KartverketAddressProvider` validerer input, bruker timeout og mapper offisielle adressepunkter til en intern leverandøruavhengig kontrakt;
+- `OpenStreetMapBuildingProvider` bruker timeout, lav søkeradius, streng responsvalidering, 3–30 polygonpunkter og forkaster selvkryssende/urimelig geometri;
 - full kunde­adresse sendes ikke til Gemini – bare geografisk anker og det godkjente private målebildet;
 - privat bilde må være klassifisert som `measurement`, ha støttet MIME-type og være under 10 MB;
 - kilde, URL, lisens, kreditering, hentetidspunkt og privat kartbilde lagres på måleversjonen;
@@ -76,10 +90,11 @@ Gate 6 er teknisk bestått. Produksjonsflagget for automatisk takmåling forblir
 
 ## Produksjonsblokkere
 
-- inngå og dokumenter rett til Norge i bilder WMS/WMTS, opprett GeoID/token og registrer `MAP_TERMS_ACCEPTED_AT`;
+- valider gratis OSM-løp mot minst tre representative, fysisk kjente tak før produksjonsflagget aktiveres;
 - opprett faktiske prisregler i admin og godkjenn dem etter intern økonomisk kontroll; ingen markedsføringspris brukes automatisk;
 - godkjenn prisvilkår, toleranse og maksimalbeløpsregel juridisk/kommersielt;
 - kontroller tre representative eiendommer mot kjent fysisk måling før pilot;
-- kjør autentisert admin-smoke med privat testbilde i staging;
+- kjør autentisert admin-smoke med full testadresse og riktig OSM-bygg i staging;
 - `FEATURE_ROOF_MEASUREMENT` skal først slås på etter denne kontrollen.
 
+Lisensiert Norge i bilder-tilgang er nå en valgfri presisjonsforbedring, ikke en blokkering for det kontrollerte gratisløpet.
