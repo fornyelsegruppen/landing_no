@@ -13,4 +13,7 @@ describe("quote and contract version protection", () => {
   it("makes a signed contract immutable", () => {
     expect(() => protectContractVersion({ operation: "update", data: { status: "revoked" }, originalDoc: { status: "signed" } } as never)).toThrow();
   });
+  it("accepts a new draft contract even when Payload supplies an empty original document", () => {
+    expect(protectContractVersion({ operation: "create", data: { status: "draft" }, originalDoc: {} } as never)).toEqual({ status: "draft" });
+  });
 });

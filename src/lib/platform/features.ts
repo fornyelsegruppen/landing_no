@@ -58,7 +58,9 @@ export function readIntegrationStatus(
   environment: Environment = process.env,
 ): Record<IntegrationName, IntegrationStatus> {
   const aiReady = configured(environment, "GEMINI_API_KEY");
-  const emailReady = configured(environment, "RESEND_API_KEY");
+  const previewEmailLog = environment.VERCEL_ENV === "preview"
+    && parseBooleanFlag(environment.ALLOW_PREVIEW_EMAIL_LOG);
+  const emailReady = configured(environment, "RESEND_API_KEY") || previewEmailLog;
   const smsProvider = environment.SMS_PROVIDER?.trim() || "disabled";
   const smsReady =
     smsProvider !== "disabled" && configured(environment, "SMS_API_KEY");
@@ -82,7 +84,7 @@ export function readIntegrationStatus(
     email: {
       name: "email",
       readiness: emailReady ? "ready" : "configuration_required",
-      provider: emailReady ? "resend" : "log",
+      provider: configured(environment, "RESEND_API_KEY") ? "resend" : "log",
       missing: emailReady ? [] : ["RESEND_API_KEY"],
     },
     sms: {

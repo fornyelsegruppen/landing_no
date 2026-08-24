@@ -5,7 +5,10 @@ import { adminOnly } from "../access/roles";
 const immutableFields = ["quote", "version", "snapshot", "documentHash", "termsVersion"] as const;
 
 export const protectContractVersion: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
-  if (operation === "create" && data.status && data.status !== "draft") throw new Error("New contracts must start as drafts");
+  if (operation === "create") {
+    if (data.status && data.status !== "draft") throw new Error("New contracts must start as drafts");
+    return data;
+  }
   if (!originalDoc) return data;
   if (data.status && data.status !== originalDoc.status) assertContractTransition(originalDoc.status as ContractStatus, data.status as ContractStatus);
   if (originalDoc.status !== "draft") {

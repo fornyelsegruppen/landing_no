@@ -83,4 +83,16 @@ describe("platform feature configuration", () => {
       unavailable: ["signature"],
     });
   });
+
+  it("allows non-delivering email logs only in an explicitly enabled preview", () => {
+    const preview = {
+      VERCEL_ENV: "preview",
+      ALLOW_PREVIEW_EMAIL_LOG: "true",
+      FEATURE_CUSTOMER_QUOTES: "true",
+      LEGAL_REVIEW_REFERENCE: "staging-test",
+    };
+    expect(readIntegrationStatus(preview).email).toMatchObject({ readiness: "ready", provider: "log", missing: [] });
+    expect(() => assertFeatureReady("customerQuotes", preview)).not.toThrow();
+    expect(readIntegrationStatus({ ...preview, VERCEL_ENV: "production" }).email.readiness).toBe("configuration_required");
+  });
 });

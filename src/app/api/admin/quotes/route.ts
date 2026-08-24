@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const result = await createQuoteDraft(payload, parsed.data.calculationId);
     return NextResponse.json({ quoteId: result.quote.id, contractId: result.contract.id }, { status: 201 });
   } catch (error) {
+    console.error("Quote draft creation failed", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Quote creation failed" }, { status: 409 });
   }
 }
