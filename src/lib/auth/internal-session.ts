@@ -10,6 +10,7 @@ import {
   normalizePanelLocale,
   type PanelLocale,
 } from "@/lib/panel-i18n";
+import { adminAccessDecision } from "@/lib/admin-v2/access";
 
 export type InternalUser = {
   active: true;
@@ -47,5 +48,14 @@ export async function getInternalUser(): Promise<InternalUser | null> {
 export async function requireInternalUser() {
   const user = await getInternalUser();
   if (!user) redirect("/user/login");
+  return user;
+}
+
+export async function requireAdminUser() {
+  const user = await getInternalUser();
+  const decision = adminAccessDecision(user);
+  if (decision === "login") redirect("/admin/login?redirect=%2Fadmin-v2");
+  if (decision === "worker-portal") redirect("/user");
+  if (!user) throw new Error("Unreachable admin access state");
   return user;
 }

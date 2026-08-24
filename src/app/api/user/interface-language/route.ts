@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   cookieStore.set("tf_panel_language", parsed.data.language, {
     httpOnly: true,
     maxAge: 60 * 60 * 24 * 365,
-    path: "/user",
+    path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
