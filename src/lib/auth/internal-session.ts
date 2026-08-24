@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayload } from "@/lib/payload";
 import {
@@ -30,6 +31,9 @@ export async function getInternalUser(): Promise<InternalUser | null> {
 
   if (!user || !role || !userIsActive(user)) return null;
 
+  const cookieStore = await cookies();
+  const savedInterfaceLanguage = cookieStore.get("tf_panel_language")?.value;
+
   return {
     active: true,
     displayName:
@@ -39,7 +43,8 @@ export async function getInternalUser(): Promise<InternalUser | null> {
     email: typeof user.email === "string" ? user.email : "",
     id: Number(user.id),
     interfaceLanguage: normalizePanelLocale(
-      "interfaceLanguage" in user ? user.interfaceLanguage : null,
+      savedInterfaceLanguage ??
+        ("interfaceLanguage" in user ? user.interfaceLanguage : null),
     ),
     role,
   };
