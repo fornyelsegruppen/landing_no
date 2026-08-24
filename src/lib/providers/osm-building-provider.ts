@@ -4,7 +4,8 @@ import type { GeoPoint, MeasurementConfidence } from "../measurements/types";
 import type { ProviderHealth } from "./contracts";
 
 const DEFAULT_ENDPOINT = "https://overpass-api.de/api/interpreter";
-const SEARCH_RADIUS_METERS = 80;
+const FALLBACK_ENDPOINT = "https://overpass.kumi.systems/api/interpreter";
+const SEARCH_RADIUS_METERS = 60;
 const MAX_POLYGON_POINTS = 30;
 const USER_AGENT = "Takfornyelse-roof-footprint/1.0 (post@takfornyelse.as)";
 
@@ -138,10 +139,15 @@ function confidenceFor(input: { containsAddress: boolean; distance: number; area
 }
 
 export class OpenStreetMapBuildingProvider {
+  private readonly endpoints: string[];
+
   constructor(
     private readonly fetcher: typeof fetch = fetch,
-    private readonly endpoint = process.env.OSM_OVERPASS_ENDPOINT?.trim() || DEFAULT_ENDPOINT,
-  ) {}
+    endpoint = process.env.OSM_OVERPASS_ENDPOINT?.trim() || DEFAULT_ENDPOINT,
+    fallbackEndpoint = process.env.OSM_OVERPASS_FALLBACK_ENDPOINT?.trim() || FALLBACK_ENDPOINT,
+  ) {
+    this.endpoints = Array.from(new Set([endpoint, fallbackEndpoint].filter(Boolean)));
+  }
 
   health(): ProviderHealth {
     return {
@@ -153,19 +159,31 @@ export class OpenStreetMapBuildingProvider {
 
   async findBuildings(addressPoint: GeoPoint): Promise<BuildingFootprintCandidate[]> {
     const query = `[out:json][timeout:12];(way["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude});relation["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude}););out tags geom;`;
-    const response = await this.fetcher(this.endpoint, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        "User-Agent": USER_AGENT,
-      },
-      body: new URLSearchParams({ data: query }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) throw new Error(`OpenStreetMap building lookup failed (${response.status})`);
+    let parsed: z.infer<typeof overpassResponseSchema> | null = null;
+    let lastError: unknown;
+    for (const endpoint of this.endpoints) {
+      try {
+        const response = await this.fetcher(endpoint, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "User-Agent": USER_AGENT,
+          },
+          body: new URLSearchParams({ data: query }),
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (!response.ok) throw new Error(`OpenStreetMap building lookup failed (${response.status})`);
+        parsed = overpassResponseSchema.parse(await response.json());
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!parsed) {
+      throw new Error(`OpenStreetMap building services are temporarily unavailable${lastError instanceof Error ? `: ${lastError.message}` : ""}`);
+    }
 
-    const parsed = overpassResponseSchema.parse(await response.json());
     const candidates: BuildingFootprintCandidate[] = [];
     for (const element of parsed.elements) {
       for (const raw of rawPolygons(element)) {

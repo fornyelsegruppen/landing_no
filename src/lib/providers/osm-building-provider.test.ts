@@ -89,4 +89,27 @@ describe("OpenStreetMap building provider", () => {
     }]);
     await expect(new OpenStreetMapBuildingProvider(fetcher as typeof fetch).findBuildings(center)).resolves.toEqual([]);
   });
+
+  it("automatically retries a fallback Overpass endpoint", async () => {
+    const endpoints: string[] = [];
+    const fetcher = async (input: RequestInfo | URL) => {
+      endpoints.push(String(input));
+      if (endpoints.length === 1) throw new Error("primary timeout");
+      return response([{
+        type: "way",
+        id: 321,
+        tags: { building: "house" },
+        geometry: [
+          { lat: 59.89995, lon: 10.6999 },
+          { lat: 59.89995, lon: 10.7001 },
+          { lat: 59.90005, lon: 10.7001 },
+          { lat: 59.90005, lon: 10.6999 },
+          { lat: 59.89995, lon: 10.6999 },
+        ],
+      }]);
+    };
+    const provider = new OpenStreetMapBuildingProvider(fetcher as typeof fetch, "https://primary.test", "https://fallback.test");
+    await expect(provider.findBuildings(center)).resolves.toHaveLength(1);
+    expect(endpoints).toEqual(["https://primary.test", "https://fallback.test"]);
+  });
 });
