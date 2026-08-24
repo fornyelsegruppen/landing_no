@@ -6,7 +6,7 @@
 **Produksjon:** Skal ikke endres før siste gate og eksplisitt eiergodkjenning  
 **Styrende regel:** Én vertikal fase om gangen; kode, brukerflate, test og dokumentasjon godkjennes samlet
 
-**Gjennomføringsstatus:** R0 og R1 er fullført i isolert staging. Neste fase er R2 – samlet saksflate og handlingsinnboks. Produksjon er fortsatt urørt.
+**Gjennomføringsstatus:** R0, R1 og R2 er fullført i isolert staging. Neste fase er R3 – profilert kommunikasjon og rask jobbkjøring. Produksjon er fortsatt urørt.
 
 ## 1. Formål
 
