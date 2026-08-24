@@ -2,6 +2,7 @@ import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionC
 import { assertWorkOrderTransition, type WorkOrderStatus } from "@/lib/work-orders/workflow";
 import { enqueueCompletionCommunication, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
+import { documentedPipelineUpdate } from "@/lib/leads/pipeline-state";
 import { adminOnly, assignedWorkerOrAdmin, userIsAdmin } from "../access/roles";
 
 function relationId(value: unknown) {
@@ -87,6 +88,17 @@ export const scheduleWorkOrderCommunications: CollectionAfterChangeHook = async 
   const scheduleChanged = operation === "create" || doc.scheduledAt !== previousDoc?.scheduledAt || doc.status !== previousDoc?.status;
   if (!scheduleChanged) return doc;
   const correlationId = correlationIdFromHeaders(req.headers);
+  if (doc.status === "documented" && previousDoc?.status !== "documented") {
+    const leadId = relationId(doc.lead);
+    if (leadId) {
+      await req.payload.update({
+        collection: "leads",
+        id: leadId,
+        overrideAccess: true,
+        data: documentedPipelineUpdate(),
+      });
+    }
+  }
   await syncWorkOrderCommunicationJobs(req.payload, doc, correlationId);
   if (doc.status === "documented" && previousDoc?.status !== "documented") await enqueueCompletionCommunication(req.payload, doc, correlationId);
   return doc;
@@ -110,7 +122,7 @@ export const WorkOrders: CollectionConfig = {
     { name: "contract", type: "relationship", relationTo: "contracts", label: "Signert kontrakt", required: true, unique: true, index: true },
     { name: "contractDocumentHash", type: "text", required: true, index: true, admin: { readOnly: true } },
     { name: "assignedWorker", type: "relationship", relationTo: "users", label: "Tildelt ansatt", index: true, filterOptions: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] } },
-    { name: "scheduledAt", type: "date", label: "Planlagt tidspunkt", index: true, admin: { date: { pickerAppearance: "dayAndTime" } } },
+    { name: "scheduledAt", type: "date", label: "Planlagt tidspunkt (norsk tid)", index: true, admin: { components: { Field: "/components/NorwayDateTimeField", Cell: "/components/NorwayDateTimeCell" } } },
     { name: "status", type: "select", label: "Status", required: true, defaultValue: "unassigned", index: true, options: [
       { label: "Ikke tildelt", value: "unassigned" }, { label: "Tildelt", value: "assigned" }, { label: "Planlagt", value: "scheduled" },
       { label: "På vei", value: "on_way" }, { label: "Ankommet", value: "arrived" }, { label: "Før-kontroll", value: "precheck" },
@@ -143,6 +155,7 @@ export const WorkOrders: CollectionConfig = {
     { name: "completedAt", type: "date", admin: { readOnly: true } },
     { name: "documentationSubmittedAt", type: "date", admin: { readOnly: true } },
     { name: "eventTimeline", type: "json", label: "Tidslinje", admin: { readOnly: true, description: "Systemstyrte hendelser uten kundeopplysninger." } },
+    { name: "completionCommunicationAction", type: "ui", admin: { components: { Field: "/components/WorkOrderCompletionAction" } } },
     { name: "changeAgreementAction", type: "ui", admin: { components: { Field: "/components/WorkOrderChangeAction" } } },
   ],
 };

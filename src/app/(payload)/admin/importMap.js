@@ -7,6 +7,9 @@ import { default as default_cf71b81e06f58aa0c3d18a461342b807 } from './/componen
 import { default as default_af6cb37b0f1fec55a327eb4c3a8f8c81 } from './/components/ContractWorkOrderAction'
 import { default as default_217dc73508bb482650b22bb9e31f812d } from './/components/ChangeAgreementActions'
 import { default as default_ecdb22922be72304df7d9170f4c5e5a3 } from './/components/WorkOrderChangeAction'
+import { default as default_norwayDateTimeField } from './/components/NorwayDateTimeField'
+import { default as default_norwayDateTimeCell } from './/components/NorwayDateTimeCell'
+import { default as default_workOrderCompletionAction } from './/components/WorkOrderCompletionAction'
 import { default as default_23ec33776346719f737fb9ed0745e7e8 } from './/components/AdminDashboard'
 import { VercelBlobClientUploadHandler as VercelBlobClientUploadHandler_16c82c5e25f430251a3e3ba57219ff4e } from '@payloadcms/storage-vercel-blob/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
@@ -22,6 +25,9 @@ export const importMap = {
   "/components/ContractWorkOrderAction#default": default_af6cb37b0f1fec55a327eb4c3a8f8c81,
   "/components/ChangeAgreementActions#default": default_217dc73508bb482650b22bb9e31f812d,
   "/components/WorkOrderChangeAction#default": default_ecdb22922be72304df7d9170f4c5e5a3,
+  "/components/NorwayDateTimeField#default": default_norwayDateTimeField,
+  "/components/NorwayDateTimeCell#default": default_norwayDateTimeCell,
+  "/components/WorkOrderCompletionAction#default": default_workOrderCompletionAction,
   "/components/AdminDashboard#default": default_23ec33776346719f737fb9ed0745e7e8,
   "@payloadcms/storage-vercel-blob/client#VercelBlobClientUploadHandler": VercelBlobClientUploadHandler_16c82c5e25f430251a3e3ba57219ff4e,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1

@@ -6,6 +6,7 @@ import { requireInternalUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { documentHash, quoteDisplayModel, type ContractSnapshot } from "@/lib/quotes/document";
 import { getWorkerCopy, panelDateLocale } from "@/lib/panel-i18n";
+import { formatNorwayDateTime } from "@/lib/norway-time";
 
 function relationId(value: unknown) {
   if (typeof value === "number") return value;
@@ -53,7 +54,7 @@ export default async function WorkerOrderPage({ params }: { params: Promise<{ id
         {phoneHref ? <a className="min-h-12 rounded-xl border border-white/15 p-3 font-semibold hover:border-accent" href={phoneHref}>{copy.call} {snapshot.customer.phone}</a> : <p className="rounded-xl border border-white/10 p-3 text-muted-foreground">{copy.phoneMissing}</p>}
       </div>
       <dl className="mt-6 grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-2">
-        <Info label={copy.planned} value={order.scheduledAt ? new Intl.DateTimeFormat(dateLocale, { dateStyle: "long", timeStyle: "short" }).format(new Date(order.scheduledAt)) : copy.notPlanned} />
+        <Info label={copy.planned} value={order.scheduledAt ? formatNorwayDateTime(order.scheduledAt, dateLocale, { dateStyle: "long", timeStyle: "short" }) : copy.notPlanned} />
         <Info label={copy.service} value={display.service} />
         <Info label={copy.estimatedArea} value={`${display.estimatedAreaMin.toLocaleString(dateLocale)}–${display.estimatedAreaMax.toLocaleString(dateLocale)} m²`} />
         <Info label={copy.tolerance} value={`${display.tolerancePercent.toLocaleString(dateLocale)} %`} />

@@ -4,6 +4,7 @@ import { getPayload } from "@/lib/payload";
 import { KartverketAddressProvider, norgeIBilderAccess } from "@/lib/providers/kartverket-address-provider";
 import { prepareMeasurement, roofProposalSchema } from "@/lib/measurements/proposal";
 import { userIsAdmin } from "@/payload/access/roles";
+import { measurementPipelineUpdate } from "@/lib/leads/pipeline-state";
 
 const candidateSchema = z.object({
   id: z.string(), label: z.string(), postalCode: z.string(), city: z.string(),
@@ -95,9 +96,19 @@ export async function POST(request: Request) {
   if (prior.docs[0]) {
     await payload.update({ collection: "roof-measurements", id: prior.docs[0].id, overrideAccess: true, data: { status: "superseded" } });
   }
-  await payload.update({ collection: "leads", id: lead.id, overrideAccess: true, data: {
-    status: "measuring",
-    nextAction: prepared.gate.allowed ? "Kontroller og godkjenn takmålingen." : `Takmåling blokkert: ${prepared.gate.reasons.join(", ")}`,
-  } });
+  const pipelineUpdate = measurementPipelineUpdate(
+    lead.status ?? "new",
+    prepared.gate.allowed
+      ? "Kontroller og godkjenn takmålingen."
+      : `Takmåling blokkert: ${prepared.gate.reasons.join(", ")}`,
+  );
+  if (pipelineUpdate) {
+    await payload.update({
+      collection: "leads",
+      id: lead.id,
+      overrideAccess: true,
+      data: pipelineUpdate,
+    });
+  }
   return NextResponse.json({ measurement, gate: prepared.gate }, { status: 201 });
 }

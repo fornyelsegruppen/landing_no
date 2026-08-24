@@ -1,7 +1,10 @@
 import type { Payload } from "payload";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
-import { enqueueMessageJob } from "@/lib/messages/message-engine";
+import { sanitizeJobError } from "@/lib/jobs/job-policy";
+import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
 import { featureReadiness } from "@/lib/platform/features";
+import type { EmailProvider } from "@/lib/providers/contracts";
+import { createEmailProvider } from "@/lib/providers/email-provider";
 import { relationId } from "./access";
 
 export type WorkOrderCommunicationKind = "schedule_confirmation" | "reminder_48h" | "same_day" | "completion";
@@ -64,6 +67,109 @@ export async function enqueueCompletionCommunication(payload: Payload, order: { 
   if (!featureReadiness("automatedReminders").ready) return { skipped: true as const };
   if (order.status !== "documented" || !order.documentationSubmittedAt) throw new CommunicationCancelledError("Completion communication requires documented work");
   return { skipped: false as const, job: await createJob(payload, { workOrderId: order.id, kind: "completion", scheduleVersion: `documented:${order.documentationSubmittedAt}` }, now, correlationId) };
+}
+
+export async function dispatchCompletionCommunicationNow(
+  payload: Payload,
+  order: {
+    id: number;
+    status: string;
+    documentationSubmittedAt?: string | null;
+  },
+  correlationId: string,
+  provider: EmailProvider = createEmailProvider(),
+) {
+  const queued = await enqueueCompletionCommunication(
+    payload,
+    order,
+    correlationId,
+  );
+  if (queued.skipped) return queued;
+
+  const job = queued.job;
+  const attempts = (job.attempts || 0) + 1;
+  await payload.update({
+    collection: "operational-jobs",
+    id: job.id,
+    overrideAccess: true,
+    data: {
+      status: "running",
+      attempts,
+      startedAt: new Date().toISOString(),
+    },
+  });
+
+  try {
+    const communication = await processWorkOrderCommunicationJob(
+      payload,
+      job.payload,
+      correlationId,
+    );
+    if (provider.health().status !== "ready") {
+      throw new Error("Email provider requires configuration");
+    }
+    await deliverMessage(
+      payload,
+      provider,
+      communication.message.id,
+      correlationId,
+    );
+    const deliveryJob = await enqueueMessageJob(
+      payload,
+      communication.message.id,
+      correlationId,
+    );
+    const completedAt = new Date().toISOString();
+    await payload.update({
+      collection: "operational-jobs",
+      id: deliveryJob.id,
+      overrideAccess: true,
+      data: {
+        status: "completed",
+        completedAt,
+        result: { processed: true, immediate: true },
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+    });
+    await payload.update({
+      collection: "operational-jobs",
+      id: job.id,
+      overrideAccess: true,
+      data: {
+        status: "completed",
+        completedAt,
+        result: { processed: true, immediate: true },
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+    });
+    return {
+      skipped: false as const,
+      delivered: true as const,
+      message: communication.message,
+      job,
+    };
+  } catch (error) {
+    const sanitized = sanitizeJobError(error);
+    await payload.update({
+      collection: "operational-jobs",
+      id: job.id,
+      overrideAccess: true,
+      data: {
+        status: "retry",
+        availableAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        lastErrorCode: sanitized.code,
+        lastErrorMessage: sanitized.message,
+      },
+    });
+    return {
+      skipped: false as const,
+      delivered: false as const,
+      queued: true as const,
+      job,
+    };
+  }
 }
 
 function copyFor(kind: WorkOrderCommunicationKind, leadName: string, scheduledAt?: string | null) {

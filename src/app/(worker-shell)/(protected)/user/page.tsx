@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireInternalUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { getWorkerCopy, panelDateLocale } from "@/lib/panel-i18n";
+import { formatNorwayDateTime, norwayDateKey } from "@/lib/norway-time";
 
 function relationId(value: number | { id: number } | null | undefined) {
   return typeof value === "object" && value ? value.id : value;
@@ -24,23 +25,23 @@ export default async function WorkerHomePage() {
   // Server component: one request-scoped timestamp deliberately groups the returned records.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = norwayDateKey(now);
   const active = result.docs.filter((order) => !["documented", "cancelled"].includes(order.status));
 
   const groups = [
     {
       title: copy.today,
-      documents: active.filter((order) => order.scheduledAt?.slice(0, 10) === today),
+      documents: active.filter((order) => order.scheduledAt && norwayDateKey(order.scheduledAt) === today),
     },
     {
       title: copy.upcoming,
       documents: active.filter(
-        (order) => order.scheduledAt && new Date(order.scheduledAt).getTime() > now && order.scheduledAt.slice(0, 10) !== today,
+        (order) => order.scheduledAt && new Date(order.scheduledAt).getTime() > now && norwayDateKey(order.scheduledAt) !== today,
       ),
     },
     {
       title: copy.toFinish,
-      documents: active.filter((order) => !order.scheduledAt || ["arrived", "precheck", "blocked", "ready", "in_progress", "completed"].includes(order.status) || (order.scheduledAt && new Date(order.scheduledAt).getTime() < now && order.scheduledAt.slice(0, 10) !== today)),
+      documents: active.filter((order) => !order.scheduledAt || ["arrived", "precheck", "blocked", "ready", "in_progress", "completed"].includes(order.status) || (order.scheduledAt && new Date(order.scheduledAt).getTime() < now && norwayDateKey(order.scheduledAt) !== today)),
     },
   ];
 
@@ -65,7 +66,7 @@ export default async function WorkerHomePage() {
                     <strong className="block">{order.reference}</strong>
                     <span className="mt-1 block text-sm text-muted-foreground">
                       {order.scheduledAt
-                        ? new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(order.scheduledAt))
+                        ? formatNorwayDateTime(order.scheduledAt, dateLocale)
                         : copy.timeNotSet}
                     </span>
                     <span className="mt-2 inline-block rounded-full bg-accent/15 px-2 py-1 text-xs text-accent">

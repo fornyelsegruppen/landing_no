@@ -1,11 +1,17 @@
 import type { Payload } from "payload";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ChannelUnavailableError, CommunicationCancelledError, enqueueCompletionCommunication, processWorkOrderCommunicationJob, syncWorkOrderCommunicationJobs } from "./communications";
+import { dispatchCompletionCommunicationNow } from "./communications";
+import { LogEmailProvider } from "@/lib/providers/safe-providers";
 
 type Row = Record<string, unknown> & { id: number };
 
 function fakePayload(seed: { jobs?: Row[]; messages?: Row[]; order?: Row; lead?: Row; contract?: Row } = {}) {
-  const rows = { jobs: seed.jobs || [], messages: seed.messages || [] };
+  const rows = {
+    jobs: seed.jobs || [],
+    messages: seed.messages || [],
+    leads: seed.lead ? [seed.lead] : [],
+  };
   let nextId = 100;
   const payload = {
     async find(args: Record<string, unknown>) {
@@ -21,10 +27,13 @@ function fakePayload(seed: { jobs?: Row[]; messages?: Row[]; order?: Row; lead?:
       }
       return { docs: [] };
     },
-    async findByID(args: { collection: string }) {
+    async findByID(args: { collection: string; id: number }) {
       if (args.collection === "work-orders") return seed.order;
-      if (args.collection === "leads") return seed.lead;
+      if (args.collection === "leads") return rows.leads[0];
       if (args.collection === "contracts") return seed.contract;
+      if (args.collection === "messages") {
+        return rows.messages.find((message) => message.id === args.id);
+      }
       throw new Error(`Unexpected ${args.collection}`);
     },
     async create(args: { collection: string; data: Record<string, unknown> }) {
@@ -34,7 +43,11 @@ function fakePayload(seed: { jobs?: Row[]; messages?: Row[]; order?: Row; lead?:
       return row;
     },
     async update(args: { collection: string; id: number; data: Record<string, unknown> }) {
-      const list = args.collection === "operational-jobs" ? rows.jobs : rows.messages;
+      const list = args.collection === "operational-jobs"
+        ? rows.jobs
+        : args.collection === "messages"
+          ? rows.messages
+          : rows.leads;
       const row = list.find((item) => item.id === args.id);
       if (!row) throw new Error("Missing row");
       Object.assign(row, args.data); return row;
@@ -77,6 +90,45 @@ describe("work-order communications", () => {
     await expect(enqueueCompletionCommunication(payload, { id: 9, status: "completed", documentationSubmittedAt: null }, "correlation-1")).rejects.toBeInstanceOf(CommunicationCancelledError);
     await enqueueCompletionCommunication(payload, { id: 9, status: "documented", documentationSubmittedAt: "2026-08-23T10:00:00Z" }, "correlation-1");
     expect(rows.jobs).toHaveLength(1);
+  });
+
+  it("delivers completion communication immediately and closes both queue jobs", async () => {
+    const { payload, rows } = fakePayload({
+      order: {
+        id: 9,
+        lead: 4,
+        contract: null,
+        status: "documented",
+        documentationSubmittedAt: "2026-08-23T10:00:00Z",
+        afterPhotos: [],
+      },
+      lead: {
+        id: 4,
+        name: "Kunde",
+        email: "kunde@example.no",
+        preferredChannel: "email",
+        status: "converted",
+      },
+    });
+    const provider = new LogEmailProvider();
+
+    const result = await dispatchCompletionCommunicationNow(
+      payload,
+      {
+        id: 9,
+        status: "documented",
+        documentationSubmittedAt: "2026-08-23T10:00:00Z",
+      },
+      "correlation-1",
+      provider,
+    );
+
+    expect(result).toMatchObject({ delivered: true });
+    expect(provider.deliveries).toHaveLength(1);
+    expect(rows.messages[0]).toMatchObject({ status: "sent", category: "completion" });
+    expect(rows.jobs).toHaveLength(2);
+    expect(rows.jobs.every((job) => job.status === "completed")).toBe(true);
+    expect(rows.leads[0]).toMatchObject({ status: "converted" });
   });
 
   it("requires attention instead of silently changing an SMS preference", async () => {

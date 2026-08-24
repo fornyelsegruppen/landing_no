@@ -116,6 +116,38 @@ describe("message engine", () => {
     expect(state.leads[0]?.status).toBe("converted");
   });
 
+  it("keeps a completion message in the converted pipeline state", async () => {
+    const state = repository();
+    state.leads[0]!.status = "measuring";
+    await state.payload.create({ collection: "messages", overrideAccess: true, data: {
+      lead: 1,
+      direction: "outbound",
+      category: "completion",
+      channel: "email",
+      subject: "Takarbeidet er dokumentert",
+      bodyText: "Arbeidet er fullført og dokumentert.",
+      status: "queued",
+      idempotencyKey: "work-order-completion:1",
+      aiAssisted: false,
+      approvedAt: new Date().toISOString(),
+      queuedAt: new Date().toISOString(),
+    } });
+
+    await deliverMessage(
+      state.payload,
+      new LogEmailProvider(),
+      1,
+      "completion-message",
+    );
+
+    expect(state.messages[0]?.status).toBe("sent");
+    expect(state.leads[0]).toMatchObject({
+      status: "converted",
+      nextAction: "Oppdrag fullført og dokumentert.",
+      nextActionAt: null,
+    });
+  });
+
   it("keeps the lead when AI validation fails", async () => {
     const state = repository();
     await expect(createLeadAiReply(state.payload, new DeterministicAiProvider({ invalid: true }), 1, "ai-fail")).rejects.toThrow();

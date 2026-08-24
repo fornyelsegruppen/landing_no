@@ -238,7 +238,13 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
         await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
       }
     }
-    const followUp = ["receipt", "contract", "change_confirmation"].includes(message.category)
+    const followUp = message.category === "completion"
+      ? {
+          status: "converted" as const,
+          nextAction: "Oppdrag fullført og dokumentert.",
+          nextActionAt: null,
+        }
+      : ["receipt", "contract", "change_confirmation"].includes(message.category)
       ? {}
       : message.category === "information_request" || analysis.recommendedNextAction === "request_information"
         ? {
