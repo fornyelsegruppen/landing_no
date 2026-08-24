@@ -5,8 +5,6 @@
  *   npm run db:migrate:status
  */
 import path from "path";
-import { createRequire } from "module";
-import { fileURLToPath } from "url";
 import pg from "pg";
 import { postgresSslOptions } from "./postgres-ssl.mjs";
 
@@ -14,7 +12,7 @@ const rawUrl =
   process.env.DATABASE_URL_MIGRATE ||
   process.env.DATABASE_URL ||
   "file:./takfornying.db";
-const databaseUrl = rawUrl.replace(/[&?]channel_binding=require/g, "");
+const databaseUrl = rawUrl;
 
 if (!databaseUrl.startsWith("postgres")) {
   console.log("Migration status requires a Postgres DATABASE_URL.");
@@ -44,6 +42,9 @@ try {
     );
   }
 
+  // List filesystem migrations from index without initing Payload (avoids prompt).
+  const { createRequire } = await import("module");
+  const { fileURLToPath } = await import("url");
   const require = createRequire(import.meta.url);
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const jiti = require("jiti")(import.meta.url, {
@@ -51,12 +52,6 @@ try {
     interopDefault: true,
     tsconfigPaths: path.resolve(__dirname, "../tsconfig.json"),
   });
-  const configModule = jiti(path.resolve(__dirname, "../src/payload.config.ts"));
-  const migrations = configModule.default?.db
-    ? null
-    : null;
-
-  // List filesystem migrations from index without initing Payload (avoids prompt).
   const indexPath = path.resolve(
     __dirname,
     "../src/payload/migrations/index.ts",
@@ -68,7 +63,6 @@ try {
     const applied = rows.rows.some((r) => r.name === m.name && Number(r.batch) !== -1);
     console.log(`  ${applied ? "✓" : "•"} ${m.name}`);
   }
-  void migrations;
 } finally {
   await pool.end();
 }

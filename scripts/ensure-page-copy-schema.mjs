@@ -7,7 +7,7 @@
  */
 import pg from "pg";
 
-const url = process.env.DATABASE_URL?.replace(/[&?]channel_binding=require/g, "");
+const url = process.env.DATABASE_URL;
 if (!url?.startsWith("postgres")) {
   console.error("DATABASE_URL must be postgres");
   process.exit(1);

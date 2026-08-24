@@ -19,7 +19,7 @@ const rawUrl =
   process.env.DATABASE_URL_MIGRATE ||
   process.env.DATABASE_URL ||
   "file:./takfornying.db";
-const databaseUrl = rawUrl.replace(/[&?]channel_binding=require/g, "");
+const databaseUrl = rawUrl;
 
 if (!databaseUrl.startsWith("postgres")) {
   console.log(

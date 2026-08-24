@@ -16,10 +16,7 @@ const baselineCurrentMigrations = process.argv.includes(
 );
 const rawDatabaseUrl =
   process.env.DATABASE_URL_MIGRATE ?? process.env.DATABASE_URL ?? "";
-const databaseUrl = rawDatabaseUrl.replace(
-  /[&?]channel_binding=require/g,
-  "",
-);
+const databaseUrl = rawDatabaseUrl;
 
 if (baselineCurrentMigrations) {
   if (!databaseUrl.startsWith("postgres")) {

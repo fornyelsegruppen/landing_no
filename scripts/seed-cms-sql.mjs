@@ -20,10 +20,7 @@ const enMessages = JSON.parse(
   readFileSync(join(root, "src/i18n/messages/en.json"), "utf8"),
 );
 
-const url = process.env.DATABASE_URL?.replace(
-  /[&?]channel_binding=require/g,
-  "",
-);
+const url = process.env.DATABASE_URL;
 if (!url?.startsWith("postgres")) {
   console.error("DATABASE_URL must be postgres");
   process.exit(1);

@@ -38,8 +38,10 @@ const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
 const rawDatabaseUrl = process.env.DATABASE_URL || "file:./takfornying.db";
-// Neon sometimes adds channel_binding=require which breaks node-pg on Vercel
-const databaseUrl = rawDatabaseUrl.replace(/[&?]channel_binding=require/g, "");
+// Keep Neon connection parameters intact. Current node-postgres supports
+// channel_binding=require; removing the first query parameter can also drop
+// the `?` delimiter and corrupt the database name.
+const databaseUrl = rawDatabaseUrl;
 const usePostgres = databaseUrl.startsWith("postgres");
 const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
 
