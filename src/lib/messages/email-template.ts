@@ -32,8 +32,13 @@ function textToHtml(text: string) {
 }
 
 export function buildBrandedEmailHtml(input: BrandedEmailInput) {
-  const baseUrl = siteConfig.url.replace(/\/$/, "");
-  const logoUrl = `${baseUrl}/brand/logo.webp`;
+  // Email clients fetch images without the recipient's Vercel session. Keep
+  // branded email assets on the public production domain even when a message
+  // is generated from a protected Preview deployment.
+  const emailAssetBaseUrl = (
+    process.env.EMAIL_ASSET_BASE_URL || "https://www.takfornyelse.as"
+  ).replace(/\/$/, "");
+  const logoUrl = `${emailAssetBaseUrl}/brand/logo.png`;
   const preheader = escapeHtml(input.preheader || input.subject);
   const subject = escapeHtml(input.subject);
 

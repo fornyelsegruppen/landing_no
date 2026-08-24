@@ -8,7 +8,9 @@ describe("branded customer email", () => {
       text: "Hei!\n\nSe tilbudet: https://takfornyelse.as/tilbud/test",
     });
 
-    expect(html).toContain("/brand/logo.webp");
+    expect(html).toContain(
+      'src="https://www.takfornyelse.as/brand/logo.png"',
+    );
     expect(html).toContain("Fornyelse Gruppen AS");
     expect(html).toContain('href="https://takfornyelse.as/tilbud/test"');
     expect(html).toContain("Org.nr. 916 693 168");

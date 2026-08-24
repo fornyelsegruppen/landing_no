@@ -68,7 +68,9 @@ describe("message engine", () => {
     expect(second).toMatchObject({ skipped: false, duplicate: true });
     expect(state.messages).toHaveLength(1);
     expect(state.jobs).toHaveLength(1);
-    expect(state.messages[0]?.bodyHtml).toContain("/brand/logo.webp");
+    expect(state.messages[0]?.bodyHtml).toContain(
+      'src="https://www.takfornyelse.as/brand/logo.png"',
+    );
 
     const provider = new LogEmailProvider();
     await deliverMessage(state.payload, provider, 1, "receipt-test");
