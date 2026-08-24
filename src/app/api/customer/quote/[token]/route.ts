@@ -11,6 +11,7 @@ import { loadCustomerQuote } from "@/lib/quotes/customer-view";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { hashOpaqueToken } from "@/lib/security/opaque-token";
+import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -88,14 +89,14 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     });
     const pdfBytes = await buildQuoteContractPdf({ contract: view.snapshot as ContractSnapshot, signatureData: parsed.data.signatureData, evidence });
     const filename = `signert-${view.contractReference.toLowerCase()}.pdf`;
-    const media = await payload.create({ collection: "private-media", overrideAccess: true, data: {
+    const media = await createPrivateMedia(payload, {
       classification: "contract", ownerType: "contract", ownerId: String(view.contractId), alt: `Signert kontrakt ${view.contractReference}`,
-    }, file: { data: Buffer.from(pdfBytes), mimetype: "application/pdf", name: filename, size: pdfBytes.byteLength } });
+    }, { data: pdfBytes, mimeType: "application/pdf", filename });
     const updated = await payload.update({ collection: "contracts", overrideAccess: true, where: { and: [
       { id: { equals: view.contractId } }, { status: { equals: "issued" } },
     ] }, data: { status: "signed", signatureEvidence: evidence, signedDocument: media.id, signedAt: evidence.signedAt } });
     if (updated.docs.length === 0) {
-      await payload.delete({ collection: "private-media", id: media.id, overrideAccess: true });
+      await deletePrivateMedia(payload, media);
       const latest = await payload.findByID({ collection: "contracts", id: view.contractId, depth: 0, overrideAccess: true });
       if (latest.status === "signed") return NextResponse.json({ ok: true, status: "signed", idempotent: true });
       throw new Error("Contract signing conflict");

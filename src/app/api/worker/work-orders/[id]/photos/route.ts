@@ -6,6 +6,7 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/features";
 import { appendTimeline, loadAuthorizedWorkOrder, relationId } from "@/lib/work-orders/access";
+import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 
 const phaseSchema = z.enum(["before", "after"]);
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -28,9 +29,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (phase.data === "before" && !["arrived", "precheck", "blocked"].includes(order.status)) return NextResponse.json({ error: "Before photos can only be added during precheck" }, { status: 409 });
     if (phase.data === "after" && !["in_progress", "completed"].includes(order.status)) return NextResponse.json({ error: "After photos can only be added after work starts" }, { status: 409 });
     const safeName = `${phase.data}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-100)}`;
-    const media = await payload.create({ collection: "private-media", overrideAccess: true, data: {
+    const media = await createPrivateMedia(payload, {
       classification: "work", ownerType: "work-order", ownerId: String(order.id), alt: `${phase.data === "before" ? "Før" : "Etter"}-dokumentasjon for ${order.reference}`,
-    }, file: { data: Buffer.from(await file.arrayBuffer()), mimetype: file.type, name: safeName, size: file.size } });
+    }, { data: Buffer.from(await file.arrayBuffer()), mimeType: file.type, filename: safeName });
     try {
       const field = phase.data === "before" ? "beforePhotos" : "afterPhotos";
       const existing = Array.isArray(order[field]) ? order[field].map(relationId).filter((value): value is number => value !== null) : [];
@@ -41,7 +42,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       } });
       await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: Number(user.id), action: `work-order.photo-${phase.data}`, entityType: "work-order", entityId: order.id, correlationId: correlationIdFromHeaders(request.headers), changedFields: [field] });
     } catch (error) {
-      await payload.delete({ collection: "private-media", id: media.id, overrideAccess: true }).catch(() => undefined);
+      await deletePrivateMedia(payload, media).catch(() => undefined);
       throw error;
     }
     return NextResponse.json({ id: media.id, phase: phase.data }, { status: 201 });

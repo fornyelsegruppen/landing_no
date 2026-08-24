@@ -12,6 +12,7 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { appendTimeline } from "@/lib/work-orders/access";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
+import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("accept"), customerName: z.string().min(3).max(160), expectedDocumentHash: z.string().length(64), accepted: z.literal(true) }),
@@ -40,9 +41,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     if (!process.env.CUSTOMER_TOKEN_SECRET && !process.env.PAYLOAD_SECRET) throw new Error("Acceptance evidence is not configured");
     const evidence = createChangeAcceptanceEvidence({ snapshot: view.snapshot, expectedDocumentHash: parsed.data.expectedDocumentHash, customerName: parsed.data.customerName, accepted: parsed.data.accepted, ipAddress: clientIp(request), userAgent: request.headers.get("user-agent") || "", securitySalt: process.env.CUSTOMER_TOKEN_SECRET || process.env.PAYLOAD_SECRET! });
     const pdf = await buildAcceptedChangePdf(view.snapshot, evidence); const filename = `${view.snapshot.reference}-akseptert.pdf`;
-    const media = await payload.create({ collection: "private-media", overrideAccess: true, data: { classification: "contract", ownerType: "change-agreement", ownerId: String(view.agreementId), alt: "" }, file: { data: Buffer.from(pdf), mimetype: "application/pdf", name: filename, size: pdf.byteLength } });
+    const media = await createPrivateMedia(payload, { classification: "contract", ownerType: "change-agreement", ownerId: String(view.agreementId), alt: "" }, { data: pdf, mimeType: "application/pdf", filename });
     const updated = await payload.update({ collection: "change-agreements", overrideAccess: true, where: { and: [{ id: { equals: view.agreementId } }, { status: { in: ["sent", "viewed"] } }] }, data: { status: "accepted", acceptanceEvidence: evidence, acceptedDocument: media.id, acceptedAt: evidence.acceptedAt } });
-    if (!updated.docs?.length) { await payload.delete({ collection: "private-media", id: media.id, overrideAccess: true }); return NextResponse.json({ status: "accepted", idempotent: true }); }
+    if (!updated.docs?.length) { await deletePrivateMedia(payload, media); return NextResponse.json({ status: "accepted", idempotent: true }); }
     const order = await payload.findByID({ collection: "work-orders", id: view.workOrderId, depth: 0, overrideAccess: true });
     await payload.update({ collection: "work-orders", id: order.id, overrideAccess: true, context: { trustedWorkerAction: true }, data: { approvedChangeAgreement: view.agreementId, eventTimeline: appendTimeline(order.eventTimeline, { action: "change-agreement.accepted", actorId: 0, changedFields: ["approvedChangeAgreement"] }) } });
     await recordAuditEvent(createPayloadAuditWriter(payload), { action: "change-agreement.customer-accepted", entityType: "change-agreement", entityId: view.agreementId, correlationId, changedFields: ["status", "acceptanceEvidence", "acceptedDocument", "acceptedAt"] });

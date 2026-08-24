@@ -20,6 +20,10 @@ export const PrivateMedia: CollectionConfig = {
   upload: {
     staticDir: "private-media",
     mimeTypes: ["image/*", "application/pdf"],
+    // Cloud deployments persist the bytes with the private Blob SDK and then
+    // create this protected metadata record without a second public upload.
+    filesRequiredOnCreate: false,
+    disableLocalStorage: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
   },
   fields: [
     {

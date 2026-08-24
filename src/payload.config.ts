@@ -169,7 +169,6 @@ export default buildConfig({
       enabled: Boolean(blobToken),
       collections: {
         media: true,
-        "private-media": true,
       },
       token: blobToken,
       // Bypass Vercel 4.5MB serverless body limit — upload goes client → Blob.
