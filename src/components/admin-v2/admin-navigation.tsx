@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
@@ -20,13 +20,16 @@ const links = [
 
 export function AdminNavigation({ locale, mobile = false }: { locale: PanelLocale; mobile?: boolean }) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const selectedQueue = searchParams.get("queue");
   const copy = getAdminV2Copy(locale);
 
   return (
     <nav aria-label={copy.control} className={mobile ? "grid grid-cols-2 gap-2" : "grid gap-1"}>
       {links.map((link) => {
-        const active = link.queue === null ? !selectedQueue : selectedQueue === link.queue;
+        const active = link.queue === null
+          ? pathname === "/admin-v2" && !selectedQueue
+          : pathname === "/admin-v2" && selectedQueue === link.queue;
         return (
           <Link
             aria-current={active ? "page" : undefined}

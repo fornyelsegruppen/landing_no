@@ -139,6 +139,13 @@ function relationLabel(value: unknown) {
   return undefined;
 }
 
+function relationIdentifier(value: unknown) {
+  if (typeof value === "number") return value;
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = (value as Record<string, unknown>).id;
+  return typeof candidate === "number" ? candidate : undefined;
+}
+
 function asRecord(value: unknown) {
   return value as Record<string, unknown>;
 }
@@ -164,13 +171,15 @@ function leadItem(doc: unknown): AdminListItem {
     subtitle: address || text(item.email) || text(item.phone),
     status: text(item.status),
     createdAt: text(item.createdAt),
-    href: `/admin/collections/leads/${itemId}`,
+    href: `/admin-v2/cases/${itemId}`,
   };
 }
 
 function referenceItem(collection: "contracts" | "quotes" | "work-orders", doc: unknown): AdminListItem {
   const item = asRecord(doc);
   const itemId = id(item.id);
+  const quote = item.quote && typeof item.quote === "object" ? item.quote as Record<string, unknown> : null;
+  const leadId = relationIdentifier(item.lead) ?? relationIdentifier(quote?.lead);
   return {
     id: itemId,
     reference: text(item.reference) || `#${itemId}`,
@@ -178,20 +187,22 @@ function referenceItem(collection: "contracts" | "quotes" | "work-orders", doc: 
     subtitle: collection === "work-orders" ? text(item.workSummary) : undefined,
     status: text(item.status),
     createdAt: text(item.createdAt),
-    href: `/admin/collections/${collection}/${itemId}`,
+    href: leadId ? `/admin-v2/cases/${leadId}` : `/admin/collections/${collection}/${itemId}`,
   };
 }
 
 function genericItem(collection: string, doc: unknown): AdminListItem {
   const item = asRecord(doc);
   const itemId = id(item.id);
+  const workOrder = item.workOrder && typeof item.workOrder === "object" ? item.workOrder as Record<string, unknown> : null;
+  const leadId = relationIdentifier(item.lead) ?? relationIdentifier(workOrder?.lead);
   return {
     id: itemId,
     reference: text(item.reference) || text(item.subject) || text(item.titleNo) || `#${itemId}`,
     customer: relationLabel(item.lead),
     status: text(item.status) || text(item.editorialStatus),
     createdAt: text(item.createdAt),
-    href: `/admin/collections/${collection}/${itemId}`,
+    href: leadId ? `/admin-v2/cases/${leadId}` : `/admin/collections/${collection}/${itemId}`,
   };
 }
 

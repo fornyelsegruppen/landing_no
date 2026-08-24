@@ -1,0 +1,64 @@
+import { describe, expect, it, vi } from "vitest";
+import type { Payload } from "payload";
+import { deriveCaseNextAction, loadAdminCase } from "./case-read-model";
+
+describe("admin case next action", () => {
+  it.each([
+    [{ leadStatus: "new" }, "generate_reply"],
+    [{ leadStatus: "draft_ready", message: { id: 1, status: "draft" } }, "approve_message"],
+    [{ leadStatus: "new", message: { id: 2, status: "failed" } }, "retry_message"],
+    [{ leadStatus: "measuring", message: { id: 1, status: "sent" } }, "measurement_required"],
+    [{ leadStatus: "measuring", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "review_required" } }, "approve_measurement"],
+    [{ leadStatus: "measuring", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" } }, "calculate_price"],
+    [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "ready" } }, "create_quote"],
+    [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "draft" } }, "approve_quote"],
+    [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "approved" } }, "issue_quote"],
+    [{ leadStatus: "waiting_customer", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "sent" } }, "wait_customer"],
+    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed" } }, "create_work_order"],
+    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed" }, workOrder: { id: 7, status: "unassigned" } }, "assign_worker"],
+    [{ leadStatus: "closed" }, "none"],
+  ])("derives %s as %s", (input, expected) => {
+    expect(deriveCaseNextAction(input)).toMatchObject({ kind: expected });
+  });
+});
+
+describe("admin case read model", () => {
+  it("returns null for an unknown lead", async () => {
+    const payload = { findByID: vi.fn().mockRejectedValue(new Error("not found")) } as unknown as Payload;
+    await expect(loadAdminCase(payload, 404)).resolves.toBeNull();
+  });
+
+  it("assembles the customer journey without returning raw access tokens", async () => {
+    const findByID = vi.fn().mockResolvedValue({
+      id: 1,
+      name: "Ola Nordmann",
+      email: "ola@example.no",
+      phone: "99999999",
+      address: "Testveien",
+      houseNumber: "1",
+      postal: "0001",
+      city: "Oslo",
+      inquiryType: "takvask",
+      status: "quoted",
+      createdAt: "2026-08-24T08:00:00.000Z",
+    });
+    const responses = [
+      { docs: [{ id: 2, reference: "TM-1-V1", status: "approved", actualAreaMinTenths: 1000, actualAreaMaxTenths: 1200, createdAt: "2026-08-24T09:00:00.000Z" }] },
+      { docs: [{ id: 3, reference: "PB-1", status: "superseded", totalIncVatOre: 1250000, createdAt: "2026-08-24T10:00:00.000Z" }] },
+      { docs: [{ id: 4, reference: "T-1-V1", status: "approved", createdAt: "2026-08-24T11:00:00.000Z" }] },
+      { docs: [{ id: 5, subject: "Takk", bodyText: "Hei", direction: "outbound", category: "receipt", channel: "email", status: "sent", createdAt: "2026-08-24T08:01:00.000Z" }] },
+      { docs: [] },
+      { docs: [{ id: 6, reference: "K-1-V1", status: "draft", createdAt: "2026-08-24T11:01:00.000Z" }] },
+      { docs: [{ id: 7, filename: "tilbud.pdf", classification: "contract", mimeType: "application/pdf", url: "https://safe.blob.vercel-storage.com/private/file.pdf" }] },
+    ];
+    const find = vi.fn().mockImplementation(async () => responses.shift());
+    const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
+
+    expect(result?.lead.address).toBe("Testveien 1 0001 Oslo");
+    expect(result?.quote?.reference).toBe("T-1-V1");
+    expect(result?.nextAction.kind).toBe("issue_quote");
+    expect(result?.documents[0]?.href).toContain("/api/admin/blob?url=");
+    expect(JSON.stringify(result)).not.toContain("tokenHash");
+    expect(result?.timeline.map((item) => item.type)).toEqual(expect.arrayContaining(["lead", "message", "measurement", "price", "quote", "contract"]));
+  });
+});
