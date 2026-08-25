@@ -1,5 +1,6 @@
 import type { Payload } from "payload";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
+import { featureReadiness } from "@/lib/platform/features";
 
 export type QuoteFollowUpKind = "reminder_1" | "reminder_2" | "expire";
 export type QuoteFollowUpPayload = { quoteId: number; leadId: number; kind: QuoteFollowUpKind; validUntil: string };
@@ -12,6 +13,7 @@ async function createJob(payload: Payload, input: QuoteFollowUpPayload, availabl
 }
 
 export async function enqueueQuoteFollowUps(payload: Payload, input: { quoteId: number; leadId: number; validUntil: string }, correlationId: string, now = new Date()) {
+  if (!featureReadiness("communicationRoutingV2").ready) return { created: 0, skipped: true as const };
   const validUntil = new Date(input.validUntil);
   if (Number.isNaN(validUntil.getTime()) || validUntil <= now) return { created: 0 };
   const plans: Array<[QuoteFollowUpKind, Date]> = [
@@ -20,5 +22,5 @@ export async function enqueueQuoteFollowUps(payload: Payload, input: { quoteId: 
     ["expire", validUntil],
   ].filter(([, at]) => at > now) as Array<[QuoteFollowUpKind, Date]>;
   for (const [kind, at] of plans) await createJob(payload, { ...input, kind }, at, correlationId);
-  return { created: plans.length };
+  return { created: plans.length, skipped: false as const };
 }

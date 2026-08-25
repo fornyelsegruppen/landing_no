@@ -1,9 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { processQuoteFollowUpJob } from "./follow-up";
 import { enqueueQuoteFollowUps } from "./follow-up-schedule";
 
 describe("quote follow-up", () => {
+  afterEach(() => {
+    delete process.env.FEATURE_COMMUNICATION_ROUTING_V2;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.CRON_SECRET;
+  });
+
   it("creates at most two reminders and one expiry job idempotently", async () => {
+    process.env.FEATURE_COMMUNICATION_ROUTING_V2 = "true";
+    process.env.RESEND_API_KEY = "test";
+    process.env.CRON_SECRET = "test";
     const payload = { find: vi.fn().mockResolvedValue({ docs: [] }), create: vi.fn().mockImplementation(async ({ data }) => ({ id: Math.random(), ...data })) };
     const result = await enqueueQuoteFollowUps(payload as never, { quoteId: 4, leadId: 2, validUntil: "2026-09-10T10:00:00.000Z" }, "corr", new Date("2026-08-25T10:00:00.000Z"));
     expect(result.created).toBe(3);

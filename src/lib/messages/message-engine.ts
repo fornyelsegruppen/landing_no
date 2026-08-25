@@ -9,6 +9,7 @@ import { buildBrandedEmailHtml } from "./email-template";
 import { updateCaseState } from "@/lib/cases/case-command";
 import { caseReplyAddress } from "./case-reply";
 import { enqueueQuoteFollowUps } from "@/lib/quotes/follow-up-schedule";
+import { featureReadiness } from "@/lib/platform/features";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -209,7 +210,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       subject: message.subject,
       text: message.bodyText,
       html: message.bodyHtml || buildBrandedEmailHtml({ subject: message.subject, text: message.bodyText }),
-      replyTo: caseReplyAddress(lead.id) || process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
+      replyTo: (featureReadiness("communicationRoutingV2").ready ? caseReplyAddress(lead.id) : null) || process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
       idempotencyKey: message.idempotencyKey,
       correlationId,
       ...(attachments.length ? { attachments } : {}),
