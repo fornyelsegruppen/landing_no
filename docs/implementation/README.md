@@ -29,6 +29,7 @@ Den autentiserte helhetsrevisjonen 25. august 2026 avdekket gjenstående avvik i
 
 - [F0 – baseline, contracts and rollback](./phase-f0-baseline-and-rollback.md)
 - [F1 – data consistency and legacy reconciliation](./phase-f1-data-consistency.md)
+- [F2 – immutable roof measurement evidence](./phase-f2-measurement-evidence.md)
 
 ## Operativ admin A0–A9
 

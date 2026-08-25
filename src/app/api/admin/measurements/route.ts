@@ -6,6 +6,7 @@ import { prepareMeasurement, roofProposalSchema } from "@/lib/measurements/propo
 import { userIsAdmin } from "@/payload/access/roles";
 import { measurementPipelineUpdate } from "@/lib/leads/pipeline-state";
 import { updateCaseState } from "@/lib/cases/case-command";
+import { persistSchematicMeasurementEvidence } from "@/lib/measurements/persist-evidence";
 
 const candidateSchema = z.object({
   id: z.string(), label: z.string(), postalCode: z.string(), city: z.string(),
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
       lead: parsed.data.leadId,
       version,
       supersedes: prior.docs[0]?.id,
+      measurementMode: "schematic",
       normalizedAddress: parsed.data.address.label,
       addressSourceId: parsed.data.address.id,
       latitude: parsed.data.address.latitude,
@@ -82,6 +84,9 @@ export async function POST(request: Request) {
       imageryLicensed: parsed.data.imageryLicensed,
       capturedAt: new Date().toISOString(),
       mapImage: parsed.data.mapImageId,
+      candidateBuildings: [{ id: parsed.data.proposal.buildingIdentifier, label: parsed.data.proposal.buildingIdentifier || "Valgt bygg", polygon: parsed.data.proposal.roofPlanes[0]?.polygon || [] }],
+      evidenceSource: parsed.data.imagerySource,
+      evidenceAttribution: parsed.data.credits,
       roofPlanes: prepared.proposal.roofPlanes,
       horizontalAreaTenths: prepared.calculation?.horizontalAreaTenths ?? 0,
       actualAreaMinTenths: prepared.calculation?.actualAreaMinTenths ?? 0,
@@ -94,6 +99,25 @@ export async function POST(request: Request) {
       blockingReasons: prepared.gate.reasons,
     },
   });
+  try {
+    const selectedBuildingId = parsed.data.proposal.buildingIdentifier || "manual-building";
+    const firstPolygon = parsed.data.proposal.roofPlanes[0]?.polygon;
+    if (!firstPolygon?.length) throw new Error("Selected building polygon is required");
+    await persistSchematicMeasurementEvidence({
+      payload,
+      leadId: lead.id,
+      measurementId: measurement.id,
+      address: parsed.data.address.label,
+      addressPoint: { latitude: parsed.data.address.latitude, longitude: parsed.data.address.longitude },
+      candidates: [{ id: selectedBuildingId, label: "Valgt bygg", polygon: firstPolygon }],
+      selectedBuildingId,
+      source: parsed.data.imagerySource,
+      attribution: parsed.data.credits,
+    });
+  } catch (error) {
+    await payload.delete({ collection: "roof-measurements", id: measurement.id, overrideAccess: true }).catch(() => undefined);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Measurement evidence could not be stored" }, { status: 503 });
+  }
   if (prior.docs[0]) {
     await payload.update({ collection: "roof-measurements", id: prior.docs[0].id, overrideAccess: true, data: { status: "superseded" } });
   }

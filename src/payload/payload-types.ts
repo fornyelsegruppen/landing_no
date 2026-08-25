@@ -852,10 +852,11 @@ export interface RoofMeasurement {
   lead: number | Lead;
   version: number;
   supersedes?: (number | null) | RoofMeasurement;
+  measurementMode: 'schematic' | 'schematic_with_context' | 'manual_no_visual';
   normalizedAddress: string;
   addressSourceId?: string | null;
-  latitude: number;
-  longitude: number;
+  latitude?: number | null;
+  longitude?: number | null;
   buildingIdentifier?: string | null;
   source: string;
   sourceUrl?: string | null;
@@ -867,6 +868,25 @@ export interface RoofMeasurement {
   imageryLicensed: boolean;
   capturedAt: string;
   mapImage?: (number | null) | PrivateMedia;
+  candidateBuildings?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  evidenceSnapshot?: (number | null) | PrivateMedia;
+  evidenceHash?: string | null;
+  evidenceSource?: string | null;
+  evidenceAttribution?: string | null;
+  evidenceGeneratedAt?: string | null;
+  imageryCapturedAt?: string | null;
+  selectionConfirmedBy?: (number | null) | User;
+  selectionConfirmedAt?: string | null;
+  manualAreaSource?: ('customer' | 'drawing' | 'admin_estimate' | 'onsite') | null;
+  manualAreaReason?: string | null;
   /**
    * Polygonpunkter (lat/lon) og vinkelintervall per takflate. Redigering oppretter ny versjon via kontrollen under.
    */
@@ -1983,6 +2003,7 @@ export interface RoofMeasurementsSelect<T extends boolean = true> {
   lead?: T;
   version?: T;
   supersedes?: T;
+  measurementMode?: T;
   normalizedAddress?: T;
   addressSourceId?: T;
   latitude?: T;
@@ -1995,6 +2016,17 @@ export interface RoofMeasurementsSelect<T extends boolean = true> {
   imageryLicensed?: T;
   capturedAt?: T;
   mapImage?: T;
+  candidateBuildings?: T;
+  evidenceSnapshot?: T;
+  evidenceHash?: T;
+  evidenceSource?: T;
+  evidenceAttribution?: T;
+  evidenceGeneratedAt?: T;
+  imageryCapturedAt?: T;
+  selectionConfirmedBy?: T;
+  selectionConfirmedAt?: T;
+  manualAreaSource?: T;
+  manualAreaReason?: T;
   roofPlanes?: T;
   horizontalAreaTenths?: T;
   actualAreaMinTenths?: T;

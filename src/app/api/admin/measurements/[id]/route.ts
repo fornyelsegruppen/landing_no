@@ -9,6 +9,7 @@ import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { overridePreparedLeadArea } from "@/lib/leads/automatic-package";
+import { persistSchematicMeasurementEvidence, verifySchematicMeasurementEvidence } from "@/lib/measurements/persist-evidence";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
@@ -67,12 +68,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   if (parsed.data.action === "approve") {
+    if (process.env.FEATURE_MEASUREMENT_EVIDENCE_V2 === "true" && measurement.measurementMode !== "manual_no_visual" && !await verifySchematicMeasurementEvidence(payload, measurement)) {
+      return NextResponse.json({ error: "Measurement evidence is missing or does not match its stored hash" }, { status: 409 });
+    }
     const prepared = prepareMeasurement({
       proposal: { buildingIdentifier: measurement.buildingIdentifier ?? null, confidence: measurement.confidence, confidenceReasoning: measurement.confidenceReasoning, roofPlanes: measurement.roofPlanes },
       addressResolved: Boolean(measurement.addressSourceId), sourceAuthorized: measurement.imageryLicensed && hasAuthorizedSource(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
     });
     if (!prepared.gate.allowed) return NextResponse.json({ error: "Measurement is blocked", reasons: prepared.gate.reasons }, { status: 409 });
-    const updated = await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "approved", approvedBy: user.id, approvedAt: new Date().toISOString(), blockingReasons: [] } });
+    const approvedAt = new Date().toISOString();
+    const updated = await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "approved", approvedBy: user.id, approvedAt, selectionConfirmedBy: user.id, selectionConfirmedAt: approvedAt, blockingReasons: [] } });
     await recordAuditEvent(createPayloadAuditWriter(payload), {
       actorId: user.id,
       action: "measurement.approved",
@@ -105,6 +110,30 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     delete createData.createdAt;
     delete createData.updatedAt;
     const created = await payload.create({ collection: "roof-measurements", overrideAccess: true, data: createData as never });
+    try {
+      const planes = prepared.proposal.roofPlanes;
+      const selectedBuildingId = String(measurement.buildingIdentifier || planes[0]?.id || "selected-building");
+      const storedCandidates = Array.isArray(measurement.candidateBuildings) ? measurement.candidateBuildings as Array<Record<string, unknown>> : [];
+      const candidates = storedCandidates.map((candidate) => candidate.id === selectedBuildingId
+        ? { ...candidate, polygon: planes[0]?.polygon || candidate.polygon }
+        : candidate).filter((candidate) => typeof candidate.id === "string" && typeof candidate.label === "string" && Array.isArray(candidate.polygon)) as Array<{ id: string; label: string; polygon: Array<{ latitude: number; longitude: number }> }>;
+      if (!candidates.length && planes[0]?.polygon) candidates.push({ id: selectedBuildingId, label: "Valgt bygg", polygon: planes[0].polygon });
+      if (typeof created.latitude !== "number" || typeof created.longitude !== "number") throw new Error("Measurement coordinates are required for schematic evidence");
+      await persistSchematicMeasurementEvidence({
+        payload,
+        leadId,
+        measurementId: created.id,
+        address: created.normalizedAddress,
+        addressPoint: { latitude: created.latitude, longitude: created.longitude },
+        candidates,
+        selectedBuildingId,
+        source: created.evidenceSource || created.source,
+        attribution: created.evidenceAttribution || created.credits,
+      });
+    } catch (error) {
+      await payload.delete({ collection: "roof-measurements", id: created.id, overrideAccess: true }).catch(() => undefined);
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Measurement evidence could not be regenerated" }, { status: 503 });
+    }
     await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "superseded" } });
     await recordAuditEvent(createPayloadAuditWriter(payload), {
       actorId: user.id,

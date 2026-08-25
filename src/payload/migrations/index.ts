@@ -30,6 +30,7 @@ import * as migration_20260825_170000_commercial_quote_options from "./20260825_
 import * as migration_20260825_190000_completion_invoice_warranty from "./20260825_190000_completion_invoice_warranty";
 import * as migration_20260825_210000_lead_archive_trash from "./20260825_210000_lead_archive_trash";
 import * as migration_20260825_220000_case_state_engine from "./20260825_220000_case_state_engine";
+import * as migration_20260825_230000_measurement_evidence from "./20260825_230000_measurement_evidence";
 
 export const migrations = [
   {
@@ -191,5 +192,10 @@ export const migrations = [
     up: migration_20260825_220000_case_state_engine.up,
     down: migration_20260825_220000_case_state_engine.down,
     name: "20260825_220000_case_state_engine",
+  },
+  {
+    up: migration_20260825_230000_measurement_evidence.up,
+    down: migration_20260825_230000_measurement_evidence.down,
+    name: "20260825_230000_measurement_evidence",
   },
 ];

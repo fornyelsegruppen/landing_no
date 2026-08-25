@@ -16,6 +16,11 @@ export function nextMeasurementVersion(
     status: "review_required",
     approvedBy: null,
     approvedAt: null,
+    evidenceSnapshot: null,
+    evidenceHash: null,
+    evidenceGeneratedAt: null,
+    selectionConfirmedBy: null,
+    selectionConfirmedAt: null,
     capturedAt: now.toISOString(),
   };
   return Object.assign({}, next, { inputHash: measurementSnapshotHash(next) });

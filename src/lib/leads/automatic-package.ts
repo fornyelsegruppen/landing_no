@@ -14,12 +14,14 @@ import {
   type BuildingFootprintCandidate,
 } from "@/lib/providers/osm-building-provider";
 import { updateCaseState } from "@/lib/cases/case-command";
+import { persistSchematicMeasurementEvidence } from "@/lib/measurements/persist-evidence";
 
 export type AutomaticPackageBlockCode =
   | "ADDRESS_REQUIRED"
   | "ADDRESS_NOT_FOUND"
   | "BUILDING_NOT_FOUND"
   | "BUILDING_AMBIGUOUS"
+  | "EVIDENCE_STORAGE_FAILED"
   | "PRICE_RULE_NOT_FOUND"
   | "SERVICE_REVIEW_REQUIRED";
 
@@ -246,6 +248,7 @@ export async function prepareAutomaticLeadPackage(
       lead: leadId,
       version,
       supersedes: previousMeasurement?.id,
+      measurementMode: "schematic",
       normalizedAddress: address.label,
       addressSourceId: address.id,
       latitude: address.latitude,
@@ -257,6 +260,9 @@ export async function prepareAutomaticLeadPackage(
       credits: candidate.credits,
       imageryLicensed: true,
       capturedAt: new Date().toISOString(),
+      candidateBuildings: candidates,
+      evidenceSource: candidate.source,
+      evidenceAttribution: candidate.credits,
       roofPlanes: prepared.proposal.roofPlanes,
       horizontalAreaTenths: prepared.calculation.horizontalAreaTenths,
       actualAreaMinTenths: prepared.calculation.actualAreaMinTenths,
@@ -269,6 +275,22 @@ export async function prepareAutomaticLeadPackage(
       blockingReasons: [],
     },
   });
+  try {
+    await persistSchematicMeasurementEvidence({
+      payload,
+      leadId,
+      measurementId: measurement.id,
+      address: address.label,
+      addressPoint: { latitude: address.latitude, longitude: address.longitude },
+      candidates,
+      selectedBuildingId: candidate.id,
+      source: candidate.source,
+      attribution: candidate.credits,
+    });
+  } catch {
+    await payload.delete({ collection: "roof-measurements", id: measurement.id, overrideAccess: true }).catch(() => undefined);
+    return markBlocked(payload, lead as typeof lead & Record<string, unknown>, "EVIDENCE_STORAGE_FAILED", "Målebeviset kunne ikke lagres. Prøv igjen eller bruk manuelt areal uten kart.");
+  }
   if (previousMeasurement && previousMeasurement.status !== "approved") {
     await payload.update({ collection: "roof-measurements", id: previousMeasurement.id, overrideAccess: true, data: { status: "superseded" } });
   }
