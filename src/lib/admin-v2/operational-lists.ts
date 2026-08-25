@@ -1,7 +1,18 @@
 import type { Payload, Where } from "payload";
 
 export type OperationalListKind = "contracts" | "offers" | "work";
-export type OperationalListItem = { customer: string; detail?: string; href: string; id: number; reference: string; status?: string; updatedAt?: string };
+export type OperationalListItem = {
+  arrivalWindow?: string;
+  customer: string;
+  detail?: string;
+  employee?: string;
+  href: string;
+  id: number;
+  reference: string;
+  scheduledAt?: string;
+  status?: string;
+  updatedAt?: string;
+};
 
 function record(value: unknown) { return value as Record<string, unknown>; }
 function id(value: unknown) { return typeof value === "number" ? value : value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number" ? (value as { id: number }).id : 0; }
@@ -28,6 +39,9 @@ export async function loadOperationalList(payload: Pick<Payload, "find">, kind: 
     return {
       customer: text(lead?.name) || "—",
       detail: kind === "work" ? text(item.workSummary) : text(item.serviceDescription),
+      employee: kind === "work" ? text(relation(item.assignedWorker)?.displayName) || text(relation(item.assignedWorker)?.name) : undefined,
+      scheduledAt: kind === "work" ? text(item.scheduledAt) : undefined,
+      arrivalWindow: kind === "work" ? text(item.arrivalWindow) : undefined,
       href: leadId ? `/admin-v2/cases/${leadId}` : "/admin-v2/cases",
       id: id(item),
       reference: text(item.reference) || `#${id(item)}`,

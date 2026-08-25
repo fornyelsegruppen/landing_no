@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
-import { CaseActionPanel, CloseCaseButton } from "@/components/admin-v2/case-action-panel";
+import { CaseActionPanel } from "@/components/admin-v2/case-action-panel";
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
 import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-editor";
@@ -10,6 +10,7 @@ import { InvoiceRecordPanel } from "@/components/admin-v2/invoice-record-panel";
 import { CaseLifecyclePanel } from "@/components/admin-v2/case-lifecycle-panel";
 import { ChangeAgreementPanel } from "@/components/admin-v2/change-agreement-panel";
 import { InformationRequestButton } from "@/components/admin-v2/information-request-button";
+import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -92,6 +93,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <CaseViewedMarker leadId={caseData.lead.id} reviewed={Boolean(caseData.lead.adminReviewedAt)} />
       <Link className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-accent" href="/admin-v2/cases">
         <ArrowLeft aria-hidden="true" className="size-4" />{copy.back}
       </Link>
@@ -148,7 +150,6 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               <div><dt className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.address}</dt><dd className="mt-2 inline-flex gap-2"><MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent" />{caseData.lead.address || "—"}</dd></div>
             </dl>
             {caseData.lead.message ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4 whitespace-pre-wrap text-sm text-white/85">{caseData.lead.message}</div> : null}
-            {caseData.lead.status !== "closed" ? <div className="mt-5 border-t border-white/10 pt-4"><CloseCaseButton leadId={caseData.lead.id} locale={user.interfaceLanguage} /></div> : null}
           </Section>
 
           <Section id="ai-section" title={copy.ai}>
@@ -262,8 +263,8 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
 
           <Section id="documents-section" title={copy.documents}>
             {caseData.invoice || caseData.warranty ? <div className="mb-4 grid gap-3">
-              {caseData.invoice ? <div className="rounded-xl border border-white/10 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.invoiceDraft}</p><strong>{caseData.invoice.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.invoice.status} /></div><p className="mt-2 text-sm text-muted-foreground">{nok(caseData.invoice.totalIncVatOre)} · {copy.due}: {formatDate(caseData.invoice.dueAt)}</p>{caseData.invoice.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.invoice.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}<InvoiceRecordPanel adminNote={caseData.invoice.adminNote} externalReference={caseData.invoice.externalReference} id={caseData.invoice.id} locale={user.interfaceLanguage} status={caseData.invoice.status || "draft"} /></div> : null}
-              {caseData.warranty ? <div className="rounded-xl border border-white/10 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.warranty}</p><strong>{caseData.warranty.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.warranty.status} /></div><p className="mt-2 text-sm text-muted-foreground">{copy.warrantyUntil}: {formatDate(caseData.warranty.endsAt)}</p>{caseData.warranty.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.warranty.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}</div> : null}
+              {caseData.invoice ? <div className="scroll-mt-24 rounded-xl border border-white/10 p-3" id={`invoice-${caseData.invoice.id}`}><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.invoiceDraft}</p><strong>{caseData.invoice.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.invoice.status} /></div><p className="mt-2 text-sm text-muted-foreground">{nok(caseData.invoice.totalIncVatOre)} · {copy.due}: {formatDate(caseData.invoice.dueAt)}</p>{caseData.invoice.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.invoice.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}<InvoiceRecordPanel adminNote={caseData.invoice.adminNote} externalReference={caseData.invoice.externalReference} id={caseData.invoice.id} locale={user.interfaceLanguage} status={caseData.invoice.status || "draft"} /></div> : null}
+              {caseData.warranty ? <div className="scroll-mt-24 rounded-xl border border-white/10 p-3" id={`warranty-${caseData.warranty.id}`}><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.warranty}</p><strong>{caseData.warranty.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.warranty.status} /></div><p className="mt-2 text-sm text-muted-foreground">{copy.warrantyUntil}: {formatDate(caseData.warranty.endsAt)}</p>{caseData.warranty.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.warranty.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}</div> : null}
             </div> : null}
             {caseData.documents.length ? <div className="grid min-w-0 gap-2">{caseData.documents.map((document) => <a className="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={document.href} key={document.id} rel="noreferrer" target="_blank"><span className="min-w-0 flex-1 truncate">{document.filename}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0" /></a>)}</div> : <p className="text-muted-foreground">{copy.noDocuments}</p>}
           </Section>

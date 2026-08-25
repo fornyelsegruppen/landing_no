@@ -30,6 +30,7 @@ const cardDefinitions = [
   { key: "needsScheduling", href: "/admin-v2/work?state=assigned" },
   { key: "activeWork", href: "/admin-v2/work?state=active" },
   { key: "completionReview", href: "/admin-v2?queue=completion-review" },
+  { key: "warranties", href: "/admin-v2?queue=warranties" },
 ] as const;
 
 function queueTitle(queue: AdminQueueKey, copy: ReturnType<typeof getAdminV2Copy>) {
@@ -47,6 +48,7 @@ function queueTitle(queue: AdminQueueKey, copy: ReturnType<typeof getAdminV2Copy
     attention: copy.needsAttention,
     "unassigned-work": copy.cards.unassignedWork,
     "upcoming-work": copy.next72Hours,
+    warranties: copy.cards.warranties,
   };
   return titles[queue];
 }
@@ -150,7 +152,7 @@ export default async function AdminV2Page({ searchParams }: { searchParams: Sear
                   </span>
                   <span className="text-sm text-muted-foreground">{item.status ? `${copy.status}: ${statusLabel(user.interfaceLanguage, item.status, { contract: queue === "contract-signing" })}` : ""}</span>
                   <span className="flex items-center justify-between gap-3 text-xs text-muted-foreground sm:justify-end">
-                    {item.createdAt ? dateFormatter.format(new Date(item.createdAt)) : ""}
+                    {item.eventAt || item.createdAt ? dateFormatter.format(new Date(item.eventAt || item.createdAt!)) : ""}
                     <ArrowRight aria-hidden="true" className="size-4 transition group-hover:text-accent" />
                   </span>
                 </Link>

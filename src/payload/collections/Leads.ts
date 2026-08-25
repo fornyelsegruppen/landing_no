@@ -238,6 +238,8 @@ export const Leads: CollectionConfig = {
     { name: "nextActionBlocker", type: "text", label: "Blokkeringskode", admin: { readOnly: true } },
     { name: "caseRevision", type: "number", label: "Saksversjon", required: true, defaultValue: 1, min: 1, admin: { readOnly: true } },
     { name: "lastContactAt", type: "date", label: "Sist kontaktet" },
+    { name: "adminReviewedAt", type: "date", label: "Først gjennomgått", index: true, admin: { readOnly: true } },
+    { name: "adminReviewedBy", type: "relationship", relationTo: "users", label: "Gjennomgått av", admin: { readOnly: true } },
     { name: "closedAt", type: "date", label: "Lukket" },
     { name: "qualification", type: "json", label: "AI-oppsummering (kontrolleres av admin)" },
     {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
-import { buildPlatformHealth } from "@/lib/platform/health";
+import { buildPlatformHealth, loadOperationalHealth } from "@/lib/platform/health";
 import { buildReleaseGate } from "@/lib/platform/release-gate";
 import { userIsAdmin } from "@/payload/access/roles";
 
@@ -22,6 +22,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       ...buildPlatformHealth(),
+      operational: await loadOperationalHealth(payload),
       releaseGate: buildReleaseGate(),
     }, {
       headers: { "Cache-Control": "no-store" },

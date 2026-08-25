@@ -13,7 +13,7 @@ const copies = {
     searchHint: "Søk på minst to tegn.",
     searchResults: "Søkeresultater",
     noSearchResults: "Ingen treff.",
-    resultTypes: { lead: "Henvendelse", quote: "Tilbud", contract: "Kontrakt", workOrder: "Oppdrag" },
+    resultTypes: { lead: "Henvendelse", quote: "Tilbud", contract: "Kontrakt", workOrder: "Oppdrag", invoice: "Fakturautkast", warranty: "Garanti", document: "Dokument" },
     navigation: {
       overview: "Oversikt",
       leads: "Alle saker",
@@ -39,6 +39,7 @@ const copies = {
       needsScheduling: "Må planlegges",
       activeWork: "Aktive oppdrag",
       completionReview: "Ferdig – må sluttkontrolleres",
+      warranties: "Aktive garantier",
     },
     cases: {
       title: "Alle kundesaker",
@@ -118,7 +119,7 @@ const copies = {
     searchHint: "Įveskite bent du ženklus.",
     searchResults: "Paieškos rezultatai",
     noSearchResults: "Rezultatų nėra.",
-    resultTypes: { lead: "Užklausa", quote: "Pasiūlymas", contract: "Sutartis", workOrder: "Darbas" },
+    resultTypes: { lead: "Užklausa", quote: "Pasiūlymas", contract: "Sutartis", workOrder: "Darbas", invoice: "Sąskaitos juodraštis", warranty: "Garantija", document: "Dokumentas" },
     navigation: {
       overview: "Apžvalga",
       leads: "Visos bylos",
@@ -144,6 +145,7 @@ const copies = {
       needsScheduling: "Reikia suplanuoti",
       activeWork: "Aktyvūs darbai",
       completionReview: "Baigta – reikia galutinės patikros",
+      warranties: "Aktyvios garantijos",
     },
     cases: {
       title: "Visos klientų bylos",
@@ -223,7 +225,7 @@ const copies = {
     searchHint: "Enter at least two characters.",
     searchResults: "Search results",
     noSearchResults: "No results.",
-    resultTypes: { lead: "Enquiry", quote: "Quote", contract: "Contract", workOrder: "Work order" },
+    resultTypes: { lead: "Enquiry", quote: "Quote", contract: "Contract", workOrder: "Work order", invoice: "Invoice draft", warranty: "Warranty", document: "Document" },
     navigation: {
       overview: "Overview",
       leads: "All cases",
@@ -249,6 +251,7 @@ const copies = {
       needsScheduling: "Needs scheduling",
       activeWork: "Active jobs",
       completionReview: "Completed – final review required",
+      warranties: "Active warranties",
     },
     cases: {
       title: "All customer cases",

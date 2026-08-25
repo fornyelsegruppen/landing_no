@@ -14,6 +14,7 @@ export const adminQueueKeys = [
   "attention",
   "unassigned-work",
   "upcoming-work",
+  "warranties",
 ] as const;
 
 export type AdminQueueKey = (typeof adminQueueKeys)[number];
@@ -32,6 +33,7 @@ export type AdminDashboardCounts = {
   signedWithoutWork: number;
   unassignedWork: number;
   upcomingWork: number;
+  warranties: number;
 };
 
 export type AdminDashboardSnapshot =
@@ -41,6 +43,9 @@ export type AdminDashboardSnapshot =
 export type AdminListItem = {
   createdAt?: string;
   customer?: string;
+  eventAt?: string;
+  employee?: string;
+  arrivalWindow?: string;
   href: string;
   id: number | string;
   reference: string;
@@ -49,7 +54,7 @@ export type AdminListItem = {
 };
 
 export type AdminSearchResult = AdminListItem & {
-  type: "contract" | "lead" | "quote" | "workOrder";
+  type: "contract" | "document" | "invoice" | "lead" | "quote" | "warranty" | "workOrder";
 };
 
 export function normalizeAdminSearchTerm(value: unknown) {
@@ -71,7 +76,8 @@ function countTotal(result: { totalDocs: number }) {
 const activeLead: Where = { "lead.recordState": { equals: "active" } };
 const activeQuoteLead: Where = { "quote.lead.recordState": { equals: "active" } };
 const activeWorkLead: Where = { "workOrder.lead.recordState": { equals: "active" } };
-const newLeadWhere: Where = { and: [{ recordState: { equals: "active" } }, { status: { in: ["new", "draft_ready", "qualified"] } }] };
+const activeWarrantyLead: Where = { "lead.recordState": { equals: "active" } };
+const newLeadWhere: Where = { and: [{ recordState: { equals: "active" } }, { adminReviewedAt: { exists: false } }] };
 const activeWorkWhere: Where = { and: [activeLead, { status: { in: ["scheduled", "on_way", "arrived", "precheck", "ready", "in_progress"] } }] };
 
 async function loadSignedContractsWithoutWork(payload: Pick<Payload, "find">) {
@@ -130,6 +136,7 @@ export async function loadAdminDashboard(
       pendingContracts,
       changeAgreements,
       upcomingWork,
+      warranties,
       signedWithoutWork,
     ] = await Promise.all([
       payload.count({ collection: "leads", where: newLeadWhere }),
@@ -158,10 +165,11 @@ export async function loadAdminDashboard(
           and: [
             activeLead, { scheduledAt: { greater_than_equal: now.toISOString() } },
             { scheduledAt: { less_than_equal: next72Hours.toISOString() } },
-            { status: { not_in: ["cancelled", "completed", "documented"] } },
+            { status: { equals: "scheduled" } },
           ],
         },
       }),
+      payload.count({ collection: "warranties", where: { and: [activeWarrantyLead, { status: { equals: "active" } }] } }),
       loadSignedContractsWithoutWork(payload),
     ]);
 
@@ -188,6 +196,7 @@ export async function loadAdminDashboard(
         signedWithoutWork: signedWithoutWork.length,
         unassignedWork: countTotal(unassignedWork),
         upcomingWork: countTotal(upcomingWork),
+        warranties: countTotal(warranties),
       },
     };
   } catch {
@@ -244,13 +253,54 @@ function referenceItem(collection: "contracts" | "quotes" | "work-orders", doc: 
   const itemId = id(item.id);
   const quote = item.quote && typeof item.quote === "object" ? item.quote as Record<string, unknown> : null;
   const leadId = relationIdentifier(item.lead) ?? relationIdentifier(quote?.lead);
+  const employee = collection === "work-orders" ? relationLabel(item.assignedWorker) : undefined;
+  const arrivalWindow = collection === "work-orders" ? text(item.arrivalWindow) : undefined;
+  const workSummary = collection === "work-orders" ? text(item.workSummary) : undefined;
   return {
     id: itemId,
     reference: text(item.reference) || `#${itemId}`,
     customer: relationLabel(item.lead),
-    subtitle: collection === "work-orders" ? text(item.workSummary) : undefined,
+    subtitle: collection === "work-orders"
+      ? [workSummary, employee, arrivalWindow].filter(Boolean).join(" · ") || undefined
+      : undefined,
+    employee,
+    arrivalWindow,
     status: text(item.status),
     createdAt: text(item.createdAt),
+    eventAt: collection === "work-orders" ? text(item.scheduledAt) : text(item.createdAt),
+    href: leadId ? `/admin-v2/cases/${leadId}` : `/admin/collections/${collection}/${itemId}`,
+  };
+}
+
+function leadReferenceItem(collection: "invoice-records" | "warranties", doc: unknown): AdminListItem {
+  const item = asRecord(doc);
+  const itemId = id(item.id);
+  const leadId = relationIdentifier(item.lead);
+  return {
+    id: itemId,
+    reference: text(item.reference) || `#${itemId}`,
+    customer: relationLabel(item.lead),
+    subtitle: collection === "warranties" ? text(item.scope) : text(item.externalReference),
+    status: text(item.status),
+    createdAt: text(item.createdAt),
+    eventAt: collection === "warranties" ? text(item.endsAt) : text(item.dueAt),
+    href: leadId ? `/admin-v2/cases/${leadId}` : `/admin/collections/${collection}/${itemId}`,
+  };
+}
+
+function documentReferenceItem(collection: "change-agreements" | "roof-measurements", doc: unknown): AdminListItem {
+  const item = asRecord(doc);
+  const itemId = id(item.id);
+  const workOrder = item.workOrder && typeof item.workOrder === "object" ? item.workOrder as Record<string, unknown> : null;
+  const leadId = relationIdentifier(item.lead) ?? relationIdentifier(workOrder?.lead);
+  return {
+    id: itemId,
+    reference: text(item.reference) || `#${itemId}`,
+    customer: relationLabel(item.lead) || relationLabel(workOrder?.lead),
+    subtitle: collection === "change-agreements" ? text(item.summary) : text(item.normalizedAddress),
+    status: text(item.status),
+    createdAt: text(item.createdAt),
+    eventAt: text(item.createdAt),
     href: leadId ? `/admin-v2/cases/${leadId}` : `/admin/collections/${collection}/${itemId}`,
   };
 }
@@ -333,10 +383,14 @@ export async function loadAdminQueue(
         where: { and: [
           activeLead, { scheduledAt: { greater_than_equal: now.toISOString() } },
           { scheduledAt: { less_than_equal: next72Hours.toISOString() } },
-          { status: { not_in: ["cancelled", "completed", "documented"] } },
+          { status: { equals: "scheduled" } },
         ] },
       });
       return result.docs.map((doc) => referenceItem("work-orders", doc));
+    }
+    case "warranties": {
+      const result = await payload.find({ ...common, collection: "warranties", where: { and: [activeWarrantyLead, { status: { equals: "active" } }] } });
+      return result.docs.map((doc) => leadReferenceItem("warranties", doc));
     }
     case "attention": {
       const [work, measurements, prices, messages, operations, seo, leads] = await Promise.all([
@@ -374,12 +428,16 @@ export async function searchAdminRecords(
 ): Promise<AdminSearchResult[]> {
   const query = normalizeAdminSearchTerm(rawQuery);
   if (query.length < 2) return [];
-  const common = { depth: 1, limit: 8, overrideAccess: true, sort: "-createdAt" as const };
-  const [leads, quotes, contracts, workOrders] = await Promise.all([
-    payload.find({ ...common, collection: "leads", where: { and: [{ recordState: { equals: "active" } }, containsAny(["name", "email", "phone", "address", "houseNumber", "postal", "city"], query)] } }),
-    payload.find({ ...common, collection: "quotes", where: { and: [activeLead, { reference: { contains: query } }] } }),
-    payload.find({ ...common, collection: "contracts", where: { and: [activeQuoteLead, { reference: { contains: query } }] } }),
-    payload.find({ ...common, collection: "work-orders", where: { and: [activeLead, { reference: { contains: query } }] } }),
+  const common = { depth: 2, limit: 8, overrideAccess: true, sort: "-createdAt" as const };
+  const [leads, quotes, contracts, workOrders, invoices, warranties, measurements, changes] = await Promise.all([
+    payload.find({ ...common, collection: "leads", where: containsAny(["name", "email", "phone", "address", "houseNumber", "postal", "city"], query) }),
+    payload.find({ ...common, collection: "quotes", where: { reference: { contains: query } } }),
+    payload.find({ ...common, collection: "contracts", where: { reference: { contains: query } } }),
+    payload.find({ ...common, collection: "work-orders", where: { reference: { contains: query } } }),
+    payload.find({ ...common, collection: "invoice-records", where: { or: [{ reference: { contains: query } }, { externalReference: { contains: query } }] } }),
+    payload.find({ ...common, collection: "warranties", where: { reference: { contains: query } } }),
+    payload.find({ ...common, collection: "roof-measurements", where: { reference: { contains: query } } }),
+    payload.find({ ...common, collection: "change-agreements", where: { reference: { contains: query } } }),
   ]);
 
   return [
@@ -387,5 +445,9 @@ export async function searchAdminRecords(
     ...quotes.docs.map((doc) => ({ ...referenceItem("quotes", doc), type: "quote" as const })),
     ...contracts.docs.map((doc) => ({ ...referenceItem("contracts", doc), type: "contract" as const })),
     ...workOrders.docs.map((doc) => ({ ...referenceItem("work-orders", doc), type: "workOrder" as const })),
+    ...invoices.docs.map((doc) => ({ ...leadReferenceItem("invoice-records", doc), type: "invoice" as const })),
+    ...warranties.docs.map((doc) => ({ ...leadReferenceItem("warranties", doc), type: "warranty" as const })),
+    ...measurements.docs.map((doc) => ({ ...documentReferenceItem("roof-measurements", doc), type: "document" as const })),
+    ...changes.docs.map((doc) => ({ ...documentReferenceItem("change-agreements", doc), type: "document" as const })),
   ].slice(0, 24);
 }

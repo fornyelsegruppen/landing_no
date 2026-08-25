@@ -708,6 +708,8 @@ export interface Lead {
   trashedBy?: (number | null) | User;
   purgeAfter?: string | null;
   assignedTo?: (number | null) | User;
+  adminReviewedAt?: string | null;
+  adminReviewedBy?: (number | null) | User;
   nextAction?: string | null;
   nextActionAt?: string | null;
   nextActionOwner?: ('administrator' | 'customer' | 'system' | 'worker') | null;
@@ -1936,6 +1938,8 @@ export interface LeadsSelect<T extends boolean = true> {
   trashedBy?: T;
   purgeAfter?: T;
   assignedTo?: T;
+  adminReviewedAt?: T;
+  adminReviewedBy?: T;
   nextAction?: T;
   nextActionAt?: T;
   nextActionOwner?: T;

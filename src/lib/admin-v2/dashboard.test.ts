@@ -25,7 +25,7 @@ describe("admin v2 dashboard", () => {
   });
 
   it("loads deterministic dashboard counts", async () => {
-    const totals = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61];
+    const totals = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67];
     const count = vi.fn().mockImplementation(async () => ({ totalDocs: totals.shift() }));
     const find = vi.fn().mockImplementation(async (input: { collection: string }) => {
       if (input.collection === "contracts") return { docs: [{ id: 101 }, { id: 102 }] };
@@ -52,10 +52,11 @@ describe("admin v2 dashboard", () => {
         pendingContracts: 53,
         changeAgreements: 59,
         upcomingWork: 61,
+        warranties: 67,
         signedWithoutWork: 1,
       },
     });
-    expect(count).toHaveBeenCalledTimes(18);
+    expect(count).toHaveBeenCalledTimes(19);
     expect(find).toHaveBeenCalledTimes(2);
   });
 
@@ -124,6 +125,35 @@ describe("admin v2 dashboard", () => {
     }));
   });
 
+  it("keeps started work out of the upcoming queue", async () => {
+    const find = vi.fn().mockResolvedValue({ docs: [] });
+
+    await loadAdminQueue(
+      { find } as unknown as Pick<Payload, "find">,
+      "upcoming-work",
+      new Date("2026-08-25T08:00:00.000Z"),
+    );
+
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "work-orders",
+      where: expect.objectContaining({ and: expect.arrayContaining([{ status: { equals: "scheduled" } }]) }),
+    }));
+  });
+
+  it("uses the first admin review marker instead of a technical lead status", async () => {
+    const find = vi.fn().mockResolvedValue({ docs: [] });
+
+    await loadAdminQueue(
+      { find } as unknown as Pick<Payload, "find">,
+      "new-leads",
+    );
+
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "leads",
+      where: { and: [{ recordState: { equals: "active" } }, { adminReviewedAt: { exists: false } }] },
+    }));
+  });
+
   it("does not query for a one-character universal search", async () => {
     const find = vi.fn();
     await expect(searchAdminRecords({ find } as unknown as Pick<Payload, "find">, "a")).resolves.toEqual([]);
@@ -135,22 +165,38 @@ describe("admin v2 dashboard", () => {
       .mockResolvedValueOnce({ docs: [{ id: 7, name: "Ola Nordmann", address: "Testveien", postal: "0001", city: "Oslo", status: "new" }] })
       .mockResolvedValueOnce({ docs: [{ id: 8, reference: "TIL-100", status: "draft" }] })
       .mockResolvedValueOnce({ docs: [] })
-      .mockResolvedValueOnce({ docs: [{ id: 9, reference: "JOB-100", status: "scheduled" }] });
+      .mockResolvedValueOnce({ docs: [{ id: 9, reference: "JOB-100", status: "scheduled" }] })
+      .mockResolvedValueOnce({ docs: [{ id: 10, reference: "FU-100", status: "draft", lead: { id: 7, name: "Ola Nordmann" } }] })
+      .mockResolvedValueOnce({ docs: [{ id: 11, reference: "G-100", status: "active", lead: { id: 7, name: "Ola Nordmann" } }] })
+      .mockResolvedValueOnce({ docs: [{ id: 12, reference: "TM-100", status: "approved", lead: { id: 7, name: "Ola Nordmann" } }] })
+      .mockResolvedValueOnce({ docs: [{ id: 13, reference: "EA-100", status: "accepted", workOrder: { lead: { id: 7, name: "Ola Nordmann" } } }] });
 
     const results = await searchAdminRecords(
       { find } as unknown as Pick<Payload, "find">,
       "  Ola  ",
     );
 
-    expect(find).toHaveBeenCalledTimes(4);
-    expect(find.mock.calls[0]?.[0].where.and[1].or).toEqual(
+    expect(find).toHaveBeenCalledTimes(8);
+    expect(find.mock.calls[0]?.[0].where.or).toEqual(
       expect.arrayContaining([
         { name: { contains: "Ola" } },
         { phone: { contains: "Ola" } },
         { address: { contains: "Ola" } },
       ]),
     );
-    expect(results.map((result) => result.type)).toEqual(["lead", "quote", "workOrder"]);
+    expect(results.map((result) => result.type)).toEqual(["lead", "quote", "workOrder", "invoice", "warranty", "document", "document"]);
     expect(results[0]?.subtitle).toBe("Testveien 0001 Oslo");
+  });
+
+  it("includes archived and trashed customer cases in universal search", async () => {
+    const find = vi.fn().mockResolvedValue({ docs: [] });
+
+    await searchAdminRecords({ find } as unknown as Pick<Payload, "find">, "Ola");
+
+    expect(find.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      collection: "leads",
+      where: expect.objectContaining({ or: expect.any(Array) }),
+    }));
+    expect(JSON.stringify(find.mock.calls[0]?.[0].where)).not.toContain("recordState");
   });
 });

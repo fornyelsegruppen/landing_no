@@ -23,6 +23,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("retry_send"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("request_information") }),
   z.object({ action: z.literal("start_measurement") }),
+  z.object({ action: z.literal("mark_reviewed") }),
   z.object({ action: z.literal("update_intake"), expectedRevision: z.number().int().positive(), address: z.string().trim().min(2).max(200), postal: z.string().regex(/^\d{4}$/), city: z.string().trim().max(100).optional(), inquiryType: z.enum(["takvask", "takvask_impregnering", "impregnering", "takmaling", "nytt_tak", "usikker"]) }),
   z.object({ action: z.literal("close") }),
 ]);
@@ -158,6 +159,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const updated = await updateCaseState(payload, { leadId, actorId: user.id, expectedRevision: parsed.data.expectedRevision, command: "update_intake", idempotencyKey: `${correlationId}:update-intake`, patch: { address: parsed.data.address, postal: parsed.data.postal, city: parsed.data.city || null, inquiryType: parsed.data.inquiryType, nextAction: "Finn og kontroller riktig bygning.", nextActionOwner: "administrator", nextActionAt: new Date().toISOString() } });
       const updatedLead = "lead" in updated ? updated.lead : updated;
       result = { updated: true, lead: { id: updatedLead.id, address: updatedLead.address, postal: updatedLead.postal, city: updatedLead.city, inquiryType: updatedLead.inquiryType } };
+    } else if (parsed.data.action === "mark_reviewed") {
+      const reviewedAt = lead.adminReviewedAt || new Date().toISOString();
+      if (!lead.adminReviewedAt) {
+        await payload.update({
+          collection: "leads",
+          id: leadId,
+          depth: 0,
+          overrideAccess: true,
+          data: { adminReviewedAt: reviewedAt, adminReviewedBy: user.id },
+        });
+      }
+      result = { reviewedAt };
     } else if (parsed.data.action === "start_measurement") {
       await updateCaseState(payload, { leadId, actorId: user.id, command: "start_measurement", idempotencyKey: `${correlationId}:start-measurement`, patch: { status: "measuring", nextActionOwner: "administrator", nextAction: "Start kontrollert takmåling.", nextActionAt: new Date().toISOString() } });
       result = { status: "measuring" };
@@ -176,6 +189,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         ? ["message.status", "message.approvedAt"]
         : parsed.data.action === "update_intake"
           ? ["address", "postal", "city", "inquiryType"]
+          : parsed.data.action === "mark_reviewed"
+            ? ["adminReviewedAt", "adminReviewedBy"]
           : ["status", "nextAction"],
     });
     return NextResponse.json({ ok: true, ...result });

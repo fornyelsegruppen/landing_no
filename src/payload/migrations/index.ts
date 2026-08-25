@@ -31,6 +31,7 @@ import * as migration_20260825_190000_completion_invoice_warranty from "./202608
 import * as migration_20260825_210000_lead_archive_trash from "./20260825_210000_lead_archive_trash";
 import * as migration_20260825_220000_case_state_engine from "./20260825_220000_case_state_engine";
 import * as migration_20260825_230000_measurement_evidence from "./20260825_230000_measurement_evidence";
+import * as migration_20260825_235000_admin_operations from "./20260825_235000_admin_operations";
 
 export const migrations = [
   {
@@ -197,5 +198,10 @@ export const migrations = [
     up: migration_20260825_230000_measurement_evidence.up,
     down: migration_20260825_230000_measurement_evidence.down,
     name: "20260825_230000_measurement_evidence",
+  },
+  {
+    up: migration_20260825_235000_admin_operations.up,
+    down: migration_20260825_235000_admin_operations.down,
+    name: "20260825_235000_admin_operations",
   },
 ];

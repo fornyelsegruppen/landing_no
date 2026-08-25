@@ -165,6 +165,7 @@ export type AdminCase = {
     archiveClassification?: string;
     archiveReason?: string;
     archivedAt?: string;
+    adminReviewedAt?: string;
     assignedTo?: string;
     createdAt?: string;
     email?: string;
@@ -348,7 +349,11 @@ function makeTimeline(type: CaseTimelineItem["type"], _collection: string, raw: 
               ? "#contract-section"
               : type === "work"
                 ? "#work-section"
-                : "#changes-section",
+                : type === "invoice"
+                  ? `#invoice-${id}`
+                  : type === "warranty"
+                    ? `#warranty-${id}`
+                    : "#changes-section",
   };
 }
 
@@ -642,6 +647,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       archiveClassification: stringValue(lead.archiveClassification),
       archiveReason: stringValue(lead.archiveReason),
       archivedAt: stringValue(lead.archivedAt),
+      adminReviewedAt: stringValue(lead.adminReviewedAt),
       postal: stringValue(lead.postal),
       inquiryType: stringValue(lead.inquiryType),
       message: stringValue(lead.message),
