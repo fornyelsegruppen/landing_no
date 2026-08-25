@@ -39,13 +39,13 @@ Ingen risikofunksjon aktiveres i produksjon før dens rad i go/no-go-registeret 
 
 | Felt | Verdi |
 |---|---|
-| Staging-URL | Ikke opprettet |
-| Commit | Fylles ved deploy |
+| Staging-URL | `https://takfornyelse-staging.vercel.app` → Preview `landing-qso18lkhl-darbasnorvegija4-8212s-projects.vercel.app` |
+| Commit | `df03dbd`; quality run `32903823308` bestått |
 | Vercel-prosjekt | `darbasnorvegija4-8212s-projects/landing-no` bekreftet; preview støttes |
-| Preview database/secrets | Ikke opprettet; kritiske variabler er Production-only |
-| Stagingdatabase/snapshot | Ikke opprettet |
-| Restore-test | Ikke utført |
-| Automatisk QA | Lokal teknisk QA bestått; gjentas i staging |
+| Preview database/secrets | Separat Preview-database, Payload-secret, Resend, Gemini, Upstash, Turnstile og privat Blob er bekreftet; Production-secrets gjenbrukes ikke |
+| Stagingdatabase/snapshot | Separat Preview-database finnes; produksjonssnapshot er ikke opprettet |
+| Restore-test | Syntetisk PostgreSQL dump/restore bestått i run `32903823308`; produksjonssnapshot-restore gjenstår |
+| Automatisk QA | Lint, TypeScript, 463 unit/API, 31 migrasjoner, build, 11 E2E og restore bestått i run `32903823308` |
 | Manuell QA | Ikke signert |
 | Leadpilot 20–30 | Ikke startet |
 | Takmåling mot fasit | Ikke startet |
