@@ -30,6 +30,11 @@ Den autentiserte helhetsrevisjonen 25. august 2026 avdekket gjenstående avvik i
 - [F0 – baseline, contracts and rollback](./phase-f0-baseline-and-rollback.md)
 - [F1 – data consistency and legacy reconciliation](./phase-f1-data-consistency.md)
 - [F2 – immutable roof measurement evidence](./phase-f2-measurement-evidence.md)
+- [F3 – administrator measurement workbench](./phase-f3-admin-measurement-workbench.md)
+- [F4 – document measurement evidence](./phase-f4-document-measurement-evidence.md)
+- [F5 – operational exceptions](./phase-f5-operational-exceptions.md)
+- [F6 – communication reliability and scheduling](./phase-f6-communications-reliability.md)
+- [F7 – administrator operations workspace](./phase-f7-admin-operations.md)
 
 ## Operativ admin A0–A9
 
