@@ -152,4 +152,28 @@ describe("work-order communications", () => {
     expect(rows.messages[0].bodyText).toContain("08:00–10:00");
     expect(rows.messages[0].bodyHtml).toContain("Takfornyelse");
   });
+
+  it("never sends a same-day reminder after the visit has started", async () => {
+    const order = { id: 11, lead: 4, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T06:00:00Z", arrivalWindow: "08:00–10:00", afterPhotos: [] };
+    const { payload, rows } = fakePayload({ order, lead: { id: 4, name: "Ola", email: "ola@example.no", preferredChannel: "email" }, worker: { id: 5, displayName: "Kari", phone: "+47 900 00 000" } });
+    await expect(processWorkOrderCommunicationJob(payload, { workOrderId: 11, kind: "same_day", scheduleVersion: workOrderScheduleVersion(order) }, "correlation-late", new Date("2026-08-27T06:00:01Z"))).rejects.toBeInstanceOf(CommunicationCancelledError);
+    expect(rows.messages).toHaveLength(0);
+  });
+
+  it("creates one clear rescheduling message with the old plan, new plan and reason", async () => {
+    const order = { id: 12, lead: 4, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-29T06:00:00Z", arrivalWindow: "08:00–10:00", afterPhotos: [] };
+    const { payload, rows } = fakePayload({ order, lead: { id: 4, name: "Ola", email: "ola@example.no", preferredChannel: "email" }, worker: { id: 5, displayName: "Kari", phone: "+47 900 00 000" } });
+    await processWorkOrderCommunicationJob(payload, {
+      workOrderId: 12,
+      kind: "reschedule_confirmation",
+      scheduleVersion: workOrderScheduleVersion(order),
+      previousScheduledAt: "2026-08-28T06:00:00Z",
+      previousArrivalWindow: "10:00–12:00",
+      planningReason: "Kraftig regn",
+    }, "correlation-reschedule", new Date("2026-08-25T06:00:00Z"));
+    expect(rows.messages).toHaveLength(1);
+    expect(rows.messages[0].bodyText).toContain("Kraftig regn");
+    expect(rows.messages[0].bodyText).toContain("10:00–12:00");
+    expect(rows.messages[0].bodyText).toContain("08:00–10:00");
+  });
 });

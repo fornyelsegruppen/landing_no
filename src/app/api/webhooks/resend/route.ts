@@ -3,6 +3,8 @@ import { Resend } from "resend";
 import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
 import { applyResendWebhookEvent } from "@/lib/messages/resend-webhook";
+import { applyResendInboundEmail } from "@/lib/messages/resend-inbound";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 
 export const runtime = "nodejs";
 
@@ -23,7 +25,13 @@ export async function POST(request: Request) {
       webhookSecret,
     });
     const payload = await getPayload();
-    const result = await applyResendWebhookEvent(payload, event);
+    const result = event.type === "email.received"
+      ? await applyResendInboundEmail(payload, event.data, async (emailId) => {
+          const received = await new Resend(process.env.RESEND_API_KEY || "").emails.receiving.get(emailId);
+          if (received.error || !received.data) throw new Error("Inbound email content could not be retrieved");
+          return received.data;
+        }, correlationIdFromHeaders(request.headers))
+      : await applyResendWebhookEvent(payload, event);
     return NextResponse.json({ ok: true, matched: result.matched });
   } catch (error) {
     captureException(error, { route: "POST /api/webhooks/resend", operation: "verify-or-apply" });

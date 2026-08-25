@@ -9,7 +9,7 @@ import { buildBrandedEmailHtml } from "@/lib/messages/email-template";
 import { siteConfig } from "@/lib/site";
 import { relationId } from "./access";
 
-export type WorkOrderCommunicationKind = "schedule_confirmation" | "reminder_48h" | "same_day" | "on_way" | "arrived" | "work_started" | "completion";
+export type WorkOrderCommunicationKind = "schedule_confirmation" | "reschedule_confirmation" | "reminder_48h" | "same_day" | "on_way" | "arrived" | "work_started" | "completion";
 
 type CommunicationOrder = {
   id: number;
@@ -20,7 +20,7 @@ type CommunicationOrder = {
   documentationSubmittedAt?: string | null;
 };
 
-const scheduleKinds: WorkOrderCommunicationKind[] = ["schedule_confirmation", "reminder_48h", "same_day"];
+const scheduleKinds: WorkOrderCommunicationKind[] = ["schedule_confirmation", "reschedule_confirmation", "reminder_48h", "same_day"];
 const statusForKind: Partial<Record<WorkOrderCommunicationKind, string>> = {
   on_way: "on_way",
   arrived: "arrived",
@@ -35,12 +35,19 @@ export class ChannelUnavailableError extends Error {
   constructor(message: string) { super(message); this.name = "ChannelUnavailableError"; }
 }
 
-type JobPayload = { workOrderId: number; kind: WorkOrderCommunicationKind; scheduleVersion: string };
+type JobPayload = {
+  workOrderId: number;
+  kind: WorkOrderCommunicationKind;
+  scheduleVersion: string;
+  previousScheduledAt?: string | null;
+  previousArrivalWindow?: string | null;
+  planningReason?: string | null;
+};
 
 function parseJobPayload(value: unknown): JobPayload | null {
   if (!value || typeof value !== "object") return null;
   const data = value as Record<string, unknown>;
-  if (typeof data.workOrderId !== "number" || typeof data.scheduleVersion !== "string" || !["schedule_confirmation", "reminder_48h", "same_day", "on_way", "arrived", "work_started", "completion"].includes(String(data.kind))) return null;
+  if (typeof data.workOrderId !== "number" || typeof data.scheduleVersion !== "string" || !["schedule_confirmation", "reschedule_confirmation", "reminder_48h", "same_day", "on_way", "arrived", "work_started", "completion"].includes(String(data.kind))) return null;
   return data as JobPayload;
 }
 
@@ -231,6 +238,43 @@ export async function dispatchWorkOrderCommunicationNow(
   }
 }
 
+export async function dispatchWorkOrderRescheduleNow(
+  payload: Payload,
+  order: CommunicationOrder,
+  previous: Pick<CommunicationOrder, "scheduledAt" | "arrivalWindow">,
+  planningReason: string,
+  correlationId: string,
+  provider: EmailProvider = createEmailProvider(),
+) {
+  if (!planningReason.trim()) throw new TypeError("A rescheduling reason is required");
+  if (!order.scheduledAt || order.status !== "scheduled") throw new CommunicationCancelledError("A new complete schedule is required");
+  const input: JobPayload = {
+    workOrderId: order.id,
+    kind: "reschedule_confirmation",
+    scheduleVersion: workOrderScheduleVersion(order),
+    previousScheduledAt: previous.scheduledAt,
+    previousArrivalWindow: previous.arrivalWindow,
+    planningReason: planningReason.trim(),
+  };
+  const job = await createJob(payload, input, new Date(), correlationId);
+  const attempts = (job.attempts || 0) + 1;
+  await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: { status: "running", attempts, startedAt: new Date().toISOString() } });
+  try {
+    const communication = await processWorkOrderCommunicationJob(payload, input, correlationId);
+    if (provider.health().status !== "ready") throw new Error("Email provider requires configuration");
+    await deliverMessage(payload, provider, communication.message.id, correlationId);
+    const deliveryJob = await enqueueMessageJob(payload, communication.message.id, correlationId);
+    const completedAt = new Date().toISOString();
+    await payload.update({ collection: "operational-jobs", id: deliveryJob.id, overrideAccess: true, data: { status: "completed", completedAt, result: { processed: true, immediate: true }, lastErrorCode: null, lastErrorMessage: null } });
+    await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: { status: "completed", completedAt, result: { processed: true, immediate: true }, lastErrorCode: null, lastErrorMessage: null } });
+    return { skipped: false as const, delivered: true as const, queued: false as const, message: communication.message, job };
+  } catch (error) {
+    const sanitized = sanitizeJobError(error);
+    await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: { status: "retry", availableAt: new Date(Date.now() + 5 * 60_000).toISOString(), lastErrorCode: sanitized.code, lastErrorMessage: sanitized.message } });
+    return { skipped: false as const, delivered: false as const, queued: true as const, job };
+  }
+}
+
 export async function notifyAssignedWorkerNow(
   payload: Payload,
   order: CommunicationOrder,
@@ -255,13 +299,18 @@ export async function notifyAssignedWorkerNow(
   });
 }
 
-function copyFor(kind: WorkOrderCommunicationKind, input: { leadName: string; scheduledAt?: string | null; arrivalWindow?: string | null; workerName?: string | null; workerPhone?: string | null }) {
+function copyFor(kind: WorkOrderCommunicationKind, input: { leadName: string; scheduledAt?: string | null; arrivalWindow?: string | null; workerName?: string | null; workerPhone?: string | null; previousScheduledAt?: string | null; previousArrivalWindow?: string | null; planningReason?: string | null }) {
   const when = input.scheduledAt ? new Date(input.scheduledAt).toLocaleDateString("nb-NO", { dateStyle: "long", timeZone: "Europe/Oslo" }) : "avtalt dato";
   const window = input.arrivalWindow ? `kl. ${input.arrivalWindow}` : input.scheduledAt ? `kl. ${new Date(input.scheduledAt).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" })}` : "avtalt tid";
   const workerName = input.workerName || "vår medarbeider";
   const workerPhone = input.workerPhone || siteConfig.phone;
   const contact = `Ansvarlig medarbeider: ${workerName}\nTelefon: ${workerPhone}`;
   if (kind === "schedule_confirmation") return { category: "schedule_confirmation" as const, subject: "Medarbeider og tid er avtalt for takarbeidet", body: `Hei ${input.leadName},\n\nVi har nå tildelt en medarbeider til oppdraget ditt.\n\nDato: ${when}\nAvtalt ankomst: ${window}\n${contact}\n\nMedarbeideren varsler deg når han eller hun er på vei. Gi oss beskjed så snart som mulig dersom tidspunktet ikke passer.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  if (kind === "reschedule_confirmation") {
+    const previousDate = input.previousScheduledAt ? new Date(input.previousScheduledAt).toLocaleDateString("nb-NO", { dateStyle: "long", timeZone: "Europe/Oslo" }) : "tidligere avtalt dato";
+    const previousWindow = input.previousArrivalWindow ? `kl. ${input.previousArrivalWindow}` : "tidligere avtalt tid";
+    return { category: "schedule_confirmation" as const, subject: "Ny tid for takarbeidet", body: `Hei ${input.leadName},\n\nVi må dessverre oppdatere tidspunktet for oppdraget ditt.\n\nTidligere plan: ${previousDate}, ${previousWindow}\nNy plan: ${when}, ${window}\nÅrsak: ${input.planningReason || "Planen måtte oppdateres"}\n\n${contact}\n\nBeklager ulempen. Gi oss beskjed så snart som mulig dersom den nye tiden ikke passer.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  }
   if (kind === "reminder_48h") return { category: "reminder" as const, subject: "Påminnelse om takarbeid om 48 timer", body: `Hei ${input.leadName},\n\nDette er en påminnelse om at vi kommer ${when}, med avtalt ankomst ${window}.\n\n${contact}\n\nSørg for at vi har nødvendig tilgang til eiendommen, og kontakt oss dersom noe har endret seg.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
   if (kind === "same_day") return { category: "reminder" as const, subject: "Vi kommer i dag", body: `Hei ${input.leadName},\n\nVi minner om at oppdraget er planlagt i dag med avtalt ankomst ${window}.\n\n${contact}\n\nDu får en ny beskjed når medarbeideren er på vei.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
   if (kind === "on_way") return { category: "reminder" as const, subject: "Medarbeideren er på vei", body: `Hei ${input.leadName},\n\n${workerName} er nå på vei til eiendommen din. Planlagt ankomst er ${window}.\n\n${contact}\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
@@ -270,11 +319,14 @@ function copyFor(kind: WorkOrderCommunicationKind, input: { leadName: string; sc
   return { category: "completion" as const, subject: "Takarbeidet er fullført og dokumentert", body: `Hei ${input.leadName},\n\nArbeidet er fullført og sluttkontrollert. Garantibekreftelse, relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Eventuell faktura sendes separat etter godkjent bokføring. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n${siteConfig.phone}` };
 }
 
-export async function processWorkOrderCommunicationJob(payload: Payload, value: unknown, correlationId: string) {
+export async function processWorkOrderCommunicationJob(payload: Payload, value: unknown, correlationId: string, clock = new Date()) {
   const input = parseJobPayload(value);
   if (!input) throw new TypeError("Communication job has no valid work-order reference");
   const order = await payload.findByID({ collection: "work-orders", id: input.workOrderId, depth: 0, overrideAccess: true });
   if (!communicationIsCurrent(input, order)) throw new CommunicationCancelledError("Work schedule or status changed before communication was sent");
+  if (["reminder_48h", "same_day"].includes(input.kind) && order.scheduledAt && clock >= new Date(order.scheduledAt)) {
+    throw new CommunicationCancelledError("A visit reminder cannot be sent after the visit has started");
+  }
   const leadId = relationId(order.lead);
   if (!leadId) throw new TypeError("Work order has no lead");
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
@@ -286,7 +338,7 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
   if (existing.docs[0]) return { duplicate: true as const, message: existing.docs[0] };
   const workerId = relationId(order.assignedWorker);
   const worker = workerId ? await payload.findByID({ collection: "users", id: workerId, depth: 0, overrideAccess: true }) : null;
-  const copy = copyFor(input.kind, { leadName: lead.name, scheduledAt: order.scheduledAt, arrivalWindow: order.arrivalWindow, workerName: worker?.displayName || worker?.email, workerPhone: worker?.phone });
+  const copy = copyFor(input.kind, { leadName: lead.name, scheduledAt: order.scheduledAt, arrivalWindow: order.arrivalWindow, workerName: worker?.displayName || worker?.email, workerPhone: worker?.phone, previousScheduledAt: input.previousScheduledAt, previousArrivalWindow: input.previousArrivalWindow, planningReason: input.planningReason });
   const attachments: number[] = [];
   if (input.kind === "completion") {
     const contractId = relationId(order.contract);
@@ -300,8 +352,8 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
     const warrantyDocumentId = relationId(warranties.docs[0]?.document);
     if (warrantyDocumentId) attachments.push(warrantyDocumentId);
   }
-  const now = new Date().toISOString();
-  const message = await payload.create({ collection: "messages", overrideAccess: true, data: { lead: lead.id, direction: "outbound", category: copy.category, channel: "email", subject: copy.subject, bodyText: copy.body, bodyHtml: buildBrandedEmailHtml({ subject: copy.subject, text: copy.body }), attachments, status: "queued", idempotencyKey, aiAssisted: false, approvedAt: now, queuedAt: now, aiAnalysis: { workOrderId: order.id, communicationKind: input.kind, scheduleVersion: input.scheduleVersion } } });
+  const nowIso = clock.toISOString();
+  const message = await payload.create({ collection: "messages", overrideAccess: true, data: { lead: lead.id, direction: "outbound", category: copy.category, channel: "email", subject: copy.subject, bodyText: copy.body, bodyHtml: buildBrandedEmailHtml({ subject: copy.subject, text: copy.body }), attachments, status: "queued", idempotencyKey, aiAssisted: false, approvedAt: nowIso, queuedAt: nowIso, aiAnalysis: { workOrderId: order.id, communicationKind: input.kind, scheduleVersion: input.scheduleVersion } } });
   await enqueueMessageJob(payload, message.id, correlationId);
   return { duplicate: false as const, message };
 }

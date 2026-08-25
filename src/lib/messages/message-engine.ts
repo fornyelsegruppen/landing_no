@@ -7,6 +7,8 @@ import { assertMessageCanDeliver } from "./message-policy";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
 import { buildBrandedEmailHtml } from "./email-template";
 import { updateCaseState } from "@/lib/cases/case-command";
+import { caseReplyAddress } from "./case-reply";
+import { enqueueQuoteFollowUps } from "@/lib/quotes/follow-up-schedule";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -207,7 +209,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       subject: message.subject,
       text: message.bodyText,
       html: message.bodyHtml || buildBrandedEmailHtml({ subject: message.subject, text: message.bodyText }),
-      replyTo: process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
+      replyTo: caseReplyAddress(lead.id) || process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
       idempotencyKey: message.idempotencyKey,
       correlationId,
       ...(attachments.length ? { attachments } : {}),
@@ -236,6 +238,8 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
           await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
         }
       }
+      const primary = await payload.findByID({ collection: "quotes", id: analysis.quoteId, depth: 0, overrideAccess: true });
+      await enqueueQuoteFollowUps(payload, { quoteId: primary.id, leadId: lead.id, validUntil: primary.validUntil }, correlationId);
     }
     const followUp = message.category === "completion"
       ? {

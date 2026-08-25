@@ -12,7 +12,10 @@ export async function GET(request: Request) {
   if (!cronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const payload = await getPayload();
-    const result = await processOperationalJobs(payload, { rescueStale: true });
+    const requestUrl = new URL(request.url);
+    const requestedLimit = Number(requestUrl.searchParams.get("limit") || 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.floor(requestedLimit), 1), 50) : 10;
+    const result = await processOperationalJobs(payload, { rescueStale: true, limit });
     const invariants = await scanCaseInvariants(payload, { persist: true });
     return NextResponse.json({ ok: true, ...result, invariants });
   } catch (error) {

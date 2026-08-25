@@ -1,5 +1,7 @@
 import type { Payload } from "payload";
 import type { WebhookEventPayload } from "resend";
+import { updateCaseState } from "@/lib/cases/case-command";
+import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 
 type EmailWebhookEvent = Extract<WebhookEventPayload, { data: { email_id: string } }>;
 
@@ -52,6 +54,28 @@ export async function applyResendWebhookEvent(payload: Payload, event: WebhookEv
         failureMessage: "Leverandøren avviste eller stoppet meldingen. Kontroller adressen og leveringsloggen.",
       },
     });
+    const leadId = typeof message.lead === "number"
+      ? message.lead
+      : message.lead && typeof message.lead === "object" && "id" in message.lead
+        ? Number(message.lead.id)
+        : null;
+    if (leadId && Number.isSafeInteger(leadId)) {
+      const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+      const hasPhone = typeof lead.phone === "string" && lead.phone.trim().length >= 8;
+      await updateCaseState(payload, {
+        leadId,
+        command: "email_delivery_failed",
+        idempotencyKey: makeIdempotencyKey("email.delivery-failed", { messageId: message.id, type: event.type }),
+        patch: {
+          nextActionOwner: "administrator",
+          nextActionAt: new Date().toISOString(),
+          nextActionBlocker: "EMAIL_HARD_BOUNCE",
+          nextAction: hasPhone
+            ? "E-posten ble permanent avvist. Kontroller adressen og kontakt kunden manuelt på telefon. SMS-lenke kan først sendes når en godkjent SMS-leverandør er konfigurert."
+            : "E-posten ble permanent avvist, og kunden har ikke et gyldig telefonnummer. Finn en trygg manuell kontaktkanal.",
+        },
+      });
+    }
     return { matched: true as const, messageId: message.id, status: "attention" as const };
   }
 

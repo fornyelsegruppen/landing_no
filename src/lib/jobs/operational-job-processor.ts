@@ -7,6 +7,9 @@ import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { ChannelUnavailableError, CommunicationCancelledError, processWorkOrderCommunicationJob } from "@/lib/work-orders/communications";
 import { nextRetryDelayMs, sanitizeJobError } from "./job-policy";
+import { processQuoteFollowUpJob } from "@/lib/quotes/follow-up";
+import { updateCaseState } from "@/lib/cases/case-command";
+import { makeIdempotencyKey } from "./idempotency";
 
 type ProcessorOptions = {
   jobIds?: number[];
@@ -51,11 +54,56 @@ async function rescueStaleJobs(payload: Payload, now: Date) {
   return stale.docs.map((job) => job.id);
 }
 
+async function overduePendingJobIds(payload: Payload, now: Date) {
+  const overdueBefore = new Date(now.getTime() - 90 * 60_000).toISOString();
+  const result = await payload.find({
+    collection: "operational-jobs",
+    depth: 0,
+    limit: 50,
+    overrideAccess: true,
+    sort: "availableAt",
+    where: {
+      and: [
+        { status: { in: ["pending", "retry"] } },
+        { availableAt: { less_than_equal: overdueBefore } },
+      ],
+    },
+  });
+  return result.docs
+    .filter((job) => ["pending", "retry"].includes(job.status) && new Date(job.availableAt).getTime() <= new Date(overdueBefore).getTime())
+    .map((job) => job.id);
+}
+
+async function markMessageContactAttention(payload: Payload, messageId: number, reason: string, now: Date) {
+  const message = await payload.findByID({ collection: "messages", id: messageId, depth: 0, overrideAccess: true });
+  const leadId = typeof message.lead === "number"
+    ? message.lead
+    : message.lead && typeof message.lead === "object" && "id" in message.lead
+      ? Number(message.lead.id)
+      : null;
+  if (!leadId || !Number.isSafeInteger(leadId)) return;
+  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+  const hasPhone = typeof lead.phone === "string" && lead.phone.trim().length >= 8;
+  await updateCaseState(payload, {
+    leadId,
+    command: "message_delivery_attention",
+    idempotencyKey: makeIdempotencyKey("message.delivery-attention", { messageId, reason }),
+    patch: {
+      nextActionOwner: "administrator",
+      nextActionAt: now.toISOString(),
+      nextActionBlocker: "MESSAGE_DELIVERY_FAILED",
+      nextAction: hasPhone
+        ? "Kundemeldingen kunne ikke leveres. Kontroller e-postadressen og kontakt kunden manuelt på telefon."
+        : "Kundemeldingen kunne ikke leveres, og kunden har ingen brukbar reservekanal. Finn en trygg manuell kontaktmåte.",
+    },
+  });
+}
+
 export async function processOperationalJobs(payload: Payload, options: ProcessorOptions = {}) {
   const now = options.now || new Date();
   const rescued = options.rescueStale === false ? [] : await rescueStaleJobs(payload, now);
   const filters: Where[] = [
-    { type: { in: ["message.delivery", "lead.ai.draft", "work-order.communication"] } },
+    { type: { in: ["message.delivery", "lead.ai.draft", "work-order.communication", "quote.follow-up"] } },
     { status: { in: ["pending", "retry"] } },
     { availableAt: { less_than_equal: now.toISOString() } },
   ];
@@ -122,8 +170,10 @@ export async function processOperationalJobs(payload: Payload, options: Processo
             },
           };
         }
+      } else if (job.type === "work-order.communication") {
+        await processWorkOrderCommunicationJob(payload, job.payload, job.correlationId, now);
       } else {
-        await processWorkOrderCommunicationJob(payload, job.payload, job.correlationId);
+        jobResult = await processQuoteFollowUpJob(payload, job.payload, job.correlationId, now);
       }
 
       await payload.update({
@@ -168,6 +218,7 @@ export async function processOperationalJobs(payload: Payload, options: Processo
             overrideAccess: true,
             data: { status: "attention", failureCode: sanitized.code, failureMessage: sanitized.message },
           });
+          await markMessageContactAttention(payload, messageId, sanitized.code, now);
         }
       }
       if (exhausted) attention.push(job.id);
@@ -175,5 +226,6 @@ export async function processOperationalJobs(payload: Payload, options: Processo
     }
   }
 
-  return { completed, attention, retried, cancelled, rescued };
+  const overdue = await overduePendingJobIds(payload, now);
+  return { completed, attention, retried, cancelled, rescued, overdue };
 }

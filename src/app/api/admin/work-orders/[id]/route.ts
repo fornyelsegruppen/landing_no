@@ -7,7 +7,7 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { userIsAdmin } from "@/payload/access/roles";
 import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
-import { dispatchWorkOrderCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
+import { dispatchWorkOrderCommunicationNow, dispatchWorkOrderRescheduleNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { captureException } from "@/lib/monitoring";
 import { assertAssignableWorker } from "@/lib/work-orders/create";
 import { appendTimeline } from "@/lib/work-orders/access";
@@ -112,7 +112,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (updated.status === "scheduled") {
       try {
         await syncWorkOrderCommunicationJobs(payload, updated, correlationIdFromHeaders(request.headers));
-        const result = await dispatchWorkOrderCommunicationNow(payload, updated, "schedule_confirmation", correlationIdFromHeaders(request.headers));
+        const result = planningChanged && current.status !== "unassigned"
+          ? await dispatchWorkOrderRescheduleNow(payload, updated, current, parsed.data.planningReason || "Planen måtte oppdateres", correlationIdFromHeaders(request.headers))
+          : await dispatchWorkOrderCommunicationNow(payload, updated, "schedule_confirmation", correlationIdFromHeaders(request.headers));
         notification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
         if (planningChanged) await notifyAssignedWorkerNow(payload, updated, correlationIdFromHeaders(request.headers));
       } catch (error) {
