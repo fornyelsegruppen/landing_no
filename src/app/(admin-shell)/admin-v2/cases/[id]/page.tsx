@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import { CaseActionPanel, CloseCaseButton } from "@/components/admin-v2/case-action-panel";
+import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -37,6 +38,16 @@ function TechnicalLink({ entity, label }: { entity?: CaseEntity; label: string }
   return entity ? <Link className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-accent" href={entity.href}>{label}<ExternalLink aria-hidden="true" className="size-3.5" /></Link> : null;
 }
 
+function qualificationDetails(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  return {
+    summary: typeof record.summary === "string" ? record.summary : "",
+    missing: Array.isArray(record.missingInformation) ? record.missingInformation.filter((item): item is string => typeof item === "string") : [],
+    risks: Array.isArray(record.riskFlags) ? record.riskFlags.filter((item): item is string => typeof item === "string") : [],
+  };
+}
+
 export default async function AdminCasePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireAdminUser();
   const copy = getAdminCaseCopy(user.interfaceLanguage);
@@ -52,6 +63,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
     ? new Intl.NumberFormat(panelDateLocale(user.interfaceLanguage), { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(ore / 100)
     : "—";
   const area = (tenths?: number) => typeof tenths === "number" ? `${(tenths / 10).toLocaleString(panelDateLocale(user.interfaceLanguage))} m²` : "—";
+  const qualification = qualificationDetails(caseData.lead.qualification);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -107,8 +119,14 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="ai-section" title={copy.ai}>
-            {caseData.lead.qualification ? (
-              <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-white/10 bg-black/20 p-4 text-xs leading-relaxed text-white/75">{JSON.stringify(caseData.lead.qualification, null, 2)}</pre>
+            {qualification ? (
+              <div className="grid gap-4">
+                <div className="rounded-2xl border border-white/10 bg-black/15 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.aiSummary}</p><p className="mt-2 text-sm leading-relaxed text-white/85">{qualification.summary || copy.nothingReported}</p></div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.missingInformation}</p><p className="mt-2 text-sm">{qualification.missing.length ? qualification.missing.join(" · ") : copy.nothingReported}</p></div>
+                  <div className="rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.riskFlags}</p><p className="mt-2 text-sm">{qualification.risks.length ? qualification.risks.join(" · ") : copy.nothingReported}</p></div>
+                </div>
+              </div>
             ) : <p className="text-muted-foreground">{copy.missing}</p>}
             <div className="mt-4 rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.nextAction}</p><p className="mt-2 text-sm">{copy.actionLabels[caseData.nextAction.kind]}</p></div>
           </Section>
@@ -121,7 +139,16 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
                 <div><dt className="text-xs text-muted-foreground">{copy.confidence}</dt><dd className="mt-1 font-bold">{caseData.measurement.confidence || "—"}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">Horizontal</dt><dd className="mt-1 font-bold">{area(caseData.measurement.horizontalAreaTenths)}</dd></div>
               </dl>
+              {caseData.measurement.manualAreaOverrideTenths ? <div className="mt-4 rounded-xl border border-accent/30 bg-accent/8 p-3 text-sm"><strong className="text-accent">{copy.manualOverrideBadge}</strong><span className="ml-2">{area(caseData.measurement.manualAreaOverrideTenths)}</span>{caseData.measurement.manualOverrideReason ? <p className="mt-1 text-muted-foreground">{caseData.measurement.manualOverrideReason}</p> : null}{caseData.measurement.manualOverriddenAt ? <p className="mt-1 text-xs text-muted-foreground">{formatDate(caseData.measurement.manualOverriddenAt)}</p> : null}</div> : null}
               {caseData.measurement.confidenceReasoning ? <p className="mt-4 text-sm text-muted-foreground">{caseData.measurement.confidenceReasoning}</p> : null}
+              {["draft", "review_required"].includes(caseData.measurement.status || "") && caseData.measurement.actualAreaMaxTenths ? <MeasurementReviewPanel
+                canApprovePackage={caseData.nextAction.kind === "approve_package"}
+                currentAreaTenths={caseData.measurement.actualAreaMaxTenths}
+                leadId={caseData.lead.id}
+                locale={user.interfaceLanguage}
+                manualOverrideReason={caseData.measurement.manualOverrideReason}
+                measurementId={caseData.measurement.id}
+              /> : null}
               <TechnicalLink entity={caseData.measurement} label={copy.technicalDetail} />
             </> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
@@ -137,7 +164,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="messages-section" title={copy.messages}>
-            {caseData.messages.length ? <div className="grid gap-3">{caseData.messages.map((message) => <article className="rounded-2xl border border-white/10 bg-black/15 p-4" key={message.id}>
+            {caseData.messages.length ? <div className="grid gap-3">{caseData.messages.map((message) => <article className="scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4" id={`message-${message.id}`} key={message.id}>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{message.subject}</strong><p className="mt-1 text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
               <p className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap text-sm text-white/80">{message.bodyText}</p>
               {message.failureMessage ? <p className="mt-3 text-sm text-danger">{message.failureMessage}</p> : null}

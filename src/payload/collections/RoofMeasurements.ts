@@ -39,11 +39,26 @@ export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({ d
     hasApprovedPriceRule: rules.totalDocs > 0,
   });
   if (!prepared.gate.allowed) throw new Error(`Measurement approval blocked: ${prepared.gate.reasons.join(", ")}`);
-  data.horizontalAreaTenths = prepared.calculation?.horizontalAreaTenths ?? 0;
-  data.actualAreaMinTenths = prepared.calculation?.actualAreaMinTenths ?? 0;
-  data.actualAreaMaxTenths = prepared.calculation?.actualAreaMaxTenths ?? 0;
-  data.calculationSnapshot = prepared.calculation;
-  data.inputHash = prepared.inputHash;
+  const storedCalculation = merged.calculationSnapshot && typeof merged.calculationSnapshot === "object"
+    ? merged.calculationSnapshot as Record<string, unknown>
+    : null;
+  const manualOverride = storedCalculation?.manualOverride && typeof storedCalculation.manualOverride === "object"
+    ? storedCalculation.manualOverride as Record<string, unknown>
+    : null;
+  const manualAreaTenths = typeof manualOverride?.areaTenths === "number" ? manualOverride.areaTenths : null;
+  if (manualAreaTenths && manualAreaTenths > 0) {
+    data.horizontalAreaTenths = merged.horizontalAreaTenths;
+    data.actualAreaMinTenths = manualAreaTenths;
+    data.actualAreaMaxTenths = manualAreaTenths;
+    data.calculationSnapshot = storedCalculation;
+    data.inputHash = merged.inputHash;
+  } else {
+    data.horizontalAreaTenths = prepared.calculation?.horizontalAreaTenths ?? 0;
+    data.actualAreaMinTenths = prepared.calculation?.actualAreaMinTenths ?? 0;
+    data.actualAreaMaxTenths = prepared.calculation?.actualAreaMaxTenths ?? 0;
+    data.calculationSnapshot = prepared.calculation;
+    data.inputHash = prepared.inputHash;
+  }
   data.blockingReasons = [];
   data.approvedBy = data.approvedBy ?? req.user?.id;
   data.approvedAt = new Date().toISOString();

@@ -8,10 +8,12 @@ import { userIsAdmin } from "@/payload/access/roles";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
+import { overridePreparedLeadArea } from "@/lib/leads/automatic-package";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
   z.object({ action: z.literal("create_version"), roofPlanes: z.unknown(), confidence: z.enum(["high", "medium", "low"]), confidenceReasoning: z.string().min(10) }),
+  z.object({ action: z.literal("override_area"), areaSquareMeters: z.number().min(10).max(5000), reason: z.string().trim().min(5).max(500) }),
   z.object({ action: z.literal("calculate_price") }),
 ]);
 function idOf(value: unknown) {
@@ -40,6 +42,29 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const rules = await payload.find({ collection: "price-rules", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: {
     and: [{ serviceKey: { equals: lead.inquiryType } }, { status: { equals: "approved" } }],
   } });
+
+  if (parsed.data.action === "override_area") {
+    let result: Awaited<ReturnType<typeof overridePreparedLeadArea>>;
+    try {
+      result = await overridePreparedLeadArea(payload, {
+        measurementId: measurement.id,
+        administratorId: user.id,
+        areaSquareMeters: parsed.data.areaSquareMeters,
+        reason: parsed.data.reason,
+      });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Area override failed" }, { status: 409 });
+    }
+    await recordAuditEvent(createPayloadAuditWriter(payload), {
+      actorId: user.id,
+      action: "measurement.area-overridden",
+      entityType: "roof-measurement",
+      entityId: result.measurementId,
+      correlationId: correlationIdFromHeaders(request.headers),
+      changedFields: ["actualAreaMinTenths", "actualAreaMaxTenths", "calculationSnapshot", "price", "quote", "contract"],
+    });
+    return NextResponse.json({ measurement: result }, { status: 201 });
+  }
 
   if (parsed.data.action === "approve") {
     const prepared = prepareMeasurement({

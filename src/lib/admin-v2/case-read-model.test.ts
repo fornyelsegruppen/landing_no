@@ -95,4 +95,25 @@ describe("admin case read model", () => {
 
     expect(result?.nextAction.kind).toBe("wait_customer");
   });
+
+  it("hides a superseded AI draft instead of presenting it as a cancelled customer message", async () => {
+    const findByID = vi.fn().mockResolvedValue({ id: 8, name: "Test", address: "Testveien", postal: "0001", inquiryType: "takvask", status: "measuring", createdAt: "2026-08-25T08:00:00.000Z" });
+    const responses = [
+      { docs: [{ id: 20, reference: "TM-8-V1", status: "review_required", createdAt: "2026-08-25T09:00:00.000Z" }] },
+      { docs: [{ id: 21, reference: "PB-8", status: "superseded", createdAt: "2026-08-25T09:01:00.000Z" }] },
+      { docs: [{ id: 22, reference: "T-8-V1", status: "draft", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [
+        { id: 24, subject: "Angående din forespørsel", category: "ai_reply", bodyText: "Draft", direction: "outbound", channel: "email", status: "cancelled", createdAt: "2026-08-25T09:03:00.000Z" },
+        { id: 23, subject: "Vi har mottatt henvendelsen", category: "receipt", bodyText: "Sent", direction: "outbound", channel: "email", status: "sent", createdAt: "2026-08-25T08:01:00.000Z" },
+      ] },
+      { docs: [] },
+      { docs: [{ id: 25, reference: "K-8-V1", status: "draft", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [] },
+    ];
+    const result = await loadAdminCase({ findByID, find: vi.fn().mockImplementation(async () => responses.shift()) } as unknown as Payload, 8);
+
+    expect(result?.messages.map((message) => message.id)).toEqual([23]);
+    expect(result?.timeline.some((item) => item.id === "message-24")).toBe(false);
+    expect(result?.nextAction.kind).toBe("approve_package");
+  });
 });

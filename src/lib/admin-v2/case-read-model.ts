@@ -157,6 +157,9 @@ export type AdminCase = {
     confidence?: string;
     confidenceReasoning?: string;
     horizontalAreaTenths?: number;
+    manualAreaOverrideTenths?: number;
+    manualOverrideReason?: string;
+    manualOverriddenAt?: string;
     normalizedAddress?: string;
   };
   messages: CaseMessage[];
@@ -189,6 +192,13 @@ function stringValue(value: unknown) {
 
 function numberValue(value: unknown) {
   return typeof value === "number" ? value : undefined;
+}
+
+function manualOverride(value: unknown) {
+  if (!value || typeof value !== "object") return undefined;
+  const snapshot = value as Record<string, unknown>;
+  if (!snapshot.manualOverride || typeof snapshot.manualOverride !== "object") return undefined;
+  return snapshot.manualOverride as Record<string, unknown>;
 }
 
 function numericId(value: unknown) {
@@ -240,7 +250,7 @@ function timelineDate(record: Record<string, unknown>) {
   return stringValue(record.updatedAt) || stringValue(record.createdAt) || new Date(0).toISOString();
 }
 
-function makeTimeline(type: CaseTimelineItem["type"], collection: string, raw: unknown, title: string): CaseTimelineItem {
+function makeTimeline(type: CaseTimelineItem["type"], _collection: string, raw: unknown, title: string): CaseTimelineItem {
   const record = asRecord(raw);
   const id = numericId(record.id);
   return {
@@ -249,7 +259,19 @@ function makeTimeline(type: CaseTimelineItem["type"], collection: string, raw: u
     title,
     status: stringValue(record.status),
     at: timelineDate(record),
-    href: `/admin/collections/${collection}/${id}`,
+    href: type === "lead"
+      ? "#customer-section"
+      : type === "message"
+        ? `#message-${id}`
+        : type === "measurement"
+          ? "#measurement-section"
+          : type === "price" || type === "quote"
+            ? "#price-quote-section"
+            : type === "contract"
+              ? "#contract-section"
+              : type === "work"
+                ? "#work-section"
+                : "#changes-section",
   };
 }
 
@@ -263,7 +285,7 @@ function makeTimedEvent(type: CaseTimelineItem["type"], collection: string, raw:
     title: stringValue(raw.reference) || `#${id}`,
     status,
     at,
-    href: `/admin/collections/${collection}/${id}`,
+    href: type === "contract" ? "#contract-section" : `/admin/collections/${collection}/${id}`,
   };
 }
 
@@ -354,13 +376,20 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const latestContractRaw = latest(contracts.filter((item) => item.status !== "superseded")) || latest(contracts);
   const latestWorkRaw = latest(workOrders.filter((item) => item.status !== "cancelled")) || latest(workOrders);
   const currentMessageRaw = currentMessage(messages);
+  const visibleMessages = messages.filter((message) =>
+    !(stringValue(message.category) === "ai_reply" && stringValue(message.status) === "cancelled"),
+  );
 
+  const latestManualOverride = latestMeasurementRaw ? manualOverride(latestMeasurementRaw.calculationSnapshot) : undefined;
   const measurement = latestMeasurementRaw ? {
     ...entity("roof-measurements", latestMeasurementRaw),
     normalizedAddress: stringValue(latestMeasurementRaw.normalizedAddress),
     confidence: stringValue(latestMeasurementRaw.confidence),
     confidenceReasoning: stringValue(latestMeasurementRaw.confidenceReasoning),
     horizontalAreaTenths: numberValue(latestMeasurementRaw.horizontalAreaTenths),
+    manualAreaOverrideTenths: numberValue(latestManualOverride?.areaTenths),
+    manualOverrideReason: stringValue(latestManualOverride?.reason),
+    manualOverriddenAt: stringValue(latestManualOverride?.overriddenAt),
     actualAreaMinTenths: numberValue(latestMeasurementRaw.actualAreaMinTenths),
     actualAreaMaxTenths: numberValue(latestMeasurementRaw.actualAreaMaxTenths),
   } : undefined;
@@ -389,7 +418,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     scheduledAt: stringValue(latestWorkRaw.scheduledAt),
   } : undefined;
 
-  const mappedMessages: CaseMessage[] = messages.map((message) => ({
+  const mappedMessages: CaseMessage[] = visibleMessages.map((message) => ({
     ...entity("messages", message),
     reference: stringValue(message.subject) || `#${numericId(message.id)}`,
     subject: stringValue(message.subject) || "",
@@ -428,11 +457,11 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       title: stringValue(lead.name) || `#${leadId}`,
       status: stringValue(lead.status),
       at: stringValue(lead.createdAt) || new Date(0).toISOString(),
-      href: `/admin/collections/leads/${leadId}`,
+      href: "#customer-section",
     };
   const timeline: CaseTimelineItem[] = [
     leadTimeline,
-    ...messages.map((item) => makeTimeline("message", "messages", item, stringValue(item.subject) || "Melding")),
+    ...visibleMessages.map((item) => makeTimeline("message", "messages", item, stringValue(item.subject) || "Melding")),
     ...measurements.map((item) => makeTimeline("measurement", "roof-measurements", item, stringValue(item.reference) || "Takmåling")),
     ...prices.map((item) => makeTimeline("price", "price-calculations", item, stringValue(item.reference) || "Prisberegning")),
     ...quotes.map((item) => makeTimeline("quote", "quotes", item, stringValue(item.reference) || "Tilbud")),

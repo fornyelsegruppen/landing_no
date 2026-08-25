@@ -24,8 +24,11 @@ export const protectContractVersion: CollectionBeforeChangeHook = ({ data, origi
       "companySignedBy",
       "updatedAt",
     ]);
-    if (originalDoc.companySignedAt) throw new Error("A contract signed by both parties cannot be changed");
-    if (Object.keys(data).some((key) => !counterSignatureFields.has(key))) throw new Error("Only the supplier counter-signature may be added after the customer has signed");
+    const changedFields = Object.keys(data).filter((key) =>
+      JSON.stringify(data[key]) !== JSON.stringify(originalDoc[key]),
+    );
+    if (originalDoc.companySignedAt && changedFields.length > 0) throw new Error("A contract signed by both parties cannot be changed");
+    if (changedFields.some((key) => !counterSignatureFields.has(key))) throw new Error("Only the supplier counter-signature may be added after the customer has signed");
   }
   return data;
 };

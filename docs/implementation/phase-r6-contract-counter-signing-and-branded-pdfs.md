@@ -21,6 +21,16 @@
 - Alle genererte kontrakt-, lead- og endrings-PDF-er bruker samme Takfornyelse-letterhead, logo, kontaktinformasjon, organisasjonsnummer, adresse, footer og sidetall.
 - Adminstatus, meldingstyper og tidslinjetyper vises på valgt NB/LT/EN-panelspråk. Tidslinjeelementer er klikkbare og åpner full teknisk detalj.
 
+## Operativ admin-korrigering 25. august 2026
+
+- Et avbrutt internt `ai_reply`-utkast som er erstattet av en automatisk tilbudspakke skjules fra kundemeldinger og operativ tidslinje. Det har aldri vært sendt og skal derfor ikke presenteres som om kunden eller administratoren avbrøt en melding.
+- Meldingsretning og leveringsstatus er separate begreper i panelet; LT viser nå `Siunčiama klientui`, mens faktisk levering vises med `Išsiųsta`, `Pristatyta`, `Nepavyko` osv.
+- Tidslinjen navigerer til relevant del av den samme custom-saken. Payload-lenken er fortsatt tilgjengelig som en sekundær teknisk detalj, ikke som normal arbeidsflyt.
+- Custom-saken viser strukturert AI-oppsummering, manglende informasjon og risikoflagg i stedet for rå JSON.
+- Administratoren kan skrive inn et kontrollert takareal og begrunnelse direkte i custom-saken. Systemet oppretter da en ny, sporbar måleversjon og regenererer pris, maksimalpris, tilbud og kontraktsutkast. Tidligere utkast erstattes kontrollert.
+- Manuell arealoverstyring kan bare gjøres før tilbudet sendes. Godkjenning bevarer overstyrt areal fremfor å erstatte det med ny polygonberegning.
+- Kontraktbeskyttelsen sammenligner nå faktiske feltendringer. Payload kan sende uendrede originalfelt sammen med leverandørsignaturen uten at legitim medsignering blokkeres.
+
 ## Datamodell og migrasjon
 
 Migrasjon `20260825_120000_contract_counter_signatures` legger til:
@@ -38,7 +48,7 @@ Kommersielt snapshot og dokumenthash forblir uendret. Etter kundesignering kan b
 
 - `npm run typecheck`: bestått.
 - `npm run lint`: bestått.
-- `npm test`: 116 testfiler og 346 tester bestått.
+- `npm test`: 117 testfiler og 349 tester bestått etter operativ admin-korrigering.
 - Enhetstester dekker separat selskapsbevis, to signaturer i endelig PDF, arbeidsordreblokkering før selskapsaksept, riktig neste handling og endelig e-postvedlegg.
 - Vercel Preview `dpl_234owmDaLF3Xa1j8fDc89rnMyPd4` kjørte migrasjonen og bygget 64 sider samt den nye signeringsruten.
 - Stagingaliaset peker på denne Preview-versjonen.

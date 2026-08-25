@@ -1,6 +1,8 @@
 import type { Payload } from "payload";
+import type { PriceCalculation, RoofMeasurement } from "@/payload/payload-types";
 import { calculatePrice, type PriceRuleSnapshot } from "@/lib/measurements/pricing";
 import { prepareMeasurement } from "@/lib/measurements/proposal";
+import { nextMeasurementVersion } from "@/lib/measurements/versioning";
 import { createQuoteDraft } from "@/lib/quotes/payload-quote-engine";
 import { documentHash } from "@/lib/quotes/document";
 import { issueQuoteCustomerLink } from "@/lib/quotes/issue";
@@ -344,6 +346,158 @@ export async function prepareAutomaticLeadPackage(
     contractId: preparedDocuments.contract.id,
     duplicate: false,
   };
+}
+
+export async function overridePreparedLeadArea(
+  payload: Payload,
+  input: {
+    measurementId: number;
+    administratorId: number;
+    areaSquareMeters: number;
+    reason: string;
+  },
+) {
+  const current = await payload.findByID({
+    collection: "roof-measurements",
+    id: input.measurementId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (!["draft", "review_required"].includes(current.status)) {
+    throw new TypeError("Only a measurement awaiting review can be overridden");
+  }
+  const leadId = relationId(current.lead);
+  if (!leadId) throw new TypeError("Measurement lead is missing");
+  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+  const [quotes, rules] = await Promise.all([
+    payload.find({
+      collection: "quotes",
+      depth: 0,
+      limit: 1,
+      sort: "-version",
+      overrideAccess: true,
+      where: { and: [{ lead: { equals: leadId } }, { status: { not_equals: "superseded" } }] },
+    }),
+    payload.find({
+      collection: "price-rules",
+      depth: 0,
+      limit: 1,
+      sort: "-version",
+      overrideAccess: true,
+      where: { and: [{ serviceKey: { equals: lead.inquiryType } }, { status: { equals: "approved" } }] },
+    }),
+  ]);
+  const previousQuote = quotes.docs[0];
+  if (!previousQuote || previousQuote.status !== "draft") {
+    throw new TypeError("The roof area can only be overridden before the quote is sent");
+  }
+  const rule = rules.docs[0];
+  if (!rule) throw new TypeError("No approved price rule exists for this service");
+
+  const areaTenths = Math.round(input.areaSquareMeters * 10);
+  const overriddenAt = new Date().toISOString();
+  const previousCalculation = current.calculationSnapshot && typeof current.calculationSnapshot === "object"
+    ? current.calculationSnapshot as Record<string, unknown>
+    : {};
+  const calculationSnapshot = {
+    ...previousCalculation,
+    horizontalAreaTenths: current.horizontalAreaTenths,
+    actualAreaMinTenths: areaTenths,
+    actualAreaMaxTenths: areaTenths,
+    manualOverride: {
+      areaSquareMeters: input.areaSquareMeters,
+      areaTenths,
+      reason: input.reason,
+      administratorId: input.administratorId,
+      overriddenAt,
+      previousMeasurementId: current.id,
+      previousInputHash: current.inputHash,
+    },
+  };
+  const versionData = nextMeasurementVersion(
+    current as unknown as Record<string, unknown> & { id: number; version: number; lead: unknown; reference: string },
+    {
+      actualAreaMinTenths: areaTenths,
+      actualAreaMaxTenths: areaTenths,
+      calculationSnapshot,
+      confidence: "high",
+      confidenceReasoning: `Takarealet er manuelt kontrollert av administrator: ${input.reason}`,
+      blockingReasons: [],
+    },
+    new Date(overriddenAt),
+  );
+  const createData = { ...versionData } as Record<string, unknown>;
+  for (const key of ["id", "createdAt", "updatedAt"]) delete createData[key];
+
+  let measurement: RoofMeasurement | null = null;
+  let calculation: PriceCalculation | null = null;
+  try {
+    measurement = await payload.create({
+      collection: "roof-measurements",
+      overrideAccess: true,
+      data: createData as never,
+    });
+    const snapshot = priceRuleSnapshot(rule);
+    const calculated = calculatePrice(areaTenths, snapshot);
+    calculation = await payload.create({
+      collection: "price-calculations",
+      overrideAccess: true,
+      data: {
+        reference: `PB-${leadId}-${Date.now()}`,
+        lead: leadId,
+        measurement: measurement.id,
+        priceRule: rule.id,
+        inputSnapshot: { measurementHash: measurement.inputHash, measurementVersion: measurement.version, rule: snapshot, manualAreaOverride: true },
+        outputSnapshot: calculated,
+        inputHash: calculated.inputHash,
+        subtotalExVatOre: calculated.subtotalExVatOre,
+        vatOre: calculated.vatOre,
+        totalIncVatOre: calculated.totalIncVatOre,
+        maximumTotalIncVatOre: calculated.maximumTotalIncVatOre,
+        status: "ready",
+        blockingReasons: [],
+      },
+    });
+    const preparedDocuments = await createQuoteDraft(payload, calculation.id, new Date(overriddenAt), { allowPendingMeasurement: true });
+    await payload.update({ collection: "roof-measurements", id: current.id, overrideAccess: true, data: { status: "superseded" } });
+
+    const qualification = lead.qualification && typeof lead.qualification === "object"
+      ? lead.qualification as Record<string, unknown>
+      : {};
+    await payload.update({
+      collection: "leads",
+      id: leadId,
+      overrideAccess: true,
+      data: {
+        status: "measuring",
+        qualification: {
+          ...qualification,
+          packagePreparation: {
+            status: "ready_for_admin_review",
+            measurementId: measurement.id,
+            calculationId: calculation.id,
+            quoteId: preparedDocuments.quote.id,
+            contractId: preparedDocuments.contract.id,
+            preparedAt: overriddenAt,
+            manualAreaOverride: true,
+          },
+        },
+        nextAction: "Kontroller manuelt overstyrt takareal, maksimalpris, tilbud og kontrakt. Godkjenn deretter hele pakken for utsending.",
+        nextActionAt: overriddenAt,
+      },
+    });
+    return {
+      measurementId: measurement.id,
+      calculationId: calculation.id,
+      quoteId: preparedDocuments.quote.id,
+      contractId: preparedDocuments.contract.id,
+      areaSquareMeters: input.areaSquareMeters,
+    };
+  } catch (error) {
+    if (calculation) await payload.delete({ collection: "price-calculations", id: calculation.id, overrideAccess: true }).catch(() => undefined);
+    if (measurement) await payload.delete({ collection: "roof-measurements", id: measurement.id, overrideAccess: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function approveAndSendPreparedLeadPackage(

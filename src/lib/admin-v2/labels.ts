@@ -32,7 +32,7 @@ const types: Record<PanelLocale, Record<string, string>> = {
 
 const metadata: Record<PanelLocale, Record<string, string>> = {
   nb: { inbound: "Innkommende", outbound: "Utgående", email: "E-post", sms: "SMS", receipt: "Mottaksbekreftelse", ai_reply: "AI-svar", quote: "Tilbud", contract: "Kontrakt", customer_question: "Kundespørsmål", follow_up: "Oppfølging", information_request: "Informasjonsforespørsel", completion: "Sluttdokumentasjon" },
-  lt: { inbound: "Gauta", outbound: "Išsiųsta", email: "El. paštas", sms: "SMS", receipt: "Užklausos patvirtinimas", ai_reply: "DI atsakymas", quote: "Pasiūlymas", contract: "Sutartis", customer_question: "Kliento klausimas", follow_up: "Tolesnis susisiekimas", information_request: "Informacijos prašymas", completion: "Baigiamieji dokumentai" },
+  lt: { inbound: "Gaunama", outbound: "Siunčiama klientui", email: "El. paštas", sms: "SMS", receipt: "Užklausos patvirtinimas", ai_reply: "DI atsakymas", quote: "Pasiūlymas", contract: "Sutartis", customer_question: "Kliento klausimas", follow_up: "Tolesnis susisiekimas", information_request: "Informacijos prašymas", completion: "Baigiamieji dokumentai" },
   en: { inbound: "Inbound", outbound: "Outbound", email: "Email", sms: "SMS", receipt: "Receipt", ai_reply: "AI reply", quote: "Quote", contract: "Contract", customer_question: "Customer question", follow_up: "Follow-up", information_request: "Information request", completion: "Completion documents" },
 };
 

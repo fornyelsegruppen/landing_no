@@ -13,6 +13,26 @@ describe("quote and contract version protection", () => {
   it("makes a signed contract immutable", () => {
     expect(() => protectContractVersion({ operation: "update", data: { status: "revoked" }, originalDoc: { status: "signed" } } as never)).toThrow();
   });
+  it("allows supplier counter-signature fields when Payload also returns unchanged contract fields", () => {
+    const originalDoc = {
+      status: "signed",
+      reference: "K-6-V1",
+      snapshot: { customer: "Test" },
+      documentHash: "a".repeat(64),
+      companySignedAt: null,
+    };
+    const result = protectContractVersion({
+      operation: "update",
+      originalDoc,
+      data: {
+        ...originalDoc,
+        companySignatureEvidence: { signerName: "Administrator" },
+        companySignedAt: "2026-08-25T10:00:00.000Z",
+        companySignedBy: 9,
+      },
+    } as never);
+    expect(result).toMatchObject({ companySignedBy: 9 });
+  });
   it("accepts a new draft contract even when Payload supplies an empty original document", () => {
     expect(protectContractVersion({ operation: "create", data: { status: "draft" }, originalDoc: {} } as never)).toEqual({ status: "draft" });
   });
