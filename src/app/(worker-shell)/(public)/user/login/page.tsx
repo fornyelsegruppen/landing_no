@@ -4,12 +4,17 @@ import { WorkerLoginForm } from "@/components/worker/login-form";
 import { PanelLanguageSwitcher } from "@/components/worker/panel-language-switcher";
 import { getInternalUser } from "@/lib/auth/internal-session";
 import { getWorkerCopy, normalizePanelLocale } from "@/lib/panel-i18n";
+import { panelLanguagePreferenceCookie } from "@/lib/panel-language-preference";
 
 export const dynamic = "force-dynamic";
 
 export default async function WorkerLoginPage() {
   if (await getInternalUser()) redirect("/user");
-  const locale = normalizePanelLocale((await cookies()).get("tf_panel_language")?.value);
+  const cookieStore = await cookies();
+  const locale = normalizePanelLocale(
+    cookieStore.get(panelLanguagePreferenceCookie)?.value ??
+      cookieStore.get("tf_panel_language")?.value,
+  );
   const copy = getWorkerCopy(locale);
 
   return (

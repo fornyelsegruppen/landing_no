@@ -8,22 +8,21 @@ import {
   panelLocales,
   type PanelLocale,
 } from "@/lib/panel-i18n";
+import { serializePanelLanguagePreference } from "@/lib/panel-language-preference";
 
 export function PanelLanguageSwitcher({ locale }: { locale: PanelLocale }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const copy = getWorkerCopy(locale);
 
-  async function change(language: PanelLocale) {
+  function change(language: PanelLocale) {
     if (language === locale) return;
     setPending(true);
-    const response = await fetch("/api/user/interface-language", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language }),
-    }).catch(() => null);
-    if (response?.ok) router.refresh();
-    setPending(false);
+    document.cookie = serializePanelLanguagePreference(
+      language,
+      window.location.protocol === "https:",
+    );
+    router.refresh();
   }
 
   return (
@@ -33,7 +32,7 @@ export function PanelLanguageSwitcher({ locale }: { locale: PanelLocale }) {
         aria-label={copy.language}
         className="min-h-10 rounded-lg border border-white/15 bg-background px-2 text-sm text-white outline-none focus:border-accent"
         disabled={pending}
-        onChange={(event) => void change(event.target.value as PanelLocale)}
+        onChange={(event) => change(event.target.value as PanelLocale)}
         value={locale}
       >
         {panelLocales.map((language) => (

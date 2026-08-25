@@ -12,6 +12,7 @@ import {
   type PanelLocale,
 } from "@/lib/panel-i18n";
 import { adminAccessDecision } from "@/lib/admin-v2/access";
+import { panelLanguagePreferenceCookie } from "@/lib/panel-language-preference";
 
 export type InternalUser = {
   active: true;
@@ -32,7 +33,9 @@ export async function getInternalUser(): Promise<InternalUser | null> {
   if (!user || !role || !userIsActive(user)) return null;
 
   const cookieStore = await cookies();
-  const savedInterfaceLanguage = cookieStore.get("tf_panel_language")?.value;
+  const savedInterfaceLanguage =
+    cookieStore.get(panelLanguagePreferenceCookie)?.value ??
+    cookieStore.get("tf_panel_language")?.value;
 
   return {
     active: true,
