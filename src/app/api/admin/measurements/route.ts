@@ -135,8 +135,13 @@ export async function POST(request: Request) {
       calculationSnapshot: snapshot, inputHash: measurementSnapshotHash({ ...snapshot, version }), confidence: "medium", confidenceReasoning: `Manuelt areal: ${parsed.data.reason}`,
       status: "review_required", blockingReasons: [], manualAreaSource: parsed.data.manualAreaSource, manualAreaReason: parsed.data.reason,
     } });
+    try {
+      await updateCaseState(payload, { leadId: lead.id, actorId: user.id, expectedRevision: parsed.data.expectedRevision, command: "manual_no_visual_measurement", idempotencyKey: `manual-no-visual:${measurement.id}`, patch: { status: "measuring", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: "Kontroller og godkjenn manuelt takareal uten kart.", nextActionAt: now } });
+    } catch (error) {
+      await payload.delete({ collection: "roof-measurements", id: measurement.id, overrideAccess: true }).catch(() => undefined);
+      throw error;
+    }
     if (prior && prior.status !== "approved") await payload.update({ collection: "roof-measurements", id: prior.id, overrideAccess: true, data: { status: "superseded" } });
-    await updateCaseState(payload, { leadId: lead.id, actorId: user.id, expectedRevision: parsed.data.expectedRevision, command: "manual_no_visual_measurement", idempotencyKey: `manual-no-visual:${measurement.id}`, patch: { status: "measuring", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: "Kontroller og godkjenn manuelt takareal uten kart.", nextActionAt: now } });
     await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: user.id, action: "measurement.manual-no-visual-created", entityType: "roof-measurement", entityId: measurement.id, correlationId, changedFields: ["measurementMode", "manualAreaSource", "manualAreaReason", "actualAreaMaxTenths"], metadata: { differencePercent, supersedes: prior?.id } });
     const packageResult = await createPreparedPackageForMeasurement(payload, { leadId: lead.id, measurementId: measurement.id });
     return NextResponse.json({ measurement, differencePercent, package: { calculationId: packageResult.calculation.id, quoteId: packageResult.quote.id, contractId: packageResult.contract.id } }, { status: 201 });

@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { protectCaseStateWrites } from "./Leads";
+
+const originalFeatureFlag = process.env.FEATURE_CASE_STATE_ENGINE_V2;
+
+beforeEach(() => {
+  process.env.FEATURE_CASE_STATE_ENGINE_V2 = "true";
+});
+
+afterEach(() => {
+  if (originalFeatureFlag === undefined) delete process.env.FEATURE_CASE_STATE_ENGINE_V2;
+  else process.env.FEATURE_CASE_STATE_ENGINE_V2 = originalFeatureFlag;
+});
 
 function hook(input: {
   context?: Record<string, unknown>;
@@ -17,6 +28,15 @@ function hook(input: {
 }
 
 describe("lead case state write protection", () => {
+  it("allows legacy state updates while the revision engine is disabled", () => {
+    process.env.FEATURE_CASE_STATE_ENGINE_V2 = "false";
+    expect(hook({
+      data: { status: "measuring", caseRevision: 4 },
+      payloadAPI: "local",
+      revision: 4,
+    })).toMatchObject({ status: "measuring", caseRevision: 4 });
+  });
+
   it("allows an internal monotonic revision write when serverless context is unavailable", () => {
     expect(hook({
       data: { status: "measuring", caseRevision: 5 },

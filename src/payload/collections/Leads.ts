@@ -13,6 +13,7 @@ const caseStateFields = new Set([
 
 export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, data, operation, originalDoc, req }) => {
   if (operation !== "update" || !originalDoc) return data;
+  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true") return data;
   const actualRevision = Number(originalDoc.caseRevision || 1);
   const requestedRevision = "caseRevision" in data ? Number(data.caseRevision) : null;
   // Payload can drop custom context when a Local API update crosses a
@@ -29,7 +30,7 @@ export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, da
   if ("caseRevision" in data && !trustedCaseCommand) {
     throw new Error("Case revision is managed by the central case command layer");
   }
-  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true" || trustedCaseCommand) return data;
+  if (trustedCaseCommand) return data;
   const directStateFields = Object.keys(data).filter((key) => caseStateFields.has(key));
   if (directStateFields.length) {
     throw new Error(`Case state fields require the central command layer: ${directStateFields.join(", ")}`);
