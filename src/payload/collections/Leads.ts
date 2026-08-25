@@ -1,5 +1,4 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
-import { currentTrustedCaseCommandContext } from "@/lib/cases/case-command-context";
 import { deletePrivateMedia } from "@/lib/private-media-storage";
 import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 
@@ -12,21 +11,25 @@ const caseStateFields = new Set([
   "nextAction", "nextActionAt", "nextActionOwner", "nextActionBlocker", "caseRevision",
 ]);
 
-export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, data, operation, originalDoc }) => {
+export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, data, operation, originalDoc, req }) => {
   if (operation !== "update" || !originalDoc) return data;
-  const trustedContext = context?.trustedCaseCommand === true
-    ? context
-    : currentTrustedCaseCommandContext();
-  if (trustedContext?.trustedCaseCommand === true && typeof trustedContext.expectedCaseRevision === "number") {
-    const actual = Number(originalDoc.caseRevision || 1);
-    if (actual !== trustedContext.expectedCaseRevision) {
-      throw new Error(`CASE_REVISION_CONFLICT:${trustedContext.expectedCaseRevision}:${actual}`);
+  const actualRevision = Number(originalDoc.caseRevision || 1);
+  const requestedRevision = "caseRevision" in data ? Number(data.caseRevision) : null;
+  // Payload can drop custom context when a Local API update crosses a
+  // serverless bundle boundary. A local, monotonic +1 revision remains an
+  // internal command write; REST writes and skipped revisions stay blocked.
+  const trustedLocalRevisionWrite = req.payloadAPI === "local"
+    && requestedRevision === actualRevision + 1;
+  const trustedCaseCommand = context?.trustedCaseCommand === true || trustedLocalRevisionWrite;
+  if (context?.trustedCaseCommand === true && typeof context.expectedCaseRevision === "number") {
+    if (actualRevision !== context.expectedCaseRevision) {
+      throw new Error(`CASE_REVISION_CONFLICT:${context.expectedCaseRevision}:${actualRevision}`);
     }
   }
-  if ("caseRevision" in data && trustedContext?.trustedCaseCommand !== true) {
+  if ("caseRevision" in data && !trustedCaseCommand) {
     throw new Error("Case revision is managed by the central case command layer");
   }
-  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true" || trustedContext?.trustedCaseCommand === true) return data;
+  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true" || trustedCaseCommand) return data;
   const directStateFields = Object.keys(data).filter((key) => caseStateFields.has(key));
   if (directStateFields.length) {
     throw new Error(`Case state fields require the central command layer: ${directStateFields.join(", ")}`);

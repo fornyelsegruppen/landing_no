@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import type { Payload } from "payload";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
-import { runTrustedCaseCommand } from "@/lib/cases/case-command-context";
 
 export class CaseCommandConflictError extends Error {
   constructor(readonly expected: number, readonly actual: number) {
@@ -67,13 +66,11 @@ export async function executeCaseCommand(payload: Payload, input: ExecuteCaseCom
   } as const;
   let after;
   try {
-    after = await runTrustedCaseCommand(commandContext, () => payload.update({
+    after = await payload.update({
       collection: "leads", id: input.leadId, depth: 0, overrideAccess: true,
-      // Keep Payload's own context too. AsyncLocalStorage covers serverless
-      // runtimes where the generated local request drops this metadata.
       context: commandContext,
       data: { ...input.patch, caseRevision: nextRevision },
-    }));
+    });
   } catch (error) {
     const match = error instanceof Error && error.message.match(/^CASE_REVISION_CONFLICT:(\d+):(\d+)$/);
     if (match) throw new CaseCommandConflictError(Number(match[1]), Number(match[2]));
