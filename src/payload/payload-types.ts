@@ -991,6 +991,9 @@ export interface Quote {
   priceCalculation: number | PriceCalculation;
   version: number;
   supersedes?: (number | null) | Quote;
+  optionGroup?: string | null;
+  optionKind?: ('base' | 'recommended') | null;
+  siblingQuote?: (number | null) | Quote;
   snapshot:
     | {
         [k: string]: unknown;
@@ -1009,6 +1012,7 @@ export interface Quote {
   status: 'draft' | 'approved' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired' | 'revoked' | 'superseded';
   approvedBy?: (number | null) | User;
   approvedAt?: string | null;
+  selectedOptionQuote?: (number | null) | Quote;
   sentAt?: string | null;
   viewedAt?: string | null;
   acceptedAt?: string | null;
@@ -1979,6 +1983,9 @@ export interface QuotesSelect<T extends boolean = true> {
   priceCalculation?: T;
   version?: T;
   supersedes?: T;
+  optionGroup?: T;
+  optionKind?: T;
+  siblingQuote?: T;
   snapshot?: T;
   snapshotHash?: T;
   serviceDescription?: T;
@@ -1989,6 +1996,7 @@ export interface QuotesSelect<T extends boolean = true> {
   status?: T;
   approvedBy?: T;
   approvedAt?: T;
+  selectedOptionQuote?: T;
   sentAt?: T;
   viewedAt?: T;
   acceptedAt?: T;

@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import { CaseActionPanel, CloseCaseButton } from "@/components/admin-v2/case-action-panel";
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
+import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-editor";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -56,12 +57,19 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   if (!/^\d+$/.test(id)) notFound();
   const payload = await getPayload();
-  const [caseData, workersResult] = await Promise.all([
+  const [caseData, workersResult, rulesResult] = await Promise.all([
     loadAdminCase(payload, Number(id)),
     payload.find({ collection: "users", depth: 0, limit: 200, overrideAccess: true, pagination: false, sort: "displayName", where: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] } }),
+    payload.find({ collection: "price-rules", depth: 0, limit: 50, overrideAccess: true, pagination: false, sort: "-version", where: { status: { equals: "approved" } } }),
   ]);
   if (!caseData) notFound();
   const workers = workersResult.docs.map((worker) => ({ id: worker.id, name: worker.displayName || worker.email }));
+  const seenRuleServices = new Set<string>();
+  const rules = rulesResult.docs.filter((rule) => {
+    if (seenRuleServices.has(rule.serviceKey)) return false;
+    seenRuleServices.add(rule.serviceKey);
+    return true;
+  }).map((rule) => ({ serviceKey: rule.serviceKey, serviceName: serviceNames[rule.serviceKey] || rule.serviceKey, unitPriceExVatOre: rule.unitPriceExVatOre }));
 
   const formatDate = (value?: string) => value
     ? formatNorwayDateTime(value, panelDateLocale(user.interfaceLanguage))
@@ -178,7 +186,9 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               <div><dt className="text-xs text-muted-foreground">{copy.priceIncVat}</dt><dd className="mt-1 font-bold text-accent">{nok(caseData.price.totalIncVatOre)}</dd></div>
               <div><dt className="text-xs text-muted-foreground">{copy.maximum}</dt><dd className="mt-1 font-bold">{nok(caseData.price.maximumTotalIncVatOre)}</dd></div>
             </dl> : <p className="text-muted-foreground">{copy.missing}</p>}
-            {caseData.quote ? <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 bg-black/15 p-4"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} summary={copy.advancedTechnical} /></div> : null}
+            {caseData.quote ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /></div><a className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={`/api/admin/quotes/${caseData.quote.id}/pdf`} rel="noreferrer" target="_blank">{copy.previewQuotePdf}<ExternalLink aria-hidden="true" className="size-4" /></a><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} summary={copy.advancedTechnical} /></div> : null}
+            {caseData.quoteOptions.length > 1 ? <div className="mt-5 grid gap-3 sm:grid-cols-2">{caseData.quoteOptions.map((option) => <article className="rounded-2xl border border-accent/25 bg-black/15 p-4" key={option.id}><p className="text-xs font-bold uppercase tracking-wider text-accent">{option.optionKind === "recommended" ? copy.recommendedOption : copy.originalOption}</p><h3 className="mt-2 font-bold">{option.serviceDescription}</h3><p className="mt-2 text-2xl font-black">{nok(option.totalIncVatOre)}</p><p className="mt-1 text-sm text-muted-foreground">{copy.maximum}: {nok(option.maximumTotalIncVatOre)}</p><div className="mt-3 flex items-center justify-between"><Status locale={user.interfaceLanguage} value={option.status} /><a className="text-sm font-semibold text-accent hover:underline" href={`/api/admin/quotes/${option.id}/pdf`} target="_blank">PDF</a></div></article>)}</div> : null}
+            {caseData.quote?.status === "draft" && caseData.price ? <CommercialQuoteEditor currentService={caseData.lead.inquiryType} leadId={caseData.lead.id} locale={user.interfaceLanguage} rules={rules} unitPriceExVatOre={caseData.quote.optionKind === "recommended" ? undefined : caseData.price.unitPriceExVatOre} /> : null}
           </Section>
 
           <Section id="messages-section" title={copy.messages}>

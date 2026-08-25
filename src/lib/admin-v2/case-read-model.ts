@@ -172,16 +172,24 @@ export type AdminCase = {
   messages: CaseMessage[];
   nextAction: CaseNextAction;
   price?: CaseEntity & {
+    adjustmentReason?: string;
+    discountOre?: number;
     maximumTotalIncVatOre?: number;
     subtotalExVatOre?: number;
     totalIncVatOre?: number;
+    unitPriceExVatOre?: number;
     vatOre?: number;
   };
   quote?: CaseEntity & {
     maximumTotalIncVatOre?: number;
+    optionGroup?: string;
+    optionKind?: string;
+    siblingQuoteId?: number;
+    serviceDescription?: string;
     totalIncVatOre?: number;
     validUntil?: string;
   };
+  quoteOptions: Array<CaseEntity & { maximumTotalIncVatOre?: number; optionKind?: string; serviceDescription?: string; totalIncVatOre?: number }>;
   timeline: CaseTimelineItem[];
   workOrder?: CaseEntity & {
     adminNote?: string;
@@ -410,19 +418,39 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     actualAreaMinTenths: numberValue(latestMeasurementRaw.actualAreaMinTenths),
     actualAreaMaxTenths: numberValue(latestMeasurementRaw.actualAreaMaxTenths),
   } : undefined;
+  const priceOutput = latestPriceRaw?.outputSnapshot && typeof latestPriceRaw.outputSnapshot === "object" ? asRecord(latestPriceRaw.outputSnapshot) : undefined;
+  const priceAdjustment = priceOutput?.adjustment && typeof priceOutput.adjustment === "object" ? asRecord(priceOutput.adjustment) : undefined;
+  const priceLineItems = Array.isArray(priceOutput?.lineItems) ? priceOutput.lineItems : [];
+  const firstPriceLine = priceLineItems[0] && typeof priceLineItems[0] === "object" ? asRecord(priceLineItems[0]) : undefined;
   const price = latestPriceRaw ? {
     ...entity("price-calculations", latestPriceRaw),
+    adjustmentReason: stringValue(priceAdjustment?.reason),
+    discountOre: numberValue(priceAdjustment?.discountOre),
     subtotalExVatOre: numberValue(latestPriceRaw.subtotalExVatOre),
     vatOre: numberValue(latestPriceRaw.vatOre),
     totalIncVatOre: numberValue(latestPriceRaw.totalIncVatOre),
     maximumTotalIncVatOre: numberValue(latestPriceRaw.maximumTotalIncVatOre),
+    unitPriceExVatOre: numberValue(firstPriceLine?.unitPriceExVatOre),
   } : undefined;
   const quote = latestQuoteRaw ? {
     ...entity("quotes", latestQuoteRaw),
     totalIncVatOre: numberValue(latestQuoteRaw.totalIncVatOre),
     maximumTotalIncVatOre: numberValue(latestQuoteRaw.maximumTotalIncVatOre),
+    optionGroup: stringValue(latestQuoteRaw.optionGroup),
+    optionKind: stringValue(latestQuoteRaw.optionKind),
+    siblingQuoteId: relationId(latestQuoteRaw.siblingQuote),
+    serviceDescription: stringValue(latestQuoteRaw.serviceDescription),
     validUntil: stringValue(latestQuoteRaw.validUntil),
   } : undefined;
+  const quoteOptions = latestQuoteRaw?.optionGroup ? quotes
+    .filter((item) => item.status !== "superseded" && item.optionGroup === latestQuoteRaw.optionGroup)
+    .map((item) => ({
+      ...entity("quotes", item),
+      maximumTotalIncVatOre: numberValue(item.maximumTotalIncVatOre),
+      optionKind: stringValue(item.optionKind),
+      serviceDescription: stringValue(item.serviceDescription),
+      totalIncVatOre: numberValue(item.totalIncVatOre),
+    })) : [];
   const contract = latestContractRaw ? {
     ...entity("contracts", latestContractRaw),
     signedAt: stringValue(latestContractRaw.signedAt),
@@ -515,6 +543,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     measurement,
     price,
     quote,
+    quoteOptions,
     contract,
     workOrder,
     changes: changes.map((item) => ({ ...entity("change-agreements", item), summary: stringValue(item.reasonDescription) })),

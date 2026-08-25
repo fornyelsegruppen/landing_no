@@ -50,6 +50,16 @@ describe("customer quote signing route", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it("locks the unselected sibling option after one contract is signed", async () => {
+    mocks.load.mockResolvedValue({ ...baseView, siblingQuoteId: 3 });
+    mocks.findByID.mockResolvedValue({ id: 3, status: "viewed" });
+    mocks.find.mockResolvedValue({ docs: [{ id: 4, status: "issued" }] });
+    const response = await POST(request({ action: "sign", signerName: "Test Kunde", signatureData, expectedDocumentHash: documentHash(contract), paymentObligationAccepted: true, termsAccepted: true, withdrawalInformationReceived: true, earlyStartRequested: false, earlyStartLossAcknowledged: false }), { params: Promise.resolve({ token: "s".repeat(43) }) });
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "quotes", id: 3, data: expect.objectContaining({ status: "superseded", selectedOptionQuote: 1 }) }));
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "access-tokens", data: expect.objectContaining({ revokedAt: expect.any(String) }) }));
+  });
+
   it("does not reveal an invalid or revoked customer relationship", async () => {
     mocks.load.mockResolvedValue(null);
     const response = await POST(request({ action: "decline", reason: "price" }), { params: Promise.resolve({ token: "x".repeat(43) }) });

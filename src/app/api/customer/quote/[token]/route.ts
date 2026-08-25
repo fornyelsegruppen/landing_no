@@ -8,6 +8,7 @@ import { getPayload } from "@/lib/payload";
 import { resolvePayloadSecret } from "@/lib/payload-secret";
 import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/features";
 import { createSignatureEvidence, type ContractSnapshot } from "@/lib/quotes/document";
+import { revokeQuoteAccessTokens } from "@/lib/quotes/customer-access";
 import { loadCustomerQuote } from "@/lib/quotes/customer-view";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
@@ -41,7 +42,7 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
   return NextResponse.json({
     quoteStatus: view.quoteStatus, quoteReference: view.quoteReference, contractStatus: view.contractStatus,
     contractReference: view.contractReference, documentHash: view.documentHash, display: view.display,
-    customerName: view.customerName, supplier: view.snapshot.supplier, terms: view.snapshot.terms,
+    customerName: view.customerName, optionKind: view.optionKind, supplier: view.snapshot.supplier, terms: view.snapshot.terms,
     signedAt: view.signedAt, companySignedAt: view.companySignedAt, pdfUrl: `/api/customer/quote/${encodeURIComponent(token)}/pdf`,
   }, { headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" } });
 }
@@ -182,7 +183,18 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       if (latest.status === "signed") return NextResponse.json({ ok: true, status: "signed", idempotent: true });
       throw new Error("Contract signing conflict");
     }
-    await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "accepted", acceptedAt: evidence.signedAt } });
+    await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "accepted", acceptedAt: evidence.signedAt, selectedOptionQuote: view.quoteId } });
+    if (view.siblingQuoteId) {
+      const sibling = await payload.findByID({ collection: "quotes", id: view.siblingQuoteId, depth: 0, overrideAccess: true }).catch(() => null);
+      if (sibling && ["draft", "approved", "sent", "viewed", "declined"].includes(sibling.status)) {
+        if (sibling.status !== "declined") await payload.update({ collection: "quotes", id: sibling.id, overrideAccess: true, data: { status: "superseded", selectedOptionQuote: view.quoteId } });
+        const siblingContracts = await payload.find({ collection: "contracts", depth: 0, limit: 10, overrideAccess: true, where: { quote: { equals: sibling.id } } });
+        for (const siblingContract of siblingContracts.docs) {
+          if (["draft", "issued"].includes(siblingContract.status)) await payload.update({ collection: "contracts", id: siblingContract.id, overrideAccess: true, data: { status: "superseded" } });
+        }
+        await revokeQuoteAccessTokens(payload, sibling.id);
+      }
+    }
     await payload.update({ collection: "access-tokens", id: view.accessRecordId, overrideAccess: true, data: { usedAt: evidence.signedAt } });
     await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "converted", nextAction: "Kunden har signert. Leverandøren må kontrollere og medsignere kontrakten.", nextActionAt: new Date().toISOString() } });
     const key = `contract-signed:${view.contractId}`;

@@ -3,7 +3,7 @@ import { documentHash } from "@/lib/quotes/document";
 import { assertQuoteTransition, type QuoteStatus } from "@/lib/quotes/workflow";
 import { adminOnly, userIsAdmin } from "../access/roles";
 
-const immutableFields = ["lead", "measurement", "priceCalculation", "version", "snapshot", "snapshotHash", "termsVersion", "validUntil"] as const;
+const immutableFields = ["lead", "measurement", "priceCalculation", "version", "optionGroup", "optionKind", "siblingQuote", "snapshot", "snapshotHash", "termsVersion", "validUntil"] as const;
 
 export const protectQuoteVersion: CollectionBeforeChangeHook = ({ data, originalDoc, operation, req, context }) => {
   if (operation === "create") {
@@ -50,6 +50,9 @@ export const Quotes: CollectionConfig = {
     { name: "priceCalculation", type: "relationship", relationTo: "price-calculations", required: true },
     { name: "version", type: "number", required: true, min: 1 },
     { name: "supersedes", type: "relationship", relationTo: "quotes" },
+    { name: "optionGroup", type: "text", label: "Tilbudsgruppe", index: true, admin: { readOnly: true } },
+    { name: "optionKind", type: "select", label: "Alternativ", options: [{ label: "Opprinnelig", value: "base" }, { label: "Anbefalt tillegg", value: "recommended" }], admin: { readOnly: true } },
+    { name: "siblingQuote", type: "relationship", relationTo: "quotes", label: "Sammenlignbart alternativ", admin: { readOnly: true } },
     { name: "snapshot", type: "json", required: true, admin: { readOnly: true } },
     { name: "snapshotHash", type: "text", required: true, index: true, admin: { readOnly: true } },
     { name: "serviceDescription", type: "text", required: true },
@@ -64,6 +67,7 @@ export const Quotes: CollectionConfig = {
     ] },
     { name: "approvedBy", type: "relationship", relationTo: "users", admin: { readOnly: true } },
     { name: "approvedAt", type: "date", admin: { readOnly: true } },
+    { name: "selectedOptionQuote", type: "relationship", relationTo: "quotes", label: "Kundens valgte alternativ", admin: { readOnly: true } },
     { name: "sentAt", type: "date", admin: { readOnly: true } },
     { name: "viewedAt", type: "date", admin: { readOnly: true } },
     { name: "acceptedAt", type: "date", admin: { readOnly: true } },

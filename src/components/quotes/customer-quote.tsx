@@ -17,6 +17,7 @@ export function CustomerQuote(props: {
   terms: { version: string; text: string; withdrawalInstructions: string; withdrawalFormUrl: string };
   signedAt?: string | null;
   companySignedAt?: string | null;
+  optionKind?: string | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -113,6 +114,7 @@ export function CustomerQuote(props: {
     <header className="mb-8 border-b border-white/10 pb-6">
       <p className="text-xs font-bold uppercase tracking-[.18em] text-accent">Takfornyelse</p>
       <h1 className="mt-2 text-3xl font-bold">Tilbud {d.reference}</h1>
+      {props.optionKind ? <p className="mt-3 inline-flex rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-sm font-bold text-accent">{props.optionKind === "recommended" ? "Anbefalt alternativ" : "Opprinnelig forespørsel"}</p> : null}
       <p className="mt-2 text-muted-foreground">Hei {props.customerName}. Her kan du kontrollere tilbudet og kontrakten før du bestemmer deg.</p>
     </header>
     {notice ? <div className="mb-6 rounded-xl border border-accent/40 bg-accent/10 p-4" role="status" aria-live="polite">{notice}</div> : null}

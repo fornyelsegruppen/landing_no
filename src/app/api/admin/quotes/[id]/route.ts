@@ -27,8 +27,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (parsed.data.action === "approve") {
       if (quote.status !== "draft") throw new Error("Only a draft can be approved");
       if (documentHash(quote.snapshot) !== quote.snapshotHash) throw new Error("Quote snapshot hash mismatch");
-      const updated = await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, context: { trustedQuoteApproval: true }, data: { status: "approved", approvedBy: user.id, approvedAt: new Date().toISOString() } });
-      result = { quoteId: updated.id };
+      const siblingId = typeof quote.siblingQuote === "number" ? quote.siblingQuote : quote.siblingQuote?.id;
+      const sibling = siblingId ? await payload.findByID({ collection: "quotes", id: siblingId, depth: 0, overrideAccess: true }) : null;
+      if (sibling && (sibling.status !== "draft" || documentHash(sibling.snapshot) !== sibling.snapshotHash)) throw new Error("The alternative quote is not a valid draft");
+      const approvedAt = new Date().toISOString();
+      const approved = await Promise.all([quote, ...(sibling ? [sibling] : [])].map((item) => payload.update({ collection: "quotes", id: item.id, overrideAccess: true, context: { trustedQuoteApproval: true }, data: { status: "approved", approvedBy: user.id, approvedAt } })));
+      result = { quoteId: quote.id, approvedQuoteIds: approved.map((item) => item.id) };
     } else if (parsed.data.action === "issue" || parsed.data.action === "regenerate_link") {
       assertFeatureReady("customerQuotes");
       if (parsed.data.action === "regenerate_link" && !["sent", "viewed"].includes(quote.status)) throw new Error("Only an active issued quote can receive a new link");

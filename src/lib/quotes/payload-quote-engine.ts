@@ -16,7 +16,13 @@ export async function createQuoteDraft(
   payload: Payload,
   calculationId: number,
   now = new Date(),
-  options: { allowPendingMeasurement?: boolean } = {},
+  options: {
+    allowPendingMeasurement?: boolean;
+    optionGroup?: string;
+    optionKind?: "base" | "recommended";
+    preservePrevious?: boolean;
+    siblingQuoteId?: number;
+  } = {},
 ) {
   const calculation = await payload.findByID({ collection: "price-calculations", id: calculationId, depth: 0, overrideAccess: true });
   if (calculation.status !== "ready") throw new Error("Price calculation is not ready");
@@ -73,7 +79,9 @@ export async function createQuoteDraft(
   });
   const quote = await payload.create({ collection: "quotes", overrideAccess: true, data: {
     reference: quoteReference, lead: leadId, measurement: measurement.id, priceCalculation: calculation.id,
-    version, supersedes: previous?.id, snapshot, snapshotHash: documentHash(snapshot),
+    version, supersedes: options.preservePrevious ? undefined : previous?.id,
+    optionGroup: options.optionGroup, optionKind: options.optionKind, siblingQuote: options.siblingQuoteId,
+    snapshot, snapshotHash: documentHash(snapshot),
     serviceDescription: snapshot.serviceDescription, totalIncVatOre: snapshot.pricing.totalIncVatOre,
     maximumTotalIncVatOre: snapshot.pricing.maximumTotalIncVatOre, termsVersion: terms.version,
     validUntil: snapshot.validUntil, status: "draft",
@@ -89,7 +97,7 @@ export async function createQuoteDraft(
       reference: contractSnapshot.contractReference, quote: quote.id, version,
       snapshot: contractSnapshot, documentHash: documentHash(contractSnapshot), termsVersion: terms.version, status: "draft",
     } });
-    if (previous) {
+    if (previous && !options.preservePrevious) {
       await payload.update({ collection: "quotes", id: previous.id, overrideAccess: true, data: { status: "superseded" } });
       const oldContracts = await payload.find({ collection: "contracts", depth: 0, limit: 10, overrideAccess: true, where: { quote: { equals: previous.id } } });
       for (const old of oldContracts.docs) {

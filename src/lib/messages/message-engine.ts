@@ -232,12 +232,15 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       },
     });
     const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
-      ? message.aiAnalysis as { recommendedNextAction?: string; quoteId?: number }
+      ? message.aiAnalysis as { alternativeQuoteId?: number; recommendedNextAction?: string; quoteId?: number }
       : {};
     if (message.category === "quote" && typeof analysis.quoteId === "number") {
-      const quote = await payload.findByID({ collection: "quotes", id: analysis.quoteId, depth: 0, overrideAccess: true });
-      if (quote.status === "approved") {
-        await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
+      const quoteIds = [analysis.quoteId, analysis.alternativeQuoteId].filter((value): value is number => typeof value === "number");
+      for (const quoteId of quoteIds) {
+        const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
+        if (quote.status === "approved") {
+          await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
+        }
       }
     }
     const followUp = message.category === "completion"

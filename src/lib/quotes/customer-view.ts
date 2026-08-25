@@ -23,6 +23,8 @@ export async function loadCustomerQuote(payload: Payload, token: string, options
     quoteId: quote.id,
     quoteStatus: quote.status,
     quoteReference: quote.reference,
+    optionKind: quote.optionKind ?? null,
+    siblingQuoteId: typeof quote.siblingQuote === "number" ? quote.siblingQuote : quote.siblingQuote?.id ?? null,
     contractId: contract.id,
     contractStatus: contract.status,
     contractReference: contract.reference,

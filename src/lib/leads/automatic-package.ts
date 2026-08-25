@@ -100,7 +100,7 @@ async function markBlocked(
   return { status: "blocked", code, reason };
 }
 
-function priceRuleSnapshot(rule: {
+export function priceRuleSnapshot(rule: {
   id: number;
   version: number;
   serviceKey: string;

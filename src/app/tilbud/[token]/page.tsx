@@ -19,6 +19,6 @@ export default async function CustomerQuotePage({ params }: { params: Promise<{ 
     token={token} quoteStatus={view.quoteStatus} contractStatus={view.contractStatus}
     contractReference={view.contractReference} documentHash={view.documentHash}
     customerName={view.customerName} display={view.display} supplier={view.snapshot.supplier}
-    terms={view.snapshot.terms} signedAt={view.signedAt} companySignedAt={view.companySignedAt}
+    terms={view.snapshot.terms} signedAt={view.signedAt} companySignedAt={view.companySignedAt} optionKind={view.optionKind}
   /></body></html>;
 }

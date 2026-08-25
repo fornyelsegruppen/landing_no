@@ -26,6 +26,7 @@ import * as migration_20260824_094425_phase11_stock_image_fallback from "./20260
 import * as migration_20260824_130000_phase12_panel_languages from "./20260824_130000_phase12_panel_languages";
 import * as migration_20260825_120000_contract_counter_signatures from "./20260825_120000_contract_counter_signatures";
 import * as migration_20260825_150000_admin_work_scheduling from "./20260825_150000_admin_work_scheduling";
+import * as migration_20260825_170000_commercial_quote_options from "./20260825_170000_commercial_quote_options";
 
 export const migrations = [
   {
@@ -167,5 +168,10 @@ export const migrations = [
     up: migration_20260825_150000_admin_work_scheduling.up,
     down: migration_20260825_150000_admin_work_scheduling.down,
     name: "20260825_150000_admin_work_scheduling",
+  },
+  {
+    up: migration_20260825_170000_commercial_quote_options.up,
+    down: migration_20260825_170000_commercial_quote_options.down,
+    name: "20260825_170000_commercial_quote_options",
   },
 ];
