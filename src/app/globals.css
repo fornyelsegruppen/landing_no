@@ -112,6 +112,11 @@
 }
 
 @layer utilities {
+  .admin-v2-shell :is(a, button, summary, select, input, textarea):focus-visible {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: 3px;
+  }
+
   .section-pad {
     @apply px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28;
   }
