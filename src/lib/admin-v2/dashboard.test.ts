@@ -104,8 +104,8 @@ describe("admin v2 dashboard", () => {
     expect(find).toHaveBeenCalledWith(expect.objectContaining({
       collection: "work-orders",
       where: queue === "completion-review"
-        ? { and: [{ status: { equals: status } }, { documentationSubmittedAt: { exists: true } }] }
-        : { status: { equals: status } },
+        ? { and: [{ "lead.recordState": { equals: "active" } }, { status: { equals: status } }, { documentationSubmittedAt: { exists: true } }] }
+        : { and: [{ "lead.recordState": { equals: "active" } }, { status: { equals: status } }] },
     }));
     expect(result[0]).toEqual(expect.objectContaining({ href: "/admin-v2/cases/15", status }));
   });
@@ -120,7 +120,7 @@ describe("admin v2 dashboard", () => {
 
     expect(find).toHaveBeenCalledWith(expect.objectContaining({
       collection: "work-orders",
-      where: { status: { in: ["scheduled", "on_way", "arrived", "precheck", "ready", "in_progress"] } },
+      where: { and: [{ "lead.recordState": { equals: "active" } }, { status: { in: ["scheduled", "on_way", "arrived", "precheck", "ready", "in_progress"] } }] },
     }));
   });
 
@@ -143,7 +143,7 @@ describe("admin v2 dashboard", () => {
     );
 
     expect(find).toHaveBeenCalledTimes(4);
-    expect(find.mock.calls[0]?.[0].where.or).toEqual(
+    expect(find.mock.calls[0]?.[0].where.and[1].or).toEqual(
       expect.arrayContaining([
         { name: { contains: "Ola" } },
         { phone: { contains: "Ola" } },

@@ -41,7 +41,7 @@ describe("internal collection access", () => {
     const remove = vi.fn().mockResolvedValue({ docs: [] });
     const find = vi.fn().mockResolvedValue({ docs: [] });
     const update = vi.fn().mockResolvedValue({ docs: [] });
-    await deleteLeadMessagesBeforeLead({ id: 7, req: { payload: { delete: remove, find, update } } } as never);
+    await deleteLeadMessagesBeforeLead({ context: { trustedLeadPurge: true }, id: 7, req: { payload: { delete: remove, find, update } } } as never);
     expect(remove).toHaveBeenCalledWith(expect.objectContaining({
       collection: "messages",
       overrideAccess: true,
@@ -55,9 +55,14 @@ describe("internal collection access", () => {
       .mockResolvedValueOnce({ docs: [{ id: 12, status: "signed" }] });
     const remove = vi.fn();
     await expect(deleteLeadMessagesBeforeLead({
+      context: { trustedLeadPurge: true },
       id: 7,
       req: { payload: { delete: remove, find, update: vi.fn() } },
     } as never)).rejects.toThrow(/signed contract/);
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("blocks direct technical deletion outside the controlled retention workflow", async () => {
+    await expect(deleteLeadMessagesBeforeLead({ id: 7, req: { payload: {} } } as never)).rejects.toThrow(/archived or moved to trash/);
   });
 });

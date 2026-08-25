@@ -145,6 +145,9 @@ export type AdminCase = {
   documents: CaseDocument[];
   lead: {
     address: string;
+    archiveClassification?: string;
+    archiveReason?: string;
+    archivedAt?: string;
     assignedTo?: string;
     createdAt?: string;
     email?: string;
@@ -158,7 +161,10 @@ export type AdminCase = {
     phone?: string;
     postal?: string;
     qualification?: unknown;
+    purgeAfter?: string;
+    recordState: "active" | "archived" | "trashed";
     status?: string;
+    trashedAt?: string;
   };
   measurement?: CaseEntity & {
     actualAreaMaxTenths?: number;
@@ -579,11 +585,17 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       email: stringValue(lead.email),
       phone: stringValue(lead.phone),
       address: [stringValue(lead.address), stringValue(lead.houseNumber), stringValue(lead.postal), stringValue(lead.city)].filter(Boolean).join(" "),
+      archiveClassification: stringValue(lead.archiveClassification),
+      archiveReason: stringValue(lead.archiveReason),
+      archivedAt: stringValue(lead.archivedAt),
       postal: stringValue(lead.postal),
       inquiryType: stringValue(lead.inquiryType),
       message: stringValue(lead.message),
       qualification: qualificationForAdmin(lead.qualification),
+      purgeAfter: stringValue(lead.purgeAfter),
+      recordState: (stringValue(lead.recordState) || "active") as "active" | "archived" | "trashed",
       status: stringValue(lead.status),
+      trashedAt: stringValue(lead.trashedAt),
       assignedTo: relationName(lead.assignedTo),
       nextAction: stringValue(lead.nextAction),
       nextActionAt: stringValue(lead.nextActionAt),

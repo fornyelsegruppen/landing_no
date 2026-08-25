@@ -7,6 +7,7 @@ import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-plannin
 import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-editor";
 import { CompletionReviewPanel } from "@/components/admin-v2/completion-review-panel";
 import { InvoiceRecordPanel } from "@/components/admin-v2/invoice-record-panel";
+import { CaseLifecyclePanel } from "@/components/admin-v2/case-lifecycle-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -250,6 +251,13 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
         </aside>
       </div>
+      <CaseLifecyclePanel
+        classification={caseData.lead.archiveClassification}
+        leadId={caseData.lead.id}
+        locale={user.interfaceLanguage}
+        purgeAfter={caseData.lead.purgeAfter}
+        recordState={caseData.lead.recordState}
+      />
     </div>
   );
 }

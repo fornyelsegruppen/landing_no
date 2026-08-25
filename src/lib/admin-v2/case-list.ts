@@ -10,17 +10,21 @@ export const caseListStatusKeys = [
 ] as const;
 
 export type CaseListStatus = (typeof caseListStatusKeys)[number];
+export const caseListRecordStateKeys = ["active", "archived", "trashed", "all"] as const;
+export type CaseListRecordState = (typeof caseListRecordStateKeys)[number];
 
 export type AdminCaseListFilters = {
   action?: CaseNextActionKind | "all";
   dateFrom?: string;
   dateTo?: string;
   query?: string;
+  recordState?: CaseListRecordState;
   status?: CaseListStatus;
   workerId?: number;
 };
 
 export type AdminCaseListItem = {
+  archiveClassification?: string;
   assignedWorker?: string;
   createdAt?: string;
   customer: string;
@@ -33,6 +37,8 @@ export type AdminCaseListItem = {
   overdue: boolean;
   phone?: string;
   postalAddress?: string;
+  purgeAfter?: string;
+  recordState: string;
   status?: string;
   workStatus?: string;
 };
@@ -82,11 +88,13 @@ function validDate(value: unknown) {
 export function normalizeCaseListFilters(input: AdminCaseListFilters): AdminCaseListFilters {
   const query = typeof input.query === "string" ? input.query.replace(/\s+/g, " ").trim().slice(0, 80) : undefined;
   const status = input.status && (caseListStatusKeys as readonly string[]).includes(input.status) ? input.status : "all";
+  const recordState = input.recordState && (caseListRecordStateKeys as readonly string[]).includes(input.recordState) ? input.recordState : "active";
   return {
     action: input.action || "all",
     dateFrom: validDate(input.dateFrom),
     dateTo: validDate(input.dateTo),
     query: query || undefined,
+    recordState,
     status,
     workerId: Number.isInteger(input.workerId) && Number(input.workerId) > 0 ? Number(input.workerId) : undefined,
   };
@@ -94,6 +102,7 @@ export function normalizeCaseListFilters(input: AdminCaseListFilters): AdminCase
 
 function leadWhere(filters: AdminCaseListFilters, referenceLeadIds: number[]): Where | undefined {
   const and: Where[] = [];
+  if (filters.recordState && filters.recordState !== "all") and.push({ recordState: { equals: filters.recordState } });
   if (filters.status === "open") and.push({ status: { not_in: ["closed"] } });
   else if (filters.status && filters.status !== "all") and.push({ status: { equals: filters.status } });
   if (filters.dateFrom) and.push({ createdAt: { greater_than_equal: `${filters.dateFrom}T00:00:00.000Z` } });
@@ -219,6 +228,7 @@ export async function loadAdminCaseList(
     });
     const postalAddress = [text(lead.address), text(lead.houseNumber), text(lead.postal), text(lead.city)].filter(Boolean).join(" ");
     return {
+      archiveClassification: text(lead.archiveClassification),
       assignedWorker: relationName(workOrder?.assignedWorker) || relationName(lead.assignedTo),
       assignedWorkerId: numberId(workOrder?.assignedWorker) || numberId(lead.assignedTo),
       createdAt: text(lead.createdAt),
@@ -232,6 +242,8 @@ export async function loadAdminCaseList(
       overdue: Boolean(text(lead.nextActionAt) && new Date(text(lead.nextActionAt) || 0).getTime() <= loadedAt),
       phone: text(lead.phone),
       postalAddress,
+      purgeAfter: text(lead.purgeAfter),
+      recordState: text(lead.recordState) || "active",
       status: text(lead.status),
       workStatus: text(workOrder?.status),
     };
@@ -243,6 +255,7 @@ export async function loadAdminCaseList(
 
   return {
     items: items.map((item) => ({
+      archiveClassification: item.archiveClassification,
       assignedWorker: item.assignedWorker,
       createdAt: item.createdAt,
       customer: item.customer,
@@ -255,6 +268,8 @@ export async function loadAdminCaseList(
       overdue: item.overdue,
       phone: item.phone,
       postalAddress: item.postalAddress,
+      purgeAfter: item.purgeAfter,
+      recordState: item.recordState,
       status: item.status,
       workStatus: item.workStatus,
     })),

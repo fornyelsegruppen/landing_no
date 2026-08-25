@@ -15,6 +15,7 @@ describe("admin case list", () => {
       dateFrom: undefined,
       dateTo: "2026-08-31",
       query: "Ola Nordmann",
+      recordState: "active",
       status: "all",
       workerId: undefined,
     });
@@ -62,4 +63,3 @@ describe("admin case list", () => {
     )).resolves.toEqual({ items: [], workers: [] });
   });
 });
-

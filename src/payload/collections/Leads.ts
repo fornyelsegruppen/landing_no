@@ -1,18 +1,26 @@
 import type { CollectionBeforeDeleteHook, CollectionConfig } from "payload";
+import { deletePrivateMedia } from "@/lib/private-media-storage";
 import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 
 const adminManagedField = {
   update: adminOnlyField,
 };
 
-export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ id, req }) => {
+export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ context, id, req }) => {
+  if (context?.trustedLeadPurge !== true) {
+    throw new Error("Customer cases must be archived or moved to trash. Permanent deletion is only available through the controlled retention workflow.");
+  }
   const quotes = await req.payload.find({ collection: "quotes", depth: 0, limit: 100, overrideAccess: true, req, where: { lead: { equals: id } } });
   for (const quote of quotes.docs) {
     const contracts = await req.payload.find({ collection: "contracts", depth: 0, limit: 100, overrideAccess: true, req, where: { quote: { equals: quote.id } } });
     if (contracts.docs.some((contract) => contract.status === "signed")) {
       throw new Error("A lead with a signed contract must be archived according to the retention policy, not deleted.");
     }
-    for (const contract of contracts.docs) await req.payload.delete({ collection: "contracts", id: contract.id, overrideAccess: true, req });
+    for (const contract of contracts.docs) {
+      const changes = await req.payload.find({ collection: "change-agreements", depth: 0, limit: 100, overrideAccess: true, req, where: { contract: { equals: contract.id } } });
+      for (const change of changes.docs) await req.payload.delete({ collection: "change-agreements", id: change.id, overrideAccess: true, req });
+      await req.payload.delete({ collection: "contracts", id: contract.id, overrideAccess: true, req });
+    }
     await req.payload.update({ collection: "access-tokens", overrideAccess: true, req, where: { and: [{ subjectType: { equals: "quote" } }, { subjectId: { equals: String(quote.id) } }] }, data: { revokedAt: new Date().toISOString() } });
     await req.payload.delete({ collection: "quotes", id: quote.id, overrideAccess: true, req });
   }
@@ -34,6 +42,15 @@ export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({
     req,
     where: { lead: { equals: id } },
   });
+  const privateMedia = await req.payload.find({
+    collection: "private-media",
+    depth: 0,
+    limit: 500,
+    overrideAccess: true,
+    req,
+    where: { and: [{ ownerType: { equals: "lead" } }, { ownerId: { equals: String(id) } }] },
+  });
+  for (const media of privateMedia.docs) await deletePrivateMedia(req.payload, media);
 };
 
 export const Leads: CollectionConfig = {
@@ -145,6 +162,42 @@ export const Leads: CollectionConfig = {
         { label: "Kontaktet (eldre)", value: "contacted" },
       ],
     },
+    {
+      name: "recordState",
+      type: "select",
+      label: "Arkivstatus",
+      required: true,
+      defaultValue: "active",
+      index: true,
+      options: [
+        { label: "Aktiv", value: "active" },
+        { label: "Arkivert", value: "archived" },
+        { label: "I papirkurven", value: "trashed" },
+      ],
+      admin: { readOnly: true },
+    },
+    {
+      name: "archiveClassification",
+      type: "select",
+      label: "Arkivklassifisering",
+      index: true,
+      options: [
+        { label: "Fullført", value: "completed" },
+        { label: "Kunden avslo", value: "declined" },
+        { label: "Tapt", value: "lost" },
+        { label: "Ugyldig henvendelse", value: "invalid" },
+        { label: "Spam", value: "spam" },
+        { label: "Duplikat", value: "duplicate" },
+        { label: "Annet", value: "other" },
+      ],
+      admin: { readOnly: true },
+    },
+    { name: "archiveReason", type: "textarea", label: "Begrunnelse", admin: { readOnly: true } },
+    { name: "archivedAt", type: "date", label: "Arkivert", index: true, admin: { readOnly: true } },
+    { name: "archivedBy", type: "relationship", relationTo: "users", label: "Arkivert av", admin: { readOnly: true } },
+    { name: "trashedAt", type: "date", label: "Flyttet til papirkurven", index: true, admin: { readOnly: true } },
+    { name: "trashedBy", type: "relationship", relationTo: "users", label: "Flyttet av", admin: { readOnly: true } },
+    { name: "purgeAfter", type: "date", label: "Tidligste permanente sletting", index: true, admin: { readOnly: true } },
     { name: "assignedTo", type: "relationship", relationTo: "users", label: "Ansvarlig", index: true },
     { name: "nextAction", type: "textarea", label: "Neste handling" },
     { name: "nextActionAt", type: "date", label: "Frist", index: true },

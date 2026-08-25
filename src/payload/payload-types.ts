@@ -699,6 +699,14 @@ export interface Lead {
         | 'contacted'
       )
     | null;
+  recordState?: ('active' | 'archived' | 'trashed') | null;
+  archiveClassification?: ('completed' | 'declined' | 'lost' | 'invalid' | 'spam' | 'duplicate' | 'other') | null;
+  archiveReason?: string | null;
+  archivedAt?: string | null;
+  archivedBy?: (number | null) | User;
+  trashedAt?: string | null;
+  trashedBy?: (number | null) | User;
+  purgeAfter?: string | null;
   assignedTo?: (number | null) | User;
   nextAction?: string | null;
   nextActionAt?: string | null;
@@ -1896,6 +1904,14 @@ export interface LeadsSelect<T extends boolean = true> {
   message?: T;
   language?: T;
   status?: T;
+  recordState?: T;
+  archiveClassification?: T;
+  archiveReason?: T;
+  archivedAt?: T;
+  archivedBy?: T;
+  trashedAt?: T;
+  trashedBy?: T;
+  purgeAfter?: T;
   assignedTo?: T;
   nextAction?: T;
   nextActionAt?: T;
