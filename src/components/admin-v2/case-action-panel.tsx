@@ -60,7 +60,7 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
 
   const technicalTarget = action.kind === "measurement_required"
     ? `/admin/collections/leads/${leadId}`
-    : action.kind === "assign_worker" && action.targetId
+    : ["assign_worker", "schedule_work", "resolve_work_block", "review_completion"].includes(action.kind) && action.targetId
       ? `/admin/collections/work-orders/${action.targetId}`
       : null;
 

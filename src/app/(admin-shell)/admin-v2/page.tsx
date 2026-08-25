@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CalendarClock, Search, UserRoundX } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, Search } from "lucide-react";
 import {
   loadAdminDashboard,
   loadAdminQueue,
@@ -25,7 +25,11 @@ const cardDefinitions = [
   { key: "aiDrafts", queue: "blog-review" },
   { key: "pendingQuotes", queue: "quote-review" },
   { key: "pendingContracts", queue: "contract-signing" },
+  { key: "signedWithoutWork", queue: "signed-without-work" },
+  { key: "unassignedWork", queue: "unassigned-work" },
+  { key: "needsScheduling", queue: "needs-scheduling" },
   { key: "activeWork", queue: "active-work" },
+  { key: "completionReview", queue: "completion-review" },
 ] as const;
 
 function queueTitle(queue: AdminQueueKey, copy: ReturnType<typeof getAdminV2Copy>) {
@@ -36,9 +40,12 @@ function queueTitle(queue: AdminQueueKey, copy: ReturnType<typeof getAdminV2Copy
     "blog-review": copy.cards.aiDrafts,
     "quote-review": copy.cards.pendingQuotes,
     "contract-signing": copy.cards.pendingContracts,
+    "signed-without-work": copy.cards.signedWithoutWork,
+    "needs-scheduling": copy.cards.needsScheduling,
     "active-work": copy.cards.activeWork,
+    "completion-review": copy.cards.completionReview,
     attention: copy.needsAttention,
-    "unassigned-work": copy.unassignedWork,
+    "unassigned-work": copy.cards.unassignedWork,
     "upcoming-work": copy.next72Hours,
   };
   return titles[queue];
@@ -163,16 +170,11 @@ export default async function AdminV2Page({ searchParams }: { searchParams: Sear
             ))}
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-3">
+          <section className="grid gap-4 lg:grid-cols-2">
             <Link className="rounded-3xl border border-danger/30 bg-danger/10 p-5 transition hover:border-danger/60" href="/admin-v2?queue=attention">
               <AlertTriangle aria-hidden="true" className="size-6 text-danger" />
               <strong className="mt-4 block text-3xl">{counts ? counts.attention : "—"}</strong>
               <span className="mt-1 block font-semibold">{copy.needsAttention}</span>
-            </Link>
-            <Link className="rounded-3xl border border-white/10 bg-background-elevated/75 p-5 transition hover:border-accent/45" href="/admin-v2?queue=unassigned-work">
-              <UserRoundX aria-hidden="true" className="size-6 text-accent" />
-              <strong className="mt-4 block text-3xl">{counts ? counts.unassignedWork : "—"}</strong>
-              <span className="mt-1 block font-semibold">{copy.unassignedWork}</span>
             </Link>
             <Link className="rounded-3xl border border-white/10 bg-background-elevated/75 p-5 transition hover:border-accent/45" href="/admin-v2?queue=upcoming-work">
               <CalendarClock aria-hidden="true" className="size-6 text-accent" />

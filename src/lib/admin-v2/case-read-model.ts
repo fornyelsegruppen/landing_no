@@ -15,6 +15,9 @@ export type CaseNextActionKind =
   | "issue_quote"
   | "measurement_required"
   | "prepare_package"
+  | "review_completion"
+  | "resolve_work_block"
+  | "schedule_work"
   | "none"
   | "retry_message"
   | "wait_customer";
@@ -91,6 +94,9 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
     return { kind: "create_work_order", targetId: input.contract.id };
   }
   if (input.workOrder?.status === "unassigned") return { kind: "assign_worker", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "assigned") return { kind: "schedule_work", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "blocked") return { kind: "resolve_work_block", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "completed") return { kind: "review_completion", targetId: input.workOrder.id };
   return { kind: "none" };
 }
 

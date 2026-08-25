@@ -2,7 +2,7 @@ import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionC
 import { assertWorkOrderTransition, type WorkOrderStatus } from "@/lib/work-orders/workflow";
 import { enqueueCompletionCommunication, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
-import { documentedPipelineUpdate } from "@/lib/leads/pipeline-state";
+import { workOrderPipelineUpdate } from "@/lib/leads/pipeline-state";
 import { adminOnly, assignedWorkerOrAdmin, userIsAdmin } from "../access/roles";
 
 function relationId(value: unknown) {
@@ -88,16 +88,19 @@ export const scheduleWorkOrderCommunications: CollectionAfterChangeHook = async 
   const scheduleChanged = operation === "create" || doc.scheduledAt !== previousDoc?.scheduledAt || doc.status !== previousDoc?.status;
   if (!scheduleChanged) return doc;
   const correlationId = correlationIdFromHeaders(req.headers);
-  if (doc.status === "documented" && previousDoc?.status !== "documented") {
-    const leadId = relationId(doc.lead);
-    if (leadId) {
-      await req.payload.update({
-        collection: "leads",
-        id: leadId,
-        overrideAccess: true,
-        data: documentedPipelineUpdate(),
-      });
-    }
+  const leadId = relationId(doc.lead);
+  const pipelineUpdate = workOrderPipelineUpdate({
+    now: new Date().toISOString(),
+    scheduledAt: doc.scheduledAt,
+    status: doc.status,
+  });
+  if (leadId && pipelineUpdate) {
+    await req.payload.update({
+      collection: "leads",
+      id: leadId,
+      overrideAccess: true,
+      data: pipelineUpdate,
+    });
   }
   await syncWorkOrderCommunicationJobs(req.payload, doc, correlationId);
   if (doc.status === "documented" && previousDoc?.status !== "documented") await enqueueCompletionCommunication(req.payload, doc, correlationId);

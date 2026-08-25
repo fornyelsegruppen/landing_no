@@ -7,7 +7,10 @@ export const adminQueueKeys = [
   "blog-review",
   "quote-review",
   "contract-signing",
+  "signed-without-work",
+  "needs-scheduling",
   "active-work",
+  "completion-review",
   "attention",
   "unassigned-work",
   "upcoming-work",
@@ -20,10 +23,13 @@ export type AdminDashboardCounts = {
   aiDrafts: number;
   attention: number;
   changeAgreements: number;
+  completionReview: number;
+  needsScheduling: number;
   newLeads: number;
   pendingContracts: number;
   pendingQuotes: number;
   replyDrafts: number;
+  signedWithoutWork: number;
   unassignedWork: number;
   upcomingWork: number;
 };
@@ -62,8 +68,42 @@ function countTotal(result: { totalDocs: number }) {
   return result.totalDocs;
 }
 
+const newLeadWhere: Where = { status: { in: ["new", "draft_ready", "qualified"] } };
+const activeWorkWhere: Where = { status: { in: ["scheduled", "on_way", "arrived", "precheck", "ready", "in_progress"] } };
+
+async function loadSignedContractsWithoutWork(payload: Pick<Payload, "find">) {
+  const [contracts, workOrders] = await Promise.all([
+    payload.find({
+      collection: "contracts",
+      depth: 1,
+      limit: 1000,
+      overrideAccess: true,
+      pagination: false,
+      sort: "-companySignedAt",
+      where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: true } }] },
+    }),
+    payload.find({
+      collection: "work-orders",
+      depth: 0,
+      limit: 1000,
+      overrideAccess: true,
+      pagination: false,
+      select: { contract: true },
+    }),
+  ]);
+  const contractsWithWork = new Set(
+    workOrders.docs
+      .map((doc) => relationIdentifier(asRecord(doc).contract))
+      .filter((value): value is number => typeof value === "number"),
+  );
+  return contracts.docs.filter((doc) => {
+    const contractId = relationIdentifier(doc);
+    return typeof contractId === "number" && !contractsWithWork.has(contractId);
+  });
+}
+
 export async function loadAdminDashboard(
-  payload: Pick<Payload, "count">,
+  payload: Pick<Payload, "count" | "find">,
   now = new Date(),
 ): Promise<AdminDashboardSnapshot> {
   const next72Hours = new Date(now.getTime() + 72 * 60 * 60_000);
@@ -77,14 +117,19 @@ export async function loadAdminDashboard(
       messageAttention,
       dueLeadAttention,
       blockedWork,
+      blockedMeasurements,
+      blockedPrices,
       activeWork,
       unassignedWork,
+      needsScheduling,
+      completionReview,
       pendingQuotes,
       pendingContracts,
       changeAgreements,
       upcomingWork,
+      signedWithoutWork,
     ] = await Promise.all([
-      payload.count({ collection: "leads", where: { status: { equals: "new" } } }),
+      payload.count({ collection: "leads", where: newLeadWhere }),
       payload.count({ collection: "posts", where: { editorialStatus: { in: ["ai_qa", "human_review"] } } }),
       payload.count({ collection: "messages", where: { status: { equals: "draft" } } }),
       payload.count({ collection: "operational-jobs", where: { status: { in: ["failed", "attention"] } } }),
@@ -95,8 +140,12 @@ export async function loadAdminDashboard(
         { nextActionAt: { less_than_equal: now.toISOString() } },
       ] } }),
       payload.count({ collection: "work-orders", where: { status: { equals: "blocked" } } }),
-      payload.count({ collection: "work-orders", where: { status: { in: ["assigned", "scheduled", "on_way", "arrived", "precheck", "ready", "in_progress", "completed"] } } }),
+      payload.count({ collection: "roof-measurements", where: { status: { equals: "blocked" } } }),
+      payload.count({ collection: "price-calculations", where: { status: { equals: "blocked" } } }),
+      payload.count({ collection: "work-orders", where: activeWorkWhere }),
       payload.count({ collection: "work-orders", where: { status: { equals: "unassigned" } } }),
+      payload.count({ collection: "work-orders", where: { status: { equals: "assigned" } } }),
+      payload.count({ collection: "work-orders", where: { status: { equals: "completed" } } }),
       payload.count({ collection: "quotes", where: { status: { equals: "draft" } } }),
       payload.count({ collection: "contracts", where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: false } }] } }),
       payload.count({ collection: "change-agreements", where: { status: { in: ["draft", "approved", "sent", "viewed"] } } }),
@@ -106,10 +155,11 @@ export async function loadAdminDashboard(
           and: [
             { scheduledAt: { greater_than_equal: now.toISOString() } },
             { scheduledAt: { less_than_equal: next72Hours.toISOString() } },
-            { status: { not_in: ["cancelled", "documented"] } },
+            { status: { not_in: ["cancelled", "completed", "documented"] } },
           ],
         },
       }),
+      loadSignedContractsWithoutWork(payload),
     ]);
 
     return {
@@ -122,12 +172,17 @@ export async function loadAdminDashboard(
           countTotal(seoAttention) +
           countTotal(messageAttention) +
           countTotal(dueLeadAttention) +
-          countTotal(blockedWork),
+          countTotal(blockedWork) +
+          countTotal(blockedMeasurements) +
+          countTotal(blockedPrices),
         changeAgreements: countTotal(changeAgreements),
+        completionReview: countTotal(completionReview),
+        needsScheduling: countTotal(needsScheduling),
         newLeads: countTotal(newLeads),
         pendingContracts: countTotal(pendingContracts),
         pendingQuotes: countTotal(pendingQuotes),
         replyDrafts: countTotal(replyDrafts),
+        signedWithoutWork: signedWithoutWork.length,
         unassignedWork: countTotal(unassignedWork),
         upcomingWork: countTotal(upcomingWork),
       },
@@ -222,7 +277,7 @@ export async function loadAdminQueue(
 
   switch (queue) {
     case "new-leads": {
-      const result = await payload.find({ ...common, collection: "leads", where: { status: { equals: "new" } } });
+      const result = await payload.find({ ...common, collection: "leads", where: newLeadWhere });
       return result.docs.map(leadItem);
     }
     case "reply-drafts": {
@@ -245,8 +300,20 @@ export async function loadAdminQueue(
       const result = await payload.find({ ...common, collection: "contracts", where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: false } }] } });
       return result.docs.map((doc) => referenceItem("contracts", doc));
     }
+    case "signed-without-work": {
+      const result = await loadSignedContractsWithoutWork(payload);
+      return result.map((doc) => ({ ...referenceItem("contracts", doc), status: "fully_signed" })).slice(0, 30);
+    }
+    case "needs-scheduling": {
+      const result = await payload.find({ ...common, collection: "work-orders", where: { status: { equals: "assigned" } } });
+      return result.docs.map((doc) => referenceItem("work-orders", doc));
+    }
     case "active-work": {
-      const result = await payload.find({ ...common, collection: "work-orders", where: { status: { in: ["assigned", "scheduled", "on_way", "arrived", "precheck", "ready", "in_progress", "completed"] } } });
+      const result = await payload.find({ ...common, collection: "work-orders", where: activeWorkWhere });
+      return result.docs.map((doc) => referenceItem("work-orders", doc));
+    }
+    case "completion-review": {
+      const result = await payload.find({ ...common, collection: "work-orders", where: { status: { equals: "completed" } } });
       return result.docs.map((doc) => referenceItem("work-orders", doc));
     }
     case "unassigned-work": {
@@ -261,16 +328,19 @@ export async function loadAdminQueue(
         where: { and: [
           { scheduledAt: { greater_than_equal: now.toISOString() } },
           { scheduledAt: { less_than_equal: next72Hours.toISOString() } },
-          { status: { not_in: ["cancelled", "documented"] } },
+          { status: { not_in: ["cancelled", "completed", "documented"] } },
         ] },
       });
       return result.docs.map((doc) => referenceItem("work-orders", doc));
     }
     case "attention": {
-      const [work, messages, operations, leads] = await Promise.all([
+      const [work, measurements, prices, messages, operations, seo, leads] = await Promise.all([
         payload.find({ ...common, collection: "work-orders", where: { status: { equals: "blocked" } } }),
+        payload.find({ ...common, collection: "roof-measurements", where: { status: { equals: "blocked" } } }),
+        payload.find({ ...common, collection: "price-calculations", where: { status: { equals: "blocked" } } }),
         payload.find({ ...common, collection: "messages", where: { status: { in: ["failed", "attention"] } } }),
         payload.find({ ...common, collection: "operational-jobs", where: { status: { in: ["failed", "attention"] } } }),
+        payload.find({ ...common, collection: "seo-runs", where: { status: { in: ["failed", "attention"] } } }),
         payload.find({ ...common, collection: "leads", where: { and: [
           { status: { equals: "waiting_customer" } },
           { nextActionAt: { less_than_equal: now.toISOString() } },
@@ -278,8 +348,11 @@ export async function loadAdminQueue(
       ]);
       return [
         ...work.docs.map((doc) => referenceItem("work-orders", doc)),
+        ...measurements.docs.map((doc) => genericItem("roof-measurements", doc)),
+        ...prices.docs.map((doc) => genericItem("price-calculations", doc)),
         ...messages.docs.map((doc) => genericItem("messages", doc)),
         ...operations.docs.map((doc) => genericItem("operational-jobs", doc)),
+        ...seo.docs.map((doc) => genericItem("seo-runs", doc)),
         ...leads.docs.map(leadItem),
       ].slice(0, 30);
     }

@@ -4,6 +4,8 @@ Denne katalogen inneholder fasebevis for [samlet implementeringsplan](../full-pl
 
 > **Statusrevisjon 24. august 2026:** Rapportene under dokumenterer det tekniske fundamentet som ble bygget og testet. En autentisert stagingreise avdekket at operativ custom admin, rask jobbkjøring, automatisk måleutkast, selskapsaksept og samlet dokument-/fakturaflyt fortsatt må ferdigstilles. Resterende arbeid styres av [fase R0–R10](../custom-admin-and-automation-execution-plan.md). Ordet `Fullført` i tabellen betyr derfor fullført teknisk fase, ikke produksjonsklar kundereise.
 
+> **Operativ ferdigstilling 25. august 2026:** Den detaljerte arbeidsrekkefølgen for korrekt dashboard, handlingskøer, saksflate, arbeidstildeling, tilbudsredigering, dokumentregister, faktura/garanti, arkiv og full E2E styres av [A0–A9-planen for admin-v2](../admin-v2-operational-completion-plan.md). Denne planen er den operative gjennomføringskontrakten for det gjenstående adminarbeidet.
+
 | Fase | Rapport | Status |
 |---|---|---|
 | 0 | [Baseline og beslutningsregister](./phase-0-baseline-and-decisions.md) | Fullført |
@@ -22,6 +24,15 @@ Denne katalogen inneholder fasebevis for [samlet implementeringsplan](../full-pl
 En historisk fase kan bare markeres fullført når rapporten inneholder leveranser, verifikasjon, kjente avvik og eksplisitt gate-resultat. Den samlede løsningen kan først markeres ferdig når R10 og den reviderte Definition of Done er godkjent.
 
 ## Gjeldende resterende faser
+
+### Operativ admin A0–A9
+
+| Fase | Rapport | Status |
+|---|---|---|
+| A0 | [Admin-v2 būsenų kontraktas ir baseline](./phase-a0-admin-v2-state-baseline.md) | Užbaigta; Windows ARM64 build išimtis dokumentuota |
+| A1 | [Teisingos apžvalgos kortelės ir veiksmų eilės](./phase-a1-dashboard-action-queues.md) | Techniškai įgyvendinta; staging gate atvira |
+
+De neste A-rapportene opprettes først når den foregående fasen har bestått sin gate. Den samlede rekkefølgen og akseptansekriteriene står i [admin-v2-planen](../admin-v2-operational-completion-plan.md).
 
 | Fase | Leveranse | Status |
 |---|---|---|
