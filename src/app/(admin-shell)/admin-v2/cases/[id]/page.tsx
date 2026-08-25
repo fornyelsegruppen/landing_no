@@ -195,9 +195,9 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="messages-section" title={copy.messages}>
-            {caseData.messages.length ? <div className="grid gap-3">{caseData.messages.map((message) => <article className="scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4" id={`message-${message.id}`} key={message.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{message.subject}</strong><p className="mt-1 text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
-              <p className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap text-sm text-white/80">{message.bodyText}</p>
+            {caseData.messages.length ? <div className="grid min-w-0 gap-3">{caseData.messages.map((message) => <article className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4" id={`message-${message.id}`} key={message.id}>
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><strong className="break-words [overflow-wrap:anywhere]">{message.subject}</strong><p className="mt-1 break-words text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
+              <p className="mt-3 max-h-40 min-w-0 overflow-auto whitespace-pre-wrap text-sm text-white/80 [overflow-wrap:anywhere]">{message.bodyText}</p>
               {message.failureMessage ? <p className="mt-3 text-sm text-danger">{message.failureMessage}</p> : null}
               <TechnicalLink entity={message} label={copy.technicalDetail} summary={copy.advancedTechnical} />
             </article>)}</div> : <p className="text-muted-foreground">{copy.noMessages}</p>}
