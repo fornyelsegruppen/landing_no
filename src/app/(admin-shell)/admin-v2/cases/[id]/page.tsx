@@ -170,16 +170,24 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               </dl>
               {caseData.measurement.manualAreaOverrideTenths ? <div className="mt-4 rounded-xl border border-accent/30 bg-accent/8 p-3 text-sm"><strong className="text-accent">{copy.manualOverrideBadge}</strong><span className="ml-2">{area(caseData.measurement.manualAreaOverrideTenths)}</span>{caseData.measurement.manualOverrideReason ? <p className="mt-1 text-muted-foreground">{caseData.measurement.manualOverrideReason}</p> : null}{caseData.measurement.manualOverriddenAt ? <p className="mt-1 text-xs text-muted-foreground">{formatDate(caseData.measurement.manualOverriddenAt)}</p> : null}</div> : null}
               {caseData.measurement.confidenceReasoning ? <p className="mt-4 text-sm text-muted-foreground">{caseData.measurement.confidenceReasoning}</p> : null}
-              {["draft", "review_required"].includes(caseData.measurement.status || "") && caseData.measurement.actualAreaMaxTenths ? <MeasurementReviewPanel
-                canApprovePackage={caseData.nextAction.kind === "approve_package"}
-                currentAreaTenths={caseData.measurement.actualAreaMaxTenths}
-                leadId={caseData.lead.id}
-                locale={user.interfaceLanguage}
-                manualOverrideReason={caseData.measurement.manualOverrideReason}
-                measurementId={caseData.measurement.id}
-              /> : null}
               <TechnicalLink entity={caseData.measurement} label={copy.technicalDetail} summary={copy.advancedTechnical} />
             </> : <p className="text-muted-foreground">{copy.missing}</p>}
+            <MeasurementReviewPanel
+              canApprovePackage={caseData.nextAction.kind === "approve_package"}
+              city={caseData.lead.city}
+              currentAreaTenths={caseData.measurement?.actualAreaMaxTenths}
+              currentBuildingId={caseData.measurement?.buildingIdentifier}
+              currentMode={caseData.measurement?.measurementMode}
+              evidenceHref={caseData.measurement?.evidenceHref}
+              inquiryType={caseData.lead.inquiryType || "usikker"}
+              leadAddress={caseData.lead.streetAddress || ""}
+              leadId={caseData.lead.id}
+              locale={user.interfaceLanguage}
+              measurementId={caseData.measurement?.id}
+              postal={caseData.lead.postal}
+              revision={caseData.lead.revision}
+              measurementStatus={caseData.measurement?.status}
+            />
           </Section>
 
           <Section id="price-quote-section" title={`${copy.pricing} · ${copy.quote}`}>

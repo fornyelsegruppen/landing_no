@@ -13,7 +13,7 @@ import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { userIsAdmin } from "@/payload/access/roles";
 import { approveAndSendPreparedLeadPackage, prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
-import { updateCaseState } from "@/lib/cases/case-command";
+import { CaseCommandConflictError, updateCaseState } from "@/lib/cases/case-command";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("generate_reply") }),
@@ -23,6 +23,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("retry_send"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("request_information") }),
   z.object({ action: z.literal("start_measurement") }),
+  z.object({ action: z.literal("update_intake"), expectedRevision: z.number().int().positive(), address: z.string().trim().min(2).max(200), postal: z.string().regex(/^\d{4}$/), city: z.string().trim().max(100).optional(), inquiryType: z.enum(["takvask", "takvask_impregnering", "impregnering", "takmaling", "nytt_tak", "usikker"]) }),
   z.object({ action: z.literal("close") }),
 ]);
 
@@ -153,6 +154,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         },
       });
       result = { messageId: message.id };
+    } else if (parsed.data.action === "update_intake") {
+      const updated = await updateCaseState(payload, { leadId, actorId: user.id, expectedRevision: parsed.data.expectedRevision, command: "update_intake", idempotencyKey: `${correlationId}:update-intake`, patch: { address: parsed.data.address, postal: parsed.data.postal, city: parsed.data.city || null, inquiryType: parsed.data.inquiryType, nextAction: "Finn og kontroller riktig bygning.", nextActionOwner: "administrator", nextActionAt: new Date().toISOString() } });
+      const updatedLead = "lead" in updated ? updated.lead : updated;
+      result = { updated: true, lead: { id: updatedLead.id, address: updatedLead.address, postal: updatedLead.postal, city: updatedLead.city, inquiryType: updatedLead.inquiryType } };
     } else if (parsed.data.action === "start_measurement") {
       await updateCaseState(payload, { leadId, actorId: user.id, command: "start_measurement", idempotencyKey: `${correlationId}:start-measurement`, patch: { status: "measuring", nextActionOwner: "administrator", nextAction: "Start kontrollert takmåling.", nextActionAt: new Date().toISOString() } });
       result = { status: "measuring" };
@@ -167,11 +172,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       entityType: "lead",
       entityId: leadId,
       correlationId,
-      changedFields: ["approve_send", "retry_send"].includes(parsed.data.action) ? ["message.status", "message.approvedAt"] : ["status", "nextAction"],
+      changedFields: ["approve_send", "retry_send"].includes(parsed.data.action)
+        ? ["message.status", "message.approvedAt"]
+        : parsed.data.action === "update_intake"
+          ? ["address", "postal", "city", "inquiryType"]
+          : ["status", "nextAction"],
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof FeatureUnavailableError) return NextResponse.json({ error: error.reason, missing: error.unavailable }, { status: 503 });
+    if (error instanceof CaseCommandConflictError) return NextResponse.json({ error: "Case was changed by another administrator. Refresh before saving.", code: "CASE_REVISION_CONFLICT", expected: error.expected, actual: error.actual }, { status: 409 });
     captureException(error, { route: "POST /api/admin/leads/[id]", correlationId });
     return NextResponse.json({ error: error instanceof TypeError ? error.message : "Lead action failed", correlationId }, { status: error instanceof TypeError ? 409 : 500 });
   }

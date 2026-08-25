@@ -145,6 +145,7 @@ export type AdminCase = {
   documents: CaseDocument[];
   lead: {
     address: string;
+    city?: string;
     archiveClassification?: string;
     archiveReason?: string;
     archivedAt?: string;
@@ -161,6 +162,7 @@ export type AdminCase = {
     nextActionOwner?: string;
     nextActionOverdue: boolean;
     revision: number;
+    streetAddress?: string;
     phone?: string;
     postal?: string;
     qualification?: unknown;
@@ -175,6 +177,14 @@ export type AdminCase = {
     confidence?: string;
     confidenceReasoning?: string;
     horizontalAreaTenths?: number;
+    buildingIdentifier?: string;
+    candidateBuildings?: unknown;
+    evidenceAttribution?: string;
+    evidenceHash?: string;
+    evidenceHref?: string;
+    measurementMode?: string;
+    manualAreaReason?: string;
+    manualAreaSource?: string;
     manualAreaOverrideTenths?: number;
     manualOverrideReason?: string;
     manualOverriddenAt?: string;
@@ -379,6 +389,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const workOrders = workOrdersResult.docs.map(asRecord);
   const quoteIds = quotes.map((quote) => numericId(quote.id)).filter(Number.isFinite);
   const workOrderIds = workOrders.map((work) => numericId(work.id)).filter(Number.isFinite);
+  const measurementIds = measurements.map((item) => numericId(item.id)).filter(Number.isFinite);
 
   const [contractsResult, changesResult, invoicesResult, warrantiesResult] = await Promise.all([
     quoteIds.length
@@ -397,6 +408,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
 
   const ownerPairs = [
     { ownerType: "lead", ids: [leadId] },
+    { ownerType: "roof-measurement", ids: measurementIds },
     { ownerType: "quote", ids: quoteIds },
     { ownerType: "contract", ids: contracts.map((item) => numericId(item.id)).filter(Number.isFinite) },
     { ownerType: "work-order", ids: workOrderIds },
@@ -436,12 +448,21 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   );
 
   const latestManualOverride = latestMeasurementRaw ? manualOverride(latestMeasurementRaw.calculationSnapshot) : undefined;
+  const evidenceMediaId = latestMeasurementRaw ? relationId(latestMeasurementRaw.evidenceSnapshot) : undefined;
   const measurement = latestMeasurementRaw ? {
     ...entity("roof-measurements", latestMeasurementRaw),
     normalizedAddress: stringValue(latestMeasurementRaw.normalizedAddress),
     confidence: stringValue(latestMeasurementRaw.confidence),
     confidenceReasoning: stringValue(latestMeasurementRaw.confidenceReasoning),
     horizontalAreaTenths: numberValue(latestMeasurementRaw.horizontalAreaTenths),
+    buildingIdentifier: stringValue(latestMeasurementRaw.buildingIdentifier),
+    candidateBuildings: latestMeasurementRaw.candidateBuildings,
+    evidenceAttribution: stringValue(latestMeasurementRaw.evidenceAttribution),
+    evidenceHash: stringValue(latestMeasurementRaw.evidenceHash),
+    evidenceHref: evidenceMediaId ? `/api/admin/media/${evidenceMediaId}` : undefined,
+    measurementMode: stringValue(latestMeasurementRaw.measurementMode),
+    manualAreaReason: stringValue(latestMeasurementRaw.manualAreaReason),
+    manualAreaSource: stringValue(latestMeasurementRaw.manualAreaSource),
     manualAreaOverrideTenths: numberValue(latestManualOverride?.areaTenths),
     manualOverrideReason: stringValue(latestManualOverride?.reason),
     manualOverriddenAt: stringValue(latestManualOverride?.overriddenAt),
@@ -588,6 +609,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       email: stringValue(lead.email),
       phone: stringValue(lead.phone),
       address: [stringValue(lead.address), stringValue(lead.houseNumber), stringValue(lead.postal), stringValue(lead.city)].filter(Boolean).join(" "),
+      streetAddress: [stringValue(lead.address), stringValue(lead.houseNumber)].filter(Boolean).join(" "),
+      city: stringValue(lead.city),
       archiveClassification: stringValue(lead.archiveClassification),
       archiveReason: stringValue(lead.archiveReason),
       archivedAt: stringValue(lead.archivedAt),
