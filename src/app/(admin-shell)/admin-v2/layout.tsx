@@ -39,8 +39,8 @@ export default async function AdminV2Layout({ children }: { children: React.Reac
           <p>{copy.customerContentNotice}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
             <Link className="hover:text-accent" href="/user">{copy.employeePortal}</Link>
-            <Link className="hover:text-accent" href="/admin">{copy.technicalAdmin}</Link>
           </div>
+          <details className="rounded-xl border border-white/10 p-2"><summary className="cursor-pointer font-semibold hover:text-accent">{copy.technicalAdmin}</summary><Link className="mt-2 block hover:text-accent" href="/admin">Payload backoffice</Link></details>
         </div>
       </aside>
 

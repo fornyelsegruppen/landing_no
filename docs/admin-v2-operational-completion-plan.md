@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcinė svetainė:** neliečiama iki paskutinės fazės, pilno patikrinimo ir atskiro savininko patvirtinimo  
-**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A7 techniškai užbaigtos; A8 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas
+**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A8 techniškai užbaigtos; A9 vykdoma — atliekama bendra staging priėmimo patikra
 **Pagrindinė taisyklė:** vienu metu įgyvendinama viena fazė; po kiekvienos fazės privalomi automatiniai testai, rankinis staging patikrinimas ir rezultato įrašymas šiame dokumente
 
 ## 1. Galutinis tikslas
@@ -309,7 +309,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A8 – navigacijos ir techninio fallback sutvarkymas
 
-**Statusas:** suplanuota  
+**Statusas:** techniškai užbaigta; vizualinė staging patikra įtraukta į A9
 **Priklausomybė:** A1–A7  
 **Tikslas:** visa kasdienė administratoriaus kelionė vyksta aiškioje Takfornyelse aplinkoje, o techninis backoffice lieka tik diagnostikai.
 

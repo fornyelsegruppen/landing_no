@@ -5,18 +5,17 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
-const links = [
+export const adminNavigationLinks = [
   { key: "overview", href: "/admin-v2", queue: null },
   { key: "leads", href: "/admin-v2/cases", queue: "cases" },
-  { key: "quotes", href: "/admin-v2?queue=quote-review", queue: "quote-review" },
-  { key: "contracts", href: "/admin-v2?queue=contract-signing", queue: "contract-signing" },
-  { key: "work", href: "/admin-v2?queue=active-work", queue: "active-work" },
+  { key: "quotes", href: "/admin-v2/offers", queue: "offers" },
+  { key: "contracts", href: "/admin-v2/contracts", queue: "contracts" },
+  { key: "work", href: "/admin-v2/work", queue: "work" },
   { key: "documents", href: "/admin-v2/documents", queue: "documents" },
   { key: "archive", href: "/admin-v2/archive", queue: "archive" },
-  { key: "messages", href: "/admin-v2?queue=reply-drafts", queue: "reply-drafts" },
-  { key: "blog", href: "/admin-v2?queue=blog-review", queue: "blog-review" },
-  { key: "employees", href: "/admin/collections/users", queue: "employees" },
-  { key: "settings", href: "/admin", queue: "settings" },
+  { key: "blog", href: "/admin-v2/blog", queue: "blog" },
+  { key: "employees", href: "/admin-v2/employees", queue: "employees" },
+  { key: "settings", href: "/admin-v2/settings", queue: "settings" },
 ] as const;
 
 export function AdminNavigation({ locale, mobile = false }: { locale: PanelLocale; mobile?: boolean }) {
@@ -27,13 +26,15 @@ export function AdminNavigation({ locale, mobile = false }: { locale: PanelLocal
 
   return (
     <nav aria-label={copy.control} className={mobile ? "grid grid-cols-2 gap-2" : "grid gap-1"}>
-      {links.map((link) => {
+      {adminNavigationLinks.map((link) => {
         const active = link.queue === "cases"
           ? pathname.startsWith("/admin-v2/cases")
           : link.queue === "documents"
           ? pathname.startsWith("/admin-v2/documents")
           : link.queue === "archive"
           ? pathname.startsWith("/admin-v2/archive")
+          : ["offers", "contracts", "work", "blog", "employees", "settings"].includes(link.queue || "")
+          ? pathname.startsWith(link.href)
           : link.queue === null
           ? pathname === "/admin-v2" && !selectedQueue
           : pathname === "/admin-v2" && selectedQueue === link.queue;

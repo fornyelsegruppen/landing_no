@@ -1,0 +1,9 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { recordAuditEvent } from "@/lib/audit/audit-event";
+import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
+import { getPayload } from "@/lib/payload";
+import { userIsAdmin } from "@/payload/access/roles";
+const schema=z.object({brandName:z.string().trim().min(2).max(100),phone:z.string().trim().min(5).max(40),email:z.string().email().max(200),street:z.string().trim().min(3).max(160),postal:z.string().trim().min(4).max(10),city:z.string().trim().min(2).max(100),orgNr:z.string().trim().min(5).max(40),openingDays:z.string().trim().min(3).max(300),openingTime:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),closingTime:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)});
+export async function POST(request:Request){const correlationId=correlationIdFromHeaders(request.headers);const payload=await getPayload();const{user}=await payload.auth({headers:request.headers});if(!user)return NextResponse.json({error:"Unauthorized"},{status:401});if(!userIsAdmin(user))return NextResponse.json({error:"Forbidden"},{status:403});const parsed=schema.safeParse(await request.json());if(!parsed.success)return NextResponse.json({error:"Invalid settings"},{status:400});const before=await payload.findGlobal({slug:"site-settings",depth:0,draft:false,overrideAccess:true});const updated=await payload.updateGlobal({slug:"site-settings",draft:false,overrideAccess:true,data:parsed.data});await recordAuditEvent(createPayloadAuditWriter(payload),{action:"settings.update",actorId:user.id,before,after:updated,changedFields:Object.keys(parsed.data),correlationId,entityId:"site-settings",entityType:"global"});return NextResponse.json({ok:true});}

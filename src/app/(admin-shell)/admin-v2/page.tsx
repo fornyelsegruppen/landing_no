@@ -19,17 +19,17 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const cardDefinitions = [
-  { key: "newLeads", queue: "new-leads" },
-  { key: "replyDrafts", queue: "reply-drafts" },
-  { key: "changeAgreements", queue: "change-agreements" },
-  { key: "aiDrafts", queue: "blog-review" },
-  { key: "pendingQuotes", queue: "quote-review" },
-  { key: "pendingContracts", queue: "contract-signing" },
-  { key: "signedWithoutWork", queue: "signed-without-work" },
-  { key: "unassignedWork", queue: "unassigned-work" },
-  { key: "needsScheduling", queue: "needs-scheduling" },
-  { key: "activeWork", queue: "active-work" },
-  { key: "completionReview", queue: "completion-review" },
+  { key: "newLeads", href: "/admin-v2?queue=new-leads" },
+  { key: "replyDrafts", href: "/admin-v2?queue=reply-drafts" },
+  { key: "changeAgreements", href: "/admin-v2?queue=change-agreements" },
+  { key: "aiDrafts", href: "/admin-v2/blog" },
+  { key: "pendingQuotes", href: "/admin-v2/offers?state=draft" },
+  { key: "pendingContracts", href: "/admin-v2?queue=contract-signing" },
+  { key: "signedWithoutWork", href: "/admin-v2?queue=signed-without-work" },
+  { key: "unassignedWork", href: "/admin-v2/work?state=unassigned" },
+  { key: "needsScheduling", href: "/admin-v2/work?state=assigned" },
+  { key: "activeWork", href: "/admin-v2/work?state=active" },
+  { key: "completionReview", href: "/admin-v2?queue=completion-review" },
 ] as const;
 
 function queueTitle(queue: AdminQueueKey, copy: ReturnType<typeof getAdminV2Copy>) {
@@ -162,7 +162,7 @@ export default async function AdminV2Page({ searchParams }: { searchParams: Sear
         <>
           <section aria-label={copy.dashboard} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {cardDefinitions.map((card) => (
-              <Link className="group min-h-36 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 transition hover:-translate-y-0.5 hover:border-accent/45 hover:bg-background-elevated" href={`/admin-v2?queue=${card.queue}`} key={card.key}>
+              <Link className="group min-h-36 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 transition hover:-translate-y-0.5 hover:border-accent/45 hover:bg-background-elevated" href={card.href} key={card.key}>
                 <strong className="block text-4xl font-black tracking-tight text-white">{counts ? counts[card.key] : "—"}</strong>
                 <span className="mt-3 block max-w-52 font-semibold text-white/85">{copy.cards[card.key]}</span>
                 <span className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">{copy.openQueue}<ArrowRight aria-hidden="true" className="size-4 transition group-hover:translate-x-1" /></span>

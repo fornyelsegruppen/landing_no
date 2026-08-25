@@ -25,11 +25,18 @@ const actionSchema = z.object({
     "publish",
     "regenerate",
     "stock-image",
+    "save",
   ]),
   reviewerName: z.string().trim().min(2).max(120).optional(),
   scheduledAt: z.string().datetime().optional(),
   reason: z.string().trim().max(500).optional(),
   query: z.string().trim().min(3).max(120).optional(),
+  titleNo: z.string().trim().min(10).max(160).optional(),
+  excerptNo: z.string().trim().max(500).optional(),
+  contentNo: z.string().trim().min(300).max(30000).optional(),
+  seoTitleNo: z.string().trim().max(160).optional(),
+  seoDescriptionNo: z.string().trim().max(500).optional(),
+  primaryKeyword: z.string().trim().max(160).optional(),
 });
 
 export const runtime = "nodejs";
@@ -87,6 +94,20 @@ export async function POST(
         query: result.query,
         photographer: result.selected.photographer,
       });
+    }
+    if (parsed.data.action === "save") {
+      if (!parsed.data.titleNo || !parsed.data.contentNo) throw new TypeError("Title and article text are required");
+      const data = {
+        titleNo: parsed.data.titleNo,
+        excerptNo: parsed.data.excerptNo || null,
+        contentNo: parsed.data.contentNo,
+        seoTitleNo: parsed.data.seoTitleNo || null,
+        seoDescriptionNo: parsed.data.seoDescriptionNo || null,
+        primaryKeyword: parsed.data.primaryKeyword || null,
+      };
+      const updated = await payload.update({ collection: "posts", id: post.id, draft: true, overrideAccess: true, data });
+      await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: user.id, action: "blog.save", entityType: "post", entityId: post.id, correlationId, changedFields: Object.keys(data), before: { titleNo: post.titleNo, contentNo: post.contentNo }, after: { titleNo: updated.titleNo, contentNo: updated.contentNo } });
+      return NextResponse.json({ ok: true, postId: updated.id, action: "save" });
     }
     const quality =
       post.qualityChecks && typeof post.qualityChecks === "object"
