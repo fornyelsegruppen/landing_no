@@ -22,6 +22,11 @@ Systemets `/api/admin/platform-health` og adminoversikt beregner dette registere
 | `FEATURE_WORKER_PORTAL` | `WORKER_MOBILE_QA_REFERENCE` | Avslått |
 | `FEATURE_AUTOMATED_REMINDERS` | `COMMUNICATION_APPROVAL_REFERENCE` | Avslått |
 | `FEATURE_SEO_SCHEDULER` | `SEO_PILOT_REFERENCE` | Avslått |
+| `FEATURE_CASE_STATE_ENGINE_V2` | `STATE_INVARIANT_QA_REFERENCE` | Avslått |
+| `FEATURE_MEASUREMENT_EVIDENCE_V2` | `ROOF_EVIDENCE_QA_REFERENCE` | Avslått |
+| `FEATURE_ADMIN_EXCEPTION_FLOWS_V2` | `ADMIN_OPERATIONS_QA_REFERENCE` | Avslått |
+| `FEATURE_COMMUNICATION_ROUTING_V2` | `COMMUNICATION_V2_QA_REFERENCE` | Avslått |
+| `FEATURE_CUSTOMER_LIFECYCLE_V2` | `CUSTOMER_LIFECYCLE_QA_REFERENCE` | Avslått |
+| `FEATURE_SECURITY_HARDENING_V2` | `SECURITY_HARDENING_QA_REFERENCE` | Avslått |
 
 En rad får bare `go` når flagget er eksplisitt aktivert, alle tekniske integrasjoner er klare og alle felles og feature-spesifikke referanser finnes. Et avslått flagg rapporteres `disabled`, ikke `go`.
-

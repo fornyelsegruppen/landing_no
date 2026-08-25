@@ -17,6 +17,12 @@ describe("platform feature configuration", () => {
       workerPortal: false,
       automatedReminders: false,
       seoScheduler: false,
+      caseStateEngineV2: false,
+      measurementEvidenceV2: false,
+      adminExceptionFlowsV2: false,
+      communicationRoutingV2: false,
+      customerLifecycleV2: false,
+      securityHardeningV2: false,
     });
   });
 
@@ -94,5 +100,19 @@ describe("platform feature configuration", () => {
     expect(readIntegrationStatus(preview).email).toMatchObject({ readiness: "ready", provider: "log", missing: [] });
     expect(() => assertFeatureReady("customerQuotes", preview)).not.toThrow();
     expect(readIntegrationStatus({ ...preview, VERCEL_ENV: "production" }).email.readiness).toBe("configuration_required");
+  });
+
+  it("keeps every remediation capability independently reversible", () => {
+    const flags = readFeatureFlags({
+      FEATURE_CASE_STATE_ENGINE_V2: "true",
+      FEATURE_MEASUREMENT_EVIDENCE_V2: "1",
+    });
+
+    expect(flags.caseStateEngineV2).toBe(true);
+    expect(flags.measurementEvidenceV2).toBe(true);
+    expect(flags.adminExceptionFlowsV2).toBe(false);
+    expect(flags.communicationRoutingV2).toBe(false);
+    expect(flags.customerLifecycleV2).toBe(false);
+    expect(flags.securityHardeningV2).toBe(false);
   });
 });

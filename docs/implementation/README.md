@@ -23,6 +23,12 @@ Denne katalogen inneholder fasebevis for [samlet implementeringsplan](../full-pl
 
 En fase markeres bare fullført når rapporten inneholder leveranser, verifikasjon, kjente avvik og eksplisitt gate-resultat. A0–A9 oppfyller dette for staging; produksjonssetting er fortsatt en separat beslutning.
 
+## FULL audit remediation F0–F10
+
+Den autentiserte helhetsrevisjonen 25. august 2026 avdekket gjenstående avvik i målebevis, unntakshåndtering, kommunikasjonstiming, datainvarianter og produksjonsberedskap. [FULL audito trūkumų šalinimo roadmap](../admin-v2-full-audit-remediation-roadmap.md) er styrende for neste arbeid. Ingen tidligere stagingrapport kan alene tolkes som produksjonsgodkjenning; F0–F10 må gjennomføres i rekkefølge med egne test- og bevisporter.
+
+- [F0 – baseline, contracts and rollback](./phase-f0-baseline-and-rollback.md)
+
 ## Operativ admin A0–A9
 
 | Fase | Rapport                                                                                | Status                                             |

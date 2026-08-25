@@ -9,6 +9,12 @@ const completeEnvironment = {
   FEATURE_WORKER_PORTAL: "true",
   FEATURE_AUTOMATED_REMINDERS: "true",
   FEATURE_SEO_SCHEDULER: "true",
+  FEATURE_CASE_STATE_ENGINE_V2: "true",
+  FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
+  FEATURE_ADMIN_EXCEPTION_FLOWS_V2: "true",
+  FEATURE_COMMUNICATION_ROUTING_V2: "true",
+  FEATURE_CUSTOMER_LIFECYCLE_V2: "true",
+  FEATURE_SECURITY_HARDENING_V2: "true",
   GEMINI_API_KEY: "secret-gemini",
   RESEND_API_KEY: "secret-resend",
   NORGE_I_BILDER_TOKEN: "secret-map",
@@ -30,19 +36,25 @@ const completeEnvironment = {
   WORKER_MOBILE_QA_REFERENCE: "WORKER-1",
   COMMUNICATION_APPROVAL_REFERENCE: "COMMS-1",
   SEO_PILOT_REFERENCE: "SEO-1",
+  STATE_INVARIANT_QA_REFERENCE: "STATE-1",
+  ROOF_EVIDENCE_QA_REFERENCE: "EVIDENCE-1",
+  ADMIN_OPERATIONS_QA_REFERENCE: "ADMIN-1",
+  COMMUNICATION_V2_QA_REFERENCE: "COMMS-V2-1",
+  CUSTOMER_LIFECYCLE_QA_REFERENCE: "LIFECYCLE-1",
+  SECURITY_HARDENING_QA_REFERENCE: "SECURITY-1",
 };
 
 describe("production release gate", () => {
   it("keeps every risky feature safely disabled by default", () => {
     const gate = buildReleaseGate({});
     expect(gate.productionReady).toBe(false);
-    expect(gate.counts).toEqual({ go: 0, noGo: 0, disabled: 7 });
+    expect(gate.counts).toEqual({ go: 0, noGo: 0, disabled: 13 });
   });
 
   it("returns go only when integrations and named evidence are complete", () => {
     const gate = buildReleaseGate(completeEnvironment);
     expect(gate.productionReady).toBe(true);
-    expect(gate.counts).toEqual({ go: 7, noGo: 0, disabled: 0 });
+    expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 0 });
   });
 
   it("blocks an enabled feature when staging evidence is missing without exposing values", () => {

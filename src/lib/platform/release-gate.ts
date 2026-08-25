@@ -23,6 +23,12 @@ const featureEvidence: Record<FeatureFlagName, readonly string[]> = {
   workerPortal: ["WORKER_MOBILE_QA_REFERENCE"],
   automatedReminders: ["COMMUNICATION_APPROVAL_REFERENCE"],
   seoScheduler: ["SEO_PILOT_REFERENCE"],
+  caseStateEngineV2: ["STATE_INVARIANT_QA_REFERENCE"],
+  measurementEvidenceV2: ["ROOF_EVIDENCE_QA_REFERENCE"],
+  adminExceptionFlowsV2: ["ADMIN_OPERATIONS_QA_REFERENCE"],
+  communicationRoutingV2: ["COMMUNICATION_V2_QA_REFERENCE"],
+  customerLifecycleV2: ["CUSTOMER_LIFECYCLE_QA_REFERENCE"],
+  securityHardeningV2: ["SECURITY_HARDENING_QA_REFERENCE"],
 };
 
 function isConfigured(environment: Environment, key: string) {

@@ -6,6 +6,12 @@ export const featureFlagNames = [
   "workerPortal",
   "automatedReminders",
   "seoScheduler",
+  "caseStateEngineV2",
+  "measurementEvidenceV2",
+  "adminExceptionFlowsV2",
+  "communicationRoutingV2",
+  "customerLifecycleV2",
+  "securityHardeningV2",
 ] as const;
 
 export type FeatureFlagName = (typeof featureFlagNames)[number];
@@ -20,6 +26,12 @@ export const featureEnvironmentKeys: Record<FeatureFlagName, string> = {
   workerPortal: "FEATURE_WORKER_PORTAL",
   automatedReminders: "FEATURE_AUTOMATED_REMINDERS",
   seoScheduler: "FEATURE_SEO_SCHEDULER",
+  caseStateEngineV2: "FEATURE_CASE_STATE_ENGINE_V2",
+  measurementEvidenceV2: "FEATURE_MEASUREMENT_EVIDENCE_V2",
+  adminExceptionFlowsV2: "FEATURE_ADMIN_EXCEPTION_FLOWS_V2",
+  communicationRoutingV2: "FEATURE_COMMUNICATION_ROUTING_V2",
+  customerLifecycleV2: "FEATURE_CUSTOMER_LIFECYCLE_V2",
+  securityHardeningV2: "FEATURE_SECURITY_HARDENING_V2",
 };
 
 function parseBooleanFlag(value: string | undefined): boolean {
@@ -158,6 +170,12 @@ const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   workerPortal: [],
   automatedReminders: ["email", "jobs"],
   seoScheduler: ["ai", "jobs"],
+  caseStateEngineV2: [],
+  measurementEvidenceV2: ["maps", "buildingFootprints"],
+  adminExceptionFlowsV2: [],
+  communicationRoutingV2: ["email", "jobs"],
+  customerLifecycleV2: ["email", "legal"],
+  securityHardeningV2: ["signature"],
 };
 
 export function featureReadiness(
