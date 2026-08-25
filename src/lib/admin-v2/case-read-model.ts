@@ -15,6 +15,7 @@ export type CaseNextActionKind =
   | "issue_quote"
   | "measurement_required"
   | "prepare_package"
+  | "review_cancellation"
   | "review_completion"
   | "resolve_work_block"
   | "schedule_work"
@@ -47,6 +48,7 @@ export type CaseActionInput = {
   canPreparePackage?: boolean;
   contract?: StatusRecord;
   leadStatus?: string;
+  nextActionBlocker?: string;
   measurement?: StatusRecord;
   message?: StatusRecord & { category?: string; direction?: string };
   price?: StatusRecord;
@@ -55,6 +57,7 @@ export type CaseActionInput = {
 };
 
 export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
+  if (input.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST") return { kind: "review_cancellation" };
   if (input.leadStatus === "closed") return { kind: "none" };
   if (input.quote?.status === "declined") return { kind: "follow_up_decline", targetId: input.quote.id };
   if (input.message && ["failed", "attention"].includes(input.message.status || "")) {
@@ -129,11 +132,14 @@ export type CaseChangeAgreement = CaseEntity & {
 };
 
 export type CaseMessage = CaseEntity & {
+  aiAnalysis?: unknown;
+  aiAssisted?: boolean;
   bodyText: string;
   category: string;
   channel: string;
   direction: string;
   failureMessage?: string;
+  replyToMessageId?: number;
   sentAt?: string;
   subject: string;
 };
@@ -219,6 +225,8 @@ export type AdminCase = {
     vatOre?: number;
   };
   quote?: CaseEntity & {
+    declineComment?: string;
+    declineReason?: string;
     maximumTotalIncVatOre?: number;
     optionGroup?: string;
     optionKind?: string;
@@ -246,6 +254,10 @@ export type AdminCase = {
     completedAt?: string;
     documentationSubmittedAt?: string;
     completionReviewedAt?: string;
+    cancellationRequestedAt?: string;
+    cancellationRequestMessageId?: number;
+    customerCancellationResolution?: string;
+    customerCancellationResolvedAt?: string;
     priceOutcome?: string;
     scopeChangeDetails?: string;
     workSummary: string;
@@ -512,6 +524,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const quote = latestQuoteRaw ? {
     ...entity("quotes", latestQuoteRaw),
     totalIncVatOre: numberValue(latestQuoteRaw.totalIncVatOre),
+    declineReason: stringValue(latestQuoteRaw.declineReason),
+    declineComment: stringValue(latestQuoteRaw.declineComment),
     maximumTotalIncVatOre: numberValue(latestQuoteRaw.maximumTotalIncVatOre),
     optionGroup: stringValue(latestQuoteRaw.optionGroup),
     optionKind: stringValue(latestQuoteRaw.optionKind),
@@ -554,6 +568,10 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     completedAt: stringValue(latestWorkRaw.completedAt),
     documentationSubmittedAt: stringValue(latestWorkRaw.documentationSubmittedAt),
     completionReviewedAt: stringValue(latestWorkRaw.completionReviewedAt),
+    cancellationRequestedAt: stringValue(latestWorkRaw.customerCancellationRequestedAt),
+    cancellationRequestMessageId: relationId(latestWorkRaw.cancellationRequestMessage) || undefined,
+    customerCancellationResolution: stringValue(latestWorkRaw.customerCancellationResolution),
+    customerCancellationResolvedAt: stringValue(latestWorkRaw.customerCancellationResolvedAt),
     priceOutcome: stringValue(latestWorkRaw.priceOutcome),
     scopeChangeDetails: stringValue(latestWorkRaw.scopeChangeDetails),
     workSummary: stringValue(latestWorkRaw.workSummary) || "",
@@ -587,6 +605,9 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     channel: stringValue(message.channel) || "",
     sentAt: stringValue(message.sentAt),
     failureMessage: stringValue(message.failureMessage),
+    aiAssisted: Boolean(message.aiAssisted),
+    aiAnalysis: message.aiAnalysis,
+    replyToMessageId: relationId(message.replyToMessage) || undefined,
   }));
 
   const nextAction = deriveCaseNextAction({
@@ -596,6 +617,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     canPreparePackage: Boolean(stringValue(lead.address) && !/^ikke oppgitt$/i.test(stringValue(lead.address) || ""))
       && stringValue(lead.inquiryType) !== "usikker",
     leadStatus: stringValue(lead.status),
+    nextActionBlocker: stringValue(lead.nextActionBlocker),
     message: currentMessageRaw ? {
       id: numericId(currentMessageRaw.id),
       status: stringValue(currentMessageRaw.status),

@@ -28,7 +28,7 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
   const measurement = measurementResult.docs[0];
   const currentQuote = quoteResult.docs[0];
   if (!measurement || !["draft", "review_required", "approved"].includes(measurement.status)) throw new Error("A reviewable roof measurement is required");
-  if (!currentQuote || currentQuote.status !== "draft") throw new Error("Commercial terms may only be edited before the quote is approved or sent");
+  if (!currentQuote || !["draft", "declined"].includes(currentQuote.status)) throw new Error("Commercial terms may only be edited for a draft or a declined quote");
   const requestedService = lead.inquiryType;
   if (!requestedService || requestedService === "usikker") throw new Error("A concrete requested service is required");
   const serviceKeys = [requestedService, input.recommendedServiceKey].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
@@ -76,7 +76,12 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
   }
 
   const baseCalculation = await createCalculation(requestedService, true);
-  const base = await createQuoteDraft(payload, baseCalculation.id, now, { allowPendingMeasurement: true, optionGroup: group, optionKind: "base" });
+  const base = await createQuoteDraft(payload, baseCalculation.id, now, {
+    allowPendingMeasurement: true,
+    optionGroup: group,
+    optionKind: "base",
+    retainPreviousStatus: currentQuote.status === "declined",
+  });
   let recommended: typeof base | undefined;
   if (input.recommendedServiceKey && input.recommendedServiceKey !== requestedService) {
     const recommendedCalculation = await createCalculation(input.recommendedServiceKey, false);

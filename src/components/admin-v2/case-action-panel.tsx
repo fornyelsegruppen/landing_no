@@ -59,6 +59,8 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
 
   const technicalTarget = action.kind === "measurement_required"
     ? "#measurement-section"
+    : action.kind === "review_cancellation"
+      ? "#cancellation-review"
     : ["create_work_order", "assign_worker", "schedule_work"].includes(action.kind)
       ? "#work-planning"
     : action.kind === "review_completion" && action.targetId

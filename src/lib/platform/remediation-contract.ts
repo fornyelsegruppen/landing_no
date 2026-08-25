@@ -13,7 +13,7 @@ export const remediationPhaseIds = [
 ] as const;
 
 export const operationalStateInventory = {
-  lead: ["new", "draft_ready", "waiting_customer", "qualified", "measuring", "quoted", "converted", "closed", "contacted"],
+  lead: ["new", "draft_ready", "customer_waiting", "waiting_customer", "qualified", "measuring", "quoted", "converted", "closed", "contacted"],
   measurement: ["draft", "review_required", "blocked", "approved", "superseded"],
   priceCalculation: ["draft", "ready", "blocked", "superseded"],
   quote: ["draft", "approved", "sent", "viewed", "accepted", "declined", "expired", "revoked", "superseded"],

@@ -67,12 +67,18 @@ export const protectWorkOrder: CollectionBeforeChangeHook = async ({ data, origi
   const nextStatus = data.status ?? originalDoc.status;
   if (["ready", "blocked", "in_progress", "completed", "documented"].includes(nextStatus)) {
     const merged = { ...originalDoc, ...data };
-    if (relationCount(merged.beforePhotos) < 2) throw new Error("At least two before photos are required");
-    if (!merged.roofType || !merged.actualAreaTenths || !merged.measurementMethod || !merged.slopeBasis || !merged.visibleCondition || !merged.safetyStatus) {
-      throw new Error("The complete onsite precheck is required");
+    const cancellationFreeze = nextStatus === "blocked"
+      && Boolean(merged.customerCancellationRequestedAt)
+      && Array.isArray(merged.blockingReasons)
+      && merged.blockingReasons.includes("CUSTOMER_CANCELLATION_REQUEST");
+    if (!cancellationFreeze) {
+      if (relationCount(merged.beforePhotos) < 2) throw new Error("At least two before photos are required");
+      if (!merged.roofType || !merged.actualAreaTenths || !merged.measurementMethod || !merged.slopeBasis || !merged.visibleCondition || !merged.safetyStatus) {
+        throw new Error("The complete onsite precheck is required");
+      }
+      if (!merged.precheckDecision || !merged.priceOutcome || !merged.actualTotalIncVatOre) throw new Error("The deterministic precheck result is required");
+      if (nextStatus === "in_progress" && merged.precheckDecision !== "ready") throw new Error("Blocked work cannot start");
     }
-    if (!merged.precheckDecision || !merged.priceOutcome || !merged.actualTotalIncVatOre) throw new Error("The deterministic precheck result is required");
-    if (nextStatus === "in_progress" && merged.precheckDecision !== "ready") throw new Error("Blocked work cannot start");
   }
   if (nextStatus === "documented") {
     const merged = { ...originalDoc, ...data };
@@ -144,6 +150,11 @@ export const WorkOrders: CollectionConfig = {
     { name: "scheduledAt", type: "date", label: "Planlagt tidspunkt (norsk tid)", index: true, admin: { components: { Field: "/components/NorwayDateTimeField", Cell: "/components/NorwayDateTimeCell" } } },
     { name: "arrivalWindow", type: "text", label: "Avtalt ankomstvindu", maxLength: 120, admin: { description: "For eksempel 08:00–10:00. Vis nøyaktig avtalt tidsrom, ikke et løfte som ikke kan holdes." } },
     { name: "adminNote", type: "textarea", label: "Intern planleggingsmerknad", maxLength: 1000, admin: { description: "Kun internt. Ikke sendt til kunden." } },
+    { name: "customerCancellationRequestedAt", type: "date", label: "Kunden ba om kansellering", index: true, admin: { readOnly: true } },
+    { name: "cancellationRequestMessage", type: "relationship", relationTo: "messages", label: "Kundens kanselleringsforespørsel", admin: { readOnly: true } },
+    { name: "statusBeforeCustomerCancellation", type: "text", label: "Status før kanselleringssperre", admin: { readOnly: true } },
+    { name: "customerCancellationResolvedAt", type: "date", label: "Kanselleringsforespørsel avgjort", admin: { readOnly: true } },
+    { name: "customerCancellationResolution", type: "textarea", label: "Administrators avgjørelse", admin: { readOnly: true } },
     { name: "status", type: "select", label: "Status", required: true, defaultValue: "unassigned", index: true, options: [
       { label: "Ikke tildelt", value: "unassigned" }, { label: "Tildelt", value: "assigned" }, { label: "Planlagt", value: "scheduled" },
       { label: "På vei", value: "on_way" }, { label: "Ankommet", value: "arrived" }, { label: "Før-kontroll", value: "precheck" },

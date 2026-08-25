@@ -10,6 +10,7 @@ import { updateCaseState } from "@/lib/cases/case-command";
 import { caseReplyAddress } from "./case-reply";
 import { enqueueQuoteFollowUps } from "@/lib/quotes/follow-up-schedule";
 import { featureReadiness } from "@/lib/platform/features";
+import { customerReplyContextFromAnalysis, generateCustomerReplyDraft, type CustomerReplyPurpose } from "./customer-reply";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -110,6 +111,40 @@ export async function enqueueLeadAiJob(payload: Payload, leadId: number, correla
   });
 }
 
+export async function enqueueCustomerReplyDraft(payload: Payload, input: {
+  correlationId: string;
+  leadId: number;
+  purpose: CustomerReplyPurpose;
+  sourceMessageId: number;
+}) {
+  const idempotencyKey = makeIdempotencyKey("customer.reply.draft", {
+    sourceMessageId: input.sourceMessageId,
+    purpose: input.purpose,
+  });
+  const existing = await payload.find({
+    collection: "operational-jobs",
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    where: { idempotencyKey: { equals: idempotencyKey } },
+  });
+  if (existing.docs[0]) return existing.docs[0];
+  return payload.create({
+    collection: "operational-jobs",
+    overrideAccess: true,
+    data: {
+      type: "customer.reply.draft",
+      status: "pending",
+      idempotencyKey,
+      correlationId: input.correlationId,
+      attempts: 0,
+      maxAttempts: 3,
+      availableAt: new Date().toISOString(),
+      payload: { leadId: input.leadId, purpose: input.purpose, sourceMessageId: input.sourceMessageId },
+    },
+  });
+}
+
 export async function createReceiptMessage(payload: Payload, leadId: number, correlationId: string) {
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
   if (!lead.email) return { skipped: true as const, reason: "no_email" };
@@ -186,6 +221,111 @@ export async function createLeadAiReply(payload: Payload, provider: AiProvider, 
   return { duplicate: false as const, message, generated };
 }
 
+export async function createCustomerReplyDraft(payload: Payload, provider: AiProvider, input: {
+  correlationId: string;
+  generationKey?: string;
+  leadId: number;
+  purpose: CustomerReplyPurpose;
+  sourceMessageId: number;
+}) {
+  const source = await payload.findByID({ collection: "messages", id: input.sourceMessageId, depth: 0, overrideAccess: true });
+  if (relationId(source.lead) !== input.leadId || source.direction !== "inbound") {
+    throw new TypeError("Reply source must be an inbound message in the same customer case");
+  }
+  const idempotencyKey = makeIdempotencyKey("customer.reply", {
+    generationKey: input.generationKey || "initial",
+    sourceMessageId: source.id,
+  });
+  const duplicate = await findMessageByKey(payload, idempotencyKey);
+  if (duplicate) return { duplicate: true as const, message: duplicate };
+
+  const lead = await payload.findByID({ collection: "leads", id: input.leadId, depth: 0, overrideAccess: true });
+  if (lead.status === "closed" || lead.recordState !== "active") throw new TypeError("A reply draft cannot be generated for a closed or archived case");
+  const [measurements, quotes, workOrders] = await Promise.all([
+    payload.find({ collection: "roof-measurements", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ lead: { equals: lead.id } }, { status: { equals: "approved" } }] } }),
+    payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ lead: { equals: lead.id } }, { status: { not_equals: "superseded" } }] } }),
+    payload.find({ collection: "work-orders", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: lead.id } } }),
+  ]);
+  const measurement = measurements.docs[0];
+  const quote = quotes.docs[0];
+  const workOrder = workOrders.docs[0];
+  const contracts = quote
+    ? await payload.find({ collection: "contracts", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { quote: { equals: quote.id } } })
+    : { docs: [] };
+  const contract = contracts.docs[0];
+  const context = {
+    purpose: input.purpose,
+    customerMessage: source.bodyText,
+    service: lead.inquiryType,
+    ...(measurement ? { measurement: {
+      reference: measurement.reference,
+      areaMinTenths: measurement.actualAreaMinTenths,
+      areaMaxTenths: measurement.actualAreaMaxTenths,
+    } } : {}),
+    ...(quote ? { quote: {
+      reference: quote.reference,
+      status: quote.status,
+      totalIncVatOre: quote.totalIncVatOre,
+      ...(typeof quote.maximumTotalIncVatOre === "number" ? { maximumTotalIncVatOre: quote.maximumTotalIncVatOre } : {}),
+      validUntil: quote.validUntil,
+    } } : {}),
+    ...(contract ? { contract: {
+      reference: contract.reference,
+      status: contract.status,
+      companySigned: Boolean(contract.companySignedAt),
+    } } : {}),
+    ...(workOrder ? { workOrder: {
+      reference: workOrder.reference,
+      status: workOrder.status,
+      ...(workOrder.scheduledAt ? { scheduledAt: workOrder.scheduledAt } : {}),
+      ...(workOrder.arrivalWindow ? { arrivalWindow: workOrder.arrivalWindow } : {}),
+    } } : {}),
+  };
+  const generated = await generateCustomerReplyDraft({ provider, context, correlationId: input.correlationId });
+  const factWarnings = [
+    ...generated.result.factWarnings,
+    ...(!measurement ? ["Ingen godkjent takmåling er tilgjengelig."] : []),
+    ...(!quote && input.purpose !== "cancellation" ? ["Ingen aktiv tilbudssnapshot er tilgjengelig."] : []),
+    ...(input.purpose === "cancellation" ? ["Kanselleringsforespørselen krever administratorbeslutning og må ikke bekreftes automatisk."] : []),
+  ];
+  const message = await payload.create({
+    collection: "messages",
+    overrideAccess: true,
+    data: {
+      lead: lead.id,
+      replyToMessage: source.id,
+      direction: "outbound",
+      category: "ai_reply",
+      channel: lead.email ? "email" : "sms",
+      subject: generated.result.subject,
+      bodyText: generated.result.replyDraft,
+      status: "draft",
+      idempotencyKey,
+      aiAssisted: true,
+      aiAnalysis: {
+        ...generated.result,
+        factWarnings,
+        purpose: input.purpose,
+        sourceMessageId: source.id,
+        replyFactContext: generated.context,
+      },
+      modelVersion: generated.model,
+      promptVersion: generated.promptVersion,
+    },
+  });
+  await updateCaseState(payload, { leadId: lead.id, command: "customer_reply_drafted", idempotencyKey, patch: {
+    status: "customer_waiting",
+    nextActionOwner: "administrator",
+    nextAction: input.purpose === "decline"
+      ? "Kontroller avslagsårsaken og AI-utkastet. Send oppfølging, lag et revidert tilbud eller avslutt saken."
+      : input.purpose === "cancellation"
+        ? "Vurder kundens kanselleringsforespørsel. Ikke start eller opprett arbeid før administrator har besluttet saken."
+        : "Kontroller kundens spørsmål, faktavarsler og AI-utkast før utsending.",
+    nextActionAt: new Date().toISOString(),
+  } });
+  return { duplicate: false as const, message, generated, factWarnings };
+}
+
 export async function deliverMessage(payload: Payload, provider: EmailProvider, messageId: number, correlationId: string) {
   const message = await payload.findByID({ collection: "messages", id: messageId, depth: 1, overrideAccess: true });
   if (["sent", "delivered"].includes(message.status)) return { duplicate: true as const, message };
@@ -229,8 +369,9 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       },
     });
     const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
-      ? message.aiAnalysis as { alternativeQuoteId?: number; recommendedNextAction?: string; quoteId?: number }
+      ? message.aiAnalysis as { alternativeQuoteId?: number; cancellationDecision?: string; recommendedNextAction?: string; quoteId?: number }
       : {};
+    const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
     if (message.category === "quote" && typeof analysis.quoteId === "number") {
       const quoteIds = [analysis.quoteId, analysis.alternativeQuoteId].filter((value): value is number => typeof value === "number");
       for (const quoteId of quoteIds) {
@@ -242,7 +383,21 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       const primary = await payload.findByID({ collection: "quotes", id: analysis.quoteId, depth: 0, overrideAccess: true });
       await enqueueQuoteFollowUps(payload, { quoteId: primary.id, leadId: lead.id, validUntil: primary.validUntil }, correlationId);
     }
-    const followUp = message.category === "completion"
+    const followUp = lead.status === "closed" || analysis.cancellationDecision
+      ? {}
+      : replyContext?.purpose === "cancellation"
+        ? {
+            status: "customer_waiting" as const,
+            nextAction: "Vurder kundens kanselleringsforespørsel før arbeid kan startes.",
+            nextActionAt: new Date().toISOString(),
+          }
+      : replyContext
+        ? {
+            status: "waiting_customer" as const,
+            nextAction: "Vent på kundens svar og følg opp dersom kunden ikke svarer.",
+            nextActionAt: new Date(Date.now() + 3 * 24 * 60 * 60_000).toISOString(),
+          }
+      : message.category === "completion"
       ? {
           status: "converted" as const,
           nextAction: "Oppdrag fullført og dokumentert.",
@@ -267,7 +422,12 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
               nextAction: "Kontroller henvendelsen og velg neste steg.",
               nextActionAt: new Date().toISOString(),
             };
-    await updateCaseState(payload, { leadId: lead.id, command: "message_delivered", idempotencyKey: `message-delivered:${message.id}:${result.providerMessageId}`, patch: { lastContactAt: result.acceptedAt, ...followUp, nextActionOwner: message.category === "completion" ? "system" : "administrator" } });
+    const nextActionOwner = replyContext?.purpose === "question" || replyContext?.purpose === "decline"
+      ? "customer" as const
+      : message.category === "completion"
+        ? "system" as const
+        : "administrator" as const;
+    await updateCaseState(payload, { leadId: lead.id, command: "message_delivered", idempotencyKey: `message-delivered:${message.id}:${result.providerMessageId}`, patch: { lastContactAt: result.acceptedAt, ...followUp, nextActionOwner } });
     return { duplicate: false as const, message: updated };
   } catch (error) {
     const sanitized = sanitizeJobError(error);

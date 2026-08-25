@@ -20,6 +20,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 const actionOptions: CaseNextActionKind[] = [
   "generate_reply",
   "prepare_package",
+  "review_cancellation",
   "approve_package",
   "approve_measurement",
   "measurement_required",
@@ -59,7 +60,7 @@ function selectedAction(input: string | undefined): CaseNextActionKind | "all" {
 }
 
 function selectedStatus(input: string | undefined): CaseListStatus {
-  return ["all", "open", "waiting_customer", "converted", "closed"].includes(input || "") ? input as CaseListStatus : "all";
+  return ["all", "open", "customer_waiting", "waiting_customer", "converted", "closed"].includes(input || "") ? input as CaseListStatus : "all";
 }
 
 export default async function AdminCasesPage({ searchParams }: { searchParams: SearchParams }) {
@@ -109,6 +110,7 @@ export default async function AdminCasesPage({ searchParams }: { searchParams: S
             <select className="min-h-12 rounded-xl border border-white/10 bg-[#11151d] px-3 text-sm" defaultValue={filters.status} name="status">
               <option value="all">{copy.cases.all}</option>
               <option value="open">{copy.cases.open}</option>
+              <option value="customer_waiting">{statusLabel(user.interfaceLanguage, "customer_waiting")}</option>
               <option value="waiting_customer">{copy.cases.waitingCustomer}</option>
               <option value="converted">{copy.cases.converted}</option>
               <option value="closed">{copy.cases.closed}</option>

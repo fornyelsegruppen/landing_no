@@ -16,14 +16,14 @@ export const workOrderStatuses = [
 export type WorkOrderStatus = (typeof workOrderStatuses)[number];
 
 const transitions: Record<WorkOrderStatus, readonly WorkOrderStatus[]> = {
-  unassigned: ["assigned", "scheduled", "cancelled"],
-  assigned: ["scheduled", "cancelled"],
-  scheduled: ["on_way", "cancelled"],
-  on_way: ["arrived", "scheduled"],
+  unassigned: ["assigned", "scheduled", "blocked", "cancelled"],
+  assigned: ["scheduled", "blocked", "cancelled"],
+  scheduled: ["on_way", "blocked", "cancelled"],
+  on_way: ["arrived", "scheduled", "blocked"],
   arrived: ["precheck", "blocked"],
   precheck: ["ready", "blocked"],
   ready: ["in_progress", "blocked"],
-  blocked: ["precheck", "cancelled"],
+  blocked: ["unassigned", "assigned", "scheduled", "on_way", "precheck", "cancelled"],
   in_progress: ["completed", "blocked"],
   completed: ["documented"],
   documented: [],

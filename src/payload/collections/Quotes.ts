@@ -72,6 +72,8 @@ export const Quotes: CollectionConfig = {
     { name: "viewedAt", type: "date", admin: { readOnly: true } },
     { name: "acceptedAt", type: "date", admin: { readOnly: true } },
     { name: "declinedAt", type: "date", admin: { readOnly: true } },
+    { name: "declineReason", type: "text", label: "Strukturert avslagsårsak", admin: { readOnly: true } },
+    { name: "declineComment", type: "textarea", label: "Kundens kommentar til avslag", admin: { readOnly: true } },
     { name: "quoteActions", type: "ui", admin: { components: { Field: "/components/QuoteActions" } } },
   ],
 };

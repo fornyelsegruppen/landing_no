@@ -2,19 +2,20 @@ import type { Payload } from "payload";
 import { updateCaseState } from "@/lib/cases/case-command";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { bareEmail, leadIdFromCaseReply } from "./case-reply";
+import { enqueueCustomerReplyDraft } from "./message-engine";
 
 type InboundEvent = { email_id: string; from: string; to: string[]; subject?: string; created_at?: string };
 type InboundContent = { text?: string | null; html?: string | null };
 
 class ResendInboundStageError extends Error {
-  constructor(stage: "lead" | "deduplication" | "content" | "message" | "case-state", cause: unknown) {
+  constructor(stage: "lead" | "deduplication" | "content" | "message" | "case-state" | "ai-job", cause: unknown) {
     super(`Resend inbound processing failed at ${stage}`, { cause });
     this.name = `ResendInbound${stage.replace("-", "_")}Error`;
   }
 }
 
 async function atStage<T>(
-  stage: "lead" | "deduplication" | "content" | "message" | "case-state",
+  stage: "lead" | "deduplication" | "content" | "message" | "case-state" | "ai-job",
   operation: () => Promise<T>,
 ) {
   try {
@@ -49,7 +50,13 @@ export async function applyResendInboundEmail(
     aiAnalysis: { inbound: true, correlationId },
   } }));
   await atStage("case-state", () => updateCaseState(payload, { leadId: lead.id, command: "inbound_email_received", idempotencyKey, patch: {
-    status: "draft_ready", nextActionOwner: "administrator", nextAction: "Kontroller kundens e-postsvar og godkjenn et svar.", nextActionAt: new Date().toISOString(), lastContactAt: receivedAt,
+    status: "customer_waiting", nextActionOwner: "administrator", nextAction: "Kunden venter på svar. Kontroller e-postsvaret og AI-utkastet.", nextActionAt: new Date().toISOString(), lastContactAt: receivedAt,
   } }));
+  await atStage("ai-job", () => enqueueCustomerReplyDraft(payload, {
+    correlationId,
+    leadId: lead.id,
+    purpose: "question",
+    sourceMessageId: message.id,
+  }));
   return { matched: true as const, duplicate: false as const, messageId: message.id, leadId: lead.id };
 }

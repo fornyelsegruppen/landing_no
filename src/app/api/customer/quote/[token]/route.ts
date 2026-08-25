@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
+import { deliverMessage, enqueueCustomerReplyDraft, enqueueMessageJob } from "@/lib/messages/message-engine";
 import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
@@ -28,6 +28,7 @@ const actionSchema = z.discriminatedUnion("action", [
     reason: z.enum(["price", "timing", "chose_other", "unsure", "scope", "other"]),
     comment: z.string().trim().max(1_500).optional(),
   }),
+  z.object({ action: z.literal("cancel_request"), message: z.string().trim().min(10).max(2_000) }),
   z.object({
     action: z.literal("sign"), signerName: z.string().trim().min(3).max(160),
     signatureData: z.string().min(100).max(1_500_000), expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -67,12 +68,13 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     if (parsed.data.action === "question") {
       const digest = createHash("sha256").update(parsed.data.message).digest("hex").slice(0, 24);
       const existing = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: `quote-question:${view.quoteId}:${digest}` } } });
-      if (!existing.docs[0]) await payload.create({ collection: "messages", overrideAccess: true, data: {
+      const sourceMessage = existing.docs[0] || await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId, direction: "inbound", category: "customer_question", channel: "email",
         subject: `Spørsmål om tilbud ${view.quoteReference}`, bodyText: parsed.data.message,
         status: "delivered", idempotencyKey: `quote-question:${view.quoteId}:${digest}`, aiAssisted: false, deliveredAt: new Date().toISOString(),
       } });
-      await updateCaseState(payload, { leadId, command: "customer_question", idempotencyKey: `quote-question:${view.quoteId}:${digest}`, patch: { status: "waiting_customer", nextActionOwner: "administrator", nextAction: `Svar på kundespørsmål om ${view.quoteReference}.`, nextActionAt: new Date().toISOString() } });
+      await enqueueCustomerReplyDraft(payload, { correlationId, leadId, purpose: "question", sourceMessageId: sourceMessage.id });
+      await updateCaseState(payload, { leadId, command: "customer_question", idempotencyKey: `quote-question:${view.quoteId}:${digest}`, patch: { status: "customer_waiting", nextActionOwner: "administrator", nextAction: `Kunden venter på svar om ${view.quoteReference}. Kontroller AI-utkastet.`, nextActionAt: new Date().toISOString() } });
       return NextResponse.json({ ok: true });
     }
 
@@ -92,9 +94,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       const feedback = parsed.data.comment
         ? `${reasonText}\n\nKundens kommentar:\n${parsed.data.comment}`
         : reasonText;
-      await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "declined", declinedAt: now } });
+      await payload.update({ collection: "quotes", id: view.quoteId, overrideAccess: true, data: { status: "declined", declinedAt: now, declineReason: parsed.data.reason, declineComment: parsed.data.comment || null } });
       if (view.contractStatus === "issued") await payload.update({ collection: "contracts", id: view.contractId, overrideAccess: true, data: { status: "declined" } });
-      await payload.create({ collection: "messages", overrideAccess: true, data: {
+      const declineMessage = await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId,
         direction: "inbound",
         category: "follow_up",
@@ -104,10 +106,12 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         status: "delivered",
         idempotencyKey: `quote-decline-feedback:${view.quoteId}`,
         aiAssisted: false,
+        aiAnalysis: { declineReason: parsed.data.reason, declineComment: parsed.data.comment || null, quoteId: view.quoteId },
         deliveredAt: now,
       } });
+      await enqueueCustomerReplyDraft(payload, { correlationId, leadId, purpose: "decline", sourceMessageId: declineMessage.id });
       await updateCaseState(payload, { leadId, command: "customer_declined", idempotencyKey: `quote-decline:${view.quoteId}`, patch: {
-          status: "waiting_customer",
+          status: "customer_waiting",
           closedAt: null,
           nextActionOwner: "administrator",
           nextAction: `Kunden avslo ${view.quoteReference}: ${reasonText}. Vurder personlig oppfølging eller lukk saken.`,
@@ -132,7 +136,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         try {
           await deliverMessage(payload, provider, acknowledgement.id, correlationId);
           await updateCaseState(payload, { leadId, command: "decline_acknowledgement_sent", idempotencyKey: `decline-acknowledgement-sent:${view.quoteId}`, patch: {
-            status: "waiting_customer",
+            status: "customer_waiting",
             nextActionOwner: "administrator",
             nextAction: `Kunden avslo ${view.quoteReference}: ${reasonText}. Vurder personlig oppfølging eller lukk saken.`,
             nextActionAt: now,
@@ -142,6 +146,51 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         }
       }
       return NextResponse.json({ ok: true, status: "declined" });
+    }
+
+    if (parsed.data.action === "cancel_request") {
+      if (view.contractStatus !== "signed" || view.quoteStatus !== "accepted") {
+        throw new Error("A cancellation request is only available after customer signing");
+      }
+      const now = new Date().toISOString();
+      const digest = createHash("sha256").update(parsed.data.message).digest("hex").slice(0, 24);
+      const key = `customer-cancellation:${view.contractId}:${digest}`;
+      const existing = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });
+      const sourceMessage = existing.docs[0] || await payload.create({ collection: "messages", overrideAccess: true, data: {
+        lead: leadId,
+        direction: "inbound",
+        category: "customer_question",
+        channel: "email",
+        subject: `Forespørsel om kansellering av ${view.contractReference}`,
+        bodyText: parsed.data.message,
+        status: "delivered",
+        idempotencyKey: key,
+        aiAssisted: false,
+        aiAnalysis: { purpose: "cancellation", contractId: view.contractId },
+        deliveredAt: now,
+      } });
+      const workOrders = await payload.find({ collection: "work-orders", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: leadId } } });
+      const workOrder = workOrders.docs[0];
+      if (workOrder && !["completed", "documented", "cancelled"].includes(workOrder.status)) {
+        await payload.update({ collection: "work-orders", id: workOrder.id, overrideAccess: true, data: {
+          statusBeforeCustomerCancellation: workOrder.status === "blocked"
+            ? workOrder.statusBeforeCustomerCancellation || "blocked"
+            : workOrder.status,
+          status: "blocked",
+          customerCancellationRequestedAt: now,
+          cancellationRequestMessage: sourceMessage.id,
+          blockingReasons: [...new Set([...(Array.isArray(workOrder.blockingReasons) ? workOrder.blockingReasons : []), "CUSTOMER_CANCELLATION_REQUEST"])],
+        } });
+      }
+      await enqueueCustomerReplyDraft(payload, { correlationId, leadId, purpose: "cancellation", sourceMessageId: sourceMessage.id });
+      await updateCaseState(payload, { leadId, command: "customer_cancellation_requested", idempotencyKey: key, patch: {
+        status: "customer_waiting",
+        nextActionOwner: "administrator",
+        nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST",
+        nextAction: `Kunden ber om å kansellere ${view.contractReference}. Arbeidsstart er sperret til administrator har vurdert forespørselen.`,
+        nextActionAt: now,
+      } });
+      return NextResponse.json({ ok: true, status: "review_required" });
     }
 
     assertFeatureReady("contractSigning");

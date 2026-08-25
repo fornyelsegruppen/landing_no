@@ -36,6 +36,7 @@ export async function createQuoteDraft(
     optionGroup?: string;
     optionKind?: "base" | "recommended";
     preservePrevious?: boolean;
+    retainPreviousStatus?: boolean;
     siblingQuoteId?: number;
   } = {},
 ) {
@@ -124,7 +125,7 @@ export async function createQuoteDraft(
       reference: contractSnapshot.contractReference, quote: quote.id, version,
       snapshot: contractSnapshot, documentHash: documentHash(contractSnapshot), termsVersion: terms.version, status: "draft",
     } });
-    if (previous && !options.preservePrevious) {
+    if (previous && !options.preservePrevious && !options.retainPreviousStatus) {
       await payload.update({ collection: "quotes", id: previous.id, overrideAccess: true, data: { status: "superseded" } });
       const oldContracts = await payload.find({ collection: "contracts", depth: 0, limit: 10, overrideAccess: true, where: { quote: { equals: previous.id } } });
       for (const old of oldContracts.docs) {

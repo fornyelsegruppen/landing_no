@@ -29,6 +29,11 @@ export async function createWorkOrderFromContract(payload: Payload, input: {
   const quoteId = relationId(contract.quote);
   const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
   if (quote.status !== "accepted") throw new Error("The contract quote is not accepted");
+  const leadId = relationId(quote.lead);
+  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+  if (lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST") {
+    throw new Error("The customer cancellation request must be resolved before a work order can be created");
+  }
   const existing = await payload.find({ collection: "work-orders", depth: 0, limit: 1, overrideAccess: true, where: { contract: { equals: contract.id } } });
   if (existing.docs[0]) return { workOrder: existing.docs[0], created: false };
   const snapshot = quoteSnapshotSchema.parse(quote.snapshot);
@@ -37,7 +42,7 @@ export async function createWorkOrderFromContract(payload: Payload, input: {
     reference: `A-${contract.reference}`,
     contract: contract.id,
     quote: quote.id,
-    lead: relationId(quote.lead),
+    lead: leadId,
     contractDocumentHash: contract.documentHash,
     assignedWorker: input.assignedWorkerId,
     adminNote: input.adminNote,

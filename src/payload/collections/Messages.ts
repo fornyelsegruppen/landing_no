@@ -21,6 +21,7 @@ export const Messages: CollectionConfig = {
   },
   fields: [
     { name: "lead", type: "relationship", relationTo: "leads", index: true },
+    { name: "replyToMessage", type: "relationship", relationTo: "messages", label: "Svar på melding", index: true, access: systemManaged, admin: { readOnly: true } },
     {
       name: "direction",
       type: "select",

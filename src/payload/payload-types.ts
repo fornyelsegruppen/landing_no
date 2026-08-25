@@ -690,6 +690,7 @@ export interface Lead {
     | (
         | 'new'
         | 'draft_ready'
+        | 'customer_waiting'
         | 'waiting_customer'
         | 'qualified'
         | 'measuring'
@@ -763,6 +764,7 @@ export interface Lead {
 export interface Message {
   id: number;
   lead?: (number | null) | Lead;
+  replyToMessage?: (number | null) | Message;
   direction: 'outbound' | 'inbound';
   category:
     | 'receipt'
@@ -1054,6 +1056,8 @@ export interface Quote {
   viewedAt?: string | null;
   acceptedAt?: string | null;
   declinedAt?: string | null;
+  declineReason?: string | null;
+  declineComment?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1174,6 +1178,11 @@ export interface WorkOrder {
   scheduledAt?: string | null;
   arrivalWindow?: string | null;
   adminNote?: string | null;
+  customerCancellationRequestedAt?: string | null;
+  cancellationRequestMessage?: (number | null) | Message;
+  statusBeforeCustomerCancellation?: string | null;
+  customerCancellationResolvedAt?: string | null;
+  customerCancellationResolution?: string | null;
   status:
     | 'unassigned'
     | 'assigned'
@@ -1973,6 +1982,7 @@ export interface LeadsSelect<T extends boolean = true> {
  */
 export interface MessagesSelect<T extends boolean = true> {
   lead?: T;
+  replyToMessage?: T;
   direction?: T;
   category?: T;
   channel?: T;
@@ -2119,6 +2129,8 @@ export interface QuotesSelect<T extends boolean = true> {
   viewedAt?: T;
   acceptedAt?: T;
   declinedAt?: T;
+  declineReason?: T;
+  declineComment?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2207,6 +2219,11 @@ export interface WorkOrdersSelect<T extends boolean = true> {
   scheduledAt?: T;
   arrivalWindow?: T;
   adminNote?: T;
+  customerCancellationRequestedAt?: T;
+  cancellationRequestMessage?: T;
+  statusBeforeCustomerCancellation?: T;
+  customerCancellationResolvedAt?: T;
+  customerCancellationResolution?: T;
   status?: T;
   workSummary?: T;
   beforePhotos?: T;

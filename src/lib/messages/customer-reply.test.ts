@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import { DeterministicAiProvider } from "@/lib/providers/safe-providers";
+import { assertCustomerReplyTextSafe, generateCustomerReplyDraft, minimizeCustomerReplyContext, type CustomerReplyContext } from "./customer-reply";
+
+const context: CustomerReplyContext = {
+  purpose: "question",
+  customerMessage: "Kan dere forklare prisen? Ring 99 88 77 66.",
+  service: "takvask",
+  measurement: { reference: "TM-8-V1", areaMinTenths: 935, areaMaxTenths: 1023 },
+  quote: { reference: "T-8-V1", status: "sent", totalIncVatOre: 1_764_675, maximumTotalIncVatOre: 2_029_376 },
+};
+
+const valid = {
+  subject: "Svar på spørsmålet ditt om tilbud T-8-V1",
+  replyDraft: "Takk for spørsmålet. Tilbudet viser 17 646,75 kr inkludert mva. Vi går gjerne gjennom innholdet med deg før du bestemmer deg.",
+  summary: "Kunden ber om en forklaring av prisen i tilbudet.",
+  intent: "question" as const,
+  factWarnings: [],
+  recommendedAdminAction: "review_and_reply" as const,
+};
+
+describe("customer reply safety", () => {
+  it("removes direct contact details before AI generation", () => {
+    expect(minimizeCustomerReplyContext(context).customerMessage).not.toContain("99 88 77 66");
+  });
+
+  it("allows only exact approved price and area facts", () => {
+    expect(assertCustomerReplyTextSafe("Pris 17 646,75 kr og areal 93,5 m².", context)).toBe(true);
+    expect(() => assertCustomerReplyTextSafe("Pris 12 000 kr.", context)).toThrow(/approved quote/);
+    expect(() => assertCustomerReplyTextSafe("Areal 99 m².", context)).toThrow(/approved measurement/);
+  });
+
+  it("blocks promises and automatic cancellation confirmation", () => {
+    expect(() => assertCustomerReplyTextSafe("Vi kommer mandag.", context)).toThrow(/start date/);
+    expect(() => assertCustomerReplyTextSafe("Kontrakten er kansellert.", { ...context, purpose: "cancellation" })).toThrow(/cancellation/);
+  });
+
+  it("generates a controlled draft without changing approved facts", async () => {
+    await expect(generateCustomerReplyDraft({ provider: new DeterministicAiProvider(valid), context, correlationId: "reply-test" })).resolves.toMatchObject({ result: valid });
+    await expect(generateCustomerReplyDraft({ provider: new DeterministicAiProvider({ ...valid, replyDraft: "Takk. Ny pris er 12 000 kr etter rabatt, og vi følger opp snart." }), context, correlationId: "reply-price" })).rejects.toThrow(/approved quote/);
+  });
+});

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildContractSnapshot, buildQuoteSnapshot, documentHash } from "@/lib/quotes/document";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(), remove: vi.fn(), load: vi.fn(), enqueue: vi.fn(), deliver: vi.fn(), provider: { health: vi.fn(() => ({ status: "ready" })) } }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(), remove: vi.fn(), load: vi.fn(), enqueue: vi.fn(), enqueueReply: vi.fn(), deliver: vi.fn(), provider: { health: vi.fn(() => ({ status: "ready" })) } }));
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ create: mocks.create, update: mocks.update, find: mocks.find, findByID: mocks.findByID, delete: mocks.remove })) }));
 vi.mock("@/lib/quotes/customer-view", () => ({ loadCustomerQuote: mocks.load }));
-vi.mock("@/lib/messages/message-engine", () => ({ enqueueMessageJob: mocks.enqueue, deliverMessage: mocks.deliver }));
+vi.mock("@/lib/messages/message-engine", () => ({ enqueueMessageJob: mocks.enqueue, enqueueCustomerReplyDraft: mocks.enqueueReply, deliverMessage: mocks.deliver }));
 vi.mock("@/lib/providers/email-provider", () => ({ createEmailProvider: () => mocks.provider }));
 vi.mock("@/lib/rate-limit", () => ({ clientIp: () => "192.0.2.1", rateLimit: vi.fn(async () => ({ success: true, remaining: 10 })) }));
 vi.mock("@/lib/platform/features", async (importOriginal) => {
@@ -29,7 +29,7 @@ describe("customer quote signing route", () => {
     process.env.PAYLOAD_SECRET = "test-secret-at-least-32-characters-long";
     mocks.create.mockReset().mockImplementation(async ({ collection }: { collection: string }) => collection === "private-media" ? { id: 77 } : { id: 88 });
     mocks.update.mockReset().mockImplementation(async ({ collection, where }: { collection: string; where?: unknown }) => collection === "contracts" && where ? { docs: [{ id: 2, status: "signed" }], errors: [] } : { id: 1 });
-    mocks.find.mockReset().mockResolvedValue({ docs: [] }); mocks.findByID.mockReset(); mocks.remove.mockReset(); mocks.enqueue.mockReset(); mocks.deliver.mockReset(); mocks.provider.health.mockClear();
+    mocks.find.mockReset().mockResolvedValue({ docs: [] }); mocks.findByID.mockReset(); mocks.remove.mockReset(); mocks.enqueue.mockReset(); mocks.enqueueReply.mockReset(); mocks.deliver.mockReset(); mocks.provider.health.mockClear();
     mocks.load.mockReset().mockResolvedValue({ ...baseView });
   });
 
@@ -71,7 +71,7 @@ describe("customer quote signing route", () => {
     expect(response.status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
       collection: "leads",
-      data: expect.objectContaining({ status: "waiting_customer", closedAt: null }),
+      data: expect.objectContaining({ status: "customer_waiting", closedAt: null }),
     }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
       collection: "messages",
@@ -82,6 +82,7 @@ describe("customer quote signing route", () => {
       data: expect.objectContaining({ direction: "outbound", status: "queued" }),
     }));
     expect(mocks.enqueue).toHaveBeenCalled();
+    expect(mocks.enqueueReply).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ purpose: "decline", sourceMessageId: 88 }));
     expect(mocks.deliver).toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ export type CaseStatePatch = {
   nextActionBlocker?: string | null;
   nextActionOwner?: "administrator" | "customer" | "system" | "worker";
   recordState?: "active" | "archived" | "trashed";
-  status?: "new" | "draft_ready" | "waiting_customer" | "qualified" | "measuring" | "quoted" | "converted" | "closed" | "contacted";
+  status?: "new" | "draft_ready" | "customer_waiting" | "waiting_customer" | "qualified" | "measuring" | "quoted" | "converted" | "closed" | "contacted";
   [key: string]: unknown;
 };
 

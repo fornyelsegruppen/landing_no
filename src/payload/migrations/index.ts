@@ -33,6 +33,7 @@ import * as migration_20260825_220000_case_state_engine from "./20260825_220000_
 import * as migration_20260825_230000_measurement_evidence from "./20260825_230000_measurement_evidence";
 import * as migration_20260825_235000_admin_operations from "./20260825_235000_admin_operations";
 import * as migration_20260825_235100_admin_review_backfill from "./20260825_235100_admin_review_backfill";
+import * as migration_20260825_235200_customer_reply_workflow from "./20260825_235200_customer_reply_workflow";
 
 export const migrations = [
   {
@@ -209,5 +210,10 @@ export const migrations = [
     up: migration_20260825_235100_admin_review_backfill.up,
     down: migration_20260825_235100_admin_review_backfill.down,
     name: "20260825_235100_admin_review_backfill",
+  },
+  {
+    up: migration_20260825_235200_customer_reply_workflow.up,
+    down: migration_20260825_235200_customer_reply_workflow.down,
+    name: "20260825_235200_customer_reply_workflow",
   },
 ];

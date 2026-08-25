@@ -116,6 +116,28 @@ export function CustomerQuote(props: {
     }
   }
 
+  async function requestCancellation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setPending(true);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel_request", message: data.get("message") }),
+      });
+      if (!response.ok) throw new Error("request failed");
+      form.reset();
+      setNotice("Forespørselen er mottatt. Arbeidet blir ikke startet automatisk mens Takfornyelse vurderer saken. Vi sender en egen skriftlig avklaring.");
+    } catch {
+      setNotice("Forespørselen kunne ikke registreres. Kontakt oss på telefon eller e-post.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   const d = props.display;
   return <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
     <header className="mb-8 border-b border-white/10 pb-6">
@@ -167,7 +189,6 @@ export function CustomerQuote(props: {
         </div>
         <button className="mt-6 min-h-14 w-full rounded-xl bg-accent px-5 text-base font-black text-black hover:bg-accent-hover disabled:opacity-50" disabled={pending || !hasSignature} type="submit">{pending ? "Signerer …" : "Bestilling med forpliktelse til å betale og signer"}</button>
       </form>
-      <form className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7" onSubmit={sendQuestion}><h2 className="text-xl font-bold">Har du spørsmål?</h2><textarea className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-white/5 p-4" maxLength={2000} name="message" required /><button className="mt-3 min-h-12 rounded-lg border border-white/20 px-5 font-bold" disabled={pending} type="submit">Send spørsmål</button></form>
       {!declineOpen ? <button className="mt-8 min-h-12 text-sm text-muted-foreground underline" disabled={pending} onClick={() => setDeclineOpen(true)} type="button">Jeg ønsker å avslå tilbudet</button> : (
         <form className="mt-8 rounded-2xl border border-white/15 bg-white/5 p-5 sm:p-7" onSubmit={decline}>
           <h2 className="text-xl font-bold">Før du avslår</h2>
@@ -191,6 +212,8 @@ export function CustomerQuote(props: {
         </form>
       )}
     </> : null}
+    {!declined ? <form className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7" onSubmit={sendQuestion}><h2 className="text-xl font-bold">Har du spørsmål?</h2><p className="mt-2 text-sm text-muted-foreground">Meldingen går til saken din og besvares etter kontroll av Takfornyelse.</p><textarea className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-white/5 p-4" maxLength={2000} minLength={5} name="message" required /><button className="mt-3 min-h-12 rounded-lg border border-white/20 px-5 font-bold" disabled={pending} type="submit">Send spørsmål</button></form> : null}
+    {signed ? <form className="mt-8 rounded-2xl border border-red-400/30 bg-red-400/5 p-5 sm:p-7" onSubmit={requestCancellation}><h2 className="text-xl font-bold">Be om endring eller kansellering</h2><p className="mt-2 text-sm text-muted-foreground">Dette er en forespørsel til manuell vurdering og ikke en automatisk bekreftelse på at avtalen er avsluttet. Planlagt arbeidsstart sperres mens forespørselen vurderes.</p><textarea className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-black/20 p-4" maxLength={2000} minLength={10} name="message" placeholder="Beskriv hva du ønsker å endre eller hvorfor du ber om kansellering" required /><button className="mt-3 min-h-12 rounded-lg border border-red-400/50 px-5 font-bold text-red-200" disabled={pending} type="submit">Send forespørsel til vurdering</button></form> : null}
     <footer className="mt-12 border-t border-white/10 pt-6 text-sm text-muted-foreground"><p>{props.supplier.name} · Org.nr. {props.supplier.orgNumber}</p><p>{props.supplier.address} · {props.supplier.email} · {props.supplier.phone}</p></footer>
   </main>;
 }

@@ -38,6 +38,7 @@ describe("admin case next action", () => {
     [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "completed", documentationSubmittedAt: "2026-08-25T13:00:00Z" } }, "review_completion"],
     [{ leadStatus: "converted", workOrder: { id: 7, status: "completed" } }, "wait_worker_documentation"],
     [{ leadStatus: "converted", quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" } }, "create_work_order"],
+    [{ leadStatus: "customer_waiting", nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST", quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" } }, "review_cancellation"],
     [{ leadStatus: "closed" }, "none"],
   ])("derives %s as %s", (input, expected) => {
     expect(deriveCaseNextAction(input)).toMatchObject({ kind: expected });

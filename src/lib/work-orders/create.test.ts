@@ -17,7 +17,7 @@ describe("work-order creation", () => {
 
   it("is idempotent for one signed contract", async () => {
     const payload = {
-      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
+      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }).mockResolvedValueOnce({ id: 1, nextActionBlocker: null }),
       find: vi.fn().mockResolvedValue({ docs: [{ id: 9, reference: "A-K-1-V1" }] }), create: vi.fn(),
     };
     const result = await createWorkOrderFromContract(payload as never, { contractId: 7 });
@@ -27,7 +27,7 @@ describe("work-order creation", () => {
 
   it("creates the assignment and schedule atomically", async () => {
     const payload = {
-      findByID: vi.fn().mockResolvedValueOnce({ id: 3, role: "worker", active: true, displayName: "Test Worker", phone: "+47 999 99 999" }).mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
+      findByID: vi.fn().mockResolvedValueOnce({ id: 3, role: "worker", active: true, displayName: "Test Worker", phone: "+47 999 99 999" }).mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }).mockResolvedValueOnce({ id: 1, nextActionBlocker: null }),
       find: vi.fn().mockResolvedValue({ docs: [] }),
       create: vi.fn().mockResolvedValue({ id: 10, status: "scheduled" }),
     };
@@ -44,5 +44,14 @@ describe("work-order creation", () => {
       collection: "work-orders",
       data: expect.objectContaining({ assignedWorker: 3, scheduledAt: "2026-08-25T06:30:00.000Z", status: "scheduled" }),
     }));
+  });
+
+  it("blocks work creation while a customer cancellation request is unresolved", async () => {
+    const payload = {
+      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }).mockResolvedValueOnce({ id: 1, nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST" }),
+      find: vi.fn(), create: vi.fn(),
+    };
+    await expect(createWorkOrderFromContract(payload as never, { contractId: 7 })).rejects.toThrow(/cancellation request/i);
+    expect(payload.create).not.toHaveBeenCalled();
   });
 });

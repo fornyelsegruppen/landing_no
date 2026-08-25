@@ -151,6 +151,33 @@ describe("message engine", () => {
     });
   });
 
+  it("moves an approved customer-question reply to waiting for the customer", async () => {
+    const state = repository();
+    state.leads[0]!.status = "customer_waiting";
+    await state.payload.create({ collection: "messages", overrideAccess: true, data: {
+      lead: 1, direction: "outbound", category: "ai_reply", channel: "email",
+      subject: "Svar på spørsmålet ditt", bodyText: "Takk for spørsmålet. Vi har kontrollert opplysningene og venter gjerne på svaret ditt.",
+      status: "queued", idempotencyKey: "customer-reply:1", aiAssisted: true,
+      aiAnalysis: { replyFactContext: { purpose: "question", customerMessage: "Hva skjer videre?", service: "takvask" } },
+      approvedAt: new Date().toISOString(), queuedAt: new Date().toISOString(),
+    } });
+    await deliverMessage(state.payload, new LogEmailProvider(), 1, "customer-reply");
+    expect(state.leads[0]).toMatchObject({ status: "waiting_customer", nextActionOwner: "customer" });
+  });
+
+  it("does not reopen a closed case when the cancellation decision is sent", async () => {
+    const state = repository();
+    state.leads[0]!.status = "closed";
+    await state.payload.create({ collection: "messages", overrideAccess: true, data: {
+      lead: 1, direction: "outbound", category: "follow_up", channel: "email",
+      subject: "Avklaring av kanselleringsforespørselen", bodyText: "Vi bekrefter administrators vurdering av forespørselen.",
+      status: "queued", idempotencyKey: "cancellation-resolution:1", aiAssisted: false,
+      aiAnalysis: { cancellationDecision: "cancel" }, approvedAt: new Date().toISOString(), queuedAt: new Date().toISOString(),
+    } });
+    await deliverMessage(state.payload, new LogEmailProvider(), 1, "cancellation-resolution");
+    expect(state.leads[0]?.status).toBe("closed");
+  });
+
   it("keeps the lead when AI validation fails", async () => {
     const state = repository();
     await expect(createLeadAiReply(state.payload, new DeterministicAiProvider({ invalid: true }), 1, "ai-fail")).rejects.toThrow();

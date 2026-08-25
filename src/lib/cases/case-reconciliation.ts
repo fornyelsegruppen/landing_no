@@ -24,6 +24,7 @@ export function deriveLegacyNextAction(input: {
   const { contract, lead, now, workOrder } = input;
   if ((lead.recordState || "active") !== "active" || lead.status === "closed") return null;
   const immediate = now.toISOString();
+  if (lead.status === "customer_waiting") return { nextAction: "Kontroller kundens melding og godkjenn et svarutkast.", nextActionAt: immediate, nextActionOwner: "administrator" };
   if (lead.status === "waiting_customer") return { nextAction: "Vent på kundens svar og følg opp hvis fristen utløper.", nextActionAt: afterDays(now, 3), nextActionOwner: "customer" };
   if (lead.status === "quoted") return { nextAction: "Kunden vurderer tilbudet. Følg opp før tilbudet utløper.", nextActionAt: afterDays(now, 7), nextActionOwner: "customer" };
   if (lead.status === "converted") {

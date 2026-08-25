@@ -11,6 +11,8 @@ import { CaseLifecyclePanel } from "@/components/admin-v2/case-lifecycle-panel";
 import { ChangeAgreementPanel } from "@/components/admin-v2/change-agreement-panel";
 import { InformationRequestButton } from "@/components/admin-v2/information-request-button";
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
+import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
+import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -57,6 +59,12 @@ function qualificationDetails(value: unknown) {
   };
 }
 
+function factWarnings(value: unknown) {
+  if (!value || typeof value !== "object") return [];
+  const warnings = (value as Record<string, unknown>).factWarnings;
+  return Array.isArray(warnings) ? warnings.filter((item): item is string => typeof item === "string") : [];
+}
+
 export default async function AdminCasePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireAdminUser();
   const copy = getAdminCaseCopy(user.interfaceLanguage);
@@ -90,6 +98,11 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
     ? caseData.lead.nextActionOverdue ? copy.dueNow : formatDate(caseData.lead.nextActionAt)
     : copy.noDue;
   const qualification = qualificationDetails(caseData.lead.qualification);
+  const cancellationSource = caseData.workOrder?.cancellationRequestMessageId
+    ? caseData.messages.find((message) => message.id === caseData.workOrder?.cancellationRequestMessageId)
+    : caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST"
+      ? caseData.messages.find((message) => message.direction === "inbound")
+      : undefined;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -203,19 +216,23 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               <div><dt className="text-xs text-muted-foreground">{copy.priceIncVat}</dt><dd className="mt-1 font-bold text-accent">{nok(caseData.price.totalIncVatOre)}</dd></div>
               <div><dt className="text-xs text-muted-foreground">{copy.maximum}</dt><dd className="mt-1 font-bold">{nok(caseData.price.maximumTotalIncVatOre)}</dd></div>
             </dl> : <p className="text-muted-foreground">{copy.missing}</p>}
-            {caseData.quote ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /></div><a className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={`/api/admin/quotes/${caseData.quote.id}/pdf`} rel="noreferrer" target="_blank">{copy.previewQuotePdf}<ExternalLink aria-hidden="true" className="size-4" /></a><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} summary={copy.advancedTechnical} /></div> : null}
+            {caseData.quote ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /></div>{caseData.quote.declineReason || caseData.quote.declineComment ? <div className="mt-3 rounded-xl border border-warning/25 bg-warning/5 p-3 text-sm"><strong>{caseData.quote.declineReason || metadataLabel(user.interfaceLanguage, "declined")}</strong>{caseData.quote.declineComment ? <p className="mt-1 whitespace-pre-wrap text-white/75">{caseData.quote.declineComment}</p> : null}</div> : null}<a className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={`/api/admin/quotes/${caseData.quote.id}/pdf`} rel="noreferrer" target="_blank">{copy.previewQuotePdf}<ExternalLink aria-hidden="true" className="size-4" /></a><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} summary={copy.advancedTechnical} /></div> : null}
             {caseData.quoteOptions.length > 1 ? <div className="mt-5 grid gap-3 sm:grid-cols-2">{caseData.quoteOptions.map((option) => <article className="rounded-2xl border border-accent/25 bg-black/15 p-4" key={option.id}><p className="text-xs font-bold uppercase tracking-wider text-accent">{option.optionKind === "recommended" ? copy.recommendedOption : copy.originalOption}</p><h3 className="mt-2 font-bold">{option.serviceDescription}</h3><p className="mt-2 text-2xl font-black">{nok(option.totalIncVatOre)}</p><p className="mt-1 text-sm text-muted-foreground">{copy.maximum}: {nok(option.maximumTotalIncVatOre)}</p><div className="mt-3 flex items-center justify-between"><Status locale={user.interfaceLanguage} value={option.status} /><a className="text-sm font-semibold text-accent hover:underline" href={`/api/admin/quotes/${option.id}/pdf`} target="_blank">PDF</a></div></article>)}</div> : null}
-            {caseData.quote?.status === "draft" && caseData.price ? <CommercialQuoteEditor currentService={caseData.lead.inquiryType} leadId={caseData.lead.id} locale={user.interfaceLanguage} rules={rules} unitPriceExVatOre={caseData.quote.optionKind === "recommended" ? undefined : caseData.price.unitPriceExVatOre} /> : null}
+            {caseData.quote && ["draft", "declined"].includes(caseData.quote.status || "") && caseData.price ? <CommercialQuoteEditor currentService={caseData.lead.inquiryType} leadId={caseData.lead.id} locale={user.interfaceLanguage} rules={rules} unitPriceExVatOre={caseData.quote.optionKind === "recommended" ? undefined : caseData.price.unitPriceExVatOre} /> : null}
           </Section>
 
           <Section id="messages-section" title={copy.messages}>
-            {caseData.messages.length ? <div className="grid min-w-0 gap-3">{caseData.messages.map((message) => <article className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4" id={`message-${message.id}`} key={message.id}>
-              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><strong className="break-words [overflow-wrap:anywhere]">{message.subject}</strong><p className="mt-1 break-words text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
-              <p className="mt-3 max-h-40 min-w-0 overflow-auto whitespace-pre-wrap text-sm text-white/80 [overflow-wrap:anywhere]">{message.bodyText}</p>
-              {message.failureMessage ? <p className="mt-3 text-sm text-danger">{message.failureMessage}</p> : null}
-              <TechnicalLink entity={message} label={copy.technicalDetail} summary={copy.advancedTechnical} />
-            </article>)}</div> : <p className="text-muted-foreground">{copy.noMessages}</p>}
+            {caseData.messages.length ? <div className="grid min-w-0 gap-3">{caseData.messages.map((message) => {
+              const source = message.replyToMessageId ? caseData.messages.find((candidate) => candidate.id === message.replyToMessageId) : undefined;
+              return message.status === "draft" && message.direction === "outbound" ? <div className="scroll-mt-24" id={`message-${message.id}`} key={message.id}><MessageDraftEditor aiAssisted={message.aiAssisted} bodyText={message.bodyText} factWarnings={factWarnings(message.aiAnalysis)} leadId={caseData.lead.id} locale={user.interfaceLanguage} messageId={message.id} sourceBody={source?.bodyText} sourceSubject={source?.subject} subject={message.subject} /><TechnicalLink entity={message} label={copy.technicalDetail} summary={copy.advancedTechnical} /></div> : <article className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4" id={`message-${message.id}`} key={message.id}>
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><strong className="break-words [overflow-wrap:anywhere]">{message.subject}</strong><p className="mt-1 break-words text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
+                <p className="mt-3 max-h-40 min-w-0 overflow-auto whitespace-pre-wrap text-sm text-white/80 [overflow-wrap:anywhere]">{message.bodyText}</p>
+                {message.failureMessage ? <p className="mt-3 text-sm text-danger">{message.failureMessage}</p> : null}
+                <TechnicalLink entity={message} label={copy.technicalDetail} summary={copy.advancedTechnical} />
+              </article>;
+            })}</div> : <p className="text-muted-foreground">{copy.noMessages}</p>}
           </Section>
+          {caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST" ? <CancellationReviewPanel customerMessage={cancellationSource?.bodyText} leadId={caseData.lead.id} locale={user.interfaceLanguage} /> : null}
         </div>
 
         <aside className="min-w-0 space-y-6">

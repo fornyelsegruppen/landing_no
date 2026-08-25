@@ -5,7 +5,7 @@ import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { createEmailProvider } from "@/lib/providers/email-provider";
-import { createLeadAiReply, deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
+import { createCustomerReplyDraft, createLeadAiReply, deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
 import { assertMessageCanQueue } from "@/lib/messages/message-policy";
 import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/features";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
@@ -14,6 +14,10 @@ import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { userIsAdmin } from "@/payload/access/roles";
 import { approveAndSendPreparedLeadPackage, prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
 import { CaseCommandConflictError, updateCaseState } from "@/lib/cases/case-command";
+import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
+import { customerReplyContextFromAnalysis } from "@/lib/messages/customer-reply";
+
+export const maxDuration = 60;
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("generate_reply") }),
@@ -21,6 +25,9 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve_package") }),
   z.object({ action: z.literal("approve_send"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("retry_send"), messageId: z.number().int().positive() }),
+  z.object({ action: z.literal("save_draft"), messageId: z.number().int().positive(), subject: z.string().trim().min(5).max(160), bodyText: z.string().trim().min(20).max(3_000) }),
+  z.object({ action: z.literal("regenerate_reply"), messageId: z.number().int().positive() }),
+  z.object({ action: z.literal("resolve_cancellation"), decision: z.enum(["cancel", "continue"]), reason: z.string().trim().min(10).max(1_000) }),
   z.object({ action: z.literal("request_information") }),
   z.object({ action: z.literal("start_measurement") }),
   z.object({ action: z.literal("mark_reviewed") }),
@@ -95,6 +102,29 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       assertFeatureReady("customerQuotes");
       assertFeatureReady("contractSigning");
       result = await approveAndSendPreparedLeadPackage(payload, leadId, user.id, correlationId);
+    } else if (parsed.data.action === "save_draft") {
+      const message = await payload.findByID({ collection: "messages", id: parsed.data.messageId, depth: 0, overrideAccess: true });
+      if (relationId(message.lead) !== leadId || message.status !== "draft") throw new TypeError("Only a draft in this customer case can be edited");
+      assertMessageCanQueue({ ...message, subject: parsed.data.subject, bodyText: parsed.data.bodyText, status: "draft" });
+      const updated = await payload.update({ collection: "messages", id: message.id, overrideAccess: true, data: { subject: parsed.data.subject, bodyText: parsed.data.bodyText, bodyHtml: null } });
+      result = { messageId: updated.id, saved: true };
+    } else if (parsed.data.action === "regenerate_reply") {
+      assertFeatureReady("aiDrafts");
+      const message = await payload.findByID({ collection: "messages", id: parsed.data.messageId, depth: 0, overrideAccess: true });
+      if (relationId(message.lead) !== leadId || message.status !== "draft" || message.category !== "ai_reply") throw new TypeError("Only an active AI reply draft can be regenerated");
+      const sourceMessageId = relationId(message.replyToMessage);
+      const factContext = customerReplyContextFromAnalysis(message.aiAnalysis);
+      if (!sourceMessageId || !factContext) throw new TypeError("The reply draft has no verified source message context");
+      await assertPayloadAiUsageAvailable(payload);
+      const regenerated = await createCustomerReplyDraft(payload, new GeminiAiProvider(), {
+        correlationId,
+        generationKey: `regenerate-${message.id}-${Date.now()}`,
+        leadId,
+        purpose: factContext.purpose,
+        sourceMessageId,
+      });
+      await payload.update({ collection: "messages", id: message.id, overrideAccess: true, data: { status: "cancelled" } });
+      result = { messageId: regenerated.message.id, regenerated: true };
     } else if (parsed.data.action === "approve_send" || parsed.data.action === "retry_send") {
       const message = await payload.findByID({ collection: "messages", id: parsed.data.messageId, depth: 0, overrideAccess: true });
       if (relationId(message.lead) !== leadId) return NextResponse.json({ error: "Message does not belong to lead" }, { status: 409 });
@@ -128,6 +158,53 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       } else {
         result = { messageId: queued.id, sent: false, configurationRequired: true };
       }
+    } else if (parsed.data.action === "resolve_cancellation") {
+      if (lead.nextActionBlocker !== "CUSTOMER_CANCELLATION_REQUEST") throw new TypeError("This case has no pending cancellation request");
+      const now = new Date().toISOString();
+      const workOrders = await payload.find({ collection: "work-orders", depth: 1, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: leadId } } });
+      const workOrder = workOrders.docs[0];
+      if (workOrder && workOrder.status === "blocked" && Array.isArray(workOrder.blockingReasons) && workOrder.blockingReasons.includes("CUSTOMER_CANCELLATION_REQUEST")) {
+        const previousStatus = workOrder.statusBeforeCustomerCancellation;
+        const restored: "unassigned" | "assigned" | "scheduled" | "on_way" = previousStatus && ["unassigned", "assigned", "scheduled", "on_way"].includes(previousStatus)
+          ? previousStatus as "unassigned" | "assigned" | "scheduled" | "on_way"
+          : "unassigned";
+        await payload.update({ collection: "work-orders", id: workOrder.id, overrideAccess: true, data: {
+          status: parsed.data.decision === "cancel" ? "cancelled" : restored,
+          blockingReasons: workOrder.blockingReasons.filter((item) => item !== "CUSTOMER_CANCELLATION_REQUEST"),
+          customerCancellationResolvedAt: now,
+          customerCancellationResolution: `${parsed.data.decision}: ${parsed.data.reason}`,
+        } });
+      }
+      let sourceMessageId = workOrder ? relationId(workOrder.cancellationRequestMessage) : null;
+      if (!sourceMessageId) {
+        const cancellationMessages = await payload.find({ collection: "messages", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { and: [
+          { lead: { equals: leadId } },
+          { direction: { equals: "inbound" } },
+          { subject: { contains: "kansellering" } },
+        ] } });
+        sourceMessageId = cancellationMessages.docs[0]?.id || null;
+      }
+      const confirmation = await payload.create({ collection: "messages", overrideAccess: true, data: {
+        lead: leadId,
+        ...(sourceMessageId ? { replyToMessage: sourceMessageId } : {}),
+        direction: "outbound",
+        category: "follow_up",
+        channel: lead.email ? "email" : "sms",
+        subject: parsed.data.decision === "cancel" ? "Avklaring av kanselleringsforespørselen" : "Avklaring – avtalen fortsetter",
+        bodyText: parsed.data.decision === "cancel"
+          ? `Hei ${lead.name},\n\nTakfornyelse har vurdert forespørselen din. Vi bekrefter at bestillingen avsluttes i tråd med administrators skriftlige vurdering.\n\nBegrunnelse: ${parsed.data.reason}\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
+          : `Hei ${lead.name},\n\nTakfornyelse har vurdert forespørselen din. Etter avklaring fortsetter avtalen og videre planlegging.\n\nAvklaring: ${parsed.data.reason}\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`,
+        status: "draft",
+        idempotencyKey: makeIdempotencyKey("cancellation.resolution", { decision: parsed.data.decision, leadId, revision: lead.caseRevision }),
+        aiAssisted: false,
+        aiAnalysis: { cancellationDecision: parsed.data.decision, administratorReason: parsed.data.reason, sourceMessageId },
+      } });
+      await updateCaseState(payload, { leadId, actorId: user.id, command: "resolve_cancellation", idempotencyKey: `${correlationId}:resolve-cancellation`, patch: parsed.data.decision === "cancel" ? {
+        status: "closed", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: "Kontroller og send kanselleringsbekreftelsen. Arkiver deretter saken med korrekt klassifisering.", nextActionAt: now, closedAt: now,
+      } : {
+        status: "converted", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: workOrder ? "Kontroller gjenopptatt arbeidsplan og informer kunden." : "Opprett arbeid når begge parter har signert.", nextActionAt: now, closedAt: null,
+      } });
+      result = { decision: parsed.data.decision, messageId: confirmation.id };
     } else if (parsed.data.action === "request_information") {
       const key = makeIdempotencyKey("lead.information-request", { leadId, minute: new Date().toISOString().slice(0, 16) });
       const missingNo = [
@@ -185,8 +262,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       entityType: "lead",
       entityId: leadId,
       correlationId,
-      changedFields: ["approve_send", "retry_send"].includes(parsed.data.action)
+      changedFields: ["approve_send", "retry_send", "save_draft", "regenerate_reply"].includes(parsed.data.action)
         ? ["message.status", "message.approvedAt"]
+        : parsed.data.action === "resolve_cancellation"
+          ? ["nextActionBlocker", "workOrder.status", "message.status"]
         : parsed.data.action === "update_intake"
           ? ["address", "postal", "city", "inquiryType"]
           : parsed.data.action === "mark_reviewed"

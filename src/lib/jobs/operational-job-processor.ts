@@ -1,7 +1,8 @@
 import type { Payload, Where } from "payload";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
 import { prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
-import { createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
+import { createCustomerReplyDraft, createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
+import { customerReplyPurposes, type CustomerReplyPurpose } from "@/lib/messages/customer-reply";
 import { featureReadiness } from "@/lib/platform/features";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { createEmailProvider } from "@/lib/providers/email-provider";
@@ -18,10 +19,18 @@ type ProcessorOptions = {
   rescueStale?: boolean;
 };
 
-function numericPayloadId(value: unknown, key: "messageId" | "leadId") {
+function numericPayloadId(value: unknown, key: "messageId" | "leadId" | "sourceMessageId") {
   if (!value || typeof value !== "object") return null;
   const id = (value as Record<string, unknown>)[key];
   return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function customerReplyPurpose(value: unknown): CustomerReplyPurpose | null {
+  if (!value || typeof value !== "object") return null;
+  const purpose = (value as Record<string, unknown>).purpose;
+  return typeof purpose === "string" && (customerReplyPurposes as readonly string[]).includes(purpose)
+    ? purpose as CustomerReplyPurpose
+    : null;
 }
 
 async function rescueStaleJobs(payload: Payload, now: Date) {
@@ -103,7 +112,7 @@ export async function processOperationalJobs(payload: Payload, options: Processo
   const now = options.now || new Date();
   const rescued = options.rescueStale === false ? [] : await rescueStaleJobs(payload, now);
   const filters: Where[] = [
-    { type: { in: ["message.delivery", "lead.ai.draft", "work-order.communication", "quote.follow-up"] } },
+    { type: { in: ["message.delivery", "lead.ai.draft", "customer.reply.draft", "work-order.communication", "quote.follow-up"] } },
     { status: { in: ["pending", "retry"] } },
     { availableAt: { less_than_equal: now.toISOString() } },
   ];
@@ -139,6 +148,14 @@ export async function processOperationalJobs(payload: Payload, options: Processo
         const provider = createEmailProvider();
         if (provider.health().status !== "ready") throw new Error("Email provider requires configuration");
         await deliverMessage(payload, provider, messageId, job.correlationId);
+      } else if (job.type === "customer.reply.draft") {
+        const leadId = numericPayloadId(job.payload, "leadId");
+        const sourceMessageId = numericPayloadId(job.payload, "sourceMessageId");
+        const purpose = customerReplyPurpose(job.payload);
+        if (!leadId || !sourceMessageId || !purpose) throw new TypeError("Customer reply job has incomplete references");
+        if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
+        await assertPayloadAiUsageAvailable(payload);
+        await createCustomerReplyDraft(payload, new GeminiAiProvider(), { correlationId: job.correlationId, leadId, purpose, sourceMessageId });
       } else if (job.type === "lead.ai.draft") {
         const leadId = numericPayloadId(job.payload, "leadId");
         if (!leadId) throw new TypeError("AI job has no lead reference");

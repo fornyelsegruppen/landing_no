@@ -4,6 +4,7 @@ import { deriveCaseNextAction, type CaseNextActionKind } from "./case-read-model
 export const caseListStatusKeys = [
   "all",
   "open",
+  "customer_waiting",
   "waiting_customer",
   "converted",
   "closed",

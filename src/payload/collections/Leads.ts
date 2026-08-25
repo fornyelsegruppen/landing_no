@@ -177,6 +177,7 @@ export const Leads: CollectionConfig = {
       options: [
         { label: "Ny", value: "new" },
         { label: "Svarutkast klart", value: "draft_ready" },
+        { label: "Kunden venter på svar", value: "customer_waiting" },
         { label: "Venter på kunde", value: "waiting_customer" },
         { label: "Kvalifisert", value: "qualified" },
         { label: "Måling", value: "measuring" },
