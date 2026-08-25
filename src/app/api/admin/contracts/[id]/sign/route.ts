@@ -15,6 +15,7 @@ import { clientIp } from "@/lib/rate-limit";
 import { createCompanySignatureEvidence, type ContractSnapshot, type SignatureEvidenceRecord } from "@/lib/quotes/document";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import { userIsAdmin } from "@/payload/access/roles";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -132,12 +133,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const leadId = relationId(quote.lead);
     if (!leadId) throw new TypeError("Contract lead is missing");
-    await payload.update({
-      collection: "leads",
-      id: leadId,
-      overrideAccess: true,
-      data: { status: "converted", nextAction: "Kontrakten er signert av begge parter. Opprett og planlegg arbeidsordre.", nextActionAt: evidence.signedAt },
-    });
+    await updateCaseState(payload, { leadId, actorId: user.id, command: "company_countersigned", idempotencyKey: `company-countersign:${contract.id}`, patch: {
+      status: "converted", nextActionOwner: "administrator", nextAction: "Kontrakten er signert av begge parter. Opprett og planlegg arbeidsordre.", nextActionAt: evidence.signedAt,
+    } });
 
     const key = `contract-counter-signed:${contract.id}`;
     const prior = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });

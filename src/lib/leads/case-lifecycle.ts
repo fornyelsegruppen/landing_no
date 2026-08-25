@@ -1,4 +1,5 @@
 import type { Payload } from "payload";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 export const archiveClassifications = [
   "completed",
@@ -20,6 +21,7 @@ type LifecycleInput = {
   classification?: ArchiveClassification;
   now?: Date;
   reason: string;
+  idempotencyKey?: string;
 };
 
 type RelationRecord = Record<string, unknown> & { id: number };
@@ -111,11 +113,7 @@ export async function archiveCase(payload: LifecyclePayload, leadId: number, inp
   assertCanLeaveActiveState(records);
   await cancelOpenActivity(payload, records);
   const now = (input.now || new Date()).toISOString();
-  return payload.update({
-    collection: "leads",
-    id: leadId,
-    overrideAccess: true,
-    data: {
+  return updateCaseState(payload as Payload, { leadId, actorId: input.actorId, command: "archive", now: input.now, idempotencyKey: input.idempotencyKey, patch: {
       archiveClassification: input.classification,
       archiveReason: reason,
       archivedAt: now,
@@ -123,13 +121,14 @@ export async function archiveCase(payload: LifecyclePayload, leadId: number, inp
       closedAt: lead.closedAt || now,
       nextAction: null,
       nextActionAt: null,
+      nextActionBlocker: null,
+      nextActionOwner: "administrator",
       purgeAfter: null,
       recordState: "archived",
       status: "closed",
       trashedAt: null,
       trashedBy: null,
-    },
-  });
+  } });
 }
 
 export async function trashCase(payload: LifecyclePayload, leadId: number, input: LifecycleInput) {
@@ -141,11 +140,7 @@ export async function trashCase(payload: LifecyclePayload, leadId: number, input
   await cancelOpenActivity(payload, records);
   const now = input.now || new Date();
   const purgeAfter = new Date(now.getTime() + 30 * 24 * 60 * 60_000);
-  return payload.update({
-    collection: "leads",
-    id: leadId,
-    overrideAccess: true,
-    data: {
+  return updateCaseState(payload as Payload, { leadId, actorId: input.actorId, command: "trash", now, idempotencyKey: input.idempotencyKey, patch: {
       archiveClassification: input.classification || lead.archiveClassification || "other",
       archiveReason: reason,
       archivedAt: lead.archivedAt || now.toISOString(),
@@ -153,36 +148,34 @@ export async function trashCase(payload: LifecyclePayload, leadId: number, input
       closedAt: lead.closedAt || now.toISOString(),
       nextAction: null,
       nextActionAt: null,
+      nextActionBlocker: null,
+      nextActionOwner: "administrator",
       purgeAfter: purgeAfter.toISOString(),
       recordState: "trashed",
       status: "closed",
       trashedAt: now.toISOString(),
       trashedBy: input.actorId,
-    },
-  });
+  } });
 }
 
-export async function restoreCase(payload: LifecyclePayload, leadId: number, input: Pick<LifecycleInput, "actorId" | "now" | "reason">) {
+export async function restoreCase(payload: LifecyclePayload, leadId: number, input: Pick<LifecycleInput, "actorId" | "idempotencyKey" | "now" | "reason">) {
   requiredReason(input.reason);
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
   if (!lead.recordState || lead.recordState === "active") throw new TypeError("The case is already active");
-  return payload.update({
-    collection: "leads",
-    id: leadId,
-    overrideAccess: true,
-    data: {
+  return updateCaseState(payload as Payload, { leadId, actorId: input.actorId, command: "restore", now: input.now, idempotencyKey: input.idempotencyKey, patch: {
       archiveClassification: null,
       archiveReason: null,
       archivedAt: null,
       archivedBy: null,
       nextAction: "Review the restored case and choose the next step.",
       nextActionAt: (input.now || new Date()).toISOString(),
+      nextActionBlocker: null,
+      nextActionOwner: "administrator",
       purgeAfter: null,
       recordState: "active",
       trashedAt: null,
       trashedBy: null,
-    },
-  });
+  } });
 }
 
 export async function assertCaseCanBePurged(payload: LifecyclePayload, leadId: number, now = new Date()) {

@@ -55,12 +55,14 @@ describe("work-order collection invariants", () => {
 
     expect(update).toHaveBeenCalledWith({
       collection: "leads",
+      depth: 0,
       id: 2,
       overrideAccess: true,
       data: {
         status: "converted",
-        nextAction: "Oppdrag fullført og dokumentert.",
-        nextActionAt: null,
+        nextAction: "Kontroller dokumentene og arkiver den fullførte kundesaken.",
+        nextActionAt: expect.any(String),
+        nextActionOwner: "administrator",
       },
     });
   });

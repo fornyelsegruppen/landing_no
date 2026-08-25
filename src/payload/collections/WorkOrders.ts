@@ -4,6 +4,7 @@ import { enqueueCompletionCommunication, enqueueWorkOrderStatusCommunication, sy
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { workOrderPipelineUpdate } from "@/lib/leads/pipeline-state";
 import { captureException } from "@/lib/monitoring";
+import { updateCaseState } from "@/lib/cases/case-command";
 import { adminOnly, assignedWorkerOrAdmin, userIsAdmin } from "../access/roles";
 
 function relationId(value: unknown) {
@@ -104,12 +105,7 @@ export const scheduleWorkOrderCommunications: CollectionAfterChangeHook = async 
   });
   try {
     if (leadId && pipelineUpdate) {
-      await req.payload.update({
-        collection: "leads",
-        id: leadId,
-        overrideAccess: true,
-        data: pipelineUpdate,
-      });
+      await updateCaseState(req.payload, { leadId, command: "work_order_pipeline", idempotencyKey: `work-order-pipeline:${doc.id}:${doc.status}:${doc.updatedAt}`, patch: pipelineUpdate });
     }
   } catch (error) {
     captureException(error, { operation: "work-order-pipeline-update", workOrderId: doc.id });

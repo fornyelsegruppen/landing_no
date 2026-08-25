@@ -1,9 +1,33 @@
-import type { CollectionBeforeDeleteHook, CollectionConfig } from "payload";
+import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
 import { deletePrivateMedia } from "@/lib/private-media-storage";
 import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 
 const adminManagedField = {
   update: adminOnlyField,
+};
+
+const caseStateFields = new Set([
+  "status", "recordState", "archiveClassification", "archiveReason", "assignedTo",
+  "nextAction", "nextActionAt", "nextActionOwner", "nextActionBlocker", "caseRevision",
+]);
+
+export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, data, operation, originalDoc }) => {
+  if (operation !== "update" || !originalDoc) return data;
+  if (context?.trustedCaseCommand === true && typeof context.expectedCaseRevision === "number") {
+    const actual = Number(originalDoc.caseRevision || 1);
+    if (actual !== context.expectedCaseRevision) {
+      throw new Error(`CASE_REVISION_CONFLICT:${context.expectedCaseRevision}:${actual}`);
+    }
+  }
+  if ("caseRevision" in data && context?.trustedCaseCommand !== true) {
+    throw new Error("Case revision is managed by the central case command layer");
+  }
+  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true" || context?.trustedCaseCommand === true) return data;
+  const directStateFields = Object.keys(data).filter((key) => caseStateFields.has(key));
+  if (directStateFields.length) {
+    throw new Error(`Case state fields require the central command layer: ${directStateFields.join(", ")}`);
+  }
+  return data;
 };
 
 export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ context, id, req }) => {
@@ -78,7 +102,7 @@ export const Leads: CollectionConfig = {
     read: adminsAndEditors,
     update: adminsAndEditors,
   },
-  hooks: { beforeDelete: [deleteLeadMessagesBeforeLead] },
+  hooks: { beforeChange: [protectCaseStateWrites], beforeDelete: [deleteLeadMessagesBeforeLead] },
   fields: [
     { name: "name", type: "text", required: true, access: adminManagedField },
     { name: "email", type: "email", access: adminManagedField },
@@ -201,6 +225,18 @@ export const Leads: CollectionConfig = {
     { name: "assignedTo", type: "relationship", relationTo: "users", label: "Ansvarlig", index: true },
     { name: "nextAction", type: "textarea", label: "Neste handling" },
     { name: "nextActionAt", type: "date", label: "Frist", index: true },
+    {
+      name: "nextActionOwner",
+      type: "select",
+      label: "Neste handlings eier",
+      required: true,
+      defaultValue: "administrator",
+      index: true,
+      options: ["administrator", "customer", "system", "worker"],
+      admin: { readOnly: true },
+    },
+    { name: "nextActionBlocker", type: "text", label: "Blokkeringskode", admin: { readOnly: true } },
+    { name: "caseRevision", type: "number", label: "Saksversjon", required: true, defaultValue: 1, min: 1, admin: { readOnly: true } },
     { name: "lastContactAt", type: "date", label: "Sist kontaktet" },
     { name: "closedAt", type: "date", label: "Lukket" },
     { name: "qualification", type: "json", label: "AI-oppsummering (kontrolleres av admin)" },

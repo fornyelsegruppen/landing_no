@@ -13,6 +13,7 @@ import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { userIsAdmin } from "@/payload/access/roles";
 import { approveAndSendPreparedLeadPackage, prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("generate_reply") }),
@@ -153,10 +154,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
       result = { messageId: message.id };
     } else if (parsed.data.action === "start_measurement") {
-      await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "measuring", nextAction: "Start kontrollert takmåling.", nextActionAt: new Date().toISOString() } });
+      await updateCaseState(payload, { leadId, actorId: user.id, command: "start_measurement", idempotencyKey: `${correlationId}:start-measurement`, patch: { status: "measuring", nextActionOwner: "administrator", nextAction: "Start kontrollert takmåling.", nextActionAt: new Date().toISOString() } });
       result = { status: "measuring" };
     } else {
-      await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "closed", nextAction: null, nextActionAt: null, closedAt: new Date().toISOString() } });
+      await updateCaseState(payload, { leadId, actorId: user.id, command: "close", idempotencyKey: `${correlationId}:close`, patch: { status: "closed", nextActionOwner: "administrator", nextAction: null, nextActionAt: null, closedAt: new Date().toISOString() } });
       result = { status: "closed" };
     }
 

@@ -157,7 +157,10 @@ export type AdminCase = {
     name: string;
     nextAction?: string;
     nextActionAt?: string;
+    nextActionBlocker?: string;
+    nextActionOwner?: string;
     nextActionOverdue: boolean;
+    revision: number;
     phone?: string;
     postal?: string;
     qualification?: unknown;
@@ -599,7 +602,10 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       assignedTo: relationName(lead.assignedTo),
       nextAction: stringValue(lead.nextAction),
       nextActionAt: stringValue(lead.nextActionAt),
+      nextActionBlocker: stringValue(lead.nextActionBlocker),
+      nextActionOwner: stringValue(lead.nextActionOwner),
       nextActionOverdue: Boolean(stringValue(lead.nextActionAt) && new Date(stringValue(lead.nextActionAt) || 0).getTime() <= loadedAt),
+      revision: numberValue(lead.caseRevision) || 1,
       createdAt: stringValue(lead.createdAt),
     },
     measurement,

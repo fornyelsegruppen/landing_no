@@ -18,22 +18,24 @@ describe("lead pipeline state", () => {
     ).toEqual({
       status: "measuring",
       nextAction: "Review measurement",
+      nextActionOwner: "administrator",
     });
   });
 
   it("keeps a completed customer as a converted lead", () => {
-    expect(documentedPipelineUpdate()).toEqual({
+    expect(documentedPipelineUpdate("2026-08-25T09:00:00.000Z")).toEqual({
       status: "converted",
-      nextAction: "Oppdrag fullført og dokumentert.",
-      nextActionAt: null,
+      nextAction: "Kontroller dokumentene og arkiver den fullførte kundesaken.",
+      nextActionAt: "2026-08-25T09:00:00.000Z",
+      nextActionOwner: "administrator",
     });
   });
 
   it.each([
     ["unassigned", "Tildel en ansatt", "2026-08-25T09:00:00.000Z"],
     ["assigned", "Planlegg dato", "2026-08-25T09:00:00.000Z"],
-    ["scheduled", "tildelt og planlagt", null],
-    ["in_progress", "ansattportalen", null],
+    ["scheduled", "planlagte påminnelser", "2026-08-28T08:00:00.000Z"],
+    ["in_progress", "ansattportalen", "2026-08-25T09:00:00.000Z"],
     ["blocked", "Kontroller blokkeringen", "2026-08-25T09:00:00.000Z"],
     ["completed", "Sluttkontroller", "2026-08-25T09:00:00.000Z"],
   ] as const)("derives an actionable lead state for %s work", (status, expectedText, nextActionAt) => {
@@ -49,6 +51,6 @@ describe("lead pipeline state", () => {
 
   it("reuses the documented terminal state", () => {
     expect(workOrderPipelineUpdate({ now: "2026-08-25T09:00:00.000Z", status: "documented" }))
-      .toEqual(documentedPipelineUpdate());
+      .toEqual(documentedPipelineUpdate("2026-08-25T09:00:00.000Z"));
   });
 });

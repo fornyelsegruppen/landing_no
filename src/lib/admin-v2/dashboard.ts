@@ -259,11 +259,13 @@ function genericItem(collection: string, doc: unknown): AdminListItem {
   const item = asRecord(doc);
   const itemId = id(item.id);
   const workOrder = item.workOrder && typeof item.workOrder === "object" ? item.workOrder as Record<string, unknown> : null;
-  const leadId = relationIdentifier(item.lead) ?? relationIdentifier(workOrder?.lead);
+  const jobPayload = item.payload && typeof item.payload === "object" ? item.payload as Record<string, unknown> : null;
+  const leadId = relationIdentifier(item.lead) ?? relationIdentifier(workOrder?.lead) ?? relationIdentifier(jobPayload?.leadId);
   return {
     id: itemId,
-    reference: text(item.reference) || text(item.subject) || text(item.titleNo) || `#${itemId}`,
+    reference: text(item.reference) || text(item.subject) || text(item.titleNo) || text(item.lastErrorCode) || `#${itemId}`,
     customer: relationLabel(item.lead),
+    subtitle: text(item.lastErrorMessage),
     status: text(item.status) || text(item.editorialStatus),
     createdAt: text(item.createdAt),
     href: leadId ? `/admin-v2/cases/${leadId}` : `/admin/collections/${collection}/${itemId}`,

@@ -2,6 +2,7 @@ import type { Payload } from "payload";
 import { priceRuleSnapshot } from "@/lib/leads/automatic-package";
 import { calculatePrice } from "@/lib/measurements/pricing";
 import { createQuoteDraft } from "@/lib/quotes/payload-quote-engine";
+import { updateCaseState } from "@/lib/cases/case-command";
 import { calculateAdjustedPrice, type DiscountKind } from "./commercial-adjustment";
 
 function relationId(value: unknown) {
@@ -85,8 +86,8 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
       payload.update({ collection: "quotes", id: recommended.quote.id, depth: 0, overrideAccess: true, data: { siblingQuote: base.quote.id } }),
     ]);
   }
-  await payload.update({ collection: "leads", id: input.leadId, depth: 0, overrideAccess: true, data: {
-    status: "quoted",
+  await updateCaseState(payload, { leadId: input.leadId, actorId: input.administratorId, command: "rebuild_commercial_package", idempotencyKey: `commercial-package:${currentQuote.id}:${group}`, patch: {
+    status: "quoted", nextActionOwner: "administrator",
     nextAction: recommended ? "Kontroller begge tilbudsalternativene, godkjenn og send dem samlet til kunden." : "Kontroller den nye prisversjonen, godkjenn og send tilbudet til kunden.",
     nextActionAt: now.toISOString(),
   } });

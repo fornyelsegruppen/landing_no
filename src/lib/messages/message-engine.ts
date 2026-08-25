@@ -6,6 +6,7 @@ import { generateLeadReplyDraft } from "@/lib/leads/lead-ai";
 import { assertMessageCanDeliver } from "./message-policy";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
 import { buildBrandedEmailHtml } from "./email-template";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -175,17 +176,10 @@ export async function createLeadAiReply(payload: Payload, provider: AiProvider, 
       promptVersion: generated.promptVersion,
     },
   });
-  await payload.update({
-    collection: "leads",
-    id: lead.id,
-    overrideAccess: true,
-    data: {
-      status: "draft_ready",
-      qualification: generated.result,
-      nextAction: "Kontroller AI-utkast og velg neste handling.",
-      nextActionAt: new Date().toISOString(),
-    },
-  });
+  await updateCaseState(payload, { leadId: lead.id, command: "ai_reply_drafted", idempotencyKey, patch: {
+    status: "draft_ready", qualification: generated.result, nextActionOwner: "administrator",
+    nextAction: "Kontroller AI-utkast og velg neste handling.", nextActionAt: new Date().toISOString(),
+  } });
   return { duplicate: false as const, message, generated };
 }
 
@@ -268,12 +262,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
               nextAction: "Kontroller henvendelsen og velg neste steg.",
               nextActionAt: new Date().toISOString(),
             };
-    await payload.update({
-      collection: "leads",
-      id: lead.id,
-      overrideAccess: true,
-      data: { lastContactAt: result.acceptedAt, ...followUp },
-    });
+    await updateCaseState(payload, { leadId: lead.id, command: "message_delivered", idempotencyKey: `message-delivered:${message.id}:${result.providerMessageId}`, patch: { lastContactAt: result.acceptedAt, ...followUp, nextActionOwner: message.category === "completion" ? "system" : "administrator" } });
     return { duplicate: false as const, message: updated };
   } catch (error) {
     const sanitized = sanitizeJobError(error);

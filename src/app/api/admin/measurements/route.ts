@@ -5,6 +5,7 @@ import { KartverketAddressProvider, norgeIBilderAccess } from "@/lib/providers/k
 import { prepareMeasurement, roofProposalSchema } from "@/lib/measurements/proposal";
 import { userIsAdmin } from "@/payload/access/roles";
 import { measurementPipelineUpdate } from "@/lib/leads/pipeline-state";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 const candidateSchema = z.object({
   id: z.string(), label: z.string(), postalCode: z.string(), city: z.string(),
@@ -103,12 +104,7 @@ export async function POST(request: Request) {
       : `Takmåling blokkert: ${prepared.gate.reasons.join(", ")}`,
   );
   if (pipelineUpdate) {
-    await payload.update({
-      collection: "leads",
-      id: lead.id,
-      overrideAccess: true,
-      data: pipelineUpdate,
-    });
+    await updateCaseState(payload, { leadId: lead.id, actorId: auth.user.id, command: "measurement_created", idempotencyKey: `measurement-created:${measurement.id}`, patch: { ...pipelineUpdate, nextActionOwner: "administrator" } });
   }
   return NextResponse.json({ measurement, gate: prepared.gate }, { status: 201 });
 }

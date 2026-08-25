@@ -13,6 +13,7 @@ import {
   OpenStreetMapBuildingProvider,
   type BuildingFootprintCandidate,
 } from "@/lib/providers/osm-building-provider";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 export type AutomaticPackageBlockCode =
   | "ADDRESS_REQUIRED"
@@ -83,20 +84,17 @@ async function markBlocked(
   const qualification = lead.qualification && typeof lead.qualification === "object"
     ? lead.qualification as Record<string, unknown>
     : {};
-  await payload.update({
-    collection: "leads",
-    id: lead.id,
-    overrideAccess: true,
-    data: {
+  await updateCaseState(payload, { leadId: lead.id, command: "automatic_package_blocked", idempotencyKey: `automatic-package-blocked:${lead.id}:${code}`, patch: {
       status: "measuring",
+      nextActionOwner: "administrator",
+      nextActionBlocker: code,
       qualification: {
         ...qualification,
         packagePreparation: { status: "blocked", code, reason, checkedAt: new Date().toISOString() },
       },
       nextAction: reason,
       nextActionAt: new Date().toISOString(),
-    },
-  });
+  } });
   return { status: "blocked", code, reason };
 }
 
@@ -316,12 +314,10 @@ export async function prepareAutomaticLeadPackage(
   const qualification = lead.qualification && typeof lead.qualification === "object"
     ? lead.qualification as Record<string, unknown>
     : {};
-  await payload.update({
-    collection: "leads",
-    id: lead.id,
-    overrideAccess: true,
-    data: {
+  await updateCaseState(payload, { leadId: lead.id, command: "automatic_package_ready", idempotencyKey: `automatic-package-ready:${preparedDocuments.quote.id}`, patch: {
       status: "measuring",
+      nextActionOwner: "administrator",
+      nextActionBlocker: null,
       qualification: {
         ...qualification,
         packagePreparation: {
@@ -335,8 +331,7 @@ export async function prepareAutomaticLeadPackage(
       },
       nextAction: "Kontroller automatisk takmåling, pris, tilbud og kontrakt. Godkjenn deretter hele pakken for utsending.",
       nextActionAt: new Date().toISOString(),
-    },
-  });
+  } });
 
   return {
     status: "ready",
@@ -464,12 +459,10 @@ export async function overridePreparedLeadArea(
     const qualification = lead.qualification && typeof lead.qualification === "object"
       ? lead.qualification as Record<string, unknown>
       : {};
-    await payload.update({
-      collection: "leads",
-      id: leadId,
-      overrideAccess: true,
-      data: {
+    await updateCaseState(payload, { leadId, actorId: input.administratorId, command: "manual_area_package_ready", idempotencyKey: `manual-area-package:${measurement.id}`, patch: {
         status: "measuring",
+        nextActionOwner: "administrator",
+        nextActionBlocker: null,
         qualification: {
           ...qualification,
           packagePreparation: {
@@ -484,8 +477,7 @@ export async function overridePreparedLeadArea(
         },
         nextAction: "Kontroller manuelt overstyrt takareal, maksimalpris, tilbud og kontrakt. Godkjenn deretter hele pakken for utsending.",
         nextActionAt: overriddenAt,
-      },
-    });
+    } });
     return {
       measurementId: measurement.id,
       calculationId: calculation.id,
@@ -613,18 +605,15 @@ export async function approveAndSendPreparedLeadPackage(
       // delivery state in the case timeline.
     }
   }
-  await payload.update({
-    collection: "leads",
-    id: leadId,
-    overrideAccess: true,
-    data: {
+  await updateCaseState(payload, { leadId, actorId: administratorId, command: "prepared_package_issued", idempotencyKey: `prepared-package-issued:${approvedQuote.id}`, patch: {
       status: "quoted",
+      nextActionOwner: sent ? "customer" : "administrator",
+      nextActionBlocker: sent ? null : "MESSAGE_DELIVERY_PENDING",
       nextAction: sent
         ? "Vent på at kunden åpner, godtar, spør eller avslår tilbudet."
         : "Tilbudet er godkjent, men e-posten står i kø. Kontroller leveringsstatus.",
       nextActionAt: sent ? new Date(Date.now() + 2 * 24 * 60 * 60_000).toISOString() : now,
-    },
-  });
+  } });
   return {
     measurementId: measurement.id,
     quoteId: approvedQuote.id,

@@ -15,6 +15,7 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { hashOpaqueToken } from "@/lib/security/opaque-token";
 import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 import { createEmailProvider } from "@/lib/providers/email-provider";
+import { updateCaseState } from "@/lib/cases/case-command";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -70,7 +71,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         subject: `Spørsmål om tilbud ${view.quoteReference}`, bodyText: parsed.data.message,
         status: "delivered", idempotencyKey: `quote-question:${view.quoteId}:${digest}`, aiAssisted: false, deliveredAt: new Date().toISOString(),
       } });
-      await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "waiting_customer", nextAction: `Svar på kundespørsmål om ${view.quoteReference}.`, nextActionAt: new Date().toISOString() } });
+      await updateCaseState(payload, { leadId, command: "customer_question", idempotencyKey: `quote-question:${view.quoteId}:${digest}`, patch: { status: "waiting_customer", nextActionOwner: "administrator", nextAction: `Svar på kundespørsmål om ${view.quoteReference}.`, nextActionAt: new Date().toISOString() } });
       return NextResponse.json({ ok: true });
     }
 
@@ -104,17 +105,13 @@ export async function POST(request: Request, context: { params: Promise<{ token:
         aiAssisted: false,
         deliveredAt: now,
       } });
-      await payload.update({
-        collection: "leads",
-        id: leadId,
-        overrideAccess: true,
-        data: {
+      await updateCaseState(payload, { leadId, command: "customer_declined", idempotencyKey: `quote-decline:${view.quoteId}`, patch: {
           status: "waiting_customer",
           closedAt: null,
+          nextActionOwner: "administrator",
           nextAction: `Kunden avslo ${view.quoteReference}: ${reasonText}. Vurder personlig oppfølging eller lukk saken.`,
           nextActionAt: now,
-        },
-      });
+      } });
       const acknowledgement = await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId,
         direction: "outbound",
@@ -133,8 +130,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       if (provider.health().status === "ready") {
         try {
           await deliverMessage(payload, provider, acknowledgement.id, correlationId);
-          await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: {
+          await updateCaseState(payload, { leadId, command: "decline_acknowledgement_sent", idempotencyKey: `decline-acknowledgement-sent:${view.quoteId}`, patch: {
             status: "waiting_customer",
+            nextActionOwner: "administrator",
             nextAction: `Kunden avslo ${view.quoteReference}: ${reasonText}. Vurder personlig oppfølging eller lukk saken.`,
             nextActionAt: now,
           } });
@@ -196,7 +194,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       }
     }
     await payload.update({ collection: "access-tokens", id: view.accessRecordId, overrideAccess: true, data: { usedAt: evidence.signedAt } });
-    await payload.update({ collection: "leads", id: leadId, overrideAccess: true, data: { status: "converted", nextAction: "Kunden har signert. Leverandøren må kontrollere og medsignere kontrakten.", nextActionAt: new Date().toISOString() } });
+    await updateCaseState(payload, { leadId, command: "customer_signed", idempotencyKey: `customer-signed:${view.contractId}`, patch: { status: "converted", nextActionOwner: "administrator", nextAction: "Kunden har signert. Leverandøren må kontrollere og medsignere kontrakten.", nextActionAt: new Date().toISOString() } });
     const key = `contract-signed:${view.contractId}`;
     const prior = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });
     if (!prior.docs[0]) {

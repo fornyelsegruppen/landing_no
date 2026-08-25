@@ -28,7 +28,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Invalid lifecycle action" }, { status: 400 });
     const before = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
-    const common = { actorId: user.id, reason: parsed.data.reason };
+    const common = { actorId: user.id, reason: parsed.data.reason, idempotencyKey: `${correlationId}:${parsed.data.action}` };
     let result: unknown;
     if (parsed.data.action === "archive") result = await archiveCase(payload, leadId, { ...common, classification: parsed.data.classification });
     else if (parsed.data.action === "trash") result = await trashCase(payload, leadId, { ...common, classification: parsed.data.classification });

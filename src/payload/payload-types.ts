@@ -710,6 +710,9 @@ export interface Lead {
   assignedTo?: (number | null) | User;
   nextAction?: string | null;
   nextActionAt?: string | null;
+  nextActionOwner?: ('administrator' | 'customer' | 'system' | 'worker') | null;
+  nextActionBlocker?: string | null;
+  caseRevision?: number | null;
   lastContactAt?: string | null;
   closedAt?: string | null;
   qualification?:
@@ -1915,6 +1918,9 @@ export interface LeadsSelect<T extends boolean = true> {
   assignedTo?: T;
   nextAction?: T;
   nextActionAt?: T;
+  nextActionOwner?: T;
+  nextActionBlocker?: T;
+  caseRevision?: T;
   lastContactAt?: T;
   closedAt?: T;
   qualification?: T;

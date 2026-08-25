@@ -29,6 +29,7 @@ import * as migration_20260825_150000_admin_work_scheduling from "./20260825_150
 import * as migration_20260825_170000_commercial_quote_options from "./20260825_170000_commercial_quote_options";
 import * as migration_20260825_190000_completion_invoice_warranty from "./20260825_190000_completion_invoice_warranty";
 import * as migration_20260825_210000_lead_archive_trash from "./20260825_210000_lead_archive_trash";
+import * as migration_20260825_220000_case_state_engine from "./20260825_220000_case_state_engine";
 
 export const migrations = [
   {
@@ -185,5 +186,10 @@ export const migrations = [
     up: migration_20260825_210000_lead_archive_trash.up,
     down: migration_20260825_210000_lead_archive_trash.down,
     name: "20260825_210000_lead_archive_trash",
+  },
+  {
+    up: migration_20260825_220000_case_state_engine.up,
+    down: migration_20260825_220000_case_state_engine.down,
+    name: "20260825_220000_case_state_engine",
   },
 ];
