@@ -60,11 +60,19 @@ export async function executeCaseCommand(payload: Payload, input: ExecuteCaseCom
     throw new CaseCommandConflictError(input.expectedRevision, revision);
   }
   const nextRevision = revision + 1;
+  const commandContext = {
+    trustedCaseCommand: true,
+    expectedCaseRevision: revision,
+  };
   let after;
   try {
     after = await payload.update({
       collection: "leads", id: input.leadId, depth: 0, overrideAccess: true,
-      context: { trustedCaseCommand: true, expectedCaseRevision: revision },
+      // Payload forwards local API context through the generated request. Keep
+      // it on both supported inputs so the collection hook receives it in the
+      // Next.js runtime as well as in direct local API calls.
+      context: commandContext,
+      req: { context: commandContext },
       data: { ...input.patch, caseRevision: nextRevision },
     });
   } catch (error) {
