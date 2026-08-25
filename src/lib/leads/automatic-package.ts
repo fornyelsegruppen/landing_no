@@ -3,7 +3,7 @@ import type { PriceCalculation, RoofMeasurement } from "@/payload/payload-types"
 import { calculatePrice, type PriceRuleSnapshot } from "@/lib/measurements/pricing";
 import { prepareMeasurement } from "@/lib/measurements/proposal";
 import { nextMeasurementVersion } from "@/lib/measurements/versioning";
-import { createQuoteDraft } from "@/lib/quotes/payload-quote-engine";
+import { createQuoteDraft, refreshDraftDocumentSnapshots } from "@/lib/quotes/payload-quote-engine";
 import { documentHash } from "@/lib/quotes/document";
 import { issueQuoteCustomerLink } from "@/lib/quotes/issue";
 import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
@@ -559,26 +559,33 @@ export async function approveAndSendPreparedLeadPackage(
     where: { and: [{ serviceKey: { equals: lead.inquiryType } }, { status: { equals: "approved" } }] },
   });
   const rule = rules.docs[0];
-  const prepared = prepareMeasurement({
-    proposal: {
-      buildingIdentifier: measurement.buildingIdentifier ?? null,
-      confidence: measurement.confidence,
-      confidenceReasoning: measurement.confidenceReasoning,
-      roofPlanes: measurement.roofPlanes,
-    },
-    addressResolved: Boolean(measurement.addressSourceId),
-    sourceAuthorized: measurement.imageryLicensed === true,
-    hasApprovedPriceRule: Boolean(rule),
-  });
-  if (!prepared.gate.allowed) {
-    throw new TypeError(`Roof measurement is blocked: ${prepared.gate.reasons.join(", ")}`);
+  if (measurement.measurementMode === "manual_no_visual") {
+    if (!measurement.manualAreaSource || !measurement.manualAreaReason || measurement.actualAreaMaxTenths < 100 || measurement.actualAreaMaxTenths > 50_000 || !rule) {
+      throw new TypeError("Manual roof measurement requires a realistic area, source, reason and approved price rule");
+    }
+  } else {
+    const prepared = prepareMeasurement({
+      proposal: {
+        buildingIdentifier: measurement.buildingIdentifier ?? null,
+        confidence: measurement.confidence,
+        confidenceReasoning: measurement.confidenceReasoning,
+        roofPlanes: measurement.roofPlanes,
+      },
+      addressResolved: Boolean(measurement.addressSourceId),
+      sourceAuthorized: measurement.imageryLicensed === true,
+      hasApprovedPriceRule: Boolean(rule),
+    });
+    if (!prepared.gate.allowed) {
+      throw new TypeError(`Roof measurement is blocked: ${prepared.gate.reasons.join(", ")}`);
+    }
   }
   if (documentHash(quote.snapshot) !== quote.snapshotHash) {
     throw new TypeError("Quote snapshot hash mismatch");
   }
 
+  let approvedMeasurement = measurement;
   if (measurement.status !== "approved") {
-    await payload.update({
+    approvedMeasurement = await payload.update({
       collection: "roof-measurements",
       id: measurement.id,
       overrideAccess: true,
@@ -590,9 +597,13 @@ export async function approveAndSendPreparedLeadPackage(
       },
     });
   }
+  const refreshed = await refreshDraftDocumentSnapshots(payload, { quoteId: quote.id, measurementId: approvedMeasurement.id, administratorId });
+  if (documentHash(refreshed.quote.snapshot) !== refreshed.quote.snapshotHash || documentHash(refreshed.contract.snapshot) !== refreshed.contract.documentHash) {
+    throw new TypeError("Approved document snapshot hash mismatch");
+  }
   const approvedQuote = await payload.update({
     collection: "quotes",
-    id: quote.id,
+    id: refreshed.quote.id,
     overrideAccess: true,
     context: { trustedQuoteApproval: true },
     data: {

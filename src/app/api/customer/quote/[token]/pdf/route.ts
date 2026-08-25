@@ -3,6 +3,7 @@ import { getPayload } from "@/lib/payload";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
 import { loadCustomerQuote } from "@/lib/quotes/customer-view";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
+import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 
 export const runtime = "nodejs";
 
@@ -17,7 +18,8 @@ export async function GET(_request: Request, context: { params: Promise<{ token:
     const media = await payload.findByID({ collection: "private-media", id: signedDocumentId, depth: 0, overrideAccess: true });
     bytes = await readPrivateMediaContent(media).then((file) => new Uint8Array(file.data));
   } else {
-    bytes = await buildQuoteContractPdf({ contract: view.snapshot });
+    const measurementEvidence = await loadPdfMeasurementEvidence(payload, view.snapshot);
+    bytes = await buildQuoteContractPdf({ contract: view.snapshot, measurementEvidence });
   }
   return new NextResponse(Buffer.from(bytes), { headers: {
     "Content-Type": "application/pdf",

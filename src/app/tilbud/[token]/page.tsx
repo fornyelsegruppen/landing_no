@@ -20,5 +20,6 @@ export default async function CustomerQuotePage({ params }: { params: Promise<{ 
     contractReference={view.contractReference} documentHash={view.documentHash}
     customerName={view.customerName} display={view.display} supplier={view.snapshot.supplier}
     terms={view.snapshot.terms} signedAt={view.signedAt} companySignedAt={view.companySignedAt} optionKind={view.optionKind}
+    measurementEvidenceHref={view.snapshot.quote.measurement.mode === "manual_no_visual" ? undefined : `/api/customer/quote/${encodeURIComponent(token)}/measurement-evidence`}
   /></body></html>;
 }

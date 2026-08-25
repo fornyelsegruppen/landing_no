@@ -1,10 +1,25 @@
 import type { Payload } from "payload";
-import { buildContractSnapshot, buildQuoteSnapshot, documentHash, type QuoteSnapshot } from "./document";
+import { buildContractSnapshot, buildQuoteSnapshot, documentHash, quoteSnapshotSchema, type ContractSnapshot, type QuoteSnapshot } from "./document";
 
 function idOf(value: unknown) {
   if (typeof value === "number") return value;
   if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
   throw new TypeError("Required relationship is missing");
+}
+
+function optionalId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
+  return undefined;
+}
+
+function roofAngle(measurement: { roofPlanes?: unknown }, kind: "min" | "max") {
+  if (!Array.isArray(measurement.roofPlanes)) return undefined;
+  const values = measurement.roofPlanes
+    .map((plane) => plane && typeof plane === "object" ? Number((plane as Record<string, unknown>)[kind === "min" ? "angleMinDegrees" : "angleMaxDegrees"]) : Number.NaN)
+    .filter(Number.isFinite);
+  if (!values.length) return undefined;
+  return kind === "min" ? Math.min(...values) : Math.max(...values);
 }
 
 const serviceNames: Record<string, string> = {
@@ -54,7 +69,9 @@ export async function createQuoteDraft(
   const version = (previous?.version ?? 0) + 1;
   const quoteReference = `T-${leadId}-V${version}`;
   const assumptions = [
-    `Takarealet er estimert til ${measurement.actualAreaMinTenths / 10}–${measurement.actualAreaMaxTenths / 10} m² fra lagret polygon og vinkelintervall.`,
+    measurement.measurementMode === "manual_no_visual"
+      ? `Takarealet er manuelt satt til ${measurement.actualAreaMaxTenths / 10} m². Det finnes ikke et visuelt kartvedlegg for denne målingen.`
+      : `Takarealet er estimert til ${measurement.actualAreaMinTenths / 10}–${measurement.actualAreaMaxTenths / 10} m² fra lagret polygon og vinkelintervall.`,
     "Takvinkel og faktisk areal kontrolleres på stedet før arbeidet starter.",
     "Arbeid utover avtalt toleranse eller maksimalpris krever en separat godkjenning fra kunden.",
   ];
@@ -67,6 +84,16 @@ export async function createQuoteDraft(
       horizontalAreaTenths: measurement.horizontalAreaTenths,
       actualAreaMinTenths: measurement.actualAreaMinTenths, actualAreaMaxTenths: measurement.actualAreaMaxTenths,
       source: measurement.source, credits: measurement.credits, capturedAt: measurement.capturedAt, assumptions,
+      mode: measurement.measurementMode || "legacy",
+      buildingIdentifier: measurement.buildingIdentifier || undefined,
+      evidenceMediaId: optionalId(measurement.evidenceSnapshot),
+      evidenceHash: measurement.evidenceHash || undefined,
+      evidenceAttribution: measurement.evidenceAttribution || measurement.credits,
+      angleMinDegrees: roofAngle(measurement, "min"),
+      angleMaxDegrees: roofAngle(measurement, "max"),
+      approvedAt: measurement.approvedAt || undefined,
+      manualAreaSource: measurement.manualAreaSource || undefined,
+      manualAreaReason: measurement.manualAreaReason || undefined,
     },
     pricing: {
       calculationId: calculation.id, inputHash: calculation.inputHash, ruleId: rule.id, ruleVersion: rule.version,
@@ -113,5 +140,87 @@ export async function createQuoteDraft(
 }
 
 export function quoteSnapshotFromRecord(value: unknown): QuoteSnapshot {
-  return buildQuoteSnapshot(value as Omit<QuoteSnapshot, "schemaVersion">);
+  return quoteSnapshotSchema.parse(value);
+}
+
+export async function createPreparedPackageForMeasurement(payload: Payload, input: { leadId: number; measurementId: number; now?: Date }) {
+  const [lead, measurement, currentQuotes] = await Promise.all([
+    payload.findByID({ collection: "leads", id: input.leadId, depth: 0, overrideAccess: true }),
+    payload.findByID({ collection: "roof-measurements", id: input.measurementId, depth: 0, overrideAccess: true }),
+    payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ lead: { equals: input.leadId } }, { status: { not_equals: "superseded" } }] } }),
+  ]);
+  const current = currentQuotes.docs[0];
+  if (current && current.status !== "draft") throw new TypeError("An issued or accepted quote requires a controlled change agreement");
+  const matchingRules = await payload.find({ collection: "price-rules", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ serviceKey: { equals: lead.inquiryType } }, { status: { equals: "approved" } }] } });
+  const rule = matchingRules.docs[0];
+  if (!rule) throw new TypeError("No approved price rule exists for this service");
+  const { calculatePrice } = await import("@/lib/measurements/pricing");
+  const calculated = calculatePrice(measurement.actualAreaMaxTenths, {
+    id: rule.id, version: rule.version, serviceKey: rule.serviceKey, unitPriceExVatOre: rule.unitPriceExVatOre,
+    vatBasisPoints: rule.vatBasisPoints, minimumExVatOre: rule.minimumExVatOre,
+    toleranceBasisPoints: rule.toleranceBasisPoints, maximumExVatOre: rule.maximumExVatOre, status: rule.status,
+  });
+  const calculation = await payload.create({ collection: "price-calculations", overrideAccess: true, data: {
+    reference: `PB-${input.leadId}-${Date.now()}`, lead: input.leadId, measurement: measurement.id, priceRule: rule.id,
+    inputSnapshot: { measurementHash: measurement.inputHash, measurementVersion: measurement.version, rule },
+    outputSnapshot: calculated, inputHash: calculated.inputHash, subtotalExVatOre: calculated.subtotalExVatOre,
+    vatOre: calculated.vatOre, totalIncVatOre: calculated.totalIncVatOre, maximumTotalIncVatOre: calculated.maximumTotalIncVatOre,
+    status: "ready", blockingReasons: [],
+  } });
+  try {
+    return { calculation, ...await createQuoteDraft(payload, calculation.id, input.now || new Date(), { allowPendingMeasurement: true }) };
+  } catch (error) {
+    await payload.delete({ collection: "price-calculations", id: calculation.id, overrideAccess: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function refreshDraftDocumentSnapshots(payload: Payload, input: { quoteId: number; measurementId: number; administratorId: number }) {
+  const [quote, measurement, administrator] = await Promise.all([
+    payload.findByID({ collection: "quotes", id: input.quoteId, depth: 0, overrideAccess: true }),
+    payload.findByID({ collection: "roof-measurements", id: input.measurementId, depth: 0, overrideAccess: true }),
+    payload.findByID({ collection: "users", id: input.administratorId, depth: 0, overrideAccess: true }),
+  ]);
+  if (quote.status !== "draft" || idOf(quote.measurement) !== measurement.id) throw new TypeError("Only the current draft may be refreshed");
+  const previous = quoteSnapshotSchema.parse(quote.snapshot);
+  const { schemaVersion: _schemaVersion, ...base } = previous;
+  void _schemaVersion;
+  const evidenceMediaId = optionalId(measurement.evidenceSnapshot);
+  const snapshot = buildQuoteSnapshot({ ...base, measurement: {
+    ...previous.measurement,
+    id: measurement.id,
+    version: measurement.version,
+    inputHash: measurement.inputHash,
+    horizontalAreaTenths: measurement.horizontalAreaTenths,
+    actualAreaMinTenths: measurement.actualAreaMinTenths,
+    actualAreaMaxTenths: measurement.actualAreaMaxTenths,
+    source: measurement.source,
+    credits: measurement.credits,
+    capturedAt: measurement.capturedAt,
+    mode: measurement.measurementMode || "legacy",
+    buildingIdentifier: measurement.buildingIdentifier || undefined,
+    evidenceMediaId,
+    evidenceHash: measurement.evidenceHash || undefined,
+    evidenceAttribution: measurement.evidenceAttribution || measurement.credits,
+    angleMinDegrees: roofAngle(measurement, "min"),
+    angleMaxDegrees: roofAngle(measurement, "max"),
+    approvedByName: administrator.displayName || administrator.email,
+    approvedAt: measurement.approvedAt || new Date().toISOString(),
+    manualAreaSource: measurement.manualAreaSource || undefined,
+    manualAreaReason: measurement.manualAreaReason || undefined,
+  } });
+  if ((snapshot.measurement.mode === "schematic" || snapshot.measurement.mode === "schematic_with_context") && (!evidenceMediaId || !snapshot.measurement.evidenceHash)) {
+    throw new TypeError("Visual measurement evidence is missing from the approved snapshot");
+  }
+  if (snapshot.measurement.mode === "manual_no_visual" && (!snapshot.measurement.manualAreaSource || !snapshot.measurement.manualAreaReason)) {
+    throw new TypeError("Manual measurement source and reason are required in the approved snapshot");
+  }
+  const updatedQuote = await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { snapshot, snapshotHash: documentHash(snapshot) } });
+  const contracts = await payload.find({ collection: "contracts", depth: 0, limit: 1, overrideAccess: true, where: { quote: { equals: quote.id } } });
+  const contract = contracts.docs[0];
+  if (!contract || contract.status !== "draft") throw new TypeError("Current draft contract is required");
+  const oldContract = contract.snapshot as unknown as ContractSnapshot;
+  const contractSnapshot = buildContractSnapshot({ contractReference: oldContract.contractReference, quote: snapshot, customer: oldContract.customer, terms: oldContract.terms });
+  const updatedContract = await payload.update({ collection: "contracts", id: contract.id, overrideAccess: true, data: { snapshot: contractSnapshot, documentHash: documentHash(contractSnapshot) } });
+  return { quote: updatedQuote, contract: updatedContract, snapshot, contractSnapshot };
 }

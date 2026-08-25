@@ -1,12 +1,18 @@
 "use client";
 
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 type Display = {
   reference: string; service: string; address: string; estimatedAreaMin: number; estimatedAreaMax: number;
   unitPriceExVatNok: number; subtotalExVatNok: number; vatPercent: number; vatNok: number; totalIncVatNok: number;
   tolerancePercent: number; maximumTotalIncVatNok: number | null; assumptions: string[]; source: string; credits: string;
   validUntil: string; termsVersion: string;
+  measurement: {
+    id: number; version: number; inputHash: string; horizontalAreaTenths: number; actualAreaMinTenths: number; actualAreaMaxTenths: number;
+    mode?: "legacy" | "schematic" | "schematic_with_context" | "manual_no_visual"; buildingIdentifier?: string; evidenceAttribution?: string;
+    angleMinDegrees?: number; angleMaxDegrees?: number; approvedByName?: string; approvedAt?: string; manualAreaSource?: string; manualAreaReason?: string;
+  };
 };
 
 const nok = (value: number) => value.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,6 +24,7 @@ export function CustomerQuote(props: {
   signedAt?: string | null;
   companySignedAt?: string | null;
   optionKind?: string | null;
+  measurementEvidenceHref?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -131,7 +138,19 @@ export function CustomerQuote(props: {
       <div className="sm:col-span-2 rounded-xl bg-accent/10 p-4"><p className="text-sm text-muted-foreground">Pris inkludert mva.</p><p className="text-3xl font-black text-accent">{nok(d.totalIncVatNok)} kr</p>{d.maximumTotalIncVatNok != null ? <p className="mt-2 text-sm">Avtalt maksimalpris inkl. mva.: <strong>{nok(d.maximumTotalIncVatNok)} kr</strong></p> : null}</div>
     </section>
 
-    <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7"><h2 className="text-xl font-bold">Måling og forutsetninger</h2><ul className="mt-4 list-disc space-y-2 pl-5">{d.assumptions.map((item) => <li key={item}>{item}</li>)}</ul><p className="mt-4 text-sm text-muted-foreground">Kilde: {d.source}. {d.credits}</p></section>
+    <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7">
+      <h2 className="text-xl font-bold">Beregnet tak</h2>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <p><span className="text-muted-foreground">Måleversjon:</span> <strong>TM-{d.measurement.id}-V{d.measurement.version}</strong></p>
+        {d.measurement.buildingIdentifier ? <p><span className="text-muted-foreground">Valgt bygg:</span> <strong>{d.measurement.buildingIdentifier}</strong></p> : null}
+        <p><span className="text-muted-foreground">Horisontalt areal:</span> <strong>{d.measurement.horizontalAreaTenths / 10} m²</strong></p>
+        {d.measurement.angleMinDegrees != null && d.measurement.angleMaxDegrees != null ? <p><span className="text-muted-foreground">Takvinkel:</span> <strong>{d.measurement.angleMinDegrees}–{d.measurement.angleMaxDegrees}°</strong></p> : null}
+      </div>
+      {props.measurementEvidenceHref ? <Image alt="Skjematisk visning av valgt tak" className="mt-5 h-auto w-full rounded-xl border border-white/10" height={800} src={props.measurementEvidenceHref} unoptimized width={1200} /> : null}
+      {d.measurement.mode === "manual_no_visual" ? <div className="mt-5 rounded-xl border border-accent/30 bg-accent/10 p-4"><p className="font-bold">Manuelt kontrollert takareal uten kartvedlegg</p><p className="mt-2">Grunnlag: {d.measurement.manualAreaSource || "administrator"}. {d.measurement.manualAreaReason}</p>{d.measurement.approvedAt ? <p className="mt-2 text-sm text-muted-foreground">Kontrollert {new Date(d.measurement.approvedAt).toLocaleString("nb-NO")} av {d.measurement.approvedByName || "Takfornyelse administrator"}.</p> : null}</div> : null}
+      <p className="mt-5">Takareal og takvinkel kontrolleres på stedet før arbeid starter. Et vesentlig avvik utover avtalt toleranse eller maksimalpris krever en skriftlig endringsavtale før arbeidet fortsetter.</p>
+      <h3 className="mt-6 font-bold">Forutsetninger</h3><ul className="mt-3 list-disc space-y-2 pl-5">{d.assumptions.map((item) => <li key={item}>{item}</li>)}</ul><p className="mt-4 text-sm text-muted-foreground">Kilde: {d.source}. {d.measurement.evidenceAttribution || d.credits}</p>
+    </section>
     <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7"><h2 className="text-xl font-bold">Avtalevilkår og angrerett</h2><p className="mt-4 whitespace-pre-wrap leading-7">{props.terms.text}</p><h3 className="mt-6 font-bold">Angrerett</h3><p className="mt-2 whitespace-pre-wrap leading-7">{props.terms.withdrawalInstructions}</p><a className="mt-4 inline-flex min-h-11 items-center underline" href={props.terms.withdrawalFormUrl} rel="noreferrer" target="_blank">Åpne standard angreskjema</a><div><a className="mt-2 inline-flex min-h-11 items-center underline" href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`} target="_blank">Last ned tilbud og kontrakt som PDF</a></div></section>
 
     {!signed && !declined ? <>

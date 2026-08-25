@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import type { ContractSnapshot } from "@/lib/quotes/document";
+import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 import { userIsAdmin } from "@/payload/access/roles";
 
 export const runtime = "nodejs";
@@ -16,7 +17,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const contracts = await payload.find({ collection: "contracts", depth: 0, limit: 1, overrideAccess: true, where: { quote: { equals: Number(id) } } });
   const contract = contracts.docs[0];
   if (!contract) return NextResponse.json({ error: "Contract draft not found" }, { status: 404 });
-  const bytes = await buildQuoteContractPdf({ contract: contract.snapshot as ContractSnapshot });
+  const snapshot = contract.snapshot as ContractSnapshot;
+  const measurementEvidence = await loadPdfMeasurementEvidence(payload, snapshot);
+  const bytes = await buildQuoteContractPdf({ contract: snapshot, measurementEvidence });
   return new NextResponse(Buffer.from(bytes), { headers: {
     "Content-Type": "application/pdf",
     "Content-Disposition": `inline; filename="${contract.reference.toLowerCase()}.pdf"`,

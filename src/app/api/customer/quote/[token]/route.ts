@@ -11,6 +11,7 @@ import { createSignatureEvidence, type ContractSnapshot } from "@/lib/quotes/doc
 import { revokeQuoteAccessTokens } from "@/lib/quotes/customer-access";
 import { loadCustomerQuote } from "@/lib/quotes/customer-view";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
+import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { hashOpaqueToken } from "@/lib/security/opaque-token";
 import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
@@ -166,7 +167,9 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       mimeType: "image/png",
       filename: `kundesignatur-${view.contractReference.toLowerCase()}.png`,
     });
-    const pdfBytes = await buildQuoteContractPdf({ contract: view.snapshot as ContractSnapshot, signatureData: parsed.data.signatureData, evidence });
+    const contractSnapshot = view.snapshot as ContractSnapshot;
+    const measurementEvidence = await loadPdfMeasurementEvidence(payload, contractSnapshot);
+    const pdfBytes = await buildQuoteContractPdf({ contract: contractSnapshot, signatureData: parsed.data.signatureData, evidence, measurementEvidence });
     const filename = `signert-${view.contractReference.toLowerCase()}.pdf`;
     const media = await createPrivateMedia(payload, {
       classification: "contract", ownerType: "contract", ownerId: String(view.contractId), alt: `Signert kontrakt ${view.contractReference}`,

@@ -6,6 +6,7 @@ import {
   type ContractSnapshot,
   type SignatureEvidenceRecord,
 } from "./document";
+import type { PdfMeasurementEvidence } from "./measurement-evidence";
 
 function formatNok(value: number) {
   return value.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,6 +43,7 @@ export async function buildQuoteContractPdf(input: {
   evidence?: SignatureEvidenceRecord;
   companySignatureData?: string;
   companyEvidence?: CompanySignatureEvidenceRecord;
+  measurementEvidence?: PdfMeasurementEvidence;
 }) {
   const pdf = await createBrandedPdf({
     title: `Tilbud og kontrakt ${input.contract.contractReference}`,
@@ -56,7 +58,38 @@ export async function buildQuoteContractPdf(input: {
   pdf.field("Kunde", input.contract.customer.name);
   pdf.field("Arbeidssted", input.contract.customer.address);
 
-  pdf.section("Oppdrag og beregningsgrunnlag");
+  pdf.section("Beregnet tak");
+  const measurement = model.measurement;
+  pdf.field("Måleversjon", `TM-${input.contract.quote.leadId}-V${measurement.version}`);
+  pdf.field("Målehash", measurement.inputHash);
+  if (measurement.mode !== "manual_no_visual") {
+    pdf.field("Valgt bygg", measurement.buildingIdentifier);
+    pdf.field("Horisontalt areal", `${(measurement.horizontalAreaTenths / 10).toLocaleString("nb-NO")} m²`);
+    if (measurement.angleMinDegrees != null && measurement.angleMaxDegrees != null) pdf.field("Takvinkel brukt i beregningen", `${measurement.angleMinDegrees}–${measurement.angleMaxDegrees}°`);
+    if (input.measurementEvidence) {
+      pdf.ensure(245);
+      const image = input.measurementEvidence.mimeType === "image/jpeg"
+        ? await pdf.document.embedJpg(input.measurementEvidence.data)
+        : await pdf.document.embedPng(input.measurementEvidence.data);
+      const scaled = image.scaleToFit(pdf.contentWidth, 215);
+      const top = pdf.y();
+      pdf.page().drawImage(image, { x: PDF_MARGIN, y: top - scaled.height, width: scaled.width, height: scaled.height });
+      pdf.setY(top - scaled.height - 9);
+    } else if (measurement.mode === "schematic" || measurement.mode === "schematic_with_context") {
+      throw new Error("Visual measurement evidence is required for this contract snapshot");
+    }
+    pdf.text(`Målekilde og attribusjon: ${measurement.evidenceAttribution || model.credits}.`);
+  } else {
+    pdf.field("Målemetode", "Manuelt kontrollert takareal uten kartvedlegg");
+    pdf.field("Kontrollert areal", `${(measurement.actualAreaMaxTenths / 10).toLocaleString("nb-NO")} m²`);
+    pdf.field("Grunnlag", measurement.manualAreaSource);
+    pdf.field("Begrunnelse", measurement.manualAreaReason);
+    pdf.field("Kontrollert av", measurement.approvedByName || "Takfornyelse administrator");
+    pdf.field("Kontrollert", measurement.approvedAt ? new Date(measurement.approvedAt).toLocaleString("nb-NO") : undefined);
+  }
+  pdf.text("Takareal og takvinkel kontrolleres på stedet før arbeid starter. Et vesentlig avvik utover avtalt toleranse eller maksimalpris krever en skriftlig endringsavtale før arbeidet fortsetter.");
+
+  pdf.section("Oppdrag og prisgrunnlag");
   pdf.field("Tjeneste", model.service);
   pdf.field("Estimert takareal", `${model.estimatedAreaMin.toLocaleString("nb-NO")} - ${model.estimatedAreaMax.toLocaleString("nb-NO")} m²`);
   pdf.field("Enhetspris eks. mva.", `${formatNok(model.unitPriceExVatNok)} kr/m²`);

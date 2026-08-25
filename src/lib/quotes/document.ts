@@ -14,7 +14,7 @@ export function documentHash(value: unknown) {
 
 const integer = z.number().int().nonnegative().safe();
 export const quoteSnapshotSchema = z.object({
-  schemaVersion: z.literal("quote-v1"),
+  schemaVersion: z.enum(["quote-v1", "quote-v2"]),
   quoteReference: z.string(),
   leadId: z.number().int().positive(),
   serviceKey: z.string(),
@@ -24,6 +24,17 @@ export const quoteSnapshotSchema = z.object({
     id: z.number().int().positive(), version: z.number().int().positive(), inputHash: z.string().length(64),
     horizontalAreaTenths: integer, actualAreaMinTenths: integer, actualAreaMaxTenths: integer,
     source: z.string(), credits: z.string(), capturedAt: z.string(), assumptions: z.array(z.string()),
+    mode: z.enum(["legacy", "schematic", "schematic_with_context", "manual_no_visual"]).optional().default("legacy"),
+    buildingIdentifier: z.string().optional(),
+    evidenceMediaId: z.number().int().positive().optional(),
+    evidenceHash: z.string().length(64).optional(),
+    evidenceAttribution: z.string().optional(),
+    angleMinDegrees: z.number().min(0).max(89).optional(),
+    angleMaxDegrees: z.number().min(0).max(89).optional(),
+    approvedByName: z.string().optional(),
+    approvedAt: z.string().optional(),
+    manualAreaSource: z.enum(["customer", "drawing", "admin_estimate", "onsite"]).optional(),
+    manualAreaReason: z.string().optional(),
   }),
   pricing: z.object({
     calculationId: z.number().int().positive(), inputHash: z.string().length(64), ruleId: z.number().int().positive(), ruleVersion: z.number().int().positive(),
@@ -35,9 +46,10 @@ export const quoteSnapshotSchema = z.object({
 });
 
 export type QuoteSnapshot = z.infer<typeof quoteSnapshotSchema>;
+export type QuoteSnapshotInput = Omit<z.input<typeof quoteSnapshotSchema>, "schemaVersion">;
 
-export function buildQuoteSnapshot(input: Omit<QuoteSnapshot, "schemaVersion">): QuoteSnapshot {
-  const snapshot = quoteSnapshotSchema.parse({ schemaVersion: "quote-v1", ...input });
+export function buildQuoteSnapshot(input: QuoteSnapshotInput): QuoteSnapshot {
+  const snapshot = quoteSnapshotSchema.parse({ schemaVersion: "quote-v2", ...input });
   if (new Date(snapshot.validUntil).getTime() <= Date.now()) throw new TypeError("Quote validity must be in the future");
   if (snapshot.measurement.actualAreaMinTenths > snapshot.measurement.actualAreaMaxTenths) throw new TypeError("Minimum area cannot exceed maximum area");
   return snapshot;
@@ -63,11 +75,12 @@ export function quoteDisplayModel(snapshotInput: unknown) {
     credits: snapshot.measurement.credits,
     validUntil: snapshot.validUntil,
     termsVersion: snapshot.termsVersion,
+    measurement: snapshot.measurement,
   };
 }
 
 export type ContractSnapshot = {
-  schemaVersion: "contract-v1";
+  schemaVersion: "contract-v1" | "contract-v2";
   contractReference: string;
   quoteHash: string;
   quote: QuoteSnapshot;
@@ -86,7 +99,7 @@ export function buildContractSnapshot(input: {
     throw new TypeError("Approved contract and withdrawal terms are required");
   }
   return {
-    schemaVersion: "contract-v1",
+    schemaVersion: "contract-v2",
     contractReference: input.contractReference,
     quoteHash: documentHash(input.quote),
     quote: quoteSnapshotSchema.parse(input.quote),

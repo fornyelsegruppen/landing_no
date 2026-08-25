@@ -12,6 +12,7 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { KartverketAddressProvider, norgeIBilderAccess } from "@/lib/providers/kartverket-address-provider";
 import { OpenStreetMapBuildingProvider, type BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
+import { createPreparedPackageForMeasurement } from "@/lib/quotes/payload-quote-engine";
 import { userIsAdmin } from "@/payload/access/roles";
 
 const candidateSchema = z.object({ id: z.string(), label: z.string(), postalCode: z.string(), city: z.string(), latitude: z.number(), longitude: z.number(), source: z.string() });
@@ -110,6 +111,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Case was changed by another administrator. Refresh before saving.", code: "CASE_REVISION_CONFLICT", expected: parsed.data.expectedRevision, actual: Number(lead.caseRevision || 1) }, { status: 409 });
   }
   const correlationId = correlationIdFromHeaders(request.headers);
+  if (parsed.data.action !== "create") {
+    const activeQuotes = await payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ lead: { equals: lead.id } }, { status: { not_equals: "superseded" } }] } });
+    if (activeQuotes.docs[0] && activeQuotes.docs[0].status !== "draft") {
+      return NextResponse.json({ error: "An issued or accepted quote requires a controlled change agreement", code: "CONTROLLED_CHANGE_REQUIRED" }, { status: 409 });
+    }
+  }
 
   if (parsed.data.action === "create_manual") {
     const prior = await priorMeasurement(payload, lead.id);
@@ -131,7 +138,8 @@ export async function POST(request: Request) {
     if (prior && prior.status !== "approved") await payload.update({ collection: "roof-measurements", id: prior.id, overrideAccess: true, data: { status: "superseded" } });
     await updateCaseState(payload, { leadId: lead.id, actorId: user.id, expectedRevision: parsed.data.expectedRevision, command: "manual_no_visual_measurement", idempotencyKey: `manual-no-visual:${measurement.id}`, patch: { status: "measuring", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: "Kontroller og godkjenn manuelt takareal uten kart.", nextActionAt: now } });
     await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: user.id, action: "measurement.manual-no-visual-created", entityType: "roof-measurement", entityId: measurement.id, correlationId, changedFields: ["measurementMode", "manualAreaSource", "manualAreaReason", "actualAreaMaxTenths"], metadata: { differencePercent, supersedes: prior?.id } });
-    return NextResponse.json({ measurement, differencePercent }, { status: 201 });
+    const packageResult = await createPreparedPackageForMeasurement(payload, { leadId: lead.id, measurementId: measurement.id });
+    return NextResponse.json({ measurement, differencePercent, package: { calculationId: packageResult.calculation.id, quoteId: packageResult.quote.id, contractId: packageResult.contract.id } }, { status: 201 });
   }
 
   let result: Awaited<ReturnType<typeof createVisualMeasurement>>;
@@ -156,5 +164,6 @@ export async function POST(request: Request) {
     result = await createVisualMeasurement({ payload, actorId: user.id, expectedRevision: parsed.data.expectedRevision, lead, leadId: lead.id, address: parsed.data.address, candidates, proposal: parsed.data.proposal, imageryLicensed: parsed.data.imageryLicensed, imagerySource: parsed.data.imagerySource, imagerySourceUrl: parsed.data.imagerySourceUrl, license: parsed.data.license, credits: parsed.data.credits, mapImageId: parsed.data.mapImageId });
   }
   await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: user.id, action: "measurement.building-selected", entityType: "roof-measurement", entityId: result.measurement.id, correlationId, changedFields: ["buildingIdentifier", "roofPlanes", "candidateBuildings", "evidenceHash"], metadata: { reason, supersedes: result.prior?.id } });
-  return NextResponse.json({ measurement: result.measurement, gate: result.gate }, { status: 201 });
+  const packageResult = await createPreparedPackageForMeasurement(payload, { leadId: lead.id, measurementId: result.measurement.id });
+  return NextResponse.json({ measurement: result.measurement, gate: result.gate, package: { calculationId: packageResult.calculation.id, quoteId: packageResult.quote.id, contractId: packageResult.contract.id } }, { status: 201 });
 }

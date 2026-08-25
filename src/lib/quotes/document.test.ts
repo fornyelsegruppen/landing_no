@@ -13,6 +13,9 @@ const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQ
 describe("locked quote and contract documents", () => {
   it("shows the exact same totals from the locked quote snapshot", () => {
     expect(quoteDisplayModel(quote)).toMatchObject({ totalIncVatNok: 20337.75, maximumTotalIncVatNok: 22371.53, vatPercent: 25 });
+    expect(quote.schemaVersion).toBe("quote-v2");
+    expect(contract.schemaVersion).toBe("contract-v2");
+    expect(quote.measurement.mode).toBe("legacy");
   });
 
   it("hashes canonical content deterministically", () => {

@@ -14,6 +14,7 @@ import { createEmailProvider } from "@/lib/providers/email-provider";
 import { clientIp } from "@/lib/rate-limit";
 import { createCompanySignatureEvidence, type ContractSnapshot, type SignatureEvidenceRecord } from "@/lib/quotes/document";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
+import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 import { userIsAdmin } from "@/payload/access/roles";
 import { updateCaseState } from "@/lib/cases/case-command";
 
@@ -99,12 +100,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       filename: `leverandorsignatur-${contract.reference.toLowerCase()}.png`,
     });
 
+    const measurementEvidence = await loadPdfMeasurementEvidence(payload, snapshot);
     const finalPdf = await buildQuoteContractPdf({
       contract: snapshot,
       signatureData: customerSignatureData,
       evidence: customerEvidence,
       companySignatureData: parsed.data.signatureData,
       companyEvidence: evidence,
+      measurementEvidence,
     });
     finalDocumentMedia = await createPrivateMedia(payload, {
       classification: "contract",
