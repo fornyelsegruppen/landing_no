@@ -220,6 +220,7 @@ export async function POST(request: Request) {
     const payload = await getPayload();
     const created = await payload.create({
       collection: "leads",
+      draft: false,
       data: {
         name: rest.name,
         postal: rest.postal,

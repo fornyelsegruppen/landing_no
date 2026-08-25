@@ -94,7 +94,7 @@ jobs:
       - name: Build production application against PostgreSQL
         run: npm run build
 
-      - name: Public browser smoke against production build
+      - name: Public and authenticated browser smoke against production build
         run: npm run test:e2e
 
       - name: Rehearse PostgreSQL backup and restore with synthetic data
