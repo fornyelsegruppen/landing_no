@@ -231,6 +231,30 @@ export async function dispatchWorkOrderCommunicationNow(
   }
 }
 
+export async function notifyAssignedWorkerNow(
+  payload: Payload,
+  order: CommunicationOrder,
+  correlationId: string,
+  provider: EmailProvider = createEmailProvider(),
+) {
+  const workerId = relationId(order.assignedWorker);
+  if (!workerId || !order.scheduledAt || !order.arrivalWindow) throw new TypeError("Complete assignment is required before notifying the employee");
+  const worker = await payload.findByID({ collection: "users", id: workerId, depth: 0, overrideAccess: true });
+  if (!worker.active || worker.role !== "worker" || !worker.email) throw new TypeError("The assigned employee account is not ready for notifications");
+  const date = new Date(order.scheduledAt).toLocaleDateString("nb-NO", { dateStyle: "long", timeZone: "Europe/Oslo" });
+  const text = `Hei ${worker.displayName || worker.email},\n\nDu er tildelt oppdrag ${order.id}.\nDato: ${date}\nAvtalt ankomst: kl. ${order.arrivalWindow}\n\nÅpne medarbeiderportalen for adresse, arbeidsomfang og dokumentasjon. Endringer vises alltid i portalen.\n\nTakfornyelse`;
+  return provider.send({
+    template: "worker-assignment",
+    to: worker.email,
+    subject: `Nytt eller oppdatert oppdrag ${order.id}`,
+    text,
+    html: buildBrandedEmailHtml({ subject: `Oppdrag ${order.id}`, text }),
+    replyTo: siteConfig.email,
+    idempotencyKey: makeIdempotencyKey("worker.assignment", { workOrderId: order.id, scheduleVersion: workOrderScheduleVersion(order) }),
+    correlationId,
+  });
+}
+
 function copyFor(kind: WorkOrderCommunicationKind, input: { leadName: string; scheduledAt?: string | null; arrivalWindow?: string | null; workerName?: string | null; workerPhone?: string | null }) {
   const when = input.scheduledAt ? new Date(input.scheduledAt).toLocaleDateString("nb-NO", { dateStyle: "long", timeZone: "Europe/Oslo" }) : "avtalt dato";
   const window = input.arrivalWindow ? `kl. ${input.arrivalWindow}` : input.scheduledAt ? `kl. ${new Date(input.scheduledAt).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" })}` : "avtalt tid";

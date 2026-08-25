@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   fetchWithTimeout,
@@ -11,6 +11,7 @@ import {
   panelDateLocale,
   type PanelLocale,
 } from "@/lib/panel-i18n";
+import { prepareWorkerPhoto } from "@/lib/images/worker-upload";
 
 type Props = {
   locale: PanelLocale;
@@ -43,10 +44,42 @@ export function WorkerOrderActions(props: Props) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [documentationSubmitted, setDocumentationSubmitted] = useState(Boolean(props.initialDocumentationSubmittedAt));
+  const [draftState, setDraftState] = useState<"unsent" | "saved" | "sending" | "sent" | "error">("sent");
+  const precheckFormRef = useRef<HTMLFormElement>(null);
+  const completionFormRef = useRef<HTMLFormElement>(null);
+  const draftKey = `takfornyelse:worker:${props.orderId}`;
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(draftKey);
+    if (!saved) return;
+    let values: Record<string, string | boolean>;
+    try { values = JSON.parse(saved) as Record<string, string | boolean>; } catch { return; }
+    for (const form of [precheckFormRef.current, completionFormRef.current]) {
+      if (!form) continue;
+      for (const element of Array.from(form.elements)) {
+        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) || !element.name || !(element.name in values)) continue;
+        if (element instanceof HTMLInputElement && element.type === "checkbox") element.checked = Boolean(values[element.name]);
+        else element.value = String(values[element.name] ?? "");
+      }
+    }
+  }, [draftKey, status]);
+
+  function saveLocalDraft(form: HTMLFormElement) {
+    const values: Record<string, string | boolean> = {};
+    for (const element of Array.from(form.elements)) {
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) || !element.name || element.type === "file") continue;
+      values[element.name] = element instanceof HTMLInputElement && element.type === "checkbox" ? element.checked : element.value;
+    }
+    window.localStorage.setItem(draftKey, JSON.stringify(values));
+    setDraftState("saved");
+  }
+
+  function clearLocalDraft() { window.localStorage.removeItem(draftKey); setDraftState("sent"); }
 
   async function send(body: Record<string, unknown>) {
     if (busy) return false;
     setBusy(true);
+    setDraftState("sending");
     setNotice("");
     try {
       const response = await fetchWithTimeout(
@@ -84,6 +117,7 @@ export function WorkerOrderActions(props: Props) {
         setActualTotal(result.actualTotalIncVatOre);
       setNotice(result.customerNotification === "sent" ? copy.customerNotified : result.customerNotification === "queued" ? copy.customerNotificationQueued : copy.registered);
       router.refresh();
+      setDraftState("sent");
       return true;
     } catch (error) {
       setNotice(
@@ -94,6 +128,7 @@ export function WorkerOrderActions(props: Props) {
             : copy.actionFailed,
       );
       router.refresh();
+      setDraftState("error");
       return false;
     } finally {
       setBusy(false);
@@ -107,14 +142,16 @@ export function WorkerOrderActions(props: Props) {
     try {
       const uploaded: number[] = [];
       for (const file of Array.from(files)) {
+        const prepared = await prepareWorkerPhoto(file);
         const form = new FormData();
         form.set("phase", phase);
-        form.set("file", file);
-        const response = await fetchWithTimeout(
-          `/api/worker/work-orders/${props.orderId}/photos`,
-          { method: "POST", body: form },
-          45_000,
-        );
+        form.set("file", prepared.file);
+        let response: Response | null = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          response = await fetchWithTimeout(`/api/worker/work-orders/${props.orderId}/photos`, { method: "POST", headers: { "X-Upload-SHA256": prepared.sha256 }, body: form }, 45_000).catch(() => null);
+          if (response?.ok || (response && response.status < 500 && response.status !== 408 && response.status !== 429)) break;
+        }
+        if (!response) throw new Error(copy.uploadFailed);
         const result = (await response.json()) as {
           id?: number;
           error?: string;
@@ -147,7 +184,7 @@ export function WorkerOrderActions(props: Props) {
     const area = Number(
       String(formData.get("actualArea") ?? "").replace(",", "."),
     );
-    await send({
+    const sent = await send({
       action: "submit_precheck",
       beforePhotoIds,
       roofType: formData.get("roofType"),
@@ -160,6 +197,7 @@ export function WorkerOrderActions(props: Props) {
       scopeChanged: formData.get("scopeChanged") === "on",
       scopeChangeDetails: formData.get("scopeChangeDetails"),
     });
+    if (sent) clearLocalDraft();
   }
 
   return (
@@ -185,6 +223,13 @@ export function WorkerOrderActions(props: Props) {
           </p>
         ) : null}
       </div>
+      <p className={`mt-3 text-xs font-semibold ${draftState === "error" ? "text-red-300" : "text-muted-foreground"}`} role="status">
+        {draftState === "unsent" ? (props.locale === "lt" ? "Neišsiųsta" : props.locale === "en" ? "Not sent" : "Ikke sendt")
+          : draftState === "saved" ? (props.locale === "lt" ? "Juodraštis saugomas šiame telefone" : props.locale === "en" ? "Draft saved on this phone" : "Utkast lagret på denne telefonen")
+            : draftState === "sending" ? (props.locale === "lt" ? "Siunčiama …" : props.locale === "en" ? "Sending …" : "Sender …")
+              : draftState === "error" ? (props.locale === "lt" ? "Klaida – duomenys liko telefone" : props.locale === "en" ? "Error – data remains on this phone" : "Feil – dataene er fortsatt på telefonen")
+                : (props.locale === "lt" ? "Išsiųsta" : props.locale === "en" ? "Sent" : "Sendt")}
+      </p>
 
       {status === "scheduled" ? (
         <ActionButton
@@ -234,7 +279,7 @@ export function WorkerOrderActions(props: Props) {
       ) : null}
 
       {status === "precheck" ? (
-        <form action={submitPrecheck} className="mt-5 grid gap-4">
+        <form action={submitPrecheck} className="mt-5 grid gap-4" onInput={(event) => { setDraftState("unsent"); saveLocalDraft(event.currentTarget); }} ref={precheckFormRef}>
           <PhotoInput
             busy={busy}
             count={beforePhotoIds.length}
@@ -395,13 +440,16 @@ export function WorkerOrderActions(props: Props) {
       {status === "completed" && !documentationSubmitted ? (
         <form
           action={async (form) => {
-            await send({
+            const sent = await send({
               action: "submit_documentation",
               afterPhotoIds,
               completionNotes: form.get("completionNotes"),
             });
+            if (sent) clearLocalDraft();
           }}
           className="mt-5 grid gap-4"
+          onInput={(event) => { setDraftState("unsent"); saveLocalDraft(event.currentTarget); }}
+          ref={completionFormRef}
         >
           <PhotoInput
             busy={busy}

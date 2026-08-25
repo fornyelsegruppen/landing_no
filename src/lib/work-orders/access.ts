@@ -15,7 +15,7 @@ export async function loadAuthorizedWorkOrder(payload: Payload, workOrderId: num
   return order;
 }
 
-export function appendTimeline(existing: unknown, event: { action: string; actorId: number; changedFields: string[]; at?: string }) {
+export function appendTimeline(existing: unknown, event: { action: string; actorId: number; changedFields: string[]; at?: string; reason?: string; before?: unknown; after?: unknown }) {
   const timeline = Array.isArray(existing) ? existing.slice(-99) : [];
-  return [...timeline, { action: event.action, actorId: event.actorId, changedFields: [...new Set(event.changedFields)].sort(), at: event.at ?? new Date().toISOString() }];
+  return [...timeline, { action: event.action, actorId: event.actorId, changedFields: [...new Set(event.changedFields)].sort(), at: event.at ?? new Date().toISOString(), ...(event.reason ? { reason: event.reason } : {}), ...(event.before !== undefined ? { before: event.before } : {}), ...(event.after !== undefined ? { after: event.after } : {}) }];
 }

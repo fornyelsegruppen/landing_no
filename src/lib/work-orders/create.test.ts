@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildQuoteSnapshot } from "@/lib/quotes/document";
-import { createWorkOrderFromContract } from "./create";
+import { assertAssignableWorker, createWorkOrderFromContract } from "./create";
 
 const snapshot = buildQuoteSnapshot({
   quoteReference: "T-1-V1", leadId: 1, serviceKey: "takvask", serviceDescription: "Takvask", propertyAddress: "Testveien 1",
@@ -10,6 +10,11 @@ const snapshot = buildQuoteSnapshot({
 });
 
 describe("work-order creation", () => {
+  it("blocks a customer-facing assignment without a complete worker profile", async () => {
+    const payload = { findByID: vi.fn().mockResolvedValue({ id: 3, role: "worker", active: true, displayName: "Test Worker", phone: null }) };
+    await expect(assertAssignableWorker(payload as never, 3)).rejects.toThrow(/phone/i);
+  });
+
   it("is idempotent for one signed contract", async () => {
     const payload = {
       findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
@@ -22,7 +27,7 @@ describe("work-order creation", () => {
 
   it("creates the assignment and schedule atomically", async () => {
     const payload = {
-      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
+      findByID: vi.fn().mockResolvedValueOnce({ id: 3, role: "worker", active: true, displayName: "Test Worker", phone: "+47 999 99 999" }).mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
       find: vi.fn().mockResolvedValue({ docs: [] }),
       create: vi.fn().mockResolvedValue({ id: 10, status: "scheduled" }),
     };

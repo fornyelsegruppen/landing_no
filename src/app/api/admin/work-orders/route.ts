@@ -8,7 +8,7 @@ import { norwayLocalDateTimeToIso } from "@/lib/norway-time";
 import { createWorkOrderFromContract } from "@/lib/work-orders/create";
 import { userIsAdmin } from "@/payload/access/roles";
 import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
-import { dispatchWorkOrderCommunicationNow } from "@/lib/work-orders/communications";
+import { dispatchWorkOrderCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { captureException } from "@/lib/monitoring";
 
 const schema = z.object({
@@ -52,8 +52,10 @@ export async function POST(request: Request) {
     let notification: "sent" | "queued" | "skipped" = "skipped";
     if (result.workOrder.status === "scheduled") {
       try {
+        await syncWorkOrderCommunicationJobs(payload, result.workOrder, correlationIdFromHeaders(request.headers));
         const dispatched = await dispatchWorkOrderCommunicationNow(payload, result.workOrder, "schedule_confirmation", correlationIdFromHeaders(request.headers));
         notification = dispatched.delivered ? "sent" : dispatched.queued ? "queued" : "skipped";
+        await notifyAssignedWorkerNow(payload, result.workOrder, correlationIdFromHeaders(request.headers));
       } catch (error) {
         notification = "queued";
         captureException(error, { route: "POST /api/admin/work-orders", operation: "schedule-notification", workOrderId: result.workOrder.id });

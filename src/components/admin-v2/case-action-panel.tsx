@@ -58,13 +58,13 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
   }
 
   const technicalTarget = action.kind === "measurement_required"
-    ? `/admin/collections/leads/${leadId}`
+    ? "#measurement-section"
     : ["create_work_order", "assign_worker", "schedule_work"].includes(action.kind)
       ? "#work-planning"
     : action.kind === "review_completion" && action.targetId
       ? "#completion-review"
     : action.kind === "resolve_work_block" && action.targetId
-      ? `/admin/collections/work-orders/${action.targetId}`
+      ? "#change-agreement-workbench"
       : null;
 
   return (

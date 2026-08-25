@@ -112,6 +112,16 @@ export type CaseEntity = {
   updatedAt?: string;
 };
 
+export type CaseChangeAgreement = CaseEntity & {
+  afterAreaTenths?: number;
+  afterTotalIncVatOre?: number;
+  beforeAreaTenths?: number;
+  beforeMaximumTotalIncVatOre?: number | null;
+  beforeTotalIncVatOre?: number;
+  reasonCode?: string;
+  validUntil?: string;
+};
+
 export type CaseMessage = CaseEntity & {
   bodyText: string;
   category: string;
@@ -140,7 +150,7 @@ export type CaseTimelineItem = {
 };
 
 export type AdminCase = {
-  changes: CaseEntity[];
+  changes: CaseChangeAgreement[];
   contract?: CaseEntity & { companySignedAt?: string; documentHash?: string; signedAt?: string };
   documents: CaseDocument[];
   lead: {
@@ -220,12 +230,17 @@ export type AdminCase = {
     scheduledAt?: string;
     actualAreaTenths?: number;
     actualTotalIncVatOre?: number;
+    actualSubtotalExVatOre?: number;
+    actualVatOre?: number;
+    blockingReasons: string[];
     beforePhotoCount: number;
     afterPhotoCount: number;
     completionNotes?: string;
     completedAt?: string;
     documentationSubmittedAt?: string;
     completionReviewedAt?: string;
+    priceOutcome?: string;
+    scopeChangeDetails?: string;
     workSummary: string;
   };
   invoice?: CaseEntity & { adminNote?: string; documentId?: number; dueAt?: string; externalReference?: string; subtotalExVatOre?: number; totalIncVatOre?: number; vatOre?: number };
@@ -517,12 +532,19 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     scheduledAt: stringValue(latestWorkRaw.scheduledAt),
     actualAreaTenths: numberValue(latestWorkRaw.actualAreaTenths),
     actualTotalIncVatOre: numberValue(latestWorkRaw.actualTotalIncVatOre),
+    actualSubtotalExVatOre: numberValue(latestWorkRaw.actualSubtotalExVatOre),
+    actualVatOre: numberValue(latestWorkRaw.actualVatOre),
+    blockingReasons: Array.isArray(latestWorkRaw.blockingReasons)
+      ? latestWorkRaw.blockingReasons.filter((item): item is string => typeof item === "string")
+      : [],
     beforePhotoCount: Array.isArray(latestWorkRaw.beforePhotos) ? latestWorkRaw.beforePhotos.length : 0,
     afterPhotoCount: Array.isArray(latestWorkRaw.afterPhotos) ? latestWorkRaw.afterPhotos.length : 0,
     completionNotes: stringValue(latestWorkRaw.completionNotes),
     completedAt: stringValue(latestWorkRaw.completedAt),
     documentationSubmittedAt: stringValue(latestWorkRaw.documentationSubmittedAt),
     completionReviewedAt: stringValue(latestWorkRaw.completionReviewedAt),
+    priceOutcome: stringValue(latestWorkRaw.priceOutcome),
+    scopeChangeDetails: stringValue(latestWorkRaw.scopeChangeDetails),
     workSummary: stringValue(latestWorkRaw.workSummary) || "",
   } : undefined;
   const invoice = latestInvoiceRaw ? {
@@ -639,7 +661,22 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     workOrder,
     invoice,
     warranty,
-    changes: changes.map((item) => ({ ...entity("change-agreements", item), summary: stringValue(item.reasonDescription) })),
+    changes: changes.map((item) => {
+      const snapshot = item.snapshot && typeof item.snapshot === "object" ? asRecord(item.snapshot) : undefined;
+      const before = snapshot?.before && typeof snapshot.before === "object" ? asRecord(snapshot.before) : undefined;
+      const after = snapshot?.after && typeof snapshot.after === "object" ? asRecord(snapshot.after) : undefined;
+      return {
+        ...entity("change-agreements", item),
+        summary: stringValue(item.reasonDescription),
+        reasonCode: stringValue(item.reasonCode),
+        validUntil: stringValue(item.validUntil),
+        beforeAreaTenths: numberValue(before?.areaTenths),
+        beforeTotalIncVatOre: numberValue(item.beforeTotalIncVatOre) ?? numberValue(before?.totalIncVatOre),
+        beforeMaximumTotalIncVatOre: numberValue(before?.maximumTotalIncVatOre) ?? null,
+        afterAreaTenths: numberValue(after?.areaTenths),
+        afterTotalIncVatOre: numberValue(item.afterTotalIncVatOre) ?? numberValue(after?.totalIncVatOre),
+      };
+    }),
     messages: mappedMessages,
     documents: mediaResult.docs.map((raw) => {
       const item = asRecord(raw);

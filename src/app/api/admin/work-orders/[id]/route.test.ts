@@ -11,6 +11,11 @@ vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ auth: mocks.a
 vi.mock("@/payload/access/roles", () => ({ userIsAdmin: vi.fn(() => true) }));
 vi.mock("@/lib/audit/payload-audit-writer", () => ({ createPayloadAuditWriter: vi.fn(() => vi.fn()) }));
 vi.mock("@/lib/audit/audit-event", () => ({ recordAuditEvent: mocks.recordAudit }));
+vi.mock("@/lib/work-orders/communications", () => ({
+  dispatchWorkOrderCommunicationNow: vi.fn(async () => ({ delivered: true, queued: false })),
+  notifyAssignedWorkerNow: vi.fn(async () => ({ providerMessageId: "worker-1" })),
+  syncWorkOrderCommunicationJobs: vi.fn(async () => ({ created: 1, cancelled: 0 })),
+}));
 
 import { PATCH } from "./route";
 
@@ -27,6 +32,9 @@ describe("admin work-order planning", () => {
   });
 
   it("assigns and schedules in one audited update", async () => {
+    mocks.findByID.mockReset()
+      .mockResolvedValueOnce({ id: 12, status: "unassigned", assignedWorker: null, scheduledAt: null, eventTimeline: [] })
+      .mockResolvedValueOnce({ id: 3, role: "worker", active: true, displayName: "Test Worker", phone: "+47 999 99 999" });
     const response = await PATCH(request({ action: "save", assignedWorkerId: 3, scheduledLocal: "2026-08-25T08:30", arrivalWindow: "08:30–10:00" }), { params: Promise.resolve({ id: "12" }) });
     expect(response.status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedWorker: 3, scheduledAt: "2026-08-25T06:30:00.000Z" }) }));
@@ -34,7 +42,9 @@ describe("admin work-order planning", () => {
   });
 
   it("refuses to clear the date of an already scheduled order", async () => {
-    mocks.findByID.mockResolvedValue({ id: 12, status: "scheduled", assignedWorker: 3, scheduledAt: "2026-08-25T06:30:00.000Z" });
+    mocks.findByID.mockReset()
+      .mockResolvedValueOnce({ id: 12, status: "scheduled", assignedWorker: 3, scheduledAt: "2026-08-25T06:30:00.000Z" })
+      .mockResolvedValueOnce({ id: 3, role: "worker", active: true, displayName: "Test Worker", phone: "+47 999 99 999" });
     const response = await PATCH(request({ action: "save", assignedWorkerId: 3, scheduledLocal: "" }), { params: Promise.resolve({ id: "12" }) });
     expect(response.status).toBe(409);
     expect(mocks.update).not.toHaveBeenCalled();

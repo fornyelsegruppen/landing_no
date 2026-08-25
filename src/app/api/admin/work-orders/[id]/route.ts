@@ -7,14 +7,17 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { userIsAdmin } from "@/payload/access/roles";
 import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
-import { dispatchWorkOrderCommunicationNow } from "@/lib/work-orders/communications";
+import { dispatchWorkOrderCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { captureException } from "@/lib/monitoring";
+import { assertAssignableWorker } from "@/lib/work-orders/create";
+import { appendTimeline } from "@/lib/work-orders/access";
 
 const schema = z.object({
   action: z.enum(["save", "cancel"]).default("save"),
   adminNote: z.string().trim().max(1000).optional(),
   arrivalWindow: z.string().trim().max(120).optional(),
   assignedWorkerId: z.number().int().positive().optional(),
+  planningReason: z.string().trim().max(500).optional(),
   scheduledLocal: z.union([
     z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
     z.literal(""),
@@ -58,6 +61,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const assignedWorkerId = parsed.data.assignedWorkerId ?? relationId(current.assignedWorker);
+    if (assignedWorkerId) await assertAssignableWorker(payload, assignedWorkerId);
     const scheduledAt = parsed.data.scheduledLocal === undefined
       ? current.scheduledAt
       : parsed.data.scheduledLocal
@@ -71,12 +75,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (assignedWorkerId && (!scheduledAt || !arrivalWindow)) {
       return NextResponse.json({ error: "Employee, work date and complete arrival window are required" }, { status: 400 });
     }
+    const planningChanged = relationId(current.assignedWorker) !== assignedWorkerId
+      || (current.scheduledAt || null) !== (scheduledAt || null)
+      || (current.arrivalWindow || null) !== (arrivalWindow || null);
+    if (planningChanged && current.status !== "unassigned" && (parsed.data.planningReason || "").trim().length < 5) {
+      return NextResponse.json({ error: "A reason is required when rescheduling or reassigning work" }, { status: 400 });
+    }
 
     const data = {
       ...(parsed.data.adminNote !== undefined ? { adminNote: parsed.data.adminNote || null } : {}),
       ...(parsed.data.arrivalWindow !== undefined ? { arrivalWindow } : {}),
       ...(assignedWorkerId ? { assignedWorker: assignedWorkerId } : {}),
       ...(parsed.data.scheduledLocal !== undefined ? { scheduledAt } : {}),
+      ...(planningChanged ? { eventTimeline: appendTimeline(current.eventTimeline, {
+        action: relationId(current.assignedWorker) !== assignedWorkerId ? "planning.reassigned" : "planning.rescheduled",
+        actorId: Number(user.id),
+        changedFields: ["assignedWorker", "scheduledAt", "arrivalWindow"],
+        reason: parsed.data.planningReason || "Initial assignment",
+        before: { assignedWorker: relationId(current.assignedWorker), scheduledAt: current.scheduledAt, arrivalWindow: current.arrivalWindow },
+        after: { assignedWorker: assignedWorkerId, scheduledAt, arrivalWindow },
+      }) } : {}),
     };
     const updated = await payload.update({ collection: "work-orders", id: current.id, depth: 1, overrideAccess: true, data });
     const changedFields = Object.keys(data);
@@ -93,8 +111,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     let notification: "sent" | "queued" | "skipped" = "skipped";
     if (updated.status === "scheduled") {
       try {
+        await syncWorkOrderCommunicationJobs(payload, updated, correlationIdFromHeaders(request.headers));
         const result = await dispatchWorkOrderCommunicationNow(payload, updated, "schedule_confirmation", correlationIdFromHeaders(request.headers));
         notification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
+        if (planningChanged) await notifyAssignedWorkerNow(payload, updated, correlationIdFromHeaders(request.headers));
       } catch (error) {
         notification = "queued";
         captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "schedule-notification", workOrderId: current.id });

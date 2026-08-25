@@ -41,6 +41,7 @@ export function WorkOrderPlanningPanel(props: {
   const [arrivalStart, setArrivalStart] = useState(initialArrivalStart);
   const [arrivalEnd, setArrivalEnd] = useState(initialArrivalEnd);
   const [adminNote, setAdminNote] = useState(props.adminNote || "");
+  const [planningReason, setPlanningReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const creating = !props.workOrderId;
@@ -68,6 +69,7 @@ export function WorkOrderPlanningPanel(props: {
         body: JSON.stringify({
           action: "save",
           adminNote,
+          planningReason,
           arrivalWindow,
           ...(workerId ? { assignedWorkerId: Number(workerId) } : {}),
           contractId: props.contractId,
@@ -115,7 +117,8 @@ export function WorkOrderPlanningPanel(props: {
           <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.arrivalFrom}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => { const nextStart = event.target.value; setArrivalStart(nextStart); if (arrivalEnd <= nextStart) setArrivalEnd(defaultArrivalEndTime(nextStart)); }} required value={arrivalStart}>{timeOptions.slice(0, -1).map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
           <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.arrivalTo}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => setArrivalEnd(event.target.value)} required value={arrivalEnd}>{timeOptions.slice(1).map((time) => <option disabled={time <= arrivalStart} key={time} value={time}>{time}</option>)}</select></label>
         </div>
-        {workerId && !props.workers.find((worker) => String(worker.id) === workerId)?.phone ? <p className="text-xs text-amber-300">{copy.workerPhoneFallback}</p> : null}
+        {workerId && !props.workers.find((worker) => String(worker.id) === workerId)?.phone ? <p className="text-xs text-red-300">{copy.workerPhoneFallback}</p> : null}
+        {!creating ? <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{props.locale === "lt" ? "Perplanavimo arba perskyrimo priežastis" : props.locale === "en" ? "Reason for rescheduling or reassignment" : "Årsak til omplanlegging eller ny medarbeider"}</span><textarea className="min-h-20 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] p-3" disabled={busy} maxLength={500} onChange={(event) => setPlanningReason(event.target.value)} value={planningReason} /><span className="text-xs text-muted-foreground">{props.locale === "lt" ? "Privaloma, jei keičiate darbuotoją, datą arba laiką." : props.locale === "en" ? "Required when changing employee, date or time." : "Påkrevd når medarbeider, dato eller tid endres."}</span></label> : null}
         <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.adminNote}</span><textarea className="min-h-24 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] p-3" disabled={busy} maxLength={1000} onChange={(event) => setAdminNote(event.target.value)} value={adminNote} /><span className="text-xs text-muted-foreground">{copy.adminNoteHelp}</span></label>
       </div>
       <div className="mt-4 flex flex-wrap gap-3">

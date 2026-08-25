@@ -7,6 +7,14 @@ function relationId(value: unknown) {
   throw new TypeError("Required relationship is missing");
 }
 
+export async function assertAssignableWorker(payload: Payload, workerId: number) {
+  const worker = await payload.findByID({ collection: "users", id: workerId, depth: 0, overrideAccess: true });
+  if (worker.role !== "worker" || worker.active !== true) throw new Error("Choose an active employee account");
+  if (!worker.displayName || worker.displayName.trim().length < 3) throw new Error("The employee must have a full display name before assignment");
+  if (!worker.phone || worker.phone.replace(/\D/g, "").length < 8) throw new Error("The employee must have a valid phone number before customer-facing assignment");
+  return worker;
+}
+
 export async function createWorkOrderFromContract(payload: Payload, input: {
   contractId: number;
   assignedWorkerId?: number;
@@ -14,6 +22,7 @@ export async function createWorkOrderFromContract(payload: Payload, input: {
   arrivalWindow?: string;
   scheduledAt?: string;
 }) {
+  if (input.assignedWorkerId) await assertAssignableWorker(payload, input.assignedWorkerId);
   const contract = await payload.findByID({ collection: "contracts", id: input.contractId, depth: 0, overrideAccess: true });
   if (contract.status !== "signed") throw new Error("Only a signed contract can become a work order");
   if (!contract.companySignedAt) throw new Error("The supplier must counter-sign the contract before a work order can be created");

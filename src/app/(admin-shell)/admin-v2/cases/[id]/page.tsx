@@ -8,6 +8,8 @@ import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-ed
 import { CompletionReviewPanel } from "@/components/admin-v2/completion-review-panel";
 import { InvoiceRecordPanel } from "@/components/admin-v2/invoice-record-panel";
 import { CaseLifecyclePanel } from "@/components/admin-v2/case-lifecycle-panel";
+import { ChangeAgreementPanel } from "@/components/admin-v2/change-agreement-panel";
+import { InformationRequestButton } from "@/components/admin-v2/information-request-button";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -66,7 +68,9 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
     payload.find({ collection: "price-rules", depth: 0, limit: 50, overrideAccess: true, pagination: false, sort: "-version", where: { status: { equals: "approved" } } }),
   ]);
   if (!caseData) notFound();
-  const workers = workersResult.docs.map((worker) => ({ id: worker.id, name: worker.displayName || worker.email, phone: worker.phone || undefined }));
+  const workers = workersResult.docs
+    .filter((worker) => Boolean(worker.displayName?.trim()) && (worker.phone?.replace(/\D/g, "").length ?? 0) >= 8)
+    .map((worker) => ({ id: worker.id, name: worker.displayName!, phone: worker.phone! }));
   const seenRuleServices = new Set<string>();
   const rules = rulesResult.docs.filter((rule) => {
     if (seenRuleServices.has(rule.serviceKey)) return false;
@@ -158,6 +162,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               </div>
             ) : <p className="text-muted-foreground">{copy.missing}</p>}
             <div className="mt-4 rounded-2xl border border-white/10 p-4"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.nextAction}</p><p className="mt-2 text-sm">{copy.actionLabels[caseData.nextAction.kind]}</p></div>
+            <InformationRequestButton leadId={caseData.lead.id} locale={user.interfaceLanguage} />
           </Section>
 
           <Section id="measurement-section" title={copy.measurement}>
@@ -243,7 +248,16 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="changes-section" title={copy.changes}>
-            {caseData.changes.length ? <div className="grid gap-3">{caseData.changes.map((change) => <div className="rounded-xl border border-white/10 p-3" key={change.id}><div className="flex justify-between gap-2"><strong>{change.reference}</strong><Status locale={user.interfaceLanguage} value={change.status} /></div>{change.summary ? <p className="mt-2 text-sm text-muted-foreground">{change.summary}</p> : null}</div>)}</div> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.workOrder?.status === "blocked" ? <ChangeAgreementPanel
+              actualAreaTenths={caseData.workOrder.actualAreaTenths}
+              actualTotalIncVatOre={caseData.workOrder.actualTotalIncVatOre}
+              blockingReasons={caseData.workOrder.blockingReasons}
+              changes={caseData.changes}
+              locale={user.interfaceLanguage}
+              priceOutcome={caseData.workOrder.priceOutcome}
+              scopeChangeDetails={caseData.workOrder.scopeChangeDetails}
+              workOrderId={caseData.workOrder.id}
+            /> : caseData.changes.length ? <div className="grid gap-3">{caseData.changes.map((change) => <div className="rounded-xl border border-white/10 p-3" key={change.id}><div className="flex justify-between gap-2"><strong>{change.reference}</strong><Status locale={user.interfaceLanguage} value={change.status} /></div>{change.summary ? <p className="mt-2 text-sm text-muted-foreground">{change.summary}</p> : null}<a className="mt-3 inline-flex text-sm font-semibold text-accent hover:underline" href={`/api/admin/change-agreements/${change.id}/pdf`} target="_blank">PDF</a></div>)}</div> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
           <Section id="documents-section" title={copy.documents}>
