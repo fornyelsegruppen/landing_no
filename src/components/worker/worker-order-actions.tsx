@@ -62,6 +62,8 @@ export function WorkerOrderActions(props: Props) {
         else element.value = String(values[element.name] ?? "");
       }
     }
+    const stateTimer = window.setTimeout(() => setDraftState("saved"), 0);
+    return () => window.clearTimeout(stateTimer);
   }, [draftKey, status]);
 
   function saveLocalDraft(form: HTMLFormElement) {

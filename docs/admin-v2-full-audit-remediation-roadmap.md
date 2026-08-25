@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcija:** neliečiama iki F10 fazės, uždaro Production gate ir atskiro savininko `GO`  
-**Dabartinė būsena:** F0–F4 įgyvendintos ir patikrintos; F5 yra kitas etapas
+**Dabartinė būsena:** F0–F5 įgyvendintos ir patikrintos; F6 yra kitas etapas
 **Vykdymo taisyklė:** vienu metu vykdoma tik viena fazė; neįvykdžius jos Definition of Done į kitą fazę nepereinama
 
 ## 1. Tikslas
