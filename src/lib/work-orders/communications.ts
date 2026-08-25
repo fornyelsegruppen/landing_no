@@ -177,7 +177,7 @@ function copyFor(kind: WorkOrderCommunicationKind, leadName: string, scheduledAt
   if (kind === "schedule_confirmation") return { category: "schedule_confirmation" as const, subject: "Bekreftelse på planlagt takarbeid", body: `Hei ${leadName},\n\nOppdraget ditt er planlagt til ${when}. Gi oss beskjed så snart som mulig dersom tidspunktet ikke passer.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88` };
   if (kind === "reminder_48h") return { category: "reminder" as const, subject: "Påminnelse om takarbeid om 48 timer", body: `Hei ${leadName},\n\nDette er en påminnelse om at vi kommer ${when}. Sørg for at vi har nødvendig tilgang til eiendommen, og kontakt oss dersom noe har endret seg.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88` };
   if (kind === "same_day") return { category: "reminder" as const, subject: "Vi kommer i dag", body: `Hei ${leadName},\n\nVi minner om at oppdraget er planlagt i dag, ${when}. Vår medarbeider oppdaterer status før ankomst.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88` };
-  return { category: "completion" as const, subject: "Takarbeidet er dokumentert", body: `Hei ${leadName},\n\nArbeidet er fullført og dokumentert. Relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n47 73 58 88` };
+  return { category: "completion" as const, subject: "Takarbeidet er fullført og dokumentert", body: `Hei ${leadName},\n\nArbeidet er fullført og sluttkontrollert. Garantibekreftelse, relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Eventuell faktura sendes separat etter godkjent bokføring. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n47 73 58 88` };
 }
 
 export async function processWorkOrderCommunicationJob(payload: Payload, value: unknown, correlationId: string) {
@@ -208,6 +208,9 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
       if (signedDocumentId) attachments.push(signedDocumentId);
     }
     for (const photo of (order.afterPhotos || []).slice(0, 4)) { const id = relationId(photo); if (id) attachments.push(id); }
+    const warranties = await payload.find({ collection: "warranties", depth: 0, limit: 1, overrideAccess: true, where: { and: [{ workOrder: { equals: order.id } }, { status: { equals: "active" } }] } });
+    const warrantyDocumentId = relationId(warranties.docs[0]?.document);
+    if (warrantyDocumentId) attachments.push(warrantyDocumentId);
   }
   const now = new Date().toISOString();
   const message = await payload.create({ collection: "messages", overrideAccess: true, data: { lead: lead.id, direction: "outbound", category: copy.category, channel: "email", subject: copy.subject, bodyText: copy.body, attachments, status: "queued", idempotencyKey, aiAssisted: false, approvedAt: now, queuedAt: now, aiAnalysis: { workOrderId: order.id, communicationKind: input.kind, scheduleVersion: input.scheduleVersion } } });

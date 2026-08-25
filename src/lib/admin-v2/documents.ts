@@ -1,6 +1,6 @@
 import type { Payload } from "payload";
 
-export const adminDocumentTypes = ["all", "quote", "contract_draft", "customer_signed", "final_contract", "change_agreement", "work_documentation", "measurement"] as const;
+export const adminDocumentTypes = ["all", "quote", "contract_draft", "customer_signed", "final_contract", "change_agreement", "work_documentation", "measurement", "invoice_draft", "warranty"] as const;
 export type AdminDocumentType = (typeof adminDocumentTypes)[number];
 
 export type AdminDocumentItem = {
@@ -36,13 +36,15 @@ function fileHref(media: Record<string, unknown>) {
 
 export async function loadAdminDocuments(payload: Pick<Payload, "find">, filters: Filters = {}) {
   const common = { depth: 1, limit: 500, overrideAccess: true, pagination: false, sort: "-createdAt" as const };
-  const [leadsResult, quotesResult, contractsResult, workResult, changesResult, measurementsResult, mediaResult] = await Promise.all([
+  const [leadsResult, quotesResult, contractsResult, workResult, changesResult, measurementsResult, invoicesResult, warrantiesResult, mediaResult] = await Promise.all([
     payload.find({ ...common, collection: "leads" }),
     payload.find({ ...common, collection: "quotes", sort: "-version" }),
     payload.find({ ...common, collection: "contracts", sort: "-version" }),
     payload.find({ ...common, collection: "work-orders" }),
     payload.find({ ...common, collection: "change-agreements", sort: "-version" }),
     payload.find({ ...common, collection: "roof-measurements", sort: "-version" }),
+    payload.find({ ...common, collection: "invoice-records" }),
+    payload.find({ ...common, collection: "warranties" }),
     payload.find({ ...common, collection: "private-media" }),
   ]);
   const leads = new Map<number, Record<string, unknown>>(leadsResult.docs.map((item) => [id(item) || 0, record(item)]));
@@ -118,6 +120,24 @@ export async function loadAdminDocuments(payload: Pick<Payload, "find">, filters
     const leadId = workLead(order);
     if (!leadId) continue;
     add({ id: `work-media-${mediaId}`, leadId, customer: customer(leadId), caseHref: `/admin-v2/cases/${leadId}`, reference: text(order?.reference) || `#${mediaId}`, filename: text(file.filename) || `#${mediaId}`, href: fileHref(file), type: "work_documentation", status: text(order?.status), createdAt: text(file.createdAt) });
+  }
+
+  for (const raw of invoicesResult.docs) {
+    const invoice = record(raw);
+    const invoiceId = id(invoice);
+    const leadId = id(invoice.lead);
+    const document = media.get(id(invoice.document) || 0);
+    if (!invoiceId || !leadId || !document) continue;
+    add({ id: `invoice-${invoiceId}`, leadId, customer: customer(leadId), caseHref: `/admin-v2/cases/${leadId}`, reference: text(invoice.reference) || `#${invoiceId}`, filename: text(document.filename) || `${text(invoice.reference) || invoiceId}.pdf`, href: fileHref(document), type: "invoice_draft", status: text(invoice.status), createdAt: text(invoice.createdAt), hash: text(invoice.documentHash) });
+  }
+
+  for (const raw of warrantiesResult.docs) {
+    const warranty = record(raw);
+    const warrantyId = id(warranty);
+    const leadId = id(warranty.lead);
+    const document = media.get(id(warranty.document) || 0);
+    if (!warrantyId || !leadId || !document) continue;
+    add({ id: `warranty-${warrantyId}`, leadId, customer: customer(leadId), caseHref: `/admin-v2/cases/${leadId}`, reference: text(warranty.reference) || `#${warrantyId}`, filename: text(document.filename) || `${text(warranty.reference) || warrantyId}.pdf`, href: fileHref(document), type: "warranty", status: text(warranty.status), createdAt: text(warranty.createdAt), hash: text(warranty.documentHash) });
   }
 
   const query = filters.query?.trim().toLocaleLowerCase("nb-NO");

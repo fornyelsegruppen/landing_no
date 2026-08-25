@@ -61,7 +61,9 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
     ? `/admin/collections/leads/${leadId}`
     : ["create_work_order", "assign_worker", "schedule_work"].includes(action.kind)
       ? "#work-planning"
-    : ["resolve_work_block", "review_completion"].includes(action.kind) && action.targetId
+    : action.kind === "review_completion" && action.targetId
+      ? "#completion-review"
+    : action.kind === "resolve_work_block" && action.targetId
       ? `/admin/collections/work-orders/${action.targetId}`
       : null;
 

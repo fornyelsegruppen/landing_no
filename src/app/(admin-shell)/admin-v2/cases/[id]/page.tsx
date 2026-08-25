@@ -5,6 +5,8 @@ import { CaseActionPanel, CloseCaseButton } from "@/components/admin-v2/case-act
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
 import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-editor";
+import { CompletionReviewPanel } from "@/components/admin-v2/completion-review-panel";
+import { InvoiceRecordPanel } from "@/components/admin-v2/invoice-record-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
@@ -219,6 +221,16 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               workOrderId={caseData.workOrder?.id}
               workers={workers}
             /> : null}
+            {caseData.workOrder && caseData.nextAction.kind === "review_completion" ? <div id="completion-review"><CompletionReviewPanel
+              actualAreaTenths={caseData.workOrder.actualAreaTenths}
+              actualTotalIncVatOre={caseData.workOrder.actualTotalIncVatOre}
+              afterPhotoCount={caseData.workOrder.afterPhotoCount}
+              beforePhotoCount={caseData.workOrder.beforePhotoCount}
+              completionNotes={caseData.workOrder.completionNotes}
+              locale={user.interfaceLanguage}
+              workOrderId={caseData.workOrder.id}
+              workSummary={caseData.workOrder.workSummary}
+            /></div> : null}
           </Section>
 
           <Section id="changes-section" title={copy.changes}>
@@ -226,6 +238,10 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="documents-section" title={copy.documents}>
+            {caseData.invoice || caseData.warranty ? <div className="mb-4 grid gap-3">
+              {caseData.invoice ? <div className="rounded-xl border border-white/10 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.invoiceDraft}</p><strong>{caseData.invoice.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.invoice.status} /></div><p className="mt-2 text-sm text-muted-foreground">{nok(caseData.invoice.totalIncVatOre)} · {copy.due}: {formatDate(caseData.invoice.dueAt)}</p>{caseData.invoice.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.invoice.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}<InvoiceRecordPanel adminNote={caseData.invoice.adminNote} externalReference={caseData.invoice.externalReference} id={caseData.invoice.id} locale={user.interfaceLanguage} status={caseData.invoice.status || "draft"} /></div> : null}
+              {caseData.warranty ? <div className="rounded-xl border border-white/10 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.warranty}</p><strong>{caseData.warranty.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.warranty.status} /></div><p className="mt-2 text-sm text-muted-foreground">{copy.warrantyUntil}: {formatDate(caseData.warranty.endsAt)}</p>{caseData.warranty.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.warranty.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}</div> : null}
+            </div> : null}
             {caseData.documents.length ? <div className="grid gap-2">{caseData.documents.map((document) => <a className="flex min-h-11 items-center justify-between rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={document.href} key={document.id} rel="noreferrer" target="_blank"><span className="truncate">{document.filename}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0" /></a>)}</div> : <p className="text-muted-foreground">{copy.noDocuments}</p>}
           </Section>
 

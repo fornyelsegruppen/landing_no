@@ -99,6 +99,7 @@ const workerCopies = {
     completionMessage: "Ferdigmelding",
     submitDocumentation: "Lever dokumentasjon",
     jobDelivered: "Oppdraget og dokumentasjonen er levert.",
+    pendingAdminReview: "Dokumentasjonen er levert og venter på administrativ sluttkontroll.",
     uploadedCount: "Lastet opp",
     status: {
       unassigned: "Ikke tildelt",
@@ -197,6 +198,7 @@ const workerCopies = {
     completionMessage: "Baigimo pastabos",
     submitDocumentation: "Pateikti dokumentus",
     jobDelivered: "Darbas ir dokumentai pateikti.",
+    pendingAdminReview: "Dokumentai pateikti ir laukia administratoriaus galutinės patikros.",
     uploadedCount: "Įkelta",
     status: {
       unassigned: "Nepriskirta",
@@ -295,6 +297,7 @@ const workerCopies = {
     completionMessage: "Completion notes",
     submitDocumentation: "Submit documentation",
     jobDelivered: "The job and documentation have been submitted.",
+    pendingAdminReview: "The documentation has been submitted and is awaiting the administrator's final review.",
     uploadedCount: "Uploaded",
     status: {
       unassigned: "Unassigned",

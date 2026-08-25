@@ -27,6 +27,12 @@ describe("work-order collection invariants", () => {
     await expect(protectWorkOrder({ operation: "update", req: { payload: {} }, context: { trustedWorkerAction: true }, data: { status: "completed" }, originalDoc: base } as never)).rejects.toThrow(/after photos/);
   });
 
+  it("only allows documented status through the administrative completion review", async () => {
+    const originalDoc = { id: 7, status: "completed", beforePhotos: [1, 2], afterPhotos: [3, 4], roofType: "teglstein", actualAreaTenths: 1000, measurementMethod: "laser", slopeBasis: "32 grader", visibleCondition: "Kontrollert", safetyStatus: "safe", precheckDecision: "ready", priceOutcome: "within_contract", actualTotalIncVatOre: 1000, completionNotes: "Arbeidet er dokumentert.", completedAt: "2026-09-01T12:00:00Z" };
+    await expect(protectWorkOrder({ operation: "update", req: { payload: {} }, data: { status: "documented" }, originalDoc } as never)).rejects.toThrow(/Administrator completion review/);
+    await expect(protectWorkOrder({ operation: "update", req: { payload: {} }, context: { trustedCompletionReview: true }, data: { status: "documented", completionReviewedBy: 1, completionReviewedAt: "2026-09-01T13:00:00Z" }, originalDoc } as never)).resolves.toMatchObject({ status: "documented" });
+  });
+
   it("marks the lead converted when documentation is submitted", async () => {
     const update = vi.fn().mockResolvedValue({});
     await scheduleWorkOrderCommunications({

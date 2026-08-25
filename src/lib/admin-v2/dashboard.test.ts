@@ -103,7 +103,9 @@ describe("admin v2 dashboard", () => {
 
     expect(find).toHaveBeenCalledWith(expect.objectContaining({
       collection: "work-orders",
-      where: { status: { equals: status } },
+      where: queue === "completion-review"
+        ? { and: [{ status: { equals: status } }, { documentationSubmittedAt: { exists: true } }] }
+        : { status: { equals: status } },
     }));
     expect(result[0]).toEqual(expect.objectContaining({ href: "/admin-v2/cases/15", status }));
   });

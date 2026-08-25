@@ -27,6 +27,7 @@ import * as migration_20260824_130000_phase12_panel_languages from "./20260824_1
 import * as migration_20260825_120000_contract_counter_signatures from "./20260825_120000_contract_counter_signatures";
 import * as migration_20260825_150000_admin_work_scheduling from "./20260825_150000_admin_work_scheduling";
 import * as migration_20260825_170000_commercial_quote_options from "./20260825_170000_commercial_quote_options";
+import * as migration_20260825_190000_completion_invoice_warranty from "./20260825_190000_completion_invoice_warranty";
 
 export const migrations = [
   {
@@ -173,5 +174,10 @@ export const migrations = [
     up: migration_20260825_170000_commercial_quote_options.up,
     down: migration_20260825_170000_commercial_quote_options.down,
     name: "20260825_170000_commercial_quote_options",
+  },
+  {
+    up: migration_20260825_190000_completion_invoice_warranty.up,
+    down: migration_20260825_190000_completion_invoice_warranty.down,
+    name: "20260825_190000_completion_invoice_warranty",
   },
 ];

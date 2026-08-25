@@ -20,6 +20,7 @@ type Props = {
   initialAfterPhotoIds: number[];
   initialBlockingReasons: string[];
   initialActualTotalIncVatOre?: number | null;
+  initialDocumentationSubmittedAt?: string | null;
 };
 
 export function WorkerOrderActions(props: Props) {
@@ -41,6 +42,7 @@ export function WorkerOrderActions(props: Props) {
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [documentationSubmitted, setDocumentationSubmitted] = useState(Boolean(props.initialDocumentationSubmittedAt));
 
   async function send(body: Record<string, unknown>) {
     if (busy) return false;
@@ -73,6 +75,7 @@ export function WorkerOrderActions(props: Props) {
         );
       }
       if (result.status) setStatus(result.status);
+      if (body.action === "submit_documentation") setDocumentationSubmitted(true);
       setBlockingReasons(
         Array.isArray(result.blockingReasons) ? result.blockingReasons : [],
       );
@@ -388,7 +391,7 @@ export function WorkerOrderActions(props: Props) {
           </button>
         </div>
       ) : null}
-      {status === "completed" ? (
+      {status === "completed" && !documentationSubmitted ? (
         <form
           action={async (form) => {
             await send({
@@ -425,6 +428,11 @@ export function WorkerOrderActions(props: Props) {
             {busy ? copy.processing : copy.submitDocumentation}
           </button>
         </form>
+      ) : null}
+      {status === "completed" && documentationSubmitted ? (
+        <p className="mt-5 rounded-xl border border-accent/40 bg-accent/10 p-4 font-semibold">
+          {copy.pendingAdminReview}
+        </p>
       ) : null}
       {status === "documented" ? (
         <p className="mt-5 rounded-xl border border-green-400/40 bg-green-400/10 p-4 font-semibold">

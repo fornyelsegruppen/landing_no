@@ -41,6 +41,8 @@ export const PrivateMedia: CollectionConfig = {
         { label: "Measurement", value: "measurement" },
         { label: "Contract", value: "contract" },
         { label: "Work documentation", value: "work" },
+        { label: "Invoice draft", value: "invoice" },
+        { label: "Warranty", value: "warranty" },
       ],
     },
     { name: "ownerType", type: "text", index: true },

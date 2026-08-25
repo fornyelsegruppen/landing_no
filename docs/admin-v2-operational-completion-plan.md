@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcinė svetainė:** neliečiama iki paskutinės fazės, pilno patikrinimo ir atskiro savininko patvirtinimo  
-**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A5 techniškai užbaigtos; A6 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas
+**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A6 techniškai užbaigtos; A7 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas
 **Pagrindinė taisyklė:** vienu metu įgyvendinama viena fazė; po kiekvienos fazės privalomi automatiniai testai, rankinis staging patikrinimas ir rezultato įrašymas šiame dokumente
 
 ## 1. Galutinis tikslas
@@ -254,7 +254,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A6 – užbaigimo patikra, sąskaitos juodraštis ir garantijos registras
 
-**Statusas:** suplanuota  
+**Statusas:** techniškai užbaigta; bendra staging patikra atliekama A9
 **Priklausomybė:** A3, A5  
 **Tikslas:** po darbuotojo atlikto darbo administratorius turi aiškią galutinę kontrolę ir nepalieka bylos be komercinių bei garantinių dokumentų.
 
@@ -466,8 +466,8 @@ flowchart TD
 | A2   | Techniškai užbaigta                                              | `f0b2584`                                                      | 118/118 testų failų ir 368/368 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
 | A3   | Techniškai užbaigta                                              | `b3a2bb1`                                                      | 120/120 testų failų ir 373/373 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
 | A4   | Techniškai užbaigta                                              | `852b731`                                                      | 123/123 testų failų ir 378/378 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
-| A5   | Techniškai užbaigta                                              | `25d46da`                                                      | 124/124 testų failų ir 379/379 testai                                                      | Sąskaitos ir garantijos prijungiamos A6; bendra staging patikra A9                                  |
-| A6   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A5   | Techniškai užbaigta                                              | `215c1ec`                                                      | 124/124 testų failų ir 379/379 testai                                                      | Sąskaitos ir garantijos prijungtos A6; bendra staging patikra A9                                    |
+| A6   | Techniškai užbaigta                                              | įrašomas po fazės gate                                         | 128/128 testų failų ir 387/387 testai; 13 migracijų failų / 25 testai                     | Oficiali apskaitos integracija lieka atskiras verslo sprendimas; bendra staging patikra A9          |
 | A7   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
 | A8   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
 | A9   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |

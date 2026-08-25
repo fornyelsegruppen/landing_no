@@ -32,7 +32,8 @@ describe("admin case next action", () => {
     [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "unassigned" } }, "assign_worker"],
     [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "assigned" } }, "schedule_work"],
     [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "blocked" } }, "resolve_work_block"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "completed" } }, "review_completion"],
+    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "completed", documentationSubmittedAt: "2026-08-25T13:00:00Z" } }, "review_completion"],
+    [{ leadStatus: "converted", workOrder: { id: 7, status: "completed" } }, "wait_worker_documentation"],
     [{ leadStatus: "converted", quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" } }, "create_work_order"],
     [{ leadStatus: "closed" }, "none"],
   ])("derives %s as %s", (input, expected) => {
@@ -67,6 +68,8 @@ describe("admin case read model", () => {
       { docs: [{ id: 5, subject: "Takk", bodyText: "Hei", direction: "outbound", category: "receipt", channel: "email", status: "sent", createdAt: "2026-08-24T08:01:00.000Z" }] },
       { docs: [] },
       { docs: [{ id: 6, reference: "K-1-V1", status: "draft", createdAt: "2026-08-24T11:01:00.000Z" }] },
+      { docs: [] },
+      { docs: [] },
       { docs: [{ id: 7, filename: "tilbud.pdf", classification: "contract", mimeType: "application/pdf", url: "https://safe.blob.vercel-storage.com/private/file.pdf" }] },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
@@ -93,6 +96,8 @@ describe("admin case read model", () => {
       { docs: [] },
       { docs: [{ id: 7, reference: "K-1", status: "issued", createdAt: "2026-08-24T11:00:00.000Z" }] },
       { docs: [] },
+      { docs: [] },
+      { docs: [] },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
     const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
@@ -112,6 +117,8 @@ describe("admin case read model", () => {
       ] },
       { docs: [] },
       { docs: [{ id: 25, reference: "K-8-V1", status: "draft", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [] },
+      { docs: [] },
       { docs: [] },
     ];
     const result = await loadAdminCase({ findByID, find: vi.fn().mockImplementation(async () => responses.shift()) } as unknown as Payload, 8);

@@ -28,6 +28,7 @@ const actionOptions: CaseNextActionKind[] = [
   "approve_quote",
   "issue_quote",
   "wait_customer",
+  "wait_worker_documentation",
   "follow_up_decline",
   "company_sign_contract",
   "create_work_order",

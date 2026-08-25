@@ -77,6 +77,9 @@ export const protectWorkOrder: CollectionBeforeChangeHook = async ({ data, origi
     if (relationCount(merged.afterPhotos) < 2 || !merged.completionNotes?.trim() || !merged.completedAt) {
       throw new Error("After photos, completion notes and completion time are required");
     }
+    if (context?.trustedCompletionReview !== true || !merged.completionReviewedAt || !relationId(merged.completionReviewedBy)) {
+      throw new Error("Administrator completion review is required before documentation is finalized");
+    }
   }
   if (nextStatus === "completed" && relationCount(({ ...originalDoc, ...data }).afterPhotos) < 2) {
     throw new Error("At least two after photos are required before work is marked completed");
@@ -159,6 +162,9 @@ export const WorkOrders: CollectionConfig = {
     { name: "completionNotes", type: "textarea", label: "Ferdigmelding" },
     { name: "completedAt", type: "date", admin: { readOnly: true } },
     { name: "documentationSubmittedAt", type: "date", admin: { readOnly: true } },
+    { name: "completionReviewedBy", type: "relationship", relationTo: "users", label: "Sluttkontrollert av", admin: { readOnly: true } },
+    { name: "completionReviewedAt", type: "date", label: "Sluttkontrollert", admin: { readOnly: true } },
+    { name: "completionReviewNote", type: "textarea", label: "Intern sluttkontroll", admin: { readOnly: true } },
     { name: "eventTimeline", type: "json", label: "Tidslinje", admin: { readOnly: true, description: "Systemstyrte hendelser uten kundeopplysninger." } },
     { name: "completionCommunicationAction", type: "ui", admin: { components: { Field: "/components/WorkOrderCompletionAction" } } },
     { name: "changeAgreementAction", type: "ui", admin: { components: { Field: "/components/WorkOrderChangeAction" } } },

@@ -20,7 +20,8 @@ export type CaseNextActionKind =
   | "schedule_work"
   | "none"
   | "retry_message"
-  | "wait_customer";
+  | "wait_customer"
+  | "wait_worker_documentation";
 
 export type CaseNextAction = {
   kind: CaseNextActionKind;
@@ -47,7 +48,7 @@ export type CaseActionInput = {
   message?: StatusRecord & { category?: string; direction?: string };
   price?: StatusRecord;
   quote?: StatusRecord;
-  workOrder?: StatusRecord;
+  workOrder?: StatusRecord & { documentationSubmittedAt?: string };
 };
 
 export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
@@ -59,7 +60,8 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.workOrder?.status === "unassigned") return { kind: "assign_worker", targetId: input.workOrder.id };
   if (input.workOrder?.status === "assigned") return { kind: "schedule_work", targetId: input.workOrder.id };
   if (input.workOrder?.status === "blocked") return { kind: "resolve_work_block", targetId: input.workOrder.id };
-  if (input.workOrder?.status === "completed") return { kind: "review_completion", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "completed" && input.workOrder.documentationSubmittedAt) return { kind: "review_completion", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "completed") return { kind: "wait_worker_documentation", targetId: input.workOrder.id };
   if (input.quote?.status === "accepted" && input.contract?.status === "signed" && !input.contract.companySignedAt) {
     return { kind: "company_sign_contract", targetId: input.contract.id };
   }
@@ -134,7 +136,7 @@ export type CaseTimelineItem = {
   id: string;
   status?: string;
   title: string;
-  type: "change" | "contract" | "lead" | "measurement" | "message" | "price" | "quote" | "work";
+  type: "change" | "contract" | "invoice" | "lead" | "measurement" | "message" | "price" | "quote" | "warranty" | "work";
 };
 
 export type AdminCase = {
@@ -197,7 +199,18 @@ export type AdminCase = {
     assignedWorker?: string;
     assignedWorkerId?: number;
     scheduledAt?: string;
+    actualAreaTenths?: number;
+    actualTotalIncVatOre?: number;
+    beforePhotoCount: number;
+    afterPhotoCount: number;
+    completionNotes?: string;
+    completedAt?: string;
+    documentationSubmittedAt?: string;
+    completionReviewedAt?: string;
+    workSummary: string;
   };
+  invoice?: CaseEntity & { adminNote?: string; documentId?: number; dueAt?: string; externalReference?: string; subtotalExVatOre?: number; totalIncVatOre?: number; vatOre?: number };
+  warranty?: CaseEntity & { documentId?: number; endsAt?: string; scope?: string; startsAt?: string; termsVersion?: string };
 };
 
 function asRecord(value: unknown) {
@@ -358,16 +371,20 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const quoteIds = quotes.map((quote) => numericId(quote.id)).filter(Number.isFinite);
   const workOrderIds = workOrders.map((work) => numericId(work.id)).filter(Number.isFinite);
 
-  const [contractsResult, changesResult] = await Promise.all([
+  const [contractsResult, changesResult, invoicesResult, warrantiesResult] = await Promise.all([
     quoteIds.length
       ? payload.find({ ...common, collection: "contracts", sort: "-version", where: { quote: { in: quoteIds } } })
       : Promise.resolve({ docs: [] }),
     workOrderIds.length
       ? payload.find({ ...common, collection: "change-agreements", where: { workOrder: { in: workOrderIds } } })
       : Promise.resolve({ docs: [] }),
+    payload.find({ ...common, collection: "invoice-records", where: { lead: { equals: leadId } } }),
+    payload.find({ ...common, collection: "warranties", where: { lead: { equals: leadId } } }),
   ]);
   const contracts = contractsResult.docs.map(asRecord);
   const changes = changesResult.docs.map(asRecord);
+  const invoices = invoicesResult.docs.map(asRecord);
+  const warranties = warrantiesResult.docs.map(asRecord);
 
   const ownerPairs = [
     { ownerType: "lead", ids: [leadId] },
@@ -376,6 +393,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     { ownerType: "work-order", ids: workOrderIds },
     { ownerType: "work", ids: workOrderIds },
     { ownerType: "change-agreement", ids: changes.map((item) => numericId(item.id)).filter(Number.isFinite) },
+    { ownerType: "invoice-record", ids: invoices.map((item) => numericId(item.id)).filter(Number.isFinite) },
+    { ownerType: "warranty", ids: warranties.map((item) => numericId(item.id)).filter(Number.isFinite) },
   ].filter((pair) => pair.ids.length);
   const mediaResult = ownerPairs.length
     ? await payload.find({
@@ -400,6 +419,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const latestQuoteRaw = latest(quotes.filter((item) => item.status !== "superseded")) || latest(quotes);
   const latestContractRaw = latest(contracts.filter((item) => item.status !== "superseded")) || latest(contracts);
   const latestWorkRaw = latest(workOrders.filter((item) => item.status !== "cancelled")) || latest(workOrders);
+  const latestInvoiceRaw = latest(invoices);
+  const latestWarrantyRaw = latest(warranties);
   const currentMessageRaw = currentMessage(messages);
   const visibleMessages = messages.filter((message) =>
     !(stringValue(message.category) === "ai_reply" && stringValue(message.status) === "cancelled"),
@@ -464,6 +485,33 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     assignedWorker: relationName(latestWorkRaw.assignedWorker),
     assignedWorkerId: relationId(latestWorkRaw.assignedWorker) || undefined,
     scheduledAt: stringValue(latestWorkRaw.scheduledAt),
+    actualAreaTenths: numberValue(latestWorkRaw.actualAreaTenths),
+    actualTotalIncVatOre: numberValue(latestWorkRaw.actualTotalIncVatOre),
+    beforePhotoCount: Array.isArray(latestWorkRaw.beforePhotos) ? latestWorkRaw.beforePhotos.length : 0,
+    afterPhotoCount: Array.isArray(latestWorkRaw.afterPhotos) ? latestWorkRaw.afterPhotos.length : 0,
+    completionNotes: stringValue(latestWorkRaw.completionNotes),
+    completedAt: stringValue(latestWorkRaw.completedAt),
+    documentationSubmittedAt: stringValue(latestWorkRaw.documentationSubmittedAt),
+    completionReviewedAt: stringValue(latestWorkRaw.completionReviewedAt),
+    workSummary: stringValue(latestWorkRaw.workSummary) || "",
+  } : undefined;
+  const invoice = latestInvoiceRaw ? {
+    ...entity("invoice-records", latestInvoiceRaw),
+    documentId: relationId(latestInvoiceRaw.document) || undefined,
+    dueAt: stringValue(latestInvoiceRaw.dueAt),
+    externalReference: stringValue(latestInvoiceRaw.externalReference),
+    adminNote: stringValue(latestInvoiceRaw.adminNote),
+    subtotalExVatOre: numberValue(latestInvoiceRaw.subtotalExVatOre),
+    vatOre: numberValue(latestInvoiceRaw.vatOre),
+    totalIncVatOre: numberValue(latestInvoiceRaw.totalIncVatOre),
+  } : undefined;
+  const warranty = latestWarrantyRaw ? {
+    ...entity("warranties", latestWarrantyRaw),
+    documentId: relationId(latestWarrantyRaw.document) || undefined,
+    startsAt: stringValue(latestWarrantyRaw.startsAt),
+    endsAt: stringValue(latestWarrantyRaw.endsAt),
+    scope: stringValue(latestWarrantyRaw.scope),
+    termsVersion: stringValue(latestWarrantyRaw.termsVersion),
   } : undefined;
 
   const mappedMessages: CaseMessage[] = visibleMessages.map((message) => ({
@@ -520,6 +568,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     ].filter((event): event is CaseTimelineItem => Boolean(event))),
     ...workOrders.map((item) => makeTimeline("work", "work-orders", item, stringValue(item.reference) || "Arbeid")),
     ...changes.map((item) => makeTimeline("change", "change-agreements", item, stringValue(item.reference) || "Endringsavtale")),
+    ...invoices.map((item) => makeTimeline("invoice", "invoice-records", item, stringValue(item.reference) || "Fakturautkast")),
+    ...warranties.map((item) => makeTimeline("warranty", "warranties", item, stringValue(item.reference) || "Garanti")),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return {
@@ -546,6 +596,8 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     quoteOptions,
     contract,
     workOrder,
+    invoice,
+    warranty,
     changes: changes.map((item) => ({ ...entity("change-agreements", item), summary: stringValue(item.reasonDescription) })),
     messages: mappedMessages,
     documents: mediaResult.docs.map((raw) => {

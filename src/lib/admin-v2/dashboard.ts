@@ -145,7 +145,7 @@ export async function loadAdminDashboard(
       payload.count({ collection: "work-orders", where: activeWorkWhere }),
       payload.count({ collection: "work-orders", where: { status: { equals: "unassigned" } } }),
       payload.count({ collection: "work-orders", where: { status: { equals: "assigned" } } }),
-      payload.count({ collection: "work-orders", where: { status: { equals: "completed" } } }),
+      payload.count({ collection: "work-orders", where: { and: [{ status: { equals: "completed" } }, { documentationSubmittedAt: { exists: true } }] } }),
       payload.count({ collection: "quotes", where: { status: { equals: "draft" } } }),
       payload.count({ collection: "contracts", where: { and: [{ status: { equals: "signed" } }, { companySignedAt: { exists: false } }] } }),
       payload.count({ collection: "change-agreements", where: { status: { in: ["draft", "approved", "sent", "viewed"] } } }),
@@ -313,7 +313,7 @@ export async function loadAdminQueue(
       return result.docs.map((doc) => referenceItem("work-orders", doc));
     }
     case "completion-review": {
-      const result = await payload.find({ ...common, collection: "work-orders", where: { status: { equals: "completed" } } });
+      const result = await payload.find({ ...common, collection: "work-orders", where: { and: [{ status: { equals: "completed" } }, { documentationSubmittedAt: { exists: true } }] } });
       return result.docs.map((doc) => referenceItem("work-orders", doc));
     }
     case "unassigned-work": {

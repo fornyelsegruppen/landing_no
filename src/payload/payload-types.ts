@@ -86,6 +86,8 @@ export interface Config {
     'change-agreements': ChangeAgreement;
     'contract-terms': ContractTerm;
     'work-orders': WorkOrder;
+    'invoice-records': InvoiceRecord;
+    warranties: Warranty;
     'seo-topics': SeoTopic;
     'seo-runs': SeoRun;
     'audit-events': AuditEvent;
@@ -118,6 +120,8 @@ export interface Config {
     'change-agreements': ChangeAgreementsSelect<false> | ChangeAgreementsSelect<true>;
     'contract-terms': ContractTermsSelect<false> | ContractTermsSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
+    'invoice-records': InvoiceRecordsSelect<false> | InvoiceRecordsSelect<true>;
+    warranties: WarrantiesSelect<false> | WarrantiesSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
     'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
     'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
@@ -806,7 +810,7 @@ export interface Message {
  */
 export interface PrivateMedia {
   id: number;
-  classification: 'customer' | 'measurement' | 'contract' | 'work';
+  classification: 'customer' | 'measurement' | 'contract' | 'work' | 'invoice' | 'warranty';
   ownerType?: string | null;
   ownerId?: string | null;
   /**
@@ -1184,6 +1188,9 @@ export interface WorkOrder {
   completionNotes?: string | null;
   completedAt?: string | null;
   documentationSubmittedAt?: string | null;
+  completionReviewedBy?: (number | null) | User;
+  completionReviewedAt?: string | null;
+  completionReviewNote?: string | null;
   /**
    * Systemstyrte hendelser uten kundeopplysninger.
    */
@@ -1196,6 +1203,59 @@ export interface WorkOrder {
     | number
     | boolean
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Internal invoice draft. Not booked until exported to the approved accounting system.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invoice-records".
+ */
+export interface InvoiceRecord {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  workOrder: number | WorkOrder;
+  status: 'draft' | 'approved' | 'exported' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  snapshot: { [k: string]: unknown } | unknown[] | string | number | boolean | null;
+  documentHash: string;
+  subtotalExVatOre: number;
+  vatOre: number;
+  totalIncVatOre: number;
+  issuedAt: string;
+  dueAt: string;
+  assignedTo: number | User;
+  externalReference?: string | null;
+  adminNote?: string | null;
+  document?: (number | null) | PrivateMedia;
+  approvedAt?: string | null;
+  sentAt?: string | null;
+  paidAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Case-confirmed warranty for completed work.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "warranties".
+ */
+export interface Warranty {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  workOrder: number | WorkOrder;
+  status: 'active' | 'expired' | 'revoked';
+  scope: string;
+  startsAt: string;
+  endsAt: string;
+  termsVersion: string;
+  snapshot: { [k: string]: unknown } | unknown[] | string | number | boolean | null;
+  documentHash: string;
+  document?: (number | null) | PrivateMedia;
+  approvedBy: number | User;
+  approvedAt: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -2115,7 +2175,57 @@ export interface WorkOrdersSelect<T extends boolean = true> {
   completionNotes?: T;
   completedAt?: T;
   documentationSubmittedAt?: T;
+  completionReviewedBy?: T;
+  completionReviewedAt?: T;
+  completionReviewNote?: T;
   eventTimeline?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invoice-records_select".
+ */
+export interface InvoiceRecordsSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  workOrder?: T;
+  status?: T;
+  snapshot?: T;
+  documentHash?: T;
+  subtotalExVatOre?: T;
+  vatOre?: T;
+  totalIncVatOre?: T;
+  issuedAt?: T;
+  dueAt?: T;
+  assignedTo?: T;
+  externalReference?: T;
+  adminNote?: T;
+  document?: T;
+  approvedAt?: T;
+  sentAt?: T;
+  paidAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "warranties_select".
+ */
+export interface WarrantiesSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  workOrder?: T;
+  status?: T;
+  scope?: T;
+  startsAt?: T;
+  endsAt?: T;
+  termsVersion?: T;
+  snapshot?: T;
+  documentHash?: T;
+  document?: T;
+  approvedBy?: T;
+  approvedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

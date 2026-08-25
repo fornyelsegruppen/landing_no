@@ -34,6 +34,8 @@ import { Quotes } from "./payload/collections/Quotes";
 import { Contracts } from "./payload/collections/Contracts";
 import { ChangeAgreements } from "./payload/collections/ChangeAgreements";
 import { ContractTerms } from "./payload/collections/ContractTerms";
+import { InvoiceRecords } from "./payload/collections/InvoiceRecords";
+import { Warranties } from "./payload/collections/Warranties";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -149,6 +151,8 @@ export default buildConfig({
     ChangeAgreements,
     ContractTerms,
     WorkOrders,
+    InvoiceRecords,
+    Warranties,
     SeoTopics,
     SeoRuns,
     AuditEvents,
