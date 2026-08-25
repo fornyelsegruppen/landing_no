@@ -33,7 +33,7 @@ function Status({ companySignedAt, contract, locale, value }: { companySignedAt?
 
 function Section({ children, id, title }: { children: React.ReactNode; id: string; title: string }) {
   return (
-    <section aria-labelledby={id} className="rounded-3xl border border-white/10 bg-background-elevated/75 p-5 sm:p-6">
+    <section aria-labelledby={id} className="min-w-0 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 sm:p-6">
       <h2 className="text-xl font-bold" id={id}>{title}</h2>
       <div className="mt-5">{children}</div>
     </section>
@@ -133,8 +133,8 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
         ].map(([href, label]) => <a className="shrink-0 rounded-xl px-3 py-2 text-white/75 hover:bg-white/5 hover:text-accent" href={`#${href}`} key={href}>{label}</a>)}
       </nav>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
+        <div className="min-w-0 space-y-6">
           <Section id="customer-section" title={copy.customer}>
             <dl className="grid gap-5 sm:grid-cols-2">
               <div><dt className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.contact}</dt><dd className="mt-2 grid gap-2">
@@ -204,7 +204,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <Section id="contract-section" title={copy.contract}>
             {caseData.contract ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.contract.reference}</strong><Status companySignedAt={caseData.contract.companySignedAt} contract locale={user.interfaceLanguage} value={caseData.contract.status} /></div>{caseData.contract.signedAt ? <p className="mt-3 text-sm text-muted-foreground">{copy.customerSignedAt}: {formatDate(caseData.contract.signedAt)}</p> : null}{caseData.contract.companySignedAt ? <p className="mt-1 text-sm text-muted-foreground">{copy.companySignedAt}: {formatDate(caseData.contract.companySignedAt)}</p> : null}<TechnicalLink entity={caseData.contract} label={copy.technicalDetail} summary={copy.advancedTechnical} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
@@ -243,7 +243,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               {caseData.invoice ? <div className="rounded-xl border border-white/10 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.invoiceDraft}</p><strong>{caseData.invoice.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.invoice.status} /></div><p className="mt-2 text-sm text-muted-foreground">{nok(caseData.invoice.totalIncVatOre)} · {copy.due}: {formatDate(caseData.invoice.dueAt)}</p>{caseData.invoice.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.invoice.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}<InvoiceRecordPanel adminNote={caseData.invoice.adminNote} externalReference={caseData.invoice.externalReference} id={caseData.invoice.id} locale={user.interfaceLanguage} status={caseData.invoice.status || "draft"} /></div> : null}
               {caseData.warranty ? <div className="rounded-xl border border-white/10 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.warranty}</p><strong>{caseData.warranty.reference}</strong></div><Status locale={user.interfaceLanguage} value={caseData.warranty.status} /></div><p className="mt-2 text-sm text-muted-foreground">{copy.warrantyUntil}: {formatDate(caseData.warranty.endsAt)}</p>{caseData.warranty.documentId ? <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline" href={`/api/admin/media/${caseData.warranty.documentId}`} target="_blank">PDF<ExternalLink aria-hidden="true" className="size-4" /></a> : null}</div> : null}
             </div> : null}
-            {caseData.documents.length ? <div className="grid gap-2">{caseData.documents.map((document) => <a className="flex min-h-11 items-center justify-between rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={document.href} key={document.id} rel="noreferrer" target="_blank"><span className="truncate">{document.filename}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0" /></a>)}</div> : <p className="text-muted-foreground">{copy.noDocuments}</p>}
+            {caseData.documents.length ? <div className="grid min-w-0 gap-2">{caseData.documents.map((document) => <a className="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold hover:border-accent/50 hover:text-accent" href={document.href} key={document.id} rel="noreferrer" target="_blank"><span className="min-w-0 flex-1 truncate">{document.filename}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0" /></a>)}</div> : <p className="text-muted-foreground">{copy.noDocuments}</p>}
           </Section>
 
           <Section id="timeline-section" title={copy.timeline}>
