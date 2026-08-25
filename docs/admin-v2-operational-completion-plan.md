@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcinė svetainė:** neliečiama iki paskutinės fazės, pilno patikrinimo ir atskiro savininko patvirtinimo  
-**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A4 užbaigtos; A5 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas
+**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A5 techniškai užbaigtos; A6 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas
 **Pagrindinė taisyklė:** vienu metu įgyvendinama viena fazė; po kiekvienos fazės privalomi automatiniai testai, rankinis staging patikrinimas ir rezultato įrašymas šiame dokumente
 
 ## 1. Galutinis tikslas
@@ -227,7 +227,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A5 – klientų bylomis paremtas dokumentų centras
 
-**Statusas:** suplanuota  
+**Statusas:** techniškai užbaigta; bendra staging patikra atliekama A9
 **Priklausomybė:** A2, A4  
 **Tikslas:** visi klientui ir užsakymui svarbūs dokumentai randami vienoje vietoje, o administratorius nemato neaiškaus techninių failų sąrašo.
 
@@ -463,10 +463,10 @@ flowchart TD
 | ---- | ---------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | A0   | Užbaigta                                                         | Pradinis rollback `83f24f8`; fazės dokumentai darbinėje šakoje | 117/117 testų failų ir 349/349 testų; lint ir typecheck praėjo; veikiantis Vercel baseline | Vietinio Windows ARM64 build page-data išimtis dokumentuota                                        |
 | A1   | Vykdoma – liko galutinis autentifikuotas staging perėjimų testas | `d228311`                                                      | Vercel `dpl_4xAL4JWzuUugY5rQgyx2ecxnvRou`; 117/117 testų failų ir 364/364 testai           | Naujos kortelės ir pasirašytų sutarčių eilė patikrintos; sesija pasibaigė prieš likusius perėjimus |
-| A2   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
-| A3   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
-| A4   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
-| A5   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A2   | Techniškai užbaigta                                              | `f0b2584`                                                      | 118/118 testų failų ir 368/368 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
+| A3   | Techniškai užbaigta                                              | `b3a2bb1`                                                      | 120/120 testų failų ir 373/373 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
+| A4   | Techniškai užbaigta                                              | `852b731`                                                      | 123/123 testų failų ir 378/378 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
+| A5   | Techniškai užbaigta                                              | `25d46da`                                                      | 124/124 testų failų ir 379/379 testai                                                      | Sąskaitos ir garantijos prijungiamos A6; bendra staging patikra A9                                  |
 | A6   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
 | A7   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
 | A8   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |

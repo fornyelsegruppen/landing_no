@@ -34,6 +34,7 @@ En historisk fase kan bare markeres fullført når rapporten inneholder leverans
 | A2   | [Visos bylos ir bylos darbo vieta](./phase-a2-all-cases-workspace.md)                 | Užbaigta; automatizuota patikra praėjo              |
 | A3   | [Darbo sukūrimas, paskyrimas ir planavimas](./phase-a3-work-assignment-scheduling.md) | Užbaigta; automatizuota patikra praėjo              |
 | A4   | [Pasiūlymo redaktorius ir komercinės alternatyvos](./phase-a4-commercial-quote-editor.md) | Užbaigta; automatizuota patikra praėjo            |
+| A5   | [Klientų bylomis paremtas dokumentų centras](./phase-a5-document-centre.md)               | Techniškai užbaigta; bendra staging patikra A9    |
 
 De neste A-rapportene opprettes først når den foregående fasen har bestått sin gate. Den samlede rekkefølgen og akseptansekriteriene står i [admin-v2-planen](../admin-v2-operational-completion-plan.md).
 

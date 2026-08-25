@@ -11,7 +11,7 @@ const links = [
   { key: "quotes", href: "/admin-v2?queue=quote-review", queue: "quote-review" },
   { key: "contracts", href: "/admin-v2?queue=contract-signing", queue: "contract-signing" },
   { key: "work", href: "/admin-v2?queue=active-work", queue: "active-work" },
-  { key: "documents", href: "/admin/collections/private-media", queue: "documents" },
+  { key: "documents", href: "/admin-v2/documents", queue: "documents" },
   { key: "messages", href: "/admin-v2?queue=reply-drafts", queue: "reply-drafts" },
   { key: "blog", href: "/admin-v2?queue=blog-review", queue: "blog-review" },
   { key: "employees", href: "/admin/collections/users", queue: "employees" },
@@ -29,6 +29,8 @@ export function AdminNavigation({ locale, mobile = false }: { locale: PanelLocal
       {links.map((link) => {
         const active = link.queue === "cases"
           ? pathname.startsWith("/admin-v2/cases")
+          : link.queue === "documents"
+          ? pathname.startsWith("/admin-v2/documents")
           : link.queue === null
           ? pathname === "/admin-v2" && !selectedQueue
           : pathname === "/admin-v2" && selectedQueue === link.queue;

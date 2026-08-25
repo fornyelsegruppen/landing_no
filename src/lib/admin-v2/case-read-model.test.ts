@@ -75,7 +75,7 @@ describe("admin case read model", () => {
     expect(result?.lead.address).toBe("Testveien 1 0001 Oslo");
     expect(result?.quote?.reference).toBe("T-1-V1");
     expect(result?.nextAction.kind).toBe("issue_quote");
-    expect(result?.documents[0]?.href).toContain("/api/admin/blob?url=");
+    expect(result?.documents[0]?.href).toBe("/api/admin/media/7");
     expect(JSON.stringify(result)).not.toContain("tokenHash");
     expect(result?.timeline.map((item) => item.type)).toEqual(expect.arrayContaining(["lead", "message", "measurement", "price", "quote", "contract"]));
   });

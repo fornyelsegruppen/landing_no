@@ -551,15 +551,12 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     documents: mediaResult.docs.map((raw) => {
       const item = asRecord(raw);
       const id = numericId(item.id);
-      const url = stringValue(item.url);
       return {
         id,
         filename: stringValue(item.filename) || `#${id}`,
         classification: stringValue(item.classification),
         mimeType: stringValue(item.mimeType),
-        href: url?.includes(".blob.vercel-storage.com")
-          ? `/api/admin/blob?url=${encodeURIComponent(url)}`
-          : `/admin/collections/private-media/${id}`,
+        href: `/api/admin/media/${id}`,
       };
     }),
     timeline,
