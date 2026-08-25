@@ -22,6 +22,13 @@ describe("locked quote and contract documents", () => {
     expect(documentHash(contract)).toBe(documentHash(structuredClone(contract)));
   });
 
+  it("hashes the persisted JSON shape of optional values", () => {
+    expect(documentHash({ required: "value", optional: undefined }))
+      .toBe(documentHash({ required: "value" }));
+    expect(documentHash(["value", undefined]))
+      .toBe(documentHash(["value", null]));
+  });
+
   it("signs exactly the expected contract and records minimized security evidence", () => {
     const evidence = createSignatureEvidence({ contract, expectedDocumentHash: documentHash(contract), signatureData, signerName: "Test Kunde", paymentObligationAccepted: true, termsAccepted: true, withdrawalInformationReceived: true, earlyStartRequested: true, earlyStartLossAcknowledged: true, ipAddress: "192.0.2.1", userAgent: "test browser", securitySalt: "s".repeat(32), now: new Date("2026-08-23T12:00:00Z") });
     expect(evidence.documentHash).toBe(documentHash(contract));

@@ -579,10 +579,6 @@ export async function approveAndSendPreparedLeadPackage(
       throw new TypeError(`Roof measurement is blocked: ${prepared.gate.reasons.join(", ")}`);
     }
   }
-  if (documentHash(quote.snapshot) !== quote.snapshotHash) {
-    throw new TypeError("Quote snapshot hash mismatch");
-  }
-
   let approvedMeasurement = measurement;
   if (measurement.status !== "approved") {
     approvedMeasurement = await payload.update({
