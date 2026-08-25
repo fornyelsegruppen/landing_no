@@ -67,6 +67,9 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Verify generated Payload types are synchronized
+        run: npm run generate:types && git diff --exit-code -- src/payload/payload-types.ts
+
       - name: Lint
         run: npm run lint
 

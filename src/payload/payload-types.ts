@@ -700,7 +700,7 @@ export interface Lead {
         | 'contacted'
       )
     | null;
-  recordState?: ('active' | 'archived' | 'trashed') | null;
+  recordState: 'active' | 'archived' | 'trashed';
   archiveClassification?: ('completed' | 'declined' | 'lost' | 'invalid' | 'spam' | 'duplicate' | 'other') | null;
   archiveReason?: string | null;
   archivedAt?: string | null;
@@ -709,14 +709,14 @@ export interface Lead {
   trashedBy?: (number | null) | User;
   purgeAfter?: string | null;
   assignedTo?: (number | null) | User;
-  adminReviewedAt?: string | null;
-  adminReviewedBy?: (number | null) | User;
   nextAction?: string | null;
   nextActionAt?: string | null;
-  nextActionOwner?: ('administrator' | 'customer' | 'system' | 'worker') | null;
+  nextActionOwner: 'administrator' | 'customer' | 'system' | 'worker';
   nextActionBlocker?: string | null;
-  caseRevision?: number | null;
+  caseRevision: number;
   lastContactAt?: string | null;
+  adminReviewedAt?: string | null;
+  adminReviewedBy?: (number | null) | User;
   closedAt?: string | null;
   qualification?:
     | {
@@ -841,8 +841,6 @@ export interface PrivateMedia {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
 }
 /**
  * Versjonerte takmålinger. AI kan foreslå; geometri og pris beregnes av kode og må godkjennes av administrator.
@@ -867,11 +865,14 @@ export interface RoofMeasurement {
   license: string;
   credits: string;
   /**
-   * Skal bare aktiveres når kilden kan brukes kommersielt og korrekt kreditering er registrert.
+   * Teknisk legacy-feltnavn. Gjelder både åpne bygningskonturer og bilder; aktiveres bare når kilden kan brukes og korrekt kreditering er registrert.
    */
   imageryLicensed: boolean;
   capturedAt: string;
   mapImage?: (number | null) | PrivateMedia;
+  /**
+   * Kandidater som var tilgjengelige da måleversjonen ble opprettet.
+   */
   candidateBuildings?:
     | {
         [k: string]: unknown;
@@ -1085,6 +1086,9 @@ export interface Contract {
   documentHash: string;
   termsVersion: string;
   status: 'draft' | 'issued' | 'signed' | 'declined' | 'revoked' | 'superseded';
+  /**
+   * Kundens signaturbevis.
+   */
   signatureEvidence?:
     | {
         [k: string]: unknown;
@@ -1095,8 +1099,17 @@ export interface Contract {
     | boolean
     | null;
   customerSignatureImage?: (number | null) | PrivateMedia;
+  /**
+   * Kundesignert dokument som avventer leverandørens signatur.
+   */
   signedDocument?: (number | null) | PrivateMedia;
+  /**
+   * Tidspunkt kunden signerte.
+   */
   signedAt?: string | null;
+  /**
+   * Leverandørens signaturbevis.
+   */
   companySignatureEvidence?:
     | {
         [k: string]: unknown;
@@ -1107,6 +1120,9 @@ export interface Contract {
     | boolean
     | null;
   companySignatureImage?: (number | null) | PrivateMedia;
+  /**
+   * Endelig kontrakt signert av begge parter.
+   */
   companySignedDocument?: (number | null) | PrivateMedia;
   companySignedAt?: string | null;
   companySignedBy?: (number | null) | User;
@@ -1176,7 +1192,13 @@ export interface WorkOrder {
   contractDocumentHash: string;
   assignedWorker?: (number | null) | User;
   scheduledAt?: string | null;
+  /**
+   * For eksempel 08:00–10:00. Vis nøyaktig avtalt tidsrom, ikke et løfte som ikke kan holdes.
+   */
   arrivalWindow?: string | null;
+  /**
+   * Kun internt. Ikke sendt til kunden.
+   */
   adminNote?: string | null;
   customerCancellationRequestedAt?: string | null;
   cancellationRequestMessage?: (number | null) | Message;
@@ -1249,7 +1271,27 @@ export interface WorkOrder {
   createdAt: string;
 }
 /**
- * Internal invoice draft. Not booked until exported to the approved accounting system.
+ * Versjonerte vilkår. Produksjonsgodkjenning krever dokumentert juridisk referanse.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contract-terms".
+ */
+export interface ContractTerm {
+  id: number;
+  version: string;
+  title: string;
+  contractText: string;
+  withdrawalInstructions: string;
+  withdrawalFormUrl: string;
+  status: 'draft' | 'approved' | 'retired';
+  legalReviewReference?: string | null;
+  approvedBy?: (number | null) | User;
+  approvedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Interne fakturautkast. Ikke bokført faktura før godkjent eksport til valgt regnskapssystem.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "invoice-records".
@@ -1260,7 +1302,15 @@ export interface InvoiceRecord {
   lead: number | Lead;
   workOrder: number | WorkOrder;
   status: 'draft' | 'approved' | 'exported' | 'sent' | 'paid' | 'overdue' | 'cancelled';
-  snapshot: { [k: string]: unknown } | unknown[] | string | number | boolean | null;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   documentHash: string;
   subtotalExVatOre: number;
   vatOre: number;
@@ -1278,7 +1328,7 @@ export interface InvoiceRecord {
   createdAt: string;
 }
 /**
- * Case-confirmed warranty for completed work.
+ * Saksbekreftede garantier. Omfang og varighet må kontrolleres av administrator før aktivering.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "warranties".
@@ -1293,31 +1343,19 @@ export interface Warranty {
   startsAt: string;
   endsAt: string;
   termsVersion: string;
-  snapshot: { [k: string]: unknown } | unknown[] | string | number | boolean | null;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   documentHash: string;
   document?: (number | null) | PrivateMedia;
   approvedBy: number | User;
   approvedAt: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * Versjonerte vilkår. Produksjonsgodkjenning krever dokumentert juridisk referanse.
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "contract-terms".
- */
-export interface ContractTerm {
-  id: number;
-  version: string;
-  title: string;
-  contractText: string;
-  withdrawalInstructions: string;
-  withdrawalFormUrl: string;
-  status: 'draft' | 'approved' | 'retired';
-  legalReviewReference?: string | null;
-  approvedBy?: (number | null) | User;
-  approvedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1539,6 +1577,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'work-orders';
         value: number | WorkOrder;
+      } | null)
+    | ({
+        relationTo: 'invoice-records';
+        value: number | InvoiceRecord;
+      } | null)
+    | ({
+        relationTo: 'warranties';
+        value: number | Warranty;
       } | null)
     | ({
         relationTo: 'seo-topics';
@@ -1947,14 +1993,14 @@ export interface LeadsSelect<T extends boolean = true> {
   trashedBy?: T;
   purgeAfter?: T;
   assignedTo?: T;
-  adminReviewedAt?: T;
-  adminReviewedBy?: T;
   nextAction?: T;
   nextActionAt?: T;
   nextActionOwner?: T;
   nextActionBlocker?: T;
   caseRevision?: T;
   lastContactAt?: T;
+  adminReviewedAt?: T;
+  adminReviewedBy?: T;
   closedAt?: T;
   qualification?: T;
   consentAt?: T;
@@ -2439,8 +2485,6 @@ export interface PrivateMediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
-  focalX?: T;
-  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -250,6 +250,9 @@ export async function POST(request: Request) {
         ...(referrer ? { referrer } : {}),
         ...(marketingConsent ? { marketingConsent } : {}),
         status: "new",
+        recordState: "active",
+        nextActionOwner: "administrator",
+        caseRevision: 1,
         nextAction: email
           ? "Kontroller henvendelsen og eventuelt svarutkast."
           : "Ring kunden. Automatisk e-postløp er ikke tilgjengelig uten e-postadresse.",

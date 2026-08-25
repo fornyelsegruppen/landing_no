@@ -134,3 +134,24 @@ test("anonymous visitors cannot read the custom admin dashboard", async ({ page 
   await expect(page.getByText("New enquiries", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Naujos užklausos", { exact: true })).toHaveCount(0);
 });
+
+test("anonymous and cross-site requests cannot cross internal API boundaries", async ({ request }) => {
+  const health = await request.get("/api/admin/platform-health");
+  expect(health.status()).toBe(401);
+
+  const adminMedia = await request.get("/api/admin/media/999999");
+  expect(adminMedia.status()).toBe(401);
+
+  const workerMedia = await request.get("/api/worker/work-orders/999999/media/999999");
+  expect(workerMedia.status()).toBe(401);
+
+  const crossSite = await request.post("/api/lead", {
+    data: {},
+    headers: {
+      origin: "https://cross-site.example.invalid",
+      "sec-fetch-site": "cross-site",
+    },
+  });
+  expect(crossSite.status()).toBe(403);
+  await expect(crossSite.json()).resolves.toEqual({ error: "Cross-site request blocked" });
+});
