@@ -33,6 +33,17 @@ describe("platform feature configuration", () => {
       provider: "fake",
       missing: ["GEMINI_API_KEY"],
     });
+    expect(readIntegrationStatus({}).rateLimit.missing).toEqual([
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+    ]);
+    expect(readIntegrationStatus({}).botProtection.missing).toEqual([
+      "TURNSTILE_SECRET_KEY",
+      "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+    ]);
+    expect(readIntegrationStatus({}).privateStorage.missing).toEqual([
+      "BLOB_READ_WRITE_TOKEN",
+    ]);
   });
 
   it("does not consider an enabled feature ready without dependencies", () => {
@@ -114,5 +125,26 @@ describe("platform feature configuration", () => {
     expect(flags.communicationRoutingV2).toBe(false);
     expect(flags.customerLifecycleV2).toBe(false);
     expect(flags.securityHardeningV2).toBe(false);
+  });
+
+  it("requires distributed abuse controls and private storage before security rollout", () => {
+    expect(featureReadiness("securityHardeningV2", {
+      FEATURE_SECURITY_HARDENING_V2: "true",
+      PAYLOAD_SECRET: "configured",
+    })).toEqual({
+      enabled: true,
+      ready: false,
+      unavailable: ["rateLimit", "botProtection", "privateStorage"],
+    });
+
+    expect(() => assertFeatureReady("securityHardeningV2", {
+      FEATURE_SECURITY_HARDENING_V2: "true",
+      PAYLOAD_SECRET: "configured",
+      UPSTASH_REDIS_REST_URL: "configured",
+      UPSTASH_REDIS_REST_TOKEN: "configured",
+      TURNSTILE_SECRET_KEY: "configured",
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: "configured",
+      BLOB_READ_WRITE_TOKEN: "configured",
+    })).not.toThrow();
   });
 });

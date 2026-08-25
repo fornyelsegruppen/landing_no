@@ -50,7 +50,7 @@ export function readFeatureFlags(
 }
 
 export type IntegrationName =
-  "ai" | "email" | "sms" | "maps" | "buildingFootprints" | "imagery" | "signature" | "legal" | "searchData" | "jobs";
+  "ai" | "email" | "sms" | "maps" | "buildingFootprints" | "imagery" | "signature" | "legal" | "searchData" | "jobs" | "rateLimit" | "botProtection" | "privateStorage";
 
 export type IntegrationReadiness =
   "ready" | "configuration_required" | "disabled";
@@ -159,6 +159,30 @@ export function readIntegrationStatus(
       provider: "vercel-cron",
       missing: cronReady ? [] : ["CRON_SECRET"],
     },
+    rateLimit: {
+      name: "rateLimit",
+      readiness: configured(environment, "UPSTASH_REDIS_REST_URL") && configured(environment, "UPSTASH_REDIS_REST_TOKEN") ? "ready" : "configuration_required",
+      provider: "upstash-redis",
+      missing: [
+        ...(!configured(environment, "UPSTASH_REDIS_REST_URL") ? ["UPSTASH_REDIS_REST_URL"] : []),
+        ...(!configured(environment, "UPSTASH_REDIS_REST_TOKEN") ? ["UPSTASH_REDIS_REST_TOKEN"] : []),
+      ],
+    },
+    botProtection: {
+      name: "botProtection",
+      readiness: configured(environment, "TURNSTILE_SECRET_KEY") && configured(environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY") ? "ready" : "configuration_required",
+      provider: "cloudflare-turnstile",
+      missing: [
+        ...(!configured(environment, "TURNSTILE_SECRET_KEY") ? ["TURNSTILE_SECRET_KEY"] : []),
+        ...(!configured(environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY") ? ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"] : []),
+      ],
+    },
+    privateStorage: {
+      name: "privateStorage",
+      readiness: configured(environment, "BLOB_READ_WRITE_TOKEN") ? "ready" : "configuration_required",
+      provider: "vercel-blob-private",
+      missing: configured(environment, "BLOB_READ_WRITE_TOKEN") ? [] : ["BLOB_READ_WRITE_TOKEN"],
+    },
   };
 }
 
@@ -175,7 +199,7 @@ const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   adminExceptionFlowsV2: [],
   communicationRoutingV2: ["email", "jobs"],
   customerLifecycleV2: ["email", "legal"],
-  securityHardeningV2: ["signature"],
+  securityHardeningV2: ["signature", "rateLimit", "botProtection", "privateStorage"],
 };
 
 export function featureReadiness(

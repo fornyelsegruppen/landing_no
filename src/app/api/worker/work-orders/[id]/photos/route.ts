@@ -8,6 +8,7 @@ import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/feat
 import { appendTimeline, loadAuthorizedWorkOrder, relationId } from "@/lib/work-orders/access";
 import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 import { uploadDigestMatches, uploadSha256 } from "@/lib/images/upload-integrity";
+import { normalizedImageFilename, sanitizeImageUpload, UnsafeImageUploadError } from "@/lib/images/sanitize-upload";
 
 const phaseSchema = z.enum(["before", "after"]);
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -31,12 +32,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const expectedDigest = request.headers.get("x-upload-sha256")?.toLowerCase();
     const actualDigest = uploadSha256(bytes);
     if (!uploadDigestMatches(bytes, expectedDigest)) return NextResponse.json({ error: "Upload integrity check failed; retry the photo" }, { status: 422 });
+    const normalized = await sanitizeImageUpload(bytes, {
+      declaredMime: file.type,
+      maxInputBytes: 10_000_000,
+    });
     if (phase.data === "before" && !["arrived", "precheck", "blocked"].includes(order.status)) return NextResponse.json({ error: "Before photos can only be added during precheck" }, { status: 409 });
     if (phase.data === "after" && !["in_progress", "completed"].includes(order.status)) return NextResponse.json({ error: "After photos can only be added after work starts" }, { status: 409 });
-    const safeName = `${phase.data}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-100)}`;
+    const safeName = `${phase.data}-${Date.now()}-${normalizedImageFilename(file.name, "photo")}`;
     const media = await createPrivateMedia(payload, {
       classification: "work", ownerType: "work-order", ownerId: String(order.id), alt: `${phase.data === "before" ? "Før" : "Etter"}-dokumentasjon for ${order.reference}`,
-    }, { data: bytes, mimeType: file.type, filename: safeName });
+    }, { data: normalized.bytes, mimeType: normalized.mimeType, filename: safeName });
     try {
       const field = phase.data === "before" ? "beforePhotos" : "afterPhotos";
       const existing = Array.isArray(order[field]) ? order[field].map(relationId).filter((value): value is number => value !== null) : [];
@@ -50,9 +55,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await deletePrivateMedia(payload, media).catch(() => undefined);
       throw error;
     }
-    return NextResponse.json({ id: media.id, phase: phase.data, sha256: actualDigest }, { status: 201 });
+    return NextResponse.json({ id: media.id, phase: phase.data, sha256: actualDigest, storedSha256: normalized.storedSha256 }, { status: 201 });
   } catch (error) {
     if (error instanceof FeatureUnavailableError) return NextResponse.json({ error: error.reason, missing: error.unavailable }, { status: 503 });
+    if (error instanceof UnsafeImageUploadError) return NextResponse.json({ error: error.message, code: error.code }, { status: 415 });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Upload failed" }, { status: 409 });
   }
 }

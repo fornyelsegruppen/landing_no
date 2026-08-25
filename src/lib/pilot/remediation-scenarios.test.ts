@@ -7,7 +7,7 @@ import {
 describe("remediation scenario seed pack", () => {
   it("contains stable anonymous coverage for the F0 control journeys", () => {
     expect(validateSyntheticScenarioPack()).toBe(true);
-    expect(remediationScenarios).toHaveLength(10);
+    expect(remediationScenarios).toHaveLength(19);
     expect(new Set(remediationScenarios.map((scenario) => scenario.expectedOutcome))).toEqual(new Set([
       "measurement_review",
       "building_selection",
@@ -16,8 +16,16 @@ describe("remediation scenario seed pack", () => {
       "decline_follow_up",
       "commercial_review",
       "change_agreement_required",
-      "sms_fallback",
+      "manual_contact_required",
       "closed_archive",
+      "cancellation_review_and_work_freeze",
+      "threaded_reply_review",
+      "unsafe_draft_blocked",
+      "token_rejected",
+      "assignment_attention",
+      "unsafe_upload_blocked",
+      "idempotent_retry",
+      "csrf_blocked",
     ]));
   });
 
@@ -34,4 +42,3 @@ describe("remediation scenario seed pack", () => {
     expect(() => validateSyntheticScenarioPack([remediationScenarios[0], remediationScenarios[0]])).toThrow(/Duplicate/);
   });
 });
-

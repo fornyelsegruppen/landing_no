@@ -46,6 +46,11 @@ jobs:
       FEATURE_WORKER_PORTAL: "false"
       FEATURE_AUTOMATED_REMINDERS: "false"
       FEATURE_SEO_SCHEDULER: "false"
+      E2E_SEED_ALLOWED: "true"
+      E2E_ADMIN_EMAIL: qa-admin@example.invalid
+      E2E_ADMIN_PASSWORD: ci-only-admin-password-2026
+      E2E_WORKER_EMAIL: qa-worker@example.invalid
+      E2E_WORKER_PASSWORD: ci-only-worker-password-2026
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,6 +85,9 @@ jobs:
       - name: Seed deterministic public smoke content
         run: node scripts/seed-cms-sql.mjs && node scripts/seed-page-copy.mjs
 
+      - name: Seed synthetic authenticated browser accounts
+        run: node scripts/seed-e2e-accounts.mjs
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
@@ -88,6 +96,24 @@ jobs:
 
       - name: Public browser smoke against production build
         run: npm run test:e2e
+
+      - name: Rehearse PostgreSQL backup and restore with synthetic data
+        shell: bash
+        run: |
+          set -euo pipefail
+          BACKUP_FILE="$RUNNER_TEMP/takfornyelse-ci.dump"
+          RESTORE_URL="postgresql://postgres:postgres@127.0.0.1:5432/takfornyelse_restore?sslmode=disable"
+          ADMIN_URL="postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable"
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file="$BACKUP_FILE"
+          psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS takfornyelse_restore'
+          psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE takfornyelse_restore'
+          pg_restore --dbname="$RESTORE_URL" --no-owner --no-acl "$BACKUP_FILE"
+          SOURCE_COUNTS="$(psql "$DATABASE_URL" -Atc "select json_build_object('users',(select count(*) from users),'migrations',(select count(*) from payload_migrations),'posts',(select count(*) from posts))::text")"
+          RESTORED_COUNTS="$(psql "$RESTORE_URL" -Atc "select json_build_object('users',(select count(*) from users),'migrations',(select count(*) from payload_migrations),'posts',(select count(*) from posts))::text")"
+          test "$SOURCE_COUNTS" = "$RESTORED_COUNTS"
+          test "$(psql "$RESTORE_URL" -Atc 'select count(*) from users')" -ge 2
+          rm -f "$BACKUP_FILE"
+          echo "Synthetic PostgreSQL backup/restore rehearsal: PASS"
 
       - name: Upload Playwright trace on failure
         if: failure()

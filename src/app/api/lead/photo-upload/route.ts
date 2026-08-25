@@ -2,7 +2,11 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { verifyUploadTicket } from "@/lib/upload-ticket";
-import { ALLOWED_IMAGE_MIMES, sniffImageMime } from "@/lib/image-mime";
+import {
+  normalizedImageFilename,
+  sanitizeImageUpload,
+  UnsafeImageUploadError,
+} from "@/lib/images/sanitize-upload";
 import { captureException } from "@/lib/monitoring";
 
 export const runtime = "nodejs";
@@ -66,24 +70,20 @@ export async function POST(request: Request) {
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const sniffed = sniffImageMime(bytes);
-    if (!sniffed || !ALLOWED_IMAGE_MIMES.has(sniffed)) {
-      return NextResponse.json(
-        { error: "Only JPEG, PNG, WebP, GIF or HEIC images are allowed" },
-        { status: 415 },
-      );
-    }
-
+    const normalized = await sanitizeImageUpload(bytes, {
+      declaredMime: "type" in file ? file.type : null,
+      maxInputBytes: MAX_BYTES,
+    });
     const fileName =
       "name" in file && typeof file.name === "string" && file.name
         ? file.name
         : "photo.jpg";
-    const safeName = fileName.replace(/[^\w.\-]+/g, "_") || "photo.jpg";
+    const safeName = normalizedImageFilename(fileName, "photo");
 
-    const blob = await put(`leads/${Date.now()}-${safeName}`, bytes, {
+    const blob = await put(`leads/${Date.now()}-${safeName}`, normalized.bytes, {
       access: "private",
       token: process.env.BLOB_READ_WRITE_TOKEN,
-      contentType: sniffed,
+      contentType: normalized.mimeType,
       addRandomSuffix: true,
     });
 
@@ -92,6 +92,9 @@ export async function POST(request: Request) {
       downloadUrl: blob.downloadUrl,
     });
   } catch (err) {
+    if (err instanceof UnsafeImageUploadError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 415 });
+    }
     captureException(err, { route: "POST /api/lead/photo-upload" });
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
