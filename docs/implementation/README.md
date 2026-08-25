@@ -35,6 +35,7 @@ Den autentiserte helhetsrevisjonen 25. august 2026 avdekket gjenstående avvik i
 - [F5 – operational exceptions](./phase-f5-operational-exceptions.md)
 - [F6 – communication reliability and scheduling](./phase-f6-communications-reliability.md)
 - [F7 – administrator operations workspace](./phase-f7-admin-operations.md)
+- [F8 – customer replies, safe AI drafts and recovery](./phase-f8-customer-replies-and-recovery.md)
 
 ## Operativ admin A0–A9
 
