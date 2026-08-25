@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   manualAreaDeviationPercent,
+  reviewManualMeasurement,
   requiresLargeManualAreaConfirmation,
   slopedAreaSquareMeters,
   slopeBandForPreset,
@@ -27,5 +28,28 @@ describe("admin measurement workbench", () => {
   it("rejects impossible area and slope inputs", () => {
     expect(() => slopedAreaSquareMeters(0, 32)).toThrow(RangeError);
     expect(() => slopedAreaSquareMeters(100, 90)).toThrow(RangeError);
+  });
+
+  it("allows a documented manual measurement without map evidence", () => {
+    expect(reviewManualMeasurement({
+      actualAreaMinTenths: 1_500,
+      actualAreaMaxTenths: 1_500,
+      blockingReasons: [],
+      manualAreaReason: "Oppgitt av kunden og kontrollert av administrator.",
+      manualAreaSource: "customer",
+    })).toEqual({ allowed: true, reasons: [] });
+  });
+
+  it("blocks an incomplete manual measurement", () => {
+    expect(reviewManualMeasurement({
+      actualAreaMinTenths: 0,
+      actualAreaMaxTenths: 0,
+      blockingReasons: ["manual_review_required"],
+      manualAreaReason: "",
+      manualAreaSource: null,
+    })).toEqual({
+      allowed: false,
+      reasons: ["manual_area_invalid", "manual_area_source_required", "manual_area_reason_required", "manual_review_required"],
+    });
   });
 });

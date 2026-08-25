@@ -29,3 +29,22 @@ export function manualAreaDeviationPercent(previousAreaTenths: number | undefine
 export function requiresLargeManualAreaConfirmation(previousAreaTenths: number | undefined, nextAreaTenths: number) {
   return manualAreaDeviationPercent(previousAreaTenths, nextAreaTenths) > 20;
 }
+
+export function reviewManualMeasurement(input: {
+  actualAreaMinTenths?: number | null;
+  actualAreaMaxTenths?: number | null;
+  blockingReasons?: unknown;
+  manualAreaReason?: string | null;
+  manualAreaSource?: string | null;
+}) {
+  const reasons: string[] = [];
+  const min = Number(input.actualAreaMinTenths || 0);
+  const max = Number(input.actualAreaMaxTenths || 0);
+  if (min < 100 || max < min) reasons.push("manual_area_invalid");
+  if (!input.manualAreaSource?.trim()) reasons.push("manual_area_source_required");
+  if (!input.manualAreaReason?.trim()) reasons.push("manual_area_reason_required");
+  if (Array.isArray(input.blockingReasons) && input.blockingReasons.length) {
+    reasons.push(...input.blockingReasons.map(String));
+  }
+  return { allowed: reasons.length === 0, reasons };
+}

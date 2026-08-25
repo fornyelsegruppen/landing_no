@@ -169,7 +169,19 @@ export async function createPreparedPackageForMeasurement(payload: Payload, inpu
     status: "ready", blockingReasons: [],
   } });
   try {
-    return { calculation, ...await createQuoteDraft(payload, calculation.id, input.now || new Date(), { allowPendingMeasurement: true }) };
+    const documents = await createQuoteDraft(payload, calculation.id, input.now || new Date(), { allowPendingMeasurement: true });
+    const staleAiDrafts = await payload.find({
+      collection: "messages", depth: 0, limit: 20, overrideAccess: true,
+      where: { and: [
+        { lead: { equals: input.leadId } },
+        { category: { equals: "ai_reply" } },
+        { status: { equals: "draft" } },
+      ] },
+    }).catch(() => ({ docs: [] }));
+    for (const message of staleAiDrafts.docs) {
+      await payload.update({ collection: "messages", id: message.id, overrideAccess: true, data: { status: "cancelled" } }).catch(() => undefined);
+    }
+    return { calculation, ...documents };
   } catch (error) {
     await payload.delete({ collection: "price-calculations", id: calculation.id, overrideAccess: true }).catch(() => undefined);
     throw error;

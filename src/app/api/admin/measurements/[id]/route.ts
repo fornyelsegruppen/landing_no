@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPayload } from "@/lib/payload";
 import { calculatePrice, type PriceRuleSnapshot } from "@/lib/measurements/pricing";
+import { reviewManualMeasurement } from "@/lib/measurements/admin-workbench";
 import { prepareMeasurement } from "@/lib/measurements/proposal";
 import { nextMeasurementVersion } from "@/lib/measurements/versioning";
 import { userIsAdmin } from "@/payload/access/roles";
@@ -71,11 +72,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (process.env.FEATURE_MEASUREMENT_EVIDENCE_V2 === "true" && measurement.measurementMode !== "manual_no_visual" && !await verifySchematicMeasurementEvidence(payload, measurement)) {
       return NextResponse.json({ error: "Measurement evidence is missing or does not match its stored hash" }, { status: 409 });
     }
-    const prepared = prepareMeasurement({
-      proposal: { buildingIdentifier: measurement.buildingIdentifier ?? null, confidence: measurement.confidence, confidenceReasoning: measurement.confidenceReasoning, roofPlanes: measurement.roofPlanes },
-      addressResolved: Boolean(measurement.addressSourceId), sourceAuthorized: measurement.imageryLicensed && hasAuthorizedSource(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
-    });
-    if (!prepared.gate.allowed) return NextResponse.json({ error: "Measurement is blocked", reasons: prepared.gate.reasons }, { status: 409 });
+    const gate = measurement.measurementMode === "manual_no_visual"
+      ? reviewManualMeasurement(measurement)
+      : prepareMeasurement({
+        proposal: { buildingIdentifier: measurement.buildingIdentifier ?? null, confidence: measurement.confidence, confidenceReasoning: measurement.confidenceReasoning, roofPlanes: measurement.roofPlanes },
+        addressResolved: Boolean(measurement.addressSourceId), sourceAuthorized: measurement.imageryLicensed && hasAuthorizedSource(measurement.blockingReasons), hasApprovedPriceRule: rules.totalDocs > 0,
+      }).gate;
+    if (!gate.allowed) return NextResponse.json({ error: "Measurement is blocked", reasons: gate.reasons }, { status: 409 });
     const approvedAt = new Date().toISOString();
     const updated = await payload.update({ collection: "roof-measurements", id: measurement.id, overrideAccess: true, data: { status: "approved", approvedBy: user.id, approvedAt, selectionConfirmedBy: user.id, selectionConfirmedAt: approvedAt, blockingReasons: [] } });
     await recordAuditEvent(createPayloadAuditWriter(payload), {
