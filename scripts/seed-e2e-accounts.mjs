@@ -61,5 +61,12 @@ try {
   }
   console.log("Synthetic E2E admin and worker accounts are ready.");
 } finally {
-  await payload.db.destroy();
+  await Promise.race([
+    payload.db.destroy(),
+    new Promise((resolve) => setTimeout(resolve, 2_000)),
+  ]);
 }
+
+// Payload can retain logger or adapter handles after a one-shot script. Every
+// database write above is awaited; exiting here keeps CI deterministic.
+process.exit(0);
