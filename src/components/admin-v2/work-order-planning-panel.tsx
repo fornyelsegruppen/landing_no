@@ -4,7 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
-import { arrivalWindowFromTimes, parseArrivalWindow } from "@/lib/work-orders/scheduling";
+import {
+  arrivalWindowFromTimes,
+  defaultArrivalEndTime,
+  normalizeArrivalStartTime,
+  parseArrivalWindow,
+} from "@/lib/work-orders/scheduling";
 
 type Worker = { id: number; name: string; phone?: string };
 
@@ -29,10 +34,12 @@ export function WorkOrderPlanningPanel(props: {
   const initialWindow = parseArrivalWindow(props.arrivalWindow);
   const initialScheduledDate = props.scheduledLocal?.slice(0, 10) || "";
   const initialScheduledTime = props.scheduledLocal?.slice(11, 16) || "";
+  const initialArrivalStart = initialWindow?.start || normalizeArrivalStartTime(initialScheduledTime);
+  const initialArrivalEnd = initialWindow?.end || defaultArrivalEndTime(initialArrivalStart);
   const [workerId, setWorkerId] = useState(props.assignedWorkerId ? String(props.assignedWorkerId) : "");
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate);
-  const [arrivalStart, setArrivalStart] = useState(initialWindow?.start || initialScheduledTime || "08:00");
-  const [arrivalEnd, setArrivalEnd] = useState(initialWindow?.end || "10:00");
+  const [arrivalStart, setArrivalStart] = useState(initialArrivalStart);
+  const [arrivalEnd, setArrivalEnd] = useState(initialArrivalEnd);
   const [adminNote, setAdminNote] = useState(props.adminNote || "");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -105,7 +112,7 @@ export function WorkOrderPlanningPanel(props: {
         <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.chooseEmployee}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => setWorkerId(event.target.value)} required value={workerId}><option value="">{copy.noEmployee}</option>{props.workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}{worker.phone ? ` · ${worker.phone}` : ""}</option>)}</select></label>
         <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.workDate}</span><input className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setScheduledDate(event.target.value)} required type="date" value={scheduledDate} /></label>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-          <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.arrivalFrom}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => setArrivalStart(event.target.value)} required value={arrivalStart}>{timeOptions.slice(0, -1).map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
+          <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.arrivalFrom}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => { const nextStart = event.target.value; setArrivalStart(nextStart); if (arrivalEnd <= nextStart) setArrivalEnd(defaultArrivalEndTime(nextStart)); }} required value={arrivalStart}>{timeOptions.slice(0, -1).map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
           <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.arrivalTo}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => setArrivalEnd(event.target.value)} required value={arrivalEnd}>{timeOptions.slice(1).map((time) => <option disabled={time <= arrivalStart} key={time} value={time}>{time}</option>)}</select></label>
         </div>
         {workerId && !props.workers.find((worker) => String(worker.id) === workerId)?.phone ? <p className="text-xs text-amber-300">{copy.workerPhoneFallback}</p> : null}
