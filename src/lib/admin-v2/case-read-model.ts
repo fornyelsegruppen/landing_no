@@ -21,6 +21,9 @@ export type CaseNextActionKind =
   | "none"
   | "retry_message"
   | "wait_customer"
+  | "wait_scheduled_start"
+  | "wait_worker_precheck"
+  | "wait_work_completion"
   | "wait_worker_documentation";
 
 export type CaseNextAction = {
@@ -62,6 +65,9 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.workOrder?.status === "blocked") return { kind: "resolve_work_block", targetId: input.workOrder.id };
   if (input.workOrder?.status === "completed" && input.workOrder.documentationSubmittedAt) return { kind: "review_completion", targetId: input.workOrder.id };
   if (input.workOrder?.status === "completed") return { kind: "wait_worker_documentation", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "scheduled") return { kind: "wait_scheduled_start", targetId: input.workOrder.id };
+  if (["on_way", "arrived", "precheck", "ready"].includes(input.workOrder?.status || "")) return { kind: "wait_worker_precheck", targetId: input.workOrder?.id };
+  if (input.workOrder?.status === "in_progress") return { kind: "wait_work_completion", targetId: input.workOrder.id };
   if (input.quote?.status === "accepted" && input.contract?.status === "signed" && !input.contract.companySignedAt) {
     return { kind: "company_sign_contract", targetId: input.contract.id };
   }
