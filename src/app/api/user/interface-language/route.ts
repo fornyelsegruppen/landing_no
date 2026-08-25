@@ -1,8 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getInternalUser } from "@/lib/auth/internal-session";
-import { getPayload } from "@/lib/payload";
 
 const inputSchema = z.object({
   language: z.enum(["nb", "lt", "en"]),
@@ -33,16 +31,8 @@ export async function POST(request: Request) {
     secure: secureCookie,
   });
 
-  const user = await getInternalUser();
-  if (user) {
-    const payload = await getPayload();
-    await payload.update({
-      collection: "users",
-      id: user.id,
-      data: { interfaceLanguage: parsed.data.language },
-      overrideAccess: true,
-    });
-  }
-
+  // The account field remains the administrator-managed default. A user's
+  // explicit choice is a per-browser preference and must not wait for a
+  // database write before the interface can refresh.
   return NextResponse.json({ language: parsed.data.language });
 }
