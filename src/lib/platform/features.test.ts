@@ -34,8 +34,8 @@ describe("platform feature configuration", () => {
       missing: ["GEMINI_API_KEY"],
     });
     expect(readIntegrationStatus({}).rateLimit.missing).toEqual([
-      "UPSTASH_REDIS_REST_URL",
-      "UPSTASH_REDIS_REST_TOKEN",
+      "UPSTASH_REDIS_REST_URL or KV_REST_API_URL",
+      "UPSTASH_REDIS_REST_TOKEN or KV_REST_API_TOKEN",
     ]);
     expect(readIntegrationStatus({}).botProtection.missing).toEqual([
       "TURNSTILE_SECRET_KEY",
@@ -146,5 +146,9 @@ describe("platform feature configuration", () => {
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: "configured",
       BLOB_READ_WRITE_TOKEN: "configured",
     })).not.toThrow();
+    expect(readIntegrationStatus({
+      KV_REST_API_URL: "configured",
+      KV_REST_API_TOKEN: "configured",
+    }).rateLimit).toMatchObject({ readiness: "ready", missing: [] });
   });
 });

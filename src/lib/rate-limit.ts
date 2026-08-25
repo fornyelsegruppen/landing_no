@@ -35,8 +35,8 @@ function getUpstashLimiter(namespace: string, limit: number, windowSec: number) 
   let limiter = limiters.get(cacheKey);
   if (limiter) return limiter;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
 
   limiter = new Ratelimit({

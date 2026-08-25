@@ -66,6 +66,10 @@ function configured(environment: Environment, key: string) {
   return Boolean(environment[key]?.trim());
 }
 
+function configuredAny(environment: Environment, keys: readonly string[]) {
+  return keys.some((key) => configured(environment, key));
+}
+
 export function readIntegrationStatus(
   environment: Environment = process.env,
 ): Record<IntegrationName, IntegrationStatus> {
@@ -161,11 +165,11 @@ export function readIntegrationStatus(
     },
     rateLimit: {
       name: "rateLimit",
-      readiness: configured(environment, "UPSTASH_REDIS_REST_URL") && configured(environment, "UPSTASH_REDIS_REST_TOKEN") ? "ready" : "configuration_required",
+      readiness: configuredAny(environment, ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]) && configuredAny(environment, ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"]) ? "ready" : "configuration_required",
       provider: "upstash-redis",
       missing: [
-        ...(!configured(environment, "UPSTASH_REDIS_REST_URL") ? ["UPSTASH_REDIS_REST_URL"] : []),
-        ...(!configured(environment, "UPSTASH_REDIS_REST_TOKEN") ? ["UPSTASH_REDIS_REST_TOKEN"] : []),
+        ...(!configuredAny(environment, ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]) ? ["UPSTASH_REDIS_REST_URL or KV_REST_API_URL"] : []),
+        ...(!configuredAny(environment, ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"]) ? ["UPSTASH_REDIS_REST_TOKEN or KV_REST_API_TOKEN"] : []),
       ],
     },
     botProtection: {
