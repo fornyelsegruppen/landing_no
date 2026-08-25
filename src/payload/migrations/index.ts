@@ -32,6 +32,7 @@ import * as migration_20260825_210000_lead_archive_trash from "./20260825_210000
 import * as migration_20260825_220000_case_state_engine from "./20260825_220000_case_state_engine";
 import * as migration_20260825_230000_measurement_evidence from "./20260825_230000_measurement_evidence";
 import * as migration_20260825_235000_admin_operations from "./20260825_235000_admin_operations";
+import * as migration_20260825_235100_admin_review_backfill from "./20260825_235100_admin_review_backfill";
 
 export const migrations = [
   {
@@ -203,5 +204,10 @@ export const migrations = [
     up: migration_20260825_235000_admin_operations.up,
     down: migration_20260825_235000_admin_operations.down,
     name: "20260825_235000_admin_operations",
+  },
+  {
+    up: migration_20260825_235100_admin_review_backfill.up,
+    down: migration_20260825_235100_admin_review_backfill.down,
+    name: "20260825_235100_admin_review_backfill",
   },
 ];
