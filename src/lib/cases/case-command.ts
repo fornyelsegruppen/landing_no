@@ -69,6 +69,7 @@ export async function executeCaseCommand(payload: Payload, input: ExecuteCaseCom
     after = await payload.update({
       collection: "leads", id: input.leadId, depth: 0, overrideAccess: true,
       context: commandContext,
+      req: { context: commandContext, payloadAPI: "local" } as never,
       data: { ...input.patch, caseRevision: nextRevision },
     });
   } catch (error) {

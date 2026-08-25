@@ -27,6 +27,7 @@ describe("central case command", () => {
     expect(state.lead).toMatchObject({ status: "measuring", caseRevision: 2 });
     expect(state.payload.update).toHaveBeenCalledWith(expect.objectContaining({
       context: { trustedCaseCommand: true, expectedCaseRevision: 1 },
+      req: { context: { trustedCaseCommand: true, expectedCaseRevision: 1 }, payloadAPI: "local" },
     }));
     expect(state.audit[0]).toMatchObject({ action: "case.start_measurement", entityId: "7" });
   });
