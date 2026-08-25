@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcinė svetainė:** neliečiama iki paskutinės fazės, pilno patikrinimo ir atskiro savininko patvirtinimo  
-**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A8 techniškai užbaigtos; A9 vykdoma — atliekama bendra staging priėmimo patikra
+**Dabartinė būsena:** A0–A9 staging lygiu užbaigtos; Production gate uždaryta iki atskiro savininko patvirtinimo
 **Pagrindinė taisyklė:** vienu metu įgyvendinama viena fazė; po kiekvienos fazės privalomi automatiniai testai, rankinis staging patikrinimas ir rezultato įrašymas šiame dokumente
 
 ## 1. Galutinis tikslas
@@ -227,7 +227,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A5 – klientų bylomis paremtas dokumentų centras
 
-**Statusas:** techniškai užbaigta; bendra staging patikra atliekama A9
+**Statusas:** užbaigta ir patikrinta staging aplinkoje per A9
 **Priklausomybė:** A2, A4  
 **Tikslas:** visi klientui ir užsakymui svarbūs dokumentai randami vienoje vietoje, o administratorius nemato neaiškaus techninių failų sąrašo.
 
@@ -254,7 +254,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A6 – užbaigimo patikra, sąskaitos juodraštis ir garantijos registras
 
-**Statusas:** techniškai užbaigta; bendra staging patikra atliekama A9
+**Statusas:** užbaigta ir patikrinta staging aplinkoje per A9
 **Priklausomybė:** A3, A5  
 **Tikslas:** po darbuotojo atlikto darbo administratorius turi aiškią galutinę kontrolę ir nepalieka bylos be komercinių bei garantinių dokumentų.
 
@@ -282,7 +282,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A7 – archyvas, šiukšlinė, atkūrimas ir retention
 
-**Statusas:** techniškai užbaigta, staging patikra kartojama A9
+**Statusas:** užbaigta ir patikrinta staging aplinkoje per A9
 **Priklausomybė:** A2, A5, A6  
 **Tikslas:** klaidingos ir nebeaktyvios bylos netrukdo kasdieniam darbui, tačiau duomenys tvarkomi saugiai, audituojamai ir pagal teisinius saugojimo reikalavimus.
 
@@ -309,7 +309,7 @@ Tekstas bus pritaikytas patvirtintoms paslaugų taisyklėms. Jis negalės teigti
 
 ### Fazė A8 – navigacijos ir techninio fallback sutvarkymas
 
-**Statusas:** techniškai užbaigta; vizualinė staging patikra įtraukta į A9
+**Statusas:** užbaigta, įskaitant vizualinę staging patikrą per A9
 **Priklausomybė:** A1–A7  
 **Tikslas:** visa kasdienė administratoriaus kelionė vyksta aiškioje Takfornyelse aplinkoje, o techninis backoffice lieka tik diagnostikai.
 
@@ -354,7 +354,7 @@ Nustatymai
 
 ### Fazė A9 – pilnas E2E, staging priėmimas ir produkcinė gate
 
-**Statusas:** suplanuota  
+**Statusas:** staging techninė ir vizualinė gate užbaigta; Production publikavimas nepatvirtintas
 **Priklausomybė:** A0–A8  
 **Tikslas:** įrodyti, kad visa sistema veikia kaip viena patogi ir saugi administravimo kelionė, prieš bet kokį produkcinį pakeitimą.
 
@@ -462,16 +462,16 @@ flowchart TD
 | Fazė | Statusas                                                         | Commit                                                         | Staging įrodymas                                                                           | Gate pastaba                                                                                       |
 | ---- | ---------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | A0   | Užbaigta                                                         | Pradinis rollback `83f24f8`; fazės dokumentai darbinėje šakoje | 117/117 testų failų ir 349/349 testų; lint ir typecheck praėjo; veikiantis Vercel baseline | Vietinio Windows ARM64 build page-data išimtis dokumentuota                                        |
-| A1   | Vykdoma – liko galutinis autentifikuotas staging perėjimų testas | `d228311`                                                      | Vercel `dpl_4xAL4JWzuUugY5rQgyx2ecxnvRou`; 117/117 testų failų ir 364/364 testai           | Naujos kortelės ir pasirašytų sutarčių eilė patikrintos; sesija pasibaigė prieš likusius perėjimus |
-| A2   | Techniškai užbaigta                                              | `f0b2584`                                                      | 118/118 testų failų ir 368/368 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
-| A3   | Techniškai užbaigta                                              | `b3a2bb1`                                                      | 120/120 testų failų ir 373/373 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
-| A4   | Techniškai užbaigta                                              | `852b731`                                                      | 123/123 testų failų ir 378/378 testai                                                      | Bendra autentifikuota staging patikra A9                                                            |
-| A5   | Techniškai užbaigta                                              | `215c1ec`                                                      | 124/124 testų failų ir 379/379 testai                                                      | Sąskaitos ir garantijos prijungtos A6; bendra staging patikra A9                                    |
-| A6   | Techniškai užbaigta                                              | įrašomas po fazės gate                                         | 128/128 testų failų ir 387/387 testai; 13 migracijų failų / 25 testai                     | Oficiali apskaitos integracija lieka atskiras verslo sprendimas; bendra staging patikra A9          |
-| A7   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
-| A8   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
-| A9   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A1   | Užbaigta staging lygiu                                           | `d228311`, `c14e992`                                           | Apžvalgos kortelės ir visos veiksmų eilės autentifikuotai patikrintos                     | Skaitikliai ir eilės remiasi tuo pačiu būsenų kontraktu                                            |
+| A2   | Užbaigta staging lygiu                                           | `f0b2584`                                                      | Visų 8 staging bylų registras ir bylų darbo vieta patikrinti                              | Paieška, filtrai ir kitas veiksmas rodomi custom aplinkoje                                         |
+| A3   | Užbaigta staging lygiu                                           | `b3a2bb1`                                                      | Darbo kūrimas, nepriskirto darbo būsena ir paskyrimo forma matomi byloje                   | Darbas kuriamas tik po tinkamos sutarties gate                                                      |
+| A4   | Užbaigta staging lygiu                                           | `852b731`                                                      | Kainos, PVM, maksimali kaina ir pasiūlymo būsenos patikrintos byloje Nr. 8                 | Komercinės alternatyvos ir override lieka administratoriaus kontroliuojami                          |
+| A5   | Užbaigta staging lygiu                                           | `215c1ec`                                                      | Dokumentų centre rasta 16 dokumentų pagal 5 bylas; PDF nuorodos pasiekiamos                | Ilgi failų vardai nebeišplečia puslapio                                                            |
+| A6   | Užbaigta staging lygiu                                           | `4538e58`                                                      | Dokumentuota darbuotojo byla ir baigiamieji dokumentai patikrinti; 13/25 migracijų testai | Oficiali apskaitos integracija lieka atskiras verslo sprendimas                                    |
+| A7   | Užbaigta staging lygiu                                           | `f84455a`                                                      | Archyvo / šiukšlinės custom puslapis, lifecycle ir retention testai praėjo                | Galutinis trynimas lieka griežtai blokuojamas saugotinoms byloms                                    |
+| A8   | Užbaigta staging lygiu                                           | `04cb362`                                                      | Visos 10 custom navigacijos skilčių patikrintos desktop ir mobile                         | Payload paliktas tik suskleistame techniniame fallback                                              |
+| A9   | Staging gate užbaigta; Production gate uždaryta                  | `967bc46`, `74686f4`, `1fe53d0`                               | `dpl_8mimMugGAKBVLdioogeD26wikshR`; 118/373 unit; 13/25 migracijos; lint/typecheck/build  | Reikalingas atskiras savininko patvirtinimas prieš `main` merge arba `vercel --prod`                |
 
 ## 10. Darbų pradžios tvarka
 
-Patvirtinus šį dokumentą darbai pradedami nuo **A0**, iš karto po jo – **A1**, nes pirmasis praktinis prioritetas yra panaikinti pradingstančias bylas ir neteisingas apžvalgos korteles. Produkcinė svetainė per A0–A9 kūrimą lieka nepakeista.
+A0–A9 įgyvendinimas ir staging priėmimas užbaigti. Produkcinė svetainė liko nepakeista; publikavimas galimas tik po atskiro savininko patvirtinimo ir dokumentuotos Production gate procedūros.
