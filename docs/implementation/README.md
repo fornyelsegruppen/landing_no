@@ -6,20 +6,20 @@ Denne katalogen inneholder fasebevis for [samlet implementeringsplan](../full-pl
 
 > **Operativ ferdigstilling 25. august 2026:** Den detaljerte arbeidsrekkefølgen for korrekt dashboard, handlingskøer, saksflate, arbeidstildeling, tilbudsredigering, dokumentregister, faktura/garanti, arkiv og full E2E styres av [A0–A9-planen for admin-v2](../admin-v2-operational-completion-plan.md). Denne planen er den operative gjennomføringskontrakten for det gjenstående adminarbeidet.
 
-| Fase | Rapport | Status |
-|---|---|---|
-| 0 | [Baseline og beslutningsregister](./phase-0-baseline-and-decisions.md) | Fullført |
-| 1 | [Plattformfundament](./phase-1-platform-foundation.md) | Fullført |
-| 2 | [Kontoer, admin og worker-skall](./phase-2-accounts-admin-worker-shell.md) | Fullført |
-| 3 | [Bloggfundament og offentlig artikkelmal](./phase-3-blog-foundation.md) | Fullført |
-| 4 | [AI-assistert innholdsmotor](./phase-4-ai-content-engine.md) | Fullført |
-| 5 | [Henvendelser, innboks og kontrollerte svarutkast](./phase-5-lead-inbox-and-messages.md) | Fullført |
-| 6 | [Adresse, takmåling og deterministisk pris](./phase-6-roof-measurement-and-pricing.md) | Fullført |
-| 7 | [Tilbud, kundelenke, kontrakt og signering](./phase-7-quotes-contracts-signing.md) | Fullført |
-| 8 | [Arbeidsordre og mobil ansattportal](./phase-8-work-orders-worker-portal.md) | Fullført |
-| 9 | [Endringsavtaler og kontrollert kundekommunikasjon](./phase-9-change-agreements-communications.md) | Fullført |
-| 10 | [Hardening, SEO-måling og samlet QA](./phase-10-hardening-and-qa.md) | Fullført teknisk; staginggate åpen |
-| 11 | [Stagingpilot og produksjonsgate](./phase-11-staging-and-production-gate.md) | Teknisk klargjort; ekstern gate lukket |
+| Fase | Rapport                                                                                            | Status                                 |
+| ---- | -------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 0    | [Baseline og beslutningsregister](./phase-0-baseline-and-decisions.md)                             | Fullført                               |
+| 1    | [Plattformfundament](./phase-1-platform-foundation.md)                                             | Fullført                               |
+| 2    | [Kontoer, admin og worker-skall](./phase-2-accounts-admin-worker-shell.md)                         | Fullført                               |
+| 3    | [Bloggfundament og offentlig artikkelmal](./phase-3-blog-foundation.md)                            | Fullført                               |
+| 4    | [AI-assistert innholdsmotor](./phase-4-ai-content-engine.md)                                       | Fullført                               |
+| 5    | [Henvendelser, innboks og kontrollerte svarutkast](./phase-5-lead-inbox-and-messages.md)           | Fullført                               |
+| 6    | [Adresse, takmåling og deterministisk pris](./phase-6-roof-measurement-and-pricing.md)             | Fullført                               |
+| 7    | [Tilbud, kundelenke, kontrakt og signering](./phase-7-quotes-contracts-signing.md)                 | Fullført                               |
+| 8    | [Arbeidsordre og mobil ansattportal](./phase-8-work-orders-worker-portal.md)                       | Fullført                               |
+| 9    | [Endringsavtaler og kontrollert kundekommunikasjon](./phase-9-change-agreements-communications.md) | Fullført                               |
+| 10   | [Hardening, SEO-måling og samlet QA](./phase-10-hardening-and-qa.md)                               | Fullført teknisk; staginggate åpen     |
+| 11   | [Stagingpilot og produksjonsgate](./phase-11-staging-and-production-gate.md)                       | Teknisk klargjort; ekstern gate lukket |
 
 En historisk fase kan bare markeres fullført når rapporten inneholder leveranser, verifikasjon, kjente avvik og eksplisitt gate-resultat. Den samlede løsningen kan først markeres ferdig når R10 og den reviderte Definition of Done er godkjent.
 
@@ -27,23 +27,23 @@ En historisk fase kan bare markeres fullført når rapporten inneholder leverans
 
 ### Operativ admin A0–A9
 
-| Fase | Rapport | Status |
-|---|---|---|
-| A0 | [Admin-v2 būsenų kontraktas ir baseline](./phase-a0-admin-v2-state-baseline.md) | Užbaigta; Windows ARM64 build išimtis dokumentuota |
-| A1 | [Teisingos apžvalgos kortelės ir veiksmų eilės](./phase-a1-dashboard-action-queues.md) | Techniškai įgyvendinta; staging gate atvira |
+| Fase | Rapport                                                                                | Status                                             |
+| ---- | -------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| A0   | [Admin-v2 būsenų kontraktas ir baseline](./phase-a0-admin-v2-state-baseline.md)        | Užbaigta; Windows ARM64 build išimtis dokumentuota |
+| A1   | [Teisingos apžvalgos kortelės ir veiksmų eilės](./phase-a1-dashboard-action-queues.md) | Techniškai įgyvendinta; staging gate atvira        |
 
 De neste A-rapportene opprettes først når den foregående fasen har bestått sin gate. Den samlede rekkefølgen og akseptansekriteriene står i [admin-v2-planen](../admin-v2-operational-completion-plan.md).
 
-| Fase | Leveranse | Status |
-|---|---|---|
-| R0 | [Baseline, rollback, route- og beslutningskontrakt](./phase-r0-operational-baseline-and-rollback.md) | Fullført for stagingutvikling |
-| R1 | [Custom admin-skall på `/admin-v2`](./phase-r1-custom-admin-shell.md) | Fullført i staging |
-| R2 | [Samlet saksflate og handlingsinnboks](./phase-r2-unified-case-workspace.md) | Fullført i staging |
-| R3 | [Profilert kommunikasjon og rask jobbkjøring](./phase-r3-branded-communications-and-fast-jobs.md) | Teknisk fullført; ekstern leveringsgate åpen |
-| R4 | [Automatisk kvalifisering og komplett sakspakke](./phase-r4-automatic-package-preparation.md) | Automatisk stagingpakke verifisert; utsending/E2E gjenstår |
-| R5 | Tilbud, kundespørsmål og administrativ godkjenning | Delvis implementert i R4; staging-E2E gjenstår |
-| R6 | [Kontrakt, selskapsaksept og enhetlige PDF-er](./phase-r6-contract-counter-signing-and-branded-pdfs.md) | Implementert; autentisert staging-E2E gjenstår |
-| R7 | Planlegging, varsler og ansattreise | Ikke startet |
-| R8 | Ferdigstilling, dokumentregister og fakturaflyt | Ikke startet |
-| R9 | Blogg i custom admin | Ikke startet |
-| R10 | Samlet E2E, pilot, sikkerhet og kontrollert cutover | Ikke startet |
+| Fase | Leveranse                                                                                               | Status                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| R0   | [Baseline, rollback, route- og beslutningskontrakt](./phase-r0-operational-baseline-and-rollback.md)    | Fullført for stagingutvikling                              |
+| R1   | [Custom admin-skall på `/admin-v2`](./phase-r1-custom-admin-shell.md)                                   | Fullført i staging                                         |
+| R2   | [Samlet saksflate og handlingsinnboks](./phase-r2-unified-case-workspace.md)                            | Fullført i staging                                         |
+| R3   | [Profilert kommunikasjon og rask jobbkjøring](./phase-r3-branded-communications-and-fast-jobs.md)       | Teknisk fullført; ekstern leveringsgate åpen               |
+| R4   | [Automatisk kvalifisering og komplett sakspakke](./phase-r4-automatic-package-preparation.md)           | Automatisk stagingpakke verifisert; utsending/E2E gjenstår |
+| R5   | Tilbud, kundespørsmål og administrativ godkjenning                                                      | Delvis implementert i R4; staging-E2E gjenstår             |
+| R6   | [Kontrakt, selskapsaksept og enhetlige PDF-er](./phase-r6-contract-counter-signing-and-branded-pdfs.md) | Implementert; autentisert staging-E2E gjenstår             |
+| R7   | Planlegging, varsler og ansattreise                                                                     | Ikke startet                                               |
+| R8   | Ferdigstilling, dokumentregister og fakturaflyt                                                         | Ikke startet                                               |
+| R9   | Blogg i custom admin                                                                                    | Ikke startet                                               |
+| R10  | Samlet E2E, pilot, sikkerhet og kontrollert cutover                                                     | Ikke startet                                               |

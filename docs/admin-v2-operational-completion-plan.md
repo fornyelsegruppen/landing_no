@@ -49,40 +49,40 @@ Sistema laikoma užbaigta tik tada, kai staging aplinkoje įrodomas visas proces
 
 ### 3.2 Kritiniai neužbaigti tarpai
 
-| Sritis | Dabartinė problema | Reikalingas galutinis rezultatas |
-|---|---|---|
-| Naujos užklausos | Automatika greitai pakeičia būseną iš `new`, todėl kortelė gali rodyti 0, nors užklausa dar neperžiūrėta | Skaičiuoti pagal realų administratoriaus veiksmą, ne tik techninę būseną |
-| Pasirašyta sutartis | Abi pusės pasirašė, tačiau atidėjus darbo sukūrimą byla nėra pakankamai matoma | Pagrindinė eilė „Pasirašyta – sukurti/priskirti darbą“ |
-| Nepriskirtas darbas | `unassigned` neįtraukiamas į aktyvius darbus ir rodomas nepakankamai ryškiai | Atskira pagrindinė eilė iki faktinio darbuotojo paskyrimo |
-| Darbo sukūrimas | Custom admin veiksmas priima tik sutartį | Vienoje formoje kurti darbą, paskirti darbuotoją ir, jei žinoma, datą |
-| Kitos užduoties terminas | Kai kur rodoma ankstesnio veiksmo ar pasirašymo data | Terminas perskaičiuojamas pagal dabartinį kitą veiksmą |
-| Kortelių logika | Dalis kortelių yra būsenų skaitikliai, o ne realios darbų eilės | Kiekviena kortelė atidaro tiksliai tą pačią darbų aibę, kurią suskaičiavo |
-| Kainodara | Nėra patogaus bylos lygio kainos už m², nuolaidos ir alternatyvos redaktoriaus | Audituojamas pasiūlymo komponavimo įrankis su peržiūra |
-| Papildomas pasiūlymas | AI neturi saugios struktūros pasiūlyti papildomą paslaugą | AI rekomendacija → administratoriaus patvirtinimas → du aiškūs kliento pasirinkimai |
-| Dokumentai | Kasdienė nuoroda veda į techninių failų collection | Dokumentų centras pagal klientą, bylą, tipą ir būseną |
-| Sąskaita ir garantija | Nėra pilno bylos lygio registro | Sąskaitos juodraštis/būsena ir garantijos įrašas su terminu |
-| Archyvas | Nėra aiškaus soft-delete, šiukšlinės ir atkūrimo proceso | Archyvas, šiukšlinė, atkūrimas ir kontroliuojamas galutinis valymas |
-| Paieška | Paieška neapima visų dokumentų, sąskaitų ir archyvo | Vieninga paieška per visas kasdienes administravimo esybes |
-| Techninis backoffice | Dalis kasdienių nuorodų vis dar veda į Payload | Normalus darbas atliekamas tik `admin-v2`; techninė nuoroda paslėpta |
+| Sritis                   | Dabartinė problema                                                                                       | Reikalingas galutinis rezultatas                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Naujos užklausos         | Automatika greitai pakeičia būseną iš `new`, todėl kortelė gali rodyti 0, nors užklausa dar neperžiūrėta | Skaičiuoti pagal realų administratoriaus veiksmą, ne tik techninę būseną            |
+| Pasirašyta sutartis      | Abi pusės pasirašė, tačiau atidėjus darbo sukūrimą byla nėra pakankamai matoma                           | Pagrindinė eilė „Pasirašyta – sukurti/priskirti darbą“                              |
+| Nepriskirtas darbas      | `unassigned` neįtraukiamas į aktyvius darbus ir rodomas nepakankamai ryškiai                             | Atskira pagrindinė eilė iki faktinio darbuotojo paskyrimo                           |
+| Darbo sukūrimas          | Custom admin veiksmas priima tik sutartį                                                                 | Vienoje formoje kurti darbą, paskirti darbuotoją ir, jei žinoma, datą               |
+| Kitos užduoties terminas | Kai kur rodoma ankstesnio veiksmo ar pasirašymo data                                                     | Terminas perskaičiuojamas pagal dabartinį kitą veiksmą                              |
+| Kortelių logika          | Dalis kortelių yra būsenų skaitikliai, o ne realios darbų eilės                                          | Kiekviena kortelė atidaro tiksliai tą pačią darbų aibę, kurią suskaičiavo           |
+| Kainodara                | Nėra patogaus bylos lygio kainos už m², nuolaidos ir alternatyvos redaktoriaus                           | Audituojamas pasiūlymo komponavimo įrankis su peržiūra                              |
+| Papildomas pasiūlymas    | AI neturi saugios struktūros pasiūlyti papildomą paslaugą                                                | AI rekomendacija → administratoriaus patvirtinimas → du aiškūs kliento pasirinkimai |
+| Dokumentai               | Kasdienė nuoroda veda į techninių failų collection                                                       | Dokumentų centras pagal klientą, bylą, tipą ir būseną                               |
+| Sąskaita ir garantija    | Nėra pilno bylos lygio registro                                                                          | Sąskaitos juodraštis/būsena ir garantijos įrašas su terminu                         |
+| Archyvas                 | Nėra aiškaus soft-delete, šiukšlinės ir atkūrimo proceso                                                 | Archyvas, šiukšlinė, atkūrimas ir kontroliuojamas galutinis valymas                 |
+| Paieška                  | Paieška neapima visų dokumentų, sąskaitų ir archyvo                                                      | Vieninga paieška per visas kasdienes administravimo esybes                          |
+| Techninis backoffice     | Dalis kasdienių nuorodų vis dar veda į Payload                                                           | Normalus darbas atliekamas tik `admin-v2`; techninė nuoroda paslėpta                |
 
 ## 4. Tikslinė veiksmų ir būsenų matrica
 
 Administratoriaus eilės turi būti paremtos kitu būtinu veiksmu, o ne vien žaliu duomenų bazės statusu.
 
-| Operacinė eilė | Į ją patenka | Iš jos išeina, kai |
-|---|---|---|
-| Naujos / neperžiūrėtos užklausos | Nauja byla, kurios administratorius dar neatidarė arba nepatvirtino automatinio apdorojimo | Atlikta pirmoji administratoriaus peržiūra arba aiškiai užregistruotas kitas veiksmas |
-| Matavimas ir pasiūlymas patikrai | Yra AI/matavimo/pasiūlymo juodraštis arba reikalingas pastato pasirinkimas | Administratorius patvirtina, koreguoja arba pažymi, kad reikia daugiau informacijos |
-| Laukiama kliento | Pasiūlymas ar klausimas išsiųstas ir nėra kliento sprendimo | Klientas atsako, pasirenka, atmeta, pasirašo arba terminas baigiasi |
-| Laukia mūsų parašo | Klientas pasirašė, įmonė dar ne | Įmonės įgaliotas asmuo pasirašo arba byla teisėtai atšaukiama |
-| Pasirašyta – sukurti darbą | Abi pusės pasirašė, darbo užsakymo dar nėra | Darbo užsakymas sukuriamas |
-| Laukia darbuotojo paskyrimo | Darbo užsakymas sukurtas be darbuotojo | Aktyvus darbuotojas priskiriamas |
-| Reikia suplanuoti | Darbuotojas priskirtas, tačiau nėra datos / atvykimo lango | Data patvirtinama ir klientui išsiunčiamas pranešimas |
-| Aktyvūs darbai | Suplanuotas, vykstamas arba atliekamas darbas | Darbuotojas užbaigia privalomus veiksmus |
-| Užbaigimo patikra | Darbuotojas pažymėjo darbą baigtu | Administratorius patvirtina faktus, kainą ir dokumentaciją |
-| Dokumentai / sąskaita / garantija | Trūksta bent vieno privalomo galutinio įrašo | Visi privalomi dokumentai parengti ir užsakymas uždarytas |
-| Reikalauja dėmesio | Klaida, pradelstas veiksmas, žema confidence, blokavimas ar nesuderinami duomenys | Problema išsprendžiama ir užregistruojamas rezultatas |
-| Archyvas | Užbaigta, atšaukta, prarasta arba klaidinga byla | Byla atkuriama arba pagal retention taisykles galutinai sutvarkoma |
+| Operacinė eilė                    | Į ją patenka                                                                               | Iš jos išeina, kai                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Naujos / neperžiūrėtos užklausos  | Nauja byla, kurios administratorius dar neatidarė arba nepatvirtino automatinio apdorojimo | Atlikta pirmoji administratoriaus peržiūra arba aiškiai užregistruotas kitas veiksmas |
+| Matavimas ir pasiūlymas patikrai  | Yra AI/matavimo/pasiūlymo juodraštis arba reikalingas pastato pasirinkimas                 | Administratorius patvirtina, koreguoja arba pažymi, kad reikia daugiau informacijos   |
+| Laukiama kliento                  | Pasiūlymas ar klausimas išsiųstas ir nėra kliento sprendimo                                | Klientas atsako, pasirenka, atmeta, pasirašo arba terminas baigiasi                   |
+| Laukia mūsų parašo                | Klientas pasirašė, įmonė dar ne                                                            | Įmonės įgaliotas asmuo pasirašo arba byla teisėtai atšaukiama                         |
+| Pasirašyta – sukurti darbą        | Abi pusės pasirašė, darbo užsakymo dar nėra                                                | Darbo užsakymas sukuriamas                                                            |
+| Laukia darbuotojo paskyrimo       | Darbo užsakymas sukurtas be darbuotojo                                                     | Aktyvus darbuotojas priskiriamas                                                      |
+| Reikia suplanuoti                 | Darbuotojas priskirtas, tačiau nėra datos / atvykimo lango                                 | Data patvirtinama ir klientui išsiunčiamas pranešimas                                 |
+| Aktyvūs darbai                    | Suplanuotas, vykstamas arba atliekamas darbas                                              | Darbuotojas užbaigia privalomus veiksmus                                              |
+| Užbaigimo patikra                 | Darbuotojas pažymėjo darbą baigtu                                                          | Administratorius patvirtina faktus, kainą ir dokumentaciją                            |
+| Dokumentai / sąskaita / garantija | Trūksta bent vieno privalomo galutinio įrašo                                               | Visi privalomi dokumentai parengti ir užsakymas uždarytas                             |
+| Reikalauja dėmesio                | Klaida, pradelstas veiksmas, žema confidence, blokavimas ar nesuderinami duomenys          | Problema išsprendžiama ir užregistruojamas rezultatas                                 |
+| Archyvas                          | Užbaigta, atšaukta, prarasta arba klaidinga byla                                           | Byla atkuriama arba pagal retention taisykles galutinai sutvarkoma                    |
 
 ## 5. Įgyvendinimo fazės
 
@@ -447,30 +447,30 @@ flowchart TD
 
 Šie sprendimai nestabdo A0–A3, tačiau turi būti patvirtinti prieš susijusios fazės produkcinį uždarymą:
 
-| Sprendimas | Reikalingas iki | Saugus laikinas staging variantas |
-|---|---|---|
-| Minimali leidžiama kaina / marža ir kas gali ją viršyti | A4 | Kiekvienas nukrypimas reikalauja administratoriaus priežasties; produkcijoje neaktyvuojama |
-| Patvirtinti paslaugų paketai ir kada siūlyti impregnavimą | A4 | AI rodo tik vidinę rekomendaciją, kurios administratorius neprivalo naudoti |
-| Apskaitos sistema ir sąskaitų numeravimas | A6 | Tik sąskaitos juodraštis ir būsena, ne oficiali sąskaita |
-| Garantijų apimtis ir terminai pagal paslaugą | A6 | Garantijos įrašas be automatinio klientui siunčiamo teisinio pažado |
-| Konkretūs teisiniai saugojimo terminai | A7 | Nieko su pasirašytu / apskaitos pagrindu galutinai netrinti |
+| Sprendimas                                                | Reikalingas iki | Saugus laikinas staging variantas                                                          |
+| --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
+| Minimali leidžiama kaina / marža ir kas gali ją viršyti   | A4              | Kiekvienas nukrypimas reikalauja administratoriaus priežasties; produkcijoje neaktyvuojama |
+| Patvirtinti paslaugų paketai ir kada siūlyti impregnavimą | A4              | AI rodo tik vidinę rekomendaciją, kurios administratorius neprivalo naudoti                |
+| Apskaitos sistema ir sąskaitų numeravimas                 | A6              | Tik sąskaitos juodraštis ir būsena, ne oficiali sąskaita                                   |
+| Garantijų apimtis ir terminai pagal paslaugą              | A6              | Garantijos įrašas be automatinio klientui siunčiamo teisinio pažado                        |
+| Konkretūs teisiniai saugojimo terminai                    | A7              | Nieko su pasirašytu / apskaitos pagrindu galutinai netrinti                                |
 
 ## 9. Statuso registras
 
 Ši lentelė atnaujinama po kiekvienos fazės. `Užbaigta` reiškia, kad pasiektas ne tik techninis kodas, bet ir patikrintas fazės rezultatas staging aplinkoje.
 
-| Fazė | Statusas | Commit | Staging įrodymas | Gate pastaba |
-|---|---|---|---|---|
-| A0 | Užbaigta | Pradinis rollback `83f24f8`; fazės dokumentai darbinėje šakoje | 117/117 testų failų ir 349/349 testų; lint ir typecheck praėjo; veikiantis Vercel baseline | Vietinio Windows ARM64 build page-data išimtis dokumentuota |
-| A1 | Vykdoma | – | – | – |
-| A2 | Suplanuota | – | – | – |
-| A3 | Suplanuota | – | – | – |
-| A4 | Suplanuota | – | – | – |
-| A5 | Suplanuota | – | – | – |
-| A6 | Suplanuota | – | – | – |
-| A7 | Suplanuota | – | – | – |
-| A8 | Suplanuota | – | – | – |
-| A9 | Suplanuota | – | – | – |
+| Fazė | Statusas                                                         | Commit                                                         | Staging įrodymas                                                                           | Gate pastaba                                                                                       |
+| ---- | ---------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| A0   | Užbaigta                                                         | Pradinis rollback `83f24f8`; fazės dokumentai darbinėje šakoje | 117/117 testų failų ir 349/349 testų; lint ir typecheck praėjo; veikiantis Vercel baseline | Vietinio Windows ARM64 build page-data išimtis dokumentuota                                        |
+| A1   | Vykdoma – liko galutinis autentifikuotas staging perėjimų testas | `d228311`                                                      | Vercel `dpl_4xAL4JWzuUugY5rQgyx2ecxnvRou`; 117/117 testų failų ir 364/364 testai           | Naujos kortelės ir pasirašytų sutarčių eilė patikrintos; sesija pasibaigė prieš likusius perėjimus |
+| A2   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A3   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A4   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A5   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A6   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A7   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A8   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
+| A9   | Suplanuota                                                       | –                                                              | –                                                                                          | –                                                                                                  |
 
 ## 10. Darbų pradžios tvarka
 

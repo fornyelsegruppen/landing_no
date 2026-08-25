@@ -1,7 +1,7 @@
 # A1 – teisingos apžvalgos kortelės ir veiksmų eilės
 
 **Fazė:** A1  
-**Statusas:** techniškai įgyvendinta; laukiama Vercel Preview ir autentifikuoto staging patikrinimo  
+**Statusas:** techniškai įgyvendinta; Vercel Preview veikia; autentifikuotas staging patikrinimas dalinai atliktas
 **Data:** 2026-08-25  
 **Aplinka:** `codex/master-platform-implementation`; produkcija nepakeista
 
@@ -29,13 +29,14 @@ Užtikrinti, kad administratoriaus apžvalgoje nė viena veiksmų laukianti byla
 
 ## Automatiniai įrodymai
 
-| Patikrinimas | Rezultatas |
-|---|---|
-| Tiksliniai dashboard, bylos ir darbo būsenų testai | 3 failai, 24 testai – praėjo |
-| `npm run lint` | Praėjo |
-| `npm run typecheck` | Praėjo |
-| `npm test` | 117 testų failų, 364 testai – visi praėjo |
-| `git diff --check` | Praėjo |
+| Patikrinimas                                       | Rezultatas                                            |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| Tiksliniai dashboard, bylos ir darbo būsenų testai | 3 failai, 24 testai – praėjo                          |
+| `npm run lint`                                     | Praėjo                                                |
+| `npm run typecheck`                                | Praėjo                                                |
+| `npm test`                                         | 117 testų failų, 364 testai – visi praėjo             |
+| `git diff --check`                                 | Praėjo                                                |
+| Vercel Preview build                               | Praėjo, deployment `dpl_4xAL4JWzuUugY5rQgyx2ecxnvRou` |
 
 Pridėti regresijos testai:
 
@@ -61,6 +62,15 @@ Po Preview deployment reikia patikrinti:
 9. patikrinti bylos `Kitas veiksmas` ir terminą kiekviename etape;
 10. pakartoti svarbiausius vaizdus EN ir NO panelės kalba.
 
+### Atlikta staging aplinkoje
+
+- nauja versija sėkmingai pastatyta Vercel ir prijungta prie `https://takfornyelse-staging.vercel.app`;
+- lietuviškoje apžvalgoje matomos visos naujos pagrindinės kortelės;
+- staging duomenys parodė `1` eilėje `Pasirašyta – sukurti darbą`;
+- staging duomenys parodė atskirą `1` eilėje `Laukia darbuotojo paskyrimo`;
+- `Pasirašyta – sukurti darbą` atidarė konkrečią galutinai pasirašytą sutartį ir susietą kliento bylą;
+- tolesnį interaktyvų perėjimų patikrinimą sustabdė pasibaigusi administratoriaus sesija; sistema teisingai grąžino į prisijungimo puslapį.
+
 ## A1 gate
 
 - [x] Naujos operacinės eilės įgyvendintos.
@@ -68,7 +78,6 @@ Po Preview deployment reikia patikrinti:
 - [x] Pasirašyta sutartis išlieka matoma iki darbo sukūrimo.
 - [x] Kito veiksmo ir termino logika atnaujinama pagal darbo būseną.
 - [x] Tiksliniai ir pilni automatiniai testai praeina.
-- [ ] Vercel Preview build praeina.
+- [x] Vercel Preview build praeina.
 - [ ] Autentifikuotas staging scenarijus praeina.
-- [ ] Fazės įrodymas ir commit įrašyti pagrindiniame statuso registre.
-
+- [x] Fazės įrodymas ir commit įrašyti pagrindiniame statuso registre.
