@@ -597,6 +597,17 @@ export async function approveAndSendPreparedLeadPackage(
   if (documentHash(refreshed.quote.snapshot) !== refreshed.quote.snapshotHash || documentHash(refreshed.contract.snapshot) !== refreshed.contract.documentHash) {
     throw new TypeError("Approved document snapshot hash mismatch");
   }
+  const staleAiDrafts = await payload.find({
+    collection: "messages", depth: 0, limit: 20, overrideAccess: true,
+    where: { and: [
+      { lead: { equals: leadId } },
+      { category: { equals: "ai_reply" } },
+      { status: { equals: "draft" } },
+    ] },
+  }).catch(() => ({ docs: [] }));
+  for (const message of staleAiDrafts.docs) {
+    await payload.update({ collection: "messages", id: message.id, overrideAccess: true, data: { status: "cancelled" } }).catch(() => undefined);
+  }
   const approvedQuote = await payload.update({
     collection: "quotes",
     id: refreshed.quote.id,
