@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { panelLanguageNames, panelLocales, type PanelLocale } from "@/lib/panel-i18n";
@@ -8,12 +7,10 @@ import { serializePanelLanguagePreference } from "@/lib/panel-language-preferenc
 
 export function AdminLanguageSwitcher({ locale }: { locale: PanelLocale }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
   const copy = getAdminV2Copy(locale);
 
   function change(language: PanelLocale) {
     if (language === locale) return;
-    setPending(true);
     document.cookie = serializePanelLanguagePreference(
       language,
       window.location.protocol === "https:",
@@ -27,7 +24,6 @@ export function AdminLanguageSwitcher({ locale }: { locale: PanelLocale }) {
       <select
         aria-label={copy.language}
         className="min-h-10 rounded-xl border border-white/15 bg-background px-3 text-sm text-white outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-        disabled={pending}
         onChange={(event) => change(event.target.value as PanelLocale)}
         value={locale}
       >

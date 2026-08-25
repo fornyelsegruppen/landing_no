@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   getWorkerCopy,
@@ -12,12 +11,10 @@ import { serializePanelLanguagePreference } from "@/lib/panel-language-preferenc
 
 export function PanelLanguageSwitcher({ locale }: { locale: PanelLocale }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
   const copy = getWorkerCopy(locale);
 
   function change(language: PanelLocale) {
     if (language === locale) return;
-    setPending(true);
     document.cookie = serializePanelLanguagePreference(
       language,
       window.location.protocol === "https:",
@@ -31,7 +28,6 @@ export function PanelLanguageSwitcher({ locale }: { locale: PanelLocale }) {
       <select
         aria-label={copy.language}
         className="min-h-10 rounded-lg border border-white/15 bg-background px-2 text-sm text-white outline-none focus:border-accent"
-        disabled={pending}
         onChange={(event) => change(event.target.value as PanelLocale)}
         value={locale}
       >
