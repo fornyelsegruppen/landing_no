@@ -63,6 +63,7 @@ export function WorkerOrderActions(props: Props) {
         status?: string;
         blockingReasons?: string[];
         actualTotalIncVatOre?: number;
+        customerNotification?: "sent" | "queued" | "skipped";
       };
       if (!response.ok) {
         throw new Error(
@@ -81,7 +82,7 @@ export function WorkerOrderActions(props: Props) {
       );
       if (typeof result.actualTotalIncVatOre === "number")
         setActualTotal(result.actualTotalIncVatOre);
-      setNotice(copy.registered);
+      setNotice(result.customerNotification === "sent" ? copy.customerNotified : result.customerNotification === "queued" ? copy.customerNotificationQueued : copy.registered);
       router.refresh();
       return true;
     } catch (error) {

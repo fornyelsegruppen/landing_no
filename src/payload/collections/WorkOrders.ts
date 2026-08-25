@@ -1,8 +1,9 @@
 import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionConfig } from "payload";
 import { assertWorkOrderTransition, type WorkOrderStatus } from "@/lib/work-orders/workflow";
-import { enqueueCompletionCommunication, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
+import { enqueueCompletionCommunication, enqueueWorkOrderStatusCommunication, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { workOrderPipelineUpdate } from "@/lib/leads/pipeline-state";
+import { captureException } from "@/lib/monitoring";
 import { adminOnly, assignedWorkerOrAdmin, userIsAdmin } from "../access/roles";
 
 function relationId(value: unknown) {
@@ -88,7 +89,11 @@ export const protectWorkOrder: CollectionBeforeChangeHook = async ({ data, origi
 };
 
 export const scheduleWorkOrderCommunications: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
-  const scheduleChanged = operation === "create" || doc.scheduledAt !== previousDoc?.scheduledAt || doc.status !== previousDoc?.status;
+  const scheduleChanged = operation === "create"
+    || doc.scheduledAt !== previousDoc?.scheduledAt
+    || doc.arrivalWindow !== previousDoc?.arrivalWindow
+    || relationId(doc.assignedWorker) !== relationId(previousDoc?.assignedWorker)
+    || doc.status !== previousDoc?.status;
   if (!scheduleChanged) return doc;
   const correlationId = correlationIdFromHeaders(req.headers);
   const leadId = relationId(doc.lead);
@@ -97,16 +102,28 @@ export const scheduleWorkOrderCommunications: CollectionAfterChangeHook = async 
     scheduledAt: doc.scheduledAt,
     status: doc.status,
   });
-  if (leadId && pipelineUpdate) {
-    await req.payload.update({
-      collection: "leads",
-      id: leadId,
-      overrideAccess: true,
-      data: pipelineUpdate,
-    });
+  try {
+    if (leadId && pipelineUpdate) {
+      await req.payload.update({
+        collection: "leads",
+        id: leadId,
+        overrideAccess: true,
+        data: pipelineUpdate,
+      });
+    }
+  } catch (error) {
+    captureException(error, { operation: "work-order-pipeline-update", workOrderId: doc.id });
   }
-  await syncWorkOrderCommunicationJobs(req.payload, doc, correlationId);
-  if (doc.status === "documented" && previousDoc?.status !== "documented") await enqueueCompletionCommunication(req.payload, doc, correlationId);
+  try {
+    await syncWorkOrderCommunicationJobs(req.payload, doc, correlationId);
+    if (doc.status !== previousDoc?.status) {
+      const kind = doc.status === "on_way" ? "on_way" : doc.status === "arrived" ? "arrived" : doc.status === "in_progress" ? "work_started" : null;
+      if (kind) await enqueueWorkOrderStatusCommunication(req.payload, doc, kind, correlationId);
+    }
+    if (doc.status === "documented" && previousDoc?.status !== "documented") await enqueueCompletionCommunication(req.payload, doc, correlationId);
+  } catch (error) {
+    captureException(error, { operation: "work-order-customer-communication", workOrderId: doc.id, status: doc.status });
+  }
   return doc;
 };
 

@@ -66,7 +66,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
     payload.find({ collection: "price-rules", depth: 0, limit: 50, overrideAccess: true, pagination: false, sort: "-version", where: { status: { equals: "approved" } } }),
   ]);
   if (!caseData) notFound();
-  const workers = workersResult.docs.map((worker) => ({ id: worker.id, name: worker.displayName || worker.email }));
+  const workers = workersResult.docs.map((worker) => ({ id: worker.id, name: worker.displayName || worker.email, phone: worker.phone || undefined }));
   const seenRuleServices = new Set<string>();
   const rules = rulesResult.docs.filter((rule) => {
     if (seenRuleServices.has(rule.serviceKey)) return false;

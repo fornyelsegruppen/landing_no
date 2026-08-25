@@ -9,6 +9,8 @@ import { quoteSnapshotSchema } from "@/lib/quotes/document";
 import { appendTimeline, loadAuthorizedWorkOrder, relationId } from "@/lib/work-orders/access";
 import { assessAcceptedChangePrecheck, assessPrecheck } from "@/lib/work-orders/precheck";
 import { changeAgreementSnapshotSchema } from "@/lib/change-agreements/document";
+import { dispatchWorkOrderCommunicationNow } from "@/lib/work-orders/communications";
+import { captureException } from "@/lib/monitoring";
 
 const simpleActionSchema = z.object({ action: z.enum(["on_way", "arrive", "begin_precheck", "start", "mark_completed"]) });
 const precheckSchema = z.object({
@@ -127,7 +129,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     changedFields.push("eventTimeline");
     const updated = await payload.update({ collection: "work-orders", id: order.id, overrideAccess: true, context: { trustedWorkerAction: true }, data });
     await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: Number(user.id), action: `work-order.${parsed.data.action}`, entityType: "work-order", entityId: order.id, correlationId, changedFields });
-    return NextResponse.json({ ok: true, status: updated.status, decision: updated.precheckDecision, priceOutcome: updated.priceOutcome, blockingReasons: updated.blockingReasons, actualTotalIncVatOre: updated.actualTotalIncVatOre });
+    const communicationKind = parsed.data.action === "on_way" ? "on_way" : parsed.data.action === "arrive" ? "arrived" : parsed.data.action === "start" ? "work_started" : null;
+    let customerNotification: "sent" | "queued" | "skipped" = "skipped";
+    if (communicationKind) {
+      try {
+        const notification = await dispatchWorkOrderCommunicationNow(payload, updated, communicationKind, correlationId);
+        customerNotification = notification.delivered ? "sent" : notification.queued ? "queued" : "skipped";
+      } catch (error) {
+        customerNotification = "queued";
+        captureException(error, { route: "POST /api/worker/work-orders/[id]", operation: "status-notification", workOrderId: order.id, status: updated.status });
+      }
+    }
+    return NextResponse.json({ ok: true, status: updated.status, decision: updated.precheckDecision, priceOutcome: updated.priceOutcome, blockingReasons: updated.blockingReasons, actualTotalIncVatOre: updated.actualTotalIncVatOre, customerNotification });
   } catch (error) {
     if (error instanceof FeatureUnavailableError) return NextResponse.json({ error: error.reason, missing: error.unavailable }, { status: 503 });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Work-order action failed", correlationId }, { status: 409 });

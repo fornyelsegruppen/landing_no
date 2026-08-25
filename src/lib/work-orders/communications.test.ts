@@ -1,12 +1,12 @@
 import type { Payload } from "payload";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ChannelUnavailableError, CommunicationCancelledError, enqueueCompletionCommunication, processWorkOrderCommunicationJob, syncWorkOrderCommunicationJobs } from "./communications";
+import { ChannelUnavailableError, CommunicationCancelledError, enqueueCompletionCommunication, processWorkOrderCommunicationJob, syncWorkOrderCommunicationJobs, workOrderScheduleVersion } from "./communications";
 import { dispatchCompletionCommunicationNow } from "./communications";
 import { LogEmailProvider } from "@/lib/providers/safe-providers";
 
 type Row = Record<string, unknown> & { id: number };
 
-function fakePayload(seed: { jobs?: Row[]; messages?: Row[]; order?: Row; lead?: Row; contract?: Row } = {}) {
+function fakePayload(seed: { jobs?: Row[]; messages?: Row[]; order?: Row; lead?: Row; contract?: Row; worker?: Row } = {}) {
   const rows = {
     jobs: seed.jobs || [],
     messages: seed.messages || [],
@@ -31,6 +31,7 @@ function fakePayload(seed: { jobs?: Row[]; messages?: Row[]; order?: Row; lead?:
       if (args.collection === "work-orders") return seed.order;
       if (args.collection === "leads") return rows.leads[0];
       if (args.collection === "contracts") return seed.contract;
+      if (args.collection === "users") return seed.worker;
       if (args.collection === "messages") {
         return rows.messages.find((message) => message.id === args.id);
       }
@@ -132,7 +133,23 @@ describe("work-order communications", () => {
   });
 
   it("requires attention instead of silently changing an SMS preference", async () => {
-    const { payload } = fakePayload({ order: { id: 9, lead: 4, contract: 3, status: "scheduled", scheduledAt: "2026-08-27T10:00:00Z", afterPhotos: [] }, lead: { id: 4, name: "Kunde", email: "kunde@example.no", preferredChannel: "sms" } });
-    await expect(processWorkOrderCommunicationJob(payload, { workOrderId: 9, kind: "reminder_48h", scheduleVersion: "2026-08-27T10:00:00Z" }, "correlation-1")).rejects.toBeInstanceOf(ChannelUnavailableError);
+    const order = { id: 9, lead: 4, contract: 3, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T10:00:00Z", arrivalWindow: "12:00–14:00", afterPhotos: [] };
+    const { payload } = fakePayload({ order, lead: { id: 4, name: "Kunde", email: "kunde@example.no", preferredChannel: "sms" } });
+    await expect(processWorkOrderCommunicationJob(payload, { workOrderId: 9, kind: "reminder_48h", scheduleVersion: workOrderScheduleVersion(order) }, "correlation-1")).rejects.toBeInstanceOf(ChannelUnavailableError);
+  });
+
+  it("includes the assigned worker, phone and selected arrival interval", async () => {
+    const order = { id: 10, lead: 4, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T06:00:00Z", arrivalWindow: "08:00–10:00", afterPhotos: [] };
+    const { payload, rows } = fakePayload({
+      order,
+      lead: { id: 4, name: "Ola", email: "ola@example.no", preferredChannel: "email" },
+      worker: { id: 5, displayName: "Kari Nordmann", email: "kari@example.no", phone: "+47 900 00 000" },
+    });
+    await processWorkOrderCommunicationJob(payload, { workOrderId: 10, kind: "schedule_confirmation", scheduleVersion: workOrderScheduleVersion(order) }, "correlation-2");
+    expect(rows.messages[0]).toMatchObject({ category: "schedule_confirmation", status: "queued" });
+    expect(rows.messages[0].bodyText).toContain("Kari Nordmann");
+    expect(rows.messages[0].bodyText).toContain("+47 900 00 000");
+    expect(rows.messages[0].bodyText).toContain("08:00–10:00");
+    expect(rows.messages[0].bodyHtml).toContain("Takfornyelse");
   });
 });

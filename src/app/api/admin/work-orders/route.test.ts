@@ -25,7 +25,7 @@ describe("admin work-order creation", () => {
     const response = await POST(new Request("http://localhost/api/admin/work-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contractId: 7, assignedWorkerId: 3, scheduledLocal: "2026-08-25T08:30", arrivalWindow: "08:00–10:00", adminNote: "Internt" }),
+      body: JSON.stringify({ contractId: 7, assignedWorkerId: 3, scheduledLocal: "2026-08-25T08:30", arrivalWindow: "08:30–10:00", adminNote: "Internt" }),
     }));
 
     expect(response.status).toBe(201);

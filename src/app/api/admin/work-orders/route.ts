@@ -7,6 +7,9 @@ import { getPayload } from "@/lib/payload";
 import { norwayLocalDateTimeToIso } from "@/lib/norway-time";
 import { createWorkOrderFromContract } from "@/lib/work-orders/create";
 import { userIsAdmin } from "@/payload/access/roles";
+import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
+import { dispatchWorkOrderCommunicationNow } from "@/lib/work-orders/communications";
+import { captureException } from "@/lib/monitoring";
 
 const schema = z.object({
   adminNote: z.string().trim().max(1000).optional(),
@@ -27,9 +30,13 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid work order" }, { status: 400 });
   try {
     const scheduledAt = parsed.data.scheduledLocal ? norwayLocalDateTimeToIso(parsed.data.scheduledLocal) : undefined;
+    const arrivalWindow = validateArrivalWindowForSchedule(parsed.data.scheduledLocal, parsed.data.arrivalWindow);
+    if (parsed.data.assignedWorkerId && (!scheduledAt || !arrivalWindow)) {
+      return NextResponse.json({ error: "Employee, work date and complete arrival window are required" }, { status: 400 });
+    }
     const result = await createWorkOrderFromContract(payload, {
       adminNote: parsed.data.adminNote,
-      arrivalWindow: parsed.data.arrivalWindow,
+      arrivalWindow: arrivalWindow || undefined,
       assignedWorkerId: parsed.data.assignedWorkerId,
       contractId: parsed.data.contractId,
       scheduledAt,
@@ -42,7 +49,17 @@ export async function POST(request: Request) {
       correlationId: correlationIdFromHeaders(request.headers),
       changedFields: result.created ? ["contract", "quote", "lead", "assignedWorker", "scheduledAt", "arrivalWindow", "adminNote", "status"] : [],
     });
-    return NextResponse.json({ workOrderId: result.workOrder.id, created: result.created }, { status: result.created ? 201 : 200 });
+    let notification: "sent" | "queued" | "skipped" = "skipped";
+    if (result.workOrder.status === "scheduled") {
+      try {
+        const dispatched = await dispatchWorkOrderCommunicationNow(payload, result.workOrder, "schedule_confirmation", correlationIdFromHeaders(request.headers));
+        notification = dispatched.delivered ? "sent" : dispatched.queued ? "queued" : "skipped";
+      } catch (error) {
+        notification = "queued";
+        captureException(error, { route: "POST /api/admin/work-orders", operation: "schedule-notification", workOrderId: result.workOrder.id });
+      }
+    }
+    return NextResponse.json({ workOrderId: result.workOrder.id, created: result.created, notification }, { status: result.created ? 201 : 200 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Work-order creation failed" }, { status: 409 });
   }

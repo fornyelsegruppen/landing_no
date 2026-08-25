@@ -27,7 +27,7 @@ describe("admin work-order planning", () => {
   });
 
   it("assigns and schedules in one audited update", async () => {
-    const response = await PATCH(request({ action: "save", assignedWorkerId: 3, scheduledLocal: "2026-08-25T08:30", arrivalWindow: "08:00–10:00" }), { params: Promise.resolve({ id: "12" }) });
+    const response = await PATCH(request({ action: "save", assignedWorkerId: 3, scheduledLocal: "2026-08-25T08:30", arrivalWindow: "08:30–10:00" }), { params: Promise.resolve({ id: "12" }) });
     expect(response.status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ assignedWorker: 3, scheduledAt: "2026-08-25T06:30:00.000Z" }) }));
     expect(mocks.recordAudit).toHaveBeenCalled();

@@ -5,9 +5,27 @@ import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine
 import { featureReadiness } from "@/lib/platform/features";
 import type { EmailProvider } from "@/lib/providers/contracts";
 import { createEmailProvider } from "@/lib/providers/email-provider";
+import { buildBrandedEmailHtml } from "@/lib/messages/email-template";
+import { siteConfig } from "@/lib/site";
 import { relationId } from "./access";
 
-export type WorkOrderCommunicationKind = "schedule_confirmation" | "reminder_48h" | "same_day" | "completion";
+export type WorkOrderCommunicationKind = "schedule_confirmation" | "reminder_48h" | "same_day" | "on_way" | "arrived" | "work_started" | "completion";
+
+type CommunicationOrder = {
+  id: number;
+  status: string;
+  scheduledAt?: string | null;
+  arrivalWindow?: string | null;
+  assignedWorker?: unknown;
+  documentationSubmittedAt?: string | null;
+};
+
+const scheduleKinds: WorkOrderCommunicationKind[] = ["schedule_confirmation", "reminder_48h", "same_day"];
+const statusForKind: Partial<Record<WorkOrderCommunicationKind, string>> = {
+  on_way: "on_way",
+  arrived: "arrived",
+  work_started: "in_progress",
+};
 
 export class CommunicationCancelledError extends Error {
   constructor(message: string) { super(message); this.name = "CommunicationCancelledError"; }
@@ -22,8 +40,21 @@ type JobPayload = { workOrderId: number; kind: WorkOrderCommunicationKind; sched
 function parseJobPayload(value: unknown): JobPayload | null {
   if (!value || typeof value !== "object") return null;
   const data = value as Record<string, unknown>;
-  if (typeof data.workOrderId !== "number" || typeof data.scheduleVersion !== "string" || !["schedule_confirmation", "reminder_48h", "same_day", "completion"].includes(String(data.kind))) return null;
+  if (typeof data.workOrderId !== "number" || typeof data.scheduleVersion !== "string" || !["schedule_confirmation", "reminder_48h", "same_day", "on_way", "arrived", "work_started", "completion"].includes(String(data.kind))) return null;
   return data as JobPayload;
+}
+
+export function workOrderScheduleVersion(order: CommunicationOrder) {
+  return `${order.scheduledAt || "unscheduled"}|${relationId(order.assignedWorker) || "unassigned"}|${order.arrivalWindow || "no-window"}`;
+}
+
+function communicationIsCurrent(input: JobPayload, order: CommunicationOrder) {
+  if (input.kind === "completion") {
+    return order.status === "documented" && input.scheduleVersion === `documented:${order.documentationSubmittedAt}`;
+  }
+  if (input.scheduleVersion !== workOrderScheduleVersion(order) || !order.scheduledAt) return false;
+  if (scheduleKinds.includes(input.kind)) return order.status === "scheduled";
+  return statusForKind[input.kind] === order.status;
 }
 
 async function pendingCommunicationJobs(payload: Payload, workOrderId: number) {
@@ -38,20 +69,20 @@ async function createJob(payload: Payload, input: JobPayload, availableAt: Date,
   return payload.create({ collection: "operational-jobs", overrideAccess: true, data: { type: "work-order.communication", status: "pending", idempotencyKey, correlationId, attempts: 0, maxAttempts: 3, availableAt: availableAt.toISOString(), payload: input } });
 }
 
-export async function syncWorkOrderCommunicationJobs(payload: Payload, order: { id: number; status: string; scheduledAt?: string | null }, correlationId: string, now = new Date()) {
+export async function syncWorkOrderCommunicationJobs(payload: Payload, order: CommunicationOrder, correlationId: string, now = new Date()) {
   if (!featureReadiness("automatedReminders").ready) return { created: 0, cancelled: 0, skipped: true as const };
-  const scheduleVersion = order.scheduledAt || "unscheduled";
+  const scheduleVersion = workOrderScheduleVersion(order);
   const pending = await pendingCommunicationJobs(payload, order.id);
   let cancelled = 0;
   for (const job of pending) {
     const data = parseJobPayload(job.payload);
-    const obsolete = order.status === "cancelled" || order.status === "documented" || !order.scheduledAt || (data?.kind !== "completion" && data?.scheduleVersion !== scheduleVersion);
+    const obsolete = !data || !communicationIsCurrent(data, order);
     if (obsolete) {
       await payload.update({ collection: "operational-jobs", id: job.id, overrideAccess: true, data: { status: "cancelled", completedAt: now.toISOString(), lastErrorCode: "SCHEDULE_REPLACED", lastErrorMessage: "Planlagt kundemelding ble avbrutt fordi oppdraget ble endret." } });
       cancelled += 1;
     }
   }
-  if (!order.scheduledAt || order.status === "cancelled" || order.status === "documented") return { created: 0, cancelled, skipped: false as const };
+  if (!order.scheduledAt || order.status !== "scheduled") return { created: 0, cancelled, skipped: false as const };
   const scheduledAt = new Date(order.scheduledAt);
   if (Number.isNaN(scheduledAt.getTime())) throw new TypeError("Work order schedule is invalid");
   const plans: Array<[WorkOrderCommunicationKind, Date]> = [["schedule_confirmation", now]];
@@ -61,6 +92,20 @@ export async function syncWorkOrderCommunicationJobs(payload: Payload, order: { 
   if (process.env.WORK_ORDER_SAME_DAY_MESSAGE !== "false" && sameDay > now) plans.push(["same_day", sameDay]);
   for (const [kind, availableAt] of plans) await createJob(payload, { workOrderId: order.id, kind, scheduleVersion }, availableAt, correlationId);
   return { created: plans.length, cancelled, skipped: false as const };
+}
+
+export async function enqueueWorkOrderStatusCommunication(
+  payload: Payload,
+  order: CommunicationOrder,
+  kind: "on_way" | "arrived" | "work_started",
+  correlationId: string,
+  now = new Date(),
+) {
+  if (!featureReadiness("automatedReminders").ready) return { skipped: true as const };
+  if (!communicationIsCurrent({ workOrderId: order.id, kind, scheduleVersion: workOrderScheduleVersion(order) }, order)) {
+    throw new CommunicationCancelledError("Work status no longer matches the customer notification");
+  }
+  return { skipped: false as const, job: await createJob(payload, { workOrderId: order.id, kind, scheduleVersion: workOrderScheduleVersion(order) }, now, correlationId) };
 }
 
 export async function enqueueCompletionCommunication(payload: Payload, order: { id: number; status: string; documentationSubmittedAt?: string | null }, correlationId: string, now = new Date()) {
@@ -79,12 +124,25 @@ export async function dispatchCompletionCommunicationNow(
   correlationId: string,
   provider: EmailProvider = createEmailProvider(),
 ) {
-  const queued = await enqueueCompletionCommunication(
-    payload,
-    order,
-    correlationId,
-  );
-  if (queued.skipped) return queued;
+  return dispatchWorkOrderCommunicationNow(payload, order, "completion", correlationId, provider);
+}
+
+export async function dispatchWorkOrderCommunicationNow(
+  payload: Payload,
+  order: CommunicationOrder,
+  kind: WorkOrderCommunicationKind,
+  correlationId: string,
+  provider: EmailProvider = createEmailProvider(),
+) {
+  if (!featureReadiness("automatedReminders").ready) {
+    return { skipped: true as const, delivered: false as const, queued: false as const };
+  }
+  const queued = kind === "completion"
+    ? await enqueueCompletionCommunication(payload, order, correlationId)
+    : statusForKind[kind]
+      ? await enqueueWorkOrderStatusCommunication(payload, order, kind as "on_way" | "arrived" | "work_started", correlationId)
+      : { skipped: false as const, job: await createJob(payload, { workOrderId: order.id, kind, scheduleVersion: workOrderScheduleVersion(order) }, new Date(), correlationId) };
+  if (queued.skipped) return { skipped: true as const, delivered: false as const, queued: false as const };
 
   const job = queued.job;
   const attempts = (job.attempts || 0) + 1;
@@ -147,6 +205,7 @@ export async function dispatchCompletionCommunicationNow(
     return {
       skipped: false as const,
       delivered: true as const,
+      queued: false as const,
       message: communication.message,
       job,
     };
@@ -172,23 +231,26 @@ export async function dispatchCompletionCommunicationNow(
   }
 }
 
-function copyFor(kind: WorkOrderCommunicationKind, leadName: string, scheduledAt?: string | null) {
-  const when = scheduledAt ? new Date(scheduledAt).toLocaleString("nb-NO", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Oslo" }) : "avtalt tid";
-  if (kind === "schedule_confirmation") return { category: "schedule_confirmation" as const, subject: "Bekreftelse på planlagt takarbeid", body: `Hei ${leadName},\n\nOppdraget ditt er planlagt til ${when}. Gi oss beskjed så snart som mulig dersom tidspunktet ikke passer.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88` };
-  if (kind === "reminder_48h") return { category: "reminder" as const, subject: "Påminnelse om takarbeid om 48 timer", body: `Hei ${leadName},\n\nDette er en påminnelse om at vi kommer ${when}. Sørg for at vi har nødvendig tilgang til eiendommen, og kontakt oss dersom noe har endret seg.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88` };
-  if (kind === "same_day") return { category: "reminder" as const, subject: "Vi kommer i dag", body: `Hei ${leadName},\n\nVi minner om at oppdraget er planlagt i dag, ${when}. Vår medarbeider oppdaterer status før ankomst.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88` };
-  return { category: "completion" as const, subject: "Takarbeidet er fullført og dokumentert", body: `Hei ${leadName},\n\nArbeidet er fullført og sluttkontrollert. Garantibekreftelse, relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Eventuell faktura sendes separat etter godkjent bokføring. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n47 73 58 88` };
+function copyFor(kind: WorkOrderCommunicationKind, input: { leadName: string; scheduledAt?: string | null; arrivalWindow?: string | null; workerName?: string | null; workerPhone?: string | null }) {
+  const when = input.scheduledAt ? new Date(input.scheduledAt).toLocaleDateString("nb-NO", { dateStyle: "long", timeZone: "Europe/Oslo" }) : "avtalt dato";
+  const window = input.arrivalWindow ? `kl. ${input.arrivalWindow}` : input.scheduledAt ? `kl. ${new Date(input.scheduledAt).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" })}` : "avtalt tid";
+  const workerName = input.workerName || "vår medarbeider";
+  const workerPhone = input.workerPhone || siteConfig.phone;
+  const contact = `Ansvarlig medarbeider: ${workerName}\nTelefon: ${workerPhone}`;
+  if (kind === "schedule_confirmation") return { category: "schedule_confirmation" as const, subject: "Medarbeider og tid er avtalt for takarbeidet", body: `Hei ${input.leadName},\n\nVi har nå tildelt en medarbeider til oppdraget ditt.\n\nDato: ${when}\nAvtalt ankomst: ${window}\n${contact}\n\nMedarbeideren varsler deg når han eller hun er på vei. Gi oss beskjed så snart som mulig dersom tidspunktet ikke passer.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  if (kind === "reminder_48h") return { category: "reminder" as const, subject: "Påminnelse om takarbeid om 48 timer", body: `Hei ${input.leadName},\n\nDette er en påminnelse om at vi kommer ${when}, med avtalt ankomst ${window}.\n\n${contact}\n\nSørg for at vi har nødvendig tilgang til eiendommen, og kontakt oss dersom noe har endret seg.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  if (kind === "same_day") return { category: "reminder" as const, subject: "Vi kommer i dag", body: `Hei ${input.leadName},\n\nVi minner om at oppdraget er planlagt i dag med avtalt ankomst ${window}.\n\n${contact}\n\nDu får en ny beskjed når medarbeideren er på vei.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  if (kind === "on_way") return { category: "reminder" as const, subject: "Medarbeideren er på vei", body: `Hei ${input.leadName},\n\n${workerName} er nå på vei til eiendommen din. Planlagt ankomst er ${window}.\n\n${contact}\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  if (kind === "arrived") return { category: "reminder" as const, subject: "Medarbeideren har ankommet", body: `Hei ${input.leadName},\n\n${workerName} har nå ankommet eiendommen og starter den avtalte kontrollen før arbeidet.\n\nVed behov kan du kontakte medarbeideren på ${workerPhone}.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  if (kind === "work_started") return { category: "reminder" as const, subject: "Takarbeidet er startet", body: `Hei ${input.leadName},\n\n${workerName} har nå fullført kontrollen på stedet, og det avtalte takarbeidet er startet. Vi gir deg en ny oppdatering når arbeidet er ferdig og sluttkontrollert.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
+  return { category: "completion" as const, subject: "Takarbeidet er fullført og dokumentert", body: `Hei ${input.leadName},\n\nArbeidet er fullført og sluttkontrollert. Garantibekreftelse, relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Eventuell faktura sendes separat etter godkjent bokføring. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n${siteConfig.phone}` };
 }
 
 export async function processWorkOrderCommunicationJob(payload: Payload, value: unknown, correlationId: string) {
   const input = parseJobPayload(value);
   if (!input) throw new TypeError("Communication job has no valid work-order reference");
   const order = await payload.findByID({ collection: "work-orders", id: input.workOrderId, depth: 0, overrideAccess: true });
-  if (input.kind === "completion") {
-    if (order.status !== "documented" || input.scheduleVersion !== `documented:${order.documentationSubmittedAt}`) throw new CommunicationCancelledError("Completion state changed");
-  } else if (!order.scheduledAt || order.status === "cancelled" || order.status === "documented" || input.scheduleVersion !== order.scheduledAt) {
-    throw new CommunicationCancelledError("Schedule changed before communication was sent");
-  }
+  if (!communicationIsCurrent(input, order)) throw new CommunicationCancelledError("Work schedule or status changed before communication was sent");
   const leadId = relationId(order.lead);
   if (!leadId) throw new TypeError("Work order has no lead");
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
@@ -198,7 +260,9 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
   const idempotencyKey = makeIdempotencyKey("work-order.message", input);
   const existing = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: idempotencyKey } } });
   if (existing.docs[0]) return { duplicate: true as const, message: existing.docs[0] };
-  const copy = copyFor(input.kind, lead.name, order.scheduledAt);
+  const workerId = relationId(order.assignedWorker);
+  const worker = workerId ? await payload.findByID({ collection: "users", id: workerId, depth: 0, overrideAccess: true }) : null;
+  const copy = copyFor(input.kind, { leadName: lead.name, scheduledAt: order.scheduledAt, arrivalWindow: order.arrivalWindow, workerName: worker?.displayName || worker?.email, workerPhone: worker?.phone });
   const attachments: number[] = [];
   if (input.kind === "completion") {
     const contractId = relationId(order.contract);
@@ -213,7 +277,7 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
     if (warrantyDocumentId) attachments.push(warrantyDocumentId);
   }
   const now = new Date().toISOString();
-  const message = await payload.create({ collection: "messages", overrideAccess: true, data: { lead: lead.id, direction: "outbound", category: copy.category, channel: "email", subject: copy.subject, bodyText: copy.body, attachments, status: "queued", idempotencyKey, aiAssisted: false, approvedAt: now, queuedAt: now, aiAnalysis: { workOrderId: order.id, communicationKind: input.kind, scheduleVersion: input.scheduleVersion } } });
+  const message = await payload.create({ collection: "messages", overrideAccess: true, data: { lead: lead.id, direction: "outbound", category: copy.category, channel: "email", subject: copy.subject, bodyText: copy.body, bodyHtml: buildBrandedEmailHtml({ subject: copy.subject, text: copy.body }), attachments, status: "queued", idempotencyKey, aiAssisted: false, approvedAt: now, queuedAt: now, aiAnalysis: { workOrderId: order.id, communicationKind: input.kind, scheduleVersion: input.scheduleVersion } } });
   await enqueueMessageJob(payload, message.id, correlationId);
   return { duplicate: false as const, message };
 }

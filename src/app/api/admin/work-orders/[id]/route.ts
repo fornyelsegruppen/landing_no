@@ -6,6 +6,9 @@ import { norwayLocalDateTimeToIso } from "@/lib/norway-time";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { userIsAdmin } from "@/payload/access/roles";
+import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
+import { dispatchWorkOrderCommunicationNow } from "@/lib/work-orders/communications";
+import { captureException } from "@/lib/monitoring";
 
 const schema = z.object({
   action: z.enum(["save", "cancel"]).default("save"),
@@ -62,10 +65,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         : null;
     if (scheduledAt && !assignedWorkerId) return NextResponse.json({ error: "An employee is required before scheduling" }, { status: 400 });
     if (current.status === "scheduled" && !scheduledAt) return NextResponse.json({ error: "A scheduled work order must keep a date; choose a new date or cancel it" }, { status: 409 });
+    const arrivalWindow = parsed.data.arrivalWindow === undefined
+      ? current.arrivalWindow
+      : validateArrivalWindowForSchedule(parsed.data.scheduledLocal || undefined, parsed.data.arrivalWindow || undefined);
+    if (assignedWorkerId && (!scheduledAt || !arrivalWindow)) {
+      return NextResponse.json({ error: "Employee, work date and complete arrival window are required" }, { status: 400 });
+    }
 
     const data = {
       ...(parsed.data.adminNote !== undefined ? { adminNote: parsed.data.adminNote || null } : {}),
-      ...(parsed.data.arrivalWindow !== undefined ? { arrivalWindow: parsed.data.arrivalWindow || null } : {}),
+      ...(parsed.data.arrivalWindow !== undefined ? { arrivalWindow } : {}),
       ...(assignedWorkerId ? { assignedWorker: assignedWorkerId } : {}),
       ...(parsed.data.scheduledLocal !== undefined ? { scheduledAt } : {}),
     };
@@ -81,7 +90,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       before: { assignedWorker: relationId(current.assignedWorker), scheduledAt: current.scheduledAt, arrivalWindow: current.arrivalWindow, status: current.status },
       after: { assignedWorker: relationId(updated.assignedWorker), scheduledAt: updated.scheduledAt, arrivalWindow: updated.arrivalWindow, status: updated.status },
     });
-    return NextResponse.json({ workOrderId: updated.id, status: updated.status });
+    let notification: "sent" | "queued" | "skipped" = "skipped";
+    if (updated.status === "scheduled") {
+      try {
+        const result = await dispatchWorkOrderCommunicationNow(payload, updated, "schedule_confirmation", correlationIdFromHeaders(request.headers));
+        notification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
+      } catch (error) {
+        notification = "queued";
+        captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "schedule-notification", workOrderId: current.id });
+      }
+    }
+    return NextResponse.json({ workOrderId: updated.id, status: updated.status, notification });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Work-order update failed" }, { status: 409 });
   }
