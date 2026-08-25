@@ -31,6 +31,7 @@ En historisk fase kan bare markeres fullført når rapporten inneholder leverans
 | ---- | -------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | A0   | [Admin-v2 būsenų kontraktas ir baseline](./phase-a0-admin-v2-state-baseline.md)        | Užbaigta; Windows ARM64 build išimtis dokumentuota |
 | A1   | [Teisingos apžvalgos kortelės ir veiksmų eilės](./phase-a1-dashboard-action-queues.md) | Techniškai įgyvendinta; staging gate atvira        |
+| A2   | [Visos bylos ir bylos darbo vieta](./phase-a2-all-cases-workspace.md)                 | Užbaigta; automatizuota patikra praėjo              |
 
 De neste A-rapportene opprettes først når den foregående fasen har bestått sin gate. Den samlede rekkefølgen og akseptansekriteriene står i [admin-v2-planen](../admin-v2-operational-completion-plan.md).
 

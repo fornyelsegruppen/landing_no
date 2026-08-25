@@ -34,8 +34,8 @@ function Section({ children, id, title }: { children: React.ReactNode; id: strin
   );
 }
 
-function TechnicalLink({ entity, label }: { entity?: CaseEntity; label: string }) {
-  return entity ? <Link className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-accent" href={entity.href}>{label}<ExternalLink aria-hidden="true" className="size-3.5" /></Link> : null;
+function TechnicalLink({ entity, label, summary }: { entity?: CaseEntity; label: string; summary: string }) {
+  return entity ? <details className="mt-4 border-t border-white/10 pt-3 text-xs text-muted-foreground"><summary className="cursor-pointer font-semibold hover:text-accent">{summary}</summary><Link className="mt-3 inline-flex items-center gap-2 font-semibold hover:text-accent" href={entity.href}>{label}<ExternalLink aria-hidden="true" className="size-3.5" /></Link></details> : null;
 }
 
 function qualificationDetails(value: unknown) {
@@ -63,11 +63,14 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
     ? new Intl.NumberFormat(panelDateLocale(user.interfaceLanguage), { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(ore / 100)
     : "—";
   const area = (tenths?: number) => typeof tenths === "number" ? `${(tenths / 10).toLocaleString(panelDateLocale(user.interfaceLanguage))} m²` : "—";
+  const due = caseData.lead.nextActionAt
+    ? caseData.lead.nextActionOverdue ? copy.dueNow : formatDate(caseData.lead.nextActionAt)
+    : copy.noDue;
   const qualification = qualificationDetails(caseData.lead.qualification);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <Link className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-accent" href="/admin-v2">
+      <Link className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-accent" href="/admin-v2/cases">
         <ArrowLeft aria-hidden="true" className="size-4" />{copy.back}
       </Link>
 
@@ -82,7 +85,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
             <span className="text-muted-foreground">{copy.responsible}</span>
             <strong>{caseData.lead.assignedTo || copy.unassigned}</strong>
             <span className="mt-2 text-muted-foreground">{copy.due}</span>
-            <strong>{caseData.lead.nextActionAt ? formatDate(caseData.lead.nextActionAt) : copy.noDue}</strong>
+            <strong className={due === copy.dueNow ? "text-accent" : undefined}>{due}</strong>
           </div>
         </div>
       </header>
@@ -103,6 +106,14 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           />
         </div>
       </section>
+
+      <nav aria-label={copy.overview} className="flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-background-elevated/60 p-2 text-sm font-semibold">
+        {[
+          ["customer-section", copy.customer], ["measurement-section", copy.measurement], ["price-quote-section", copy.quote],
+          ["messages-section", copy.messages], ["contract-section", copy.contract], ["work-section", copy.work],
+          ["documents-section", copy.documents], ["timeline-section", copy.timeline],
+        ].map(([href, label]) => <a className="shrink-0 rounded-xl px-3 py-2 text-white/75 hover:bg-white/5 hover:text-accent" href={`#${href}`} key={href}>{label}</a>)}
+      </nav>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
         <div className="space-y-6">
@@ -149,7 +160,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
                 manualOverrideReason={caseData.measurement.manualOverrideReason}
                 measurementId={caseData.measurement.id}
               /> : null}
-              <TechnicalLink entity={caseData.measurement} label={copy.technicalDetail} />
+              <TechnicalLink entity={caseData.measurement} label={copy.technicalDetail} summary={copy.advancedTechnical} />
             </> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
@@ -160,7 +171,7 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               <div><dt className="text-xs text-muted-foreground">{copy.priceIncVat}</dt><dd className="mt-1 font-bold text-accent">{nok(caseData.price.totalIncVatOre)}</dd></div>
               <div><dt className="text-xs text-muted-foreground">{copy.maximum}</dt><dd className="mt-1 font-bold">{nok(caseData.price.maximumTotalIncVatOre)}</dd></div>
             </dl> : <p className="text-muted-foreground">{copy.missing}</p>}
-            {caseData.quote ? <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 bg-black/15 p-4"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} /></div> : null}
+            {caseData.quote ? <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/10 bg-black/15 p-4"><div><strong>{caseData.quote.reference}</strong><p className="mt-1 text-sm text-muted-foreground">{copy.validUntil}: {formatDate(caseData.quote.validUntil)}</p></div><Status locale={user.interfaceLanguage} value={caseData.quote.status} /><TechnicalLink entity={caseData.quote} label={copy.technicalDetail} summary={copy.advancedTechnical} /></div> : null}
           </Section>
 
           <Section id="messages-section" title={copy.messages}>
@@ -168,18 +179,18 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
               <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{message.subject}</strong><p className="mt-1 text-xs text-muted-foreground">{metadataLabel(user.interfaceLanguage, message.direction)} · {metadataLabel(user.interfaceLanguage, message.category)} · {metadataLabel(user.interfaceLanguage, message.channel)}</p></div><Status locale={user.interfaceLanguage} value={message.status} /></div>
               <p className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap text-sm text-white/80">{message.bodyText}</p>
               {message.failureMessage ? <p className="mt-3 text-sm text-danger">{message.failureMessage}</p> : null}
-              <TechnicalLink entity={message} label={copy.technicalDetail} />
+              <TechnicalLink entity={message} label={copy.technicalDetail} summary={copy.advancedTechnical} />
             </article>)}</div> : <p className="text-muted-foreground">{copy.noMessages}</p>}
           </Section>
         </div>
 
         <aside className="space-y-6">
           <Section id="contract-section" title={copy.contract}>
-            {caseData.contract ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.contract.reference}</strong><Status companySignedAt={caseData.contract.companySignedAt} contract locale={user.interfaceLanguage} value={caseData.contract.status} /></div>{caseData.contract.signedAt ? <p className="mt-3 text-sm text-muted-foreground">{copy.customerSignedAt}: {formatDate(caseData.contract.signedAt)}</p> : null}{caseData.contract.companySignedAt ? <p className="mt-1 text-sm text-muted-foreground">{copy.companySignedAt}: {formatDate(caseData.contract.companySignedAt)}</p> : null}<TechnicalLink entity={caseData.contract} label={copy.technicalDetail} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.contract ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.contract.reference}</strong><Status companySignedAt={caseData.contract.companySignedAt} contract locale={user.interfaceLanguage} value={caseData.contract.status} /></div>{caseData.contract.signedAt ? <p className="mt-3 text-sm text-muted-foreground">{copy.customerSignedAt}: {formatDate(caseData.contract.signedAt)}</p> : null}{caseData.contract.companySignedAt ? <p className="mt-1 text-sm text-muted-foreground">{copy.companySignedAt}: {formatDate(caseData.contract.companySignedAt)}</p> : null}<TechnicalLink entity={caseData.contract} label={copy.technicalDetail} summary={copy.advancedTechnical} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
           <Section id="work-section" title={copy.work}>
-            {caseData.workOrder ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.workOrder.reference}</strong><Status locale={user.interfaceLanguage} value={caseData.workOrder.status} /></div><dl className="mt-4 grid gap-3"><div><dt className="text-xs text-muted-foreground">{copy.employee}</dt><dd className="font-semibold">{caseData.workOrder.assignedWorker || copy.unassigned}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.scheduled}</dt><dd className="font-semibold">{formatDate(caseData.workOrder.scheduledAt)}</dd></div></dl><TechnicalLink entity={caseData.workOrder} label={copy.technicalDetail} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.workOrder ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.workOrder.reference}</strong><Status locale={user.interfaceLanguage} value={caseData.workOrder.status} /></div><dl className="mt-4 grid gap-3"><div><dt className="text-xs text-muted-foreground">{copy.employee}</dt><dd className="font-semibold">{caseData.workOrder.assignedWorker || copy.unassigned}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.scheduled}</dt><dd className="font-semibold">{formatDate(caseData.workOrder.scheduledAt)}</dd></div></dl><TechnicalLink entity={caseData.workOrder} label={copy.technicalDetail} summary={copy.advancedTechnical} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
           </Section>
 
           <Section id="changes-section" title={copy.changes}>

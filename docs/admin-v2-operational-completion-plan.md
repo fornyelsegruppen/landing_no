@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcinė svetainė:** neliečiama iki paskutinės fazės, pilno patikrinimo ir atskiro savininko patvirtinimo  
-**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0 užbaigta, A1 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas  
+**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A2 užbaigtos; A3 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas  
 **Pagrindinė taisyklė:** vienu metu įgyvendinama viena fazė; po kiekvienos fazės privalomi automatiniai testai, rankinis staging patikrinimas ir rezultato įrašymas šiame dokumente
 
 ## 1. Galutinis tikslas
@@ -111,7 +111,7 @@ Administratoriaus eilės turi būti paremtos kitu būtinu veiksmu, o ne vien ža
 
 ### Fazė A1 – teisingos apžvalgos kortelės ir veiksmų eilės
 
-**Statusas:** vykdoma  
+**Statusas:** užbaigta 2026-08-25  
 **Priklausomybė:** A0  
 **Tikslas:** administratorius atidaręs apžvalgą iš karto mato viską, kam dabar reikia veiksmo, o kiekvienas skaičius sutampa su atidaromos eilės turiniu.
 
@@ -138,7 +138,7 @@ Administratoriaus eilės turi būti paremtos kitu būtinu veiksmu, o ne vien ža
 
 ### Fazė A2 – „Visos bylos“, paieška ir aiški bylos darbo vieta
 
-**Statusas:** suplanuota  
+**Statusas:** užbaigta 2026-08-25  
 **Priklausomybė:** A1  
 **Tikslas:** administratorius gali rasti bet kurią bylą nepriklausomai nuo jos būsenos ir valdyti ją vienoje aiškioje darbo vietoje.
 

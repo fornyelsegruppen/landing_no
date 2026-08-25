@@ -56,6 +56,16 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.message && ["failed", "attention"].includes(input.message.status || "")) {
     return { kind: "retry_message", targetId: input.message.id };
   }
+  if (input.workOrder?.status === "unassigned") return { kind: "assign_worker", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "assigned") return { kind: "schedule_work", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "blocked") return { kind: "resolve_work_block", targetId: input.workOrder.id };
+  if (input.workOrder?.status === "completed") return { kind: "review_completion", targetId: input.workOrder.id };
+  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && !input.contract.companySignedAt) {
+    return { kind: "company_sign_contract", targetId: input.contract.id };
+  }
+  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && input.contract.companySignedAt && !input.workOrder) {
+    return { kind: "create_work_order", targetId: input.contract.id };
+  }
   const measurementAiDraft = input.message?.status === "draft"
     && input.message.category === "ai_reply"
     && input.canPreparePackage === true;
@@ -87,16 +97,6 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.quote?.status === "draft") return { kind: "approve_quote", targetId: input.quote.id };
   if (input.quote?.status === "approved") return { kind: "issue_quote", targetId: input.quote.id };
   if (["sent", "viewed"].includes(input.quote?.status || "")) return { kind: "wait_customer" };
-  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && !input.contract.companySignedAt) {
-    return { kind: "company_sign_contract", targetId: input.contract.id };
-  }
-  if (input.quote?.status === "accepted" && input.contract?.status === "signed" && input.contract.companySignedAt && !input.workOrder) {
-    return { kind: "create_work_order", targetId: input.contract.id };
-  }
-  if (input.workOrder?.status === "unassigned") return { kind: "assign_worker", targetId: input.workOrder.id };
-  if (input.workOrder?.status === "assigned") return { kind: "schedule_work", targetId: input.workOrder.id };
-  if (input.workOrder?.status === "blocked") return { kind: "resolve_work_block", targetId: input.workOrder.id };
-  if (input.workOrder?.status === "completed") return { kind: "review_completion", targetId: input.workOrder.id };
   return { kind: "none" };
 }
 
@@ -152,6 +152,7 @@ export type AdminCase = {
     name: string;
     nextAction?: string;
     nextActionAt?: string;
+    nextActionOverdue: boolean;
     phone?: string;
     postal?: string;
     qualification?: unknown;
@@ -315,6 +316,7 @@ function currentMessage(messages: Array<Record<string, unknown>>) {
 }
 
 export async function loadAdminCase(payload: Payload, leadId: number): Promise<AdminCase | null> {
+  const loadedAt = Date.now();
   let leadRaw: unknown;
   try {
     leadRaw = await payload.findByID({ collection: "leads", id: leadId, depth: 1, overrideAccess: true });
@@ -495,6 +497,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       assignedTo: relationName(lead.assignedTo),
       nextAction: stringValue(lead.nextAction),
       nextActionAt: stringValue(lead.nextActionAt),
+      nextActionOverdue: Boolean(stringValue(lead.nextActionAt) && new Date(stringValue(lead.nextActionAt) || 0).getTime() <= loadedAt),
       createdAt: stringValue(lead.createdAt),
     },
     measurement,
