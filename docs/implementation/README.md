@@ -36,6 +36,9 @@ Den autentiserte helhetsrevisjonen 25. august 2026 avdekket gjenstående avvik i
 - [F6 – communication reliability and scheduling](./phase-f6-communications-reliability.md)
 - [F7 – administrator operations workspace](./phase-f7-admin-operations.md)
 - [F8 – customer replies, safe AI drafts and recovery](./phase-f8-customer-replies-and-recovery.md)
+- [F9 – security, observability and authenticated E2E](./phase-f9-security-observability-and-e2e.md)
+
+F0–F9 har egne `GO`-rapporter. F10 stagingpilot og Production gate er nå neste og eneste aktive FULL-audit-fase; Production er fortsatt uendret.
 
 ## Operativ admin A0–A9
 

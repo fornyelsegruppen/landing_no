@@ -26,6 +26,18 @@ Ingen produksjonsmigrasjon eller aktivering av masterplattformens feature-flagg 
 
 Restore er ikke bestått hvis bare dumpen finnes. Applikasjonen må starte, migrasjonene må bestå, radantall/relasjoner må stemme og privat media må være lesbart via riktig autorisasjon.
 
+## Automatisert F9-repetisjon
+
+Den 25. august 2026 bestod [GitHub Quality run 32902237284](https://github.com/fornyelsegruppen/landing_no/actions/runs/32902237284) en isolert PostgreSQL-repetisjon:
+
+1. CI startet en tom PostgreSQL 16-instans;
+2. alle migrasjoner, deterministisk offentlig seed og syntetiske `example.invalid`-kontoer ble opprettet;
+3. produksjonsbuild og 11 offentlige/autentiserte nettleserscenarier bestod;
+4. `pg_dump` ble tatt av den syntetiske CI-databasen;
+5. dumpen ble restoret til en separat tom database og kontrollen bestod.
+
+Dette beviser at schema, migrasjoner og den automatiserte dump/restore-prosedyren virker i en ren Linux CI-kontekst. Det er **ikke** en restore av et produksjonssnapshot, inneholder ikke produksjonskundedata og erstatter ikke snapshot-, Blob-inventar- og radantallskontrollen rett før F10-cutover.
+
 ## Tilbakeføring
 
 - før featureflagg aktiveres: slå dem av og rull tilbake til forrige verifiserte applikasjonsdeploy;
@@ -43,7 +55,7 @@ Restore er ikke bestått hvis bare dumpen finnes. Applikasjonen må starte, migr
 | Blob-inventar | Ikke utført ennå |
 | Stagingdatabase | Separat Preview-database finnes; produksjonslik restore er ikke utført ennå |
 | Radantall før/etter | Ikke kontrollert ennå |
-| Restore-smoke | Ikke kjørt ennå |
+| Restore-smoke | Syntetisk CI restore bestått i run `32902237284`; produksjonssnapshot-restore ikke utført ennå |
 | Godkjent av | Ikke godkjent ennå |
 
 Applikasjonsrollbacket er tilstrekkelig for å starte isolert R1-utvikling. Det erstatter ikke produksjonssnapshot, Blob-inventar eller restore-øvelse. Disse tre kontrollene er obligatoriske rett før R10-cutover og skal ikke gjennomføres ved å endre eller eksportere levende produksjonsdata uten eksplisitt eiergodkjenning.
