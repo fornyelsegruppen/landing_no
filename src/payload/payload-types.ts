@@ -1131,6 +1131,8 @@ export interface WorkOrder {
   contractDocumentHash: string;
   assignedWorker?: (number | null) | User;
   scheduledAt?: string | null;
+  arrivalWindow?: string | null;
+  adminNote?: string | null;
   status:
     | 'unassigned'
     | 'assigned'
@@ -2077,6 +2079,8 @@ export interface WorkOrdersSelect<T extends boolean = true> {
   contractDocumentHash?: T;
   assignedWorker?: T;
   scheduledAt?: T;
+  arrivalWindow?: T;
+  adminNote?: T;
   status?: T;
   workSummary?: T;
   beforePhotos?: T;

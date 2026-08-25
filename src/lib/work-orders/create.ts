@@ -10,6 +10,8 @@ function relationId(value: unknown) {
 export async function createWorkOrderFromContract(payload: Payload, input: {
   contractId: number;
   assignedWorkerId?: number;
+  adminNote?: string;
+  arrivalWindow?: string;
   scheduledAt?: string;
 }) {
   const contract = await payload.findByID({ collection: "contracts", id: input.contractId, depth: 0, overrideAccess: true });
@@ -29,6 +31,8 @@ export async function createWorkOrderFromContract(payload: Payload, input: {
     lead: relationId(quote.lead),
     contractDocumentHash: contract.documentHash,
     assignedWorker: input.assignedWorkerId,
+    adminNote: input.adminNote,
+    arrivalWindow: input.arrivalWindow,
     scheduledAt: input.scheduledAt,
     status: input.assignedWorkerId && input.scheduledAt ? "scheduled" : input.assignedWorkerId ? "assigned" : "unassigned",
     workSummary,

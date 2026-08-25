@@ -1,0 +1,48 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  auth: vi.fn(),
+  createWorkOrder: vi.fn(),
+  recordAudit: vi.fn(),
+}));
+
+vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ auth: mocks.auth })) }));
+vi.mock("@/payload/access/roles", () => ({ userIsAdmin: vi.fn(() => true) }));
+vi.mock("@/lib/work-orders/create", () => ({ createWorkOrderFromContract: mocks.createWorkOrder }));
+vi.mock("@/lib/audit/payload-audit-writer", () => ({ createPayloadAuditWriter: vi.fn(() => vi.fn()) }));
+vi.mock("@/lib/audit/audit-event", () => ({ recordAuditEvent: mocks.recordAudit }));
+
+import { POST } from "./route";
+
+describe("admin work-order creation", () => {
+  beforeEach(() => {
+    mocks.auth.mockReset().mockResolvedValue({ user: { id: 9, role: "admin" } });
+    mocks.createWorkOrder.mockReset().mockResolvedValue({ created: true, workOrder: { id: 41 } });
+    mocks.recordAudit.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("creates and plans one order using Norwegian local time", async () => {
+    const response = await POST(new Request("http://localhost/api/admin/work-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contractId: 7, assignedWorkerId: 3, scheduledLocal: "2026-08-25T08:30", arrivalWindow: "08:00–10:00", adminNote: "Internt" }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createWorkOrder).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      assignedWorkerId: 3,
+      contractId: 7,
+      scheduledAt: "2026-08-25T06:30:00.000Z",
+    }));
+  });
+
+  it("does not accept a schedule without an employee", async () => {
+    const response = await POST(new Request("http://localhost/api/admin/work-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contractId: 7, scheduledLocal: "2026-08-25T08:30" }),
+    }));
+    expect(response.status).toBe(400);
+    expect(mocks.createWorkOrder).not.toHaveBeenCalled();
+  });
+});

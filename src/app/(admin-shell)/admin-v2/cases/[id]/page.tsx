@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import { CaseActionPanel, CloseCaseButton } from "@/components/admin-v2/case-action-panel";
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
+import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { metadataLabel, statusLabel, timelineTypeLabel } from "@/lib/admin-v2/labels";
 import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
+import { formatNorwayDateTime, formatNorwayDateTimeInput } from "@/lib/norway-time";
 import { getPayload } from "@/lib/payload";
 
 export const dynamic = "force-dynamic";
@@ -53,11 +55,16 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
   const copy = getAdminCaseCopy(user.interfaceLanguage);
   const { id } = await params;
   if (!/^\d+$/.test(id)) notFound();
-  const caseData = await loadAdminCase(await getPayload(), Number(id));
+  const payload = await getPayload();
+  const [caseData, workersResult] = await Promise.all([
+    loadAdminCase(payload, Number(id)),
+    payload.find({ collection: "users", depth: 0, limit: 200, overrideAccess: true, pagination: false, sort: "displayName", where: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] } }),
+  ]);
   if (!caseData) notFound();
+  const workers = workersResult.docs.map((worker) => ({ id: worker.id, name: worker.displayName || worker.email }));
 
   const formatDate = (value?: string) => value
-    ? new Intl.DateTimeFormat(panelDateLocale(user.interfaceLanguage), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
+    ? formatNorwayDateTime(value, panelDateLocale(user.interfaceLanguage))
     : "—";
   const nok = (ore?: number) => typeof ore === "number"
     ? new Intl.NumberFormat(panelDateLocale(user.interfaceLanguage), { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(ore / 100)
@@ -190,7 +197,18 @@ export default async function AdminCasePage({ params }: { params: Promise<{ id: 
           </Section>
 
           <Section id="work-section" title={copy.work}>
-            {caseData.workOrder ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.workOrder.reference}</strong><Status locale={user.interfaceLanguage} value={caseData.workOrder.status} /></div><dl className="mt-4 grid gap-3"><div><dt className="text-xs text-muted-foreground">{copy.employee}</dt><dd className="font-semibold">{caseData.workOrder.assignedWorker || copy.unassigned}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.scheduled}</dt><dd className="font-semibold">{formatDate(caseData.workOrder.scheduledAt)}</dd></div></dl><TechnicalLink entity={caseData.workOrder} label={copy.technicalDetail} summary={copy.advancedTechnical} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.workOrder ? <><div className="flex flex-wrap justify-between gap-3"><strong>{caseData.workOrder.reference}</strong><Status locale={user.interfaceLanguage} value={caseData.workOrder.status} /></div><dl className="mt-4 grid gap-3"><div><dt className="text-xs text-muted-foreground">{copy.employee}</dt><dd className="font-semibold">{caseData.workOrder.assignedWorker || copy.unassigned}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.scheduled}</dt><dd className="font-semibold">{formatDate(caseData.workOrder.scheduledAt)}</dd></div>{caseData.workOrder.arrivalWindow ? <div><dt className="text-xs text-muted-foreground">{copy.arrivalWindow}</dt><dd className="font-semibold">{caseData.workOrder.arrivalWindow}</dd></div> : null}</dl><TechnicalLink entity={caseData.workOrder} label={copy.technicalDetail} summary={copy.advancedTechnical} /></> : <p className="text-muted-foreground">{copy.missing}</p>}
+            {caseData.contract && ((caseData.nextAction.kind === "create_work_order" && !caseData.workOrder) || (caseData.workOrder && ["unassigned", "assigned", "scheduled"].includes(caseData.workOrder.status || ""))) ? <WorkOrderPlanningPanel
+              adminNote={caseData.workOrder?.adminNote}
+              arrivalWindow={caseData.workOrder?.arrivalWindow}
+              assignedWorkerId={caseData.workOrder?.assignedWorkerId}
+              contractId={caseData.contract.id}
+              locale={user.interfaceLanguage}
+              scheduledLocal={caseData.workOrder?.scheduledAt ? formatNorwayDateTimeInput(caseData.workOrder.scheduledAt) : undefined}
+              status={caseData.workOrder?.status}
+              workOrderId={caseData.workOrder?.id}
+              workers={workers}
+            /> : null}
           </Section>
 
           <Section id="changes-section" title={copy.changes}>

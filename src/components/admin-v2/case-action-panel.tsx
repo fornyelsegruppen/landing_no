@@ -20,7 +20,6 @@ function requestFor(action: CaseNextAction, leadId: number) {
     case "create_quote": return { endpoint: "/api/admin/quotes", body: { calculationId: action.targetId } };
     case "approve_quote": return { endpoint: `/api/admin/quotes/${action.targetId}`, body: { action: "approve" } };
     case "issue_quote": return { endpoint: `/api/admin/quotes/${action.targetId}`, body: { action: "issue" } };
-    case "create_work_order": return { endpoint: "/api/admin/work-orders", body: { contractId: action.targetId } };
     default: return null;
   }
 }
@@ -60,7 +59,9 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
 
   const technicalTarget = action.kind === "measurement_required"
     ? `/admin/collections/leads/${leadId}`
-    : ["assign_worker", "schedule_work", "resolve_work_block", "review_completion"].includes(action.kind) && action.targetId
+    : ["create_work_order", "assign_worker", "schedule_work"].includes(action.kind)
+      ? "#work-planning"
+    : ["resolve_work_block", "review_completion"].includes(action.kind) && action.targetId
       ? `/admin/collections/work-orders/${action.targetId}`
       : null;
 

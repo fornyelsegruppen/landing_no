@@ -19,4 +19,25 @@ describe("work-order creation", () => {
     expect(result).toMatchObject({ created: false, workOrder: { id: 9 } });
     expect(payload.create).not.toHaveBeenCalled();
   });
+
+  it("creates the assignment and schedule atomically", async () => {
+    const payload = {
+      findByID: vi.fn().mockResolvedValueOnce({ id: 7, reference: "K-1-V1", quote: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z", documentHash: "h".repeat(64) }).mockResolvedValueOnce({ id: 6, lead: 1, status: "accepted", snapshot }),
+      find: vi.fn().mockResolvedValue({ docs: [] }),
+      create: vi.fn().mockResolvedValue({ id: 10, status: "scheduled" }),
+    };
+    const result = await createWorkOrderFromContract(payload as never, {
+      adminNote: "Internt",
+      arrivalWindow: "08:00–10:00",
+      assignedWorkerId: 3,
+      contractId: 7,
+      scheduledAt: "2026-08-25T06:30:00.000Z",
+    });
+
+    expect(result.created).toBe(true);
+    expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "work-orders",
+      data: expect.objectContaining({ assignedWorker: 3, scheduledAt: "2026-08-25T06:30:00.000Z", status: "scheduled" }),
+    }));
+  });
 });

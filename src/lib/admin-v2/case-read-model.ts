@@ -184,7 +184,10 @@ export type AdminCase = {
   };
   timeline: CaseTimelineItem[];
   workOrder?: CaseEntity & {
+    adminNote?: string;
+    arrivalWindow?: string;
     assignedWorker?: string;
+    assignedWorkerId?: number;
     scheduledAt?: string;
   };
 };
@@ -210,6 +213,12 @@ function manualOverride(value: unknown) {
 
 function numericId(value: unknown) {
   return typeof value === "number" ? value : Number.NaN;
+}
+
+function relationId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
+  return undefined;
 }
 
 function relationName(value: unknown) {
@@ -422,7 +431,10 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   } : undefined;
   const workOrder = latestWorkRaw ? {
     ...entity("work-orders", latestWorkRaw),
+    adminNote: stringValue(latestWorkRaw.adminNote),
+    arrivalWindow: stringValue(latestWorkRaw.arrivalWindow),
     assignedWorker: relationName(latestWorkRaw.assignedWorker),
+    assignedWorkerId: relationId(latestWorkRaw.assignedWorker) || undefined,
     scheduledAt: stringValue(latestWorkRaw.scheduledAt),
   } : undefined;
 

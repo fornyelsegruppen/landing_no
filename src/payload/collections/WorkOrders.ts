@@ -126,6 +126,8 @@ export const WorkOrders: CollectionConfig = {
     { name: "contractDocumentHash", type: "text", required: true, index: true, admin: { readOnly: true } },
     { name: "assignedWorker", type: "relationship", relationTo: "users", label: "Tildelt ansatt", index: true, filterOptions: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] } },
     { name: "scheduledAt", type: "date", label: "Planlagt tidspunkt (norsk tid)", index: true, admin: { components: { Field: "/components/NorwayDateTimeField", Cell: "/components/NorwayDateTimeCell" } } },
+    { name: "arrivalWindow", type: "text", label: "Avtalt ankomstvindu", maxLength: 120, admin: { description: "For eksempel 08:00–10:00. Vis nøyaktig avtalt tidsrom, ikke et løfte som ikke kan holdes." } },
+    { name: "adminNote", type: "textarea", label: "Intern planleggingsmerknad", maxLength: 1000, admin: { description: "Kun internt. Ikke sendt til kunden." } },
     { name: "status", type: "select", label: "Status", required: true, defaultValue: "unassigned", index: true, options: [
       { label: "Ikke tildelt", value: "unassigned" }, { label: "Tildelt", value: "assigned" }, { label: "Planlagt", value: "scheduled" },
       { label: "På vei", value: "on_way" }, { label: "Ankommet", value: "arrived" }, { label: "Før-kontroll", value: "precheck" },

@@ -4,7 +4,7 @@
 **Parengta:** 2026-08-25  
 **Aplinka:** tik izoliuota staging `https://takfornyelse-staging.vercel.app`  
 **Produkcinė svetainė:** neliečiama iki paskutinės fazės, pilno patikrinimo ir atskiro savininko patvirtinimo  
-**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A2 užbaigtos; A3 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas  
+**Dabartinė būsena:** R0–R6 techninis pagrindas įgyvendintas; A0–A3 užbaigtos; A4 vykdoma; kasdienis administratoriaus procesas dar neužbaigtas
 **Pagrindinė taisyklė:** vienu metu įgyvendinama viena fazė; po kiekvienos fazės privalomi automatiniai testai, rankinis staging patikrinimas ir rezultato įrašymas šiame dokumente
 
 ## 1. Galutinis tikslas
@@ -88,7 +88,7 @@ Administratoriaus eilės turi būti paremtos kitu būtinu veiksmu, o ne vien ža
 
 ### Fazė A0 – vykdymo kontraktas ir testavimo baseline
 
-**Statusas:** užbaigta 2026-08-25  
+**Statusas:** užbaigta 2026-08-25
 **Tikslas:** prieš keičiant logiką užfiksuoti vieną nekintamą būsenų žodyną, testinius scenarijus ir dabartinį staging atskaitos tašką.
 
 **Darbai:**
@@ -164,7 +164,7 @@ Administratoriaus eilės turi būti paremtos kitu būtinu veiksmu, o ne vien ža
 
 ### Fazė A3 – darbo sukūrimas, paskyrimas ir planavimas vienoje vietoje
 
-**Statusas:** suplanuota  
+**Statusas:** užbaigta 2026-08-25
 **Priklausomybė:** A1, A2  
 **Tikslas:** po galutinės sutarties administratorius vienu aiškiu procesu sukuria darbą, paskiria darbuotoją ir, jei įmanoma, suplanuoja datą.
 
