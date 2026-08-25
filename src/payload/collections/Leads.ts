@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
+import { currentTrustedCaseCommandContext } from "@/lib/cases/case-command-context";
 import { deletePrivateMedia } from "@/lib/private-media-storage";
 import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 
@@ -13,16 +14,19 @@ const caseStateFields = new Set([
 
 export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, data, operation, originalDoc }) => {
   if (operation !== "update" || !originalDoc) return data;
-  if (context?.trustedCaseCommand === true && typeof context.expectedCaseRevision === "number") {
+  const trustedContext = context?.trustedCaseCommand === true
+    ? context
+    : currentTrustedCaseCommandContext();
+  if (trustedContext?.trustedCaseCommand === true && typeof trustedContext.expectedCaseRevision === "number") {
     const actual = Number(originalDoc.caseRevision || 1);
-    if (actual !== context.expectedCaseRevision) {
-      throw new Error(`CASE_REVISION_CONFLICT:${context.expectedCaseRevision}:${actual}`);
+    if (actual !== trustedContext.expectedCaseRevision) {
+      throw new Error(`CASE_REVISION_CONFLICT:${trustedContext.expectedCaseRevision}:${actual}`);
     }
   }
-  if ("caseRevision" in data && context?.trustedCaseCommand !== true) {
+  if ("caseRevision" in data && trustedContext?.trustedCaseCommand !== true) {
     throw new Error("Case revision is managed by the central case command layer");
   }
-  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true" || context?.trustedCaseCommand === true) return data;
+  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true" || trustedContext?.trustedCaseCommand === true) return data;
   const directStateFields = Object.keys(data).filter((key) => caseStateFields.has(key));
   if (directStateFields.length) {
     throw new Error(`Case state fields require the central command layer: ${directStateFields.join(", ")}`);

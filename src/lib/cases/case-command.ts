@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Payload } from "payload";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
+import { runTrustedCaseCommand } from "@/lib/cases/case-command-context";
 
 export class CaseCommandConflictError extends Error {
   constructor(readonly expected: number, readonly actual: number) {
@@ -63,18 +64,16 @@ export async function executeCaseCommand(payload: Payload, input: ExecuteCaseCom
   const commandContext = {
     trustedCaseCommand: true,
     expectedCaseRevision: revision,
-  };
+  } as const;
   let after;
   try {
-    after = await payload.update({
+    after = await runTrustedCaseCommand(commandContext, () => payload.update({
       collection: "leads", id: input.leadId, depth: 0, overrideAccess: true,
-      // Payload forwards local API context through the generated request. Keep
-      // it on both supported inputs so the collection hook receives it in the
-      // Next.js runtime as well as in direct local API calls.
+      // Keep Payload's own context too. AsyncLocalStorage covers serverless
+      // runtimes where the generated local request drops this metadata.
       context: commandContext,
-      req: { context: commandContext },
       data: { ...input.patch, caseRevision: nextRevision },
-    });
+    }));
   } catch (error) {
     const match = error instanceof Error && error.message.match(/^CASE_REVISION_CONFLICT:(\d+):(\d+)$/);
     if (match) throw new CaseCommandConflictError(Number(match[1]), Number(match[2]));
