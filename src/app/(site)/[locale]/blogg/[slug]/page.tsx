@@ -24,6 +24,7 @@ import { getSeoServiceHref } from "@/content/seo-landing-pages";
 import { blogPostLanguageUrls } from "@/lib/blog/routing";
 import { guideLabels } from "@/lib/public-navigation";
 import { publicRelatedPosts } from "@/lib/blog/related-posts";
+import { publicReviewerName } from "@/lib/blog/reviewer";
 
 export const revalidate = 60;
 
@@ -173,6 +174,7 @@ export default async function BlogPostPage({ params }: Props) {
     ? new URL(hero.url, siteConfig.url).toString()
     : undefined;
   const reviewedDate = post.reviewedAt || post.updatedAt;
+  const reviewerName = publicReviewerName(post.reviewerName);
   const faqs = (post.faqItems || [])
     .map((faq) => ({
       question: (loc === "no" ? faq.questionNo : faq.questionEn)?.trim() || "",
@@ -211,8 +213,8 @@ export default async function BlogPostPage({ params }: Props) {
           name: post.authorName,
           worksFor: { "@id": `${siteConfig.url}/#organization` },
         },
-        reviewedBy: post.reviewerName
-          ? { "@type": "Person", name: post.reviewerName }
+        reviewedBy: reviewerName
+          ? { "@type": "Person", name: reviewerName }
           : undefined,
         publisher: { "@id": `${siteConfig.url}/#organization` },
       },
@@ -298,10 +300,10 @@ export default async function BlogPostPage({ params }: Props) {
                 {loc === "no" ? "Skrevet av" : "Written by"} {post.authorName}
               </span>
             )}
-            {post.reviewerName && (
+            {reviewerName && (
               <span>
                 {loc === "no" ? "Faglig kontrollert av" : "Reviewed by"}{" "}
-                {post.reviewerName}, {formatDate(reviewedDate, loc)}
+                {reviewerName}, {formatDate(reviewedDate, loc)}
               </span>
             )}
           </div>
