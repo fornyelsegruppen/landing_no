@@ -484,9 +484,9 @@ Stabilizuoti Production po cutover ir neleisti vienam sėkmingam smoke būti pal
 |---|---|---|---|---|
 | PROD-0 Release freeze | PASS | Release tag `public-blog-staging-rc-2026-08-26` → `e625ac40`; rollback tag `backup-live-before-master-2026-08-23` → `380f64d2`; po RC tik dokumentacijos commitai; Vercel Production `dpl_8MqTs2mWsijDYvi1AAWqz46VvDWh` yra `Ready`, aliasai patikrinti, CLI rollback komanda prieinama | Techninė patikra | 2026-08-27 08:25 EEST |
 | PROD-1 DB snapshot ir Blob inventorius | PASS | Neon `backup-before-production-2026-08-27` (`br-nameless-bread-as1qukkv`) sukurta iš `production` (`br-tiny-sea-asltfa3n`) 2026-08-27 00:40 EEST, būsena `ready`, loginis dydis 36 134 912 B, galioja iki 2026-09-03 00:40 EEST; abiejose šakose 36 lentelės ir 210 eilučių, skirtumų 0; Production Blob `takfornyelse-production-private` (`store_FzFUn9vF8bJVXcDI`) aktyvus, `fra1`, 0 B / 0 failų; staging Blob atskiras | Techninė patikra | 2026-08-27 08:50 EEST |
-| PROD-2 Izoliuotas restore | IN PROGRESS | Backup kopijoje 32/32 migracijos užbaigtos; ištaisytos dvi realios senos Production schemos kliūtys (`users.role` be seno enum ir legacy `posts_v`/`autosave`); pridėtas seno deployment suderinamumo `posts_v` view; 34/34 migracijų testai ir 536/536 vienetiniai testai PASS; Turbopack production build PASS net sąmoningai nepasiekiant DB (fallback keliai suveikė). Liko po pakartotinio Neon prisijungimo sukurti šviežią kopiją su galutiniu migracijos failu, patvirtinti 32/32 statusą ir prieš/po legacy eilučių skaičius | Techninė patikra | 2026-08-27 01:28 EEST |
+| PROD-2 Izoliuotas restore | IN PROGRESS | Backup kopijoje 32/32 migracijos užbaigtos; ištaisytos dvi realios senos Production schemos kliūtys (`users.role` be seno enum ir legacy `posts_v`/`autosave`); pridėtas seno deployment suderinamumo `posts_v` view; 34/34 migracijų testai ir 537/537 vienetiniai testai PASS; Turbopack production build PASS net sąmoningai nepasiekiant DB (fallback keliai suveikė). Liko po pakartotinio Neon prisijungimo sukurti šviežią kopiją su galutiniu migracijos failu, patvirtinti 32/32 statusą ir prieš/po legacy eilučių skaičius | Techninė patikra | 2026-08-27 01:44 EEST |
 | PROD-3 Production secrets ir flags | PENDING (preflight atliktas) | Vercel vardų auditas be reikšmių: Production turi 12 kintamųjų; nėra naujos automatikos flagų, Gemini/Pexels, cron, Turnstile, KV ir atskiro kliento tokeno rakto. Parengta saugi `false` matrica ir savininko veiksmų paketas; Production konfigūracija nepakeista | Techninė patikra | 2026-08-27 01:28 EEST |
-| PROD-4 Quality gate | PENDING (vietinė dalis parengta) | Po galutinės rollback suderinamumo pataisos: TypeScript PASS, ESLint PASS, 536/536 unit PASS, 34/34 migracijų testai PASS, Turbopack production build PASS. Runtime pataisų commit `7b6b5a7997c6512255d4717692cadb6b7cb2630e`. Liko sukurti galutinį RC tagą ir patikrinti GitHub CI bei Vercel Preview tam pačiam SHA | Techninė patikra | 2026-08-27 01:32 EEST |
+| PROD-4 Quality gate | PENDING (vietinė dalis PASS) | Galutiniame kandidatiniame kode: TypeScript PASS, ESLint PASS, 537/537 unit PASS, 34/34 migracijų testai PASS, Turbopack production compile/typecheck ir 70 route generavimas PASS. `npm audit --omit=dev`: 0 critical/high, 6 moderate transitive Payload/Drizzle `esbuild` dev-server įrašai be tiekėjo pataisos. Naujausias commit `a349fe6f0a3aecd98d9faf4237043dcad6a0c07a`: pridėtas oficialus Payload Resend adapteris ir užblokuotos tiesioginės `private-media` CMS mutacijos. Ankstesnio Preview `dpl_ceQBW1D3sGJb8UTw2QWaGhtqCx9o` smoke: vieši/blogo/SEO maršrutai 200, admin/user login redirect, privatūs admin API 401. Naujausio SHA Preview ir GitHub statusas laukia Vercel autorizacijos | Techninė patikra | 2026-08-27 01:44 EEST |
 | PROD-5 Production deploy | PENDING |  |  |  |
 | PROD-6 Bazinis Production smoke | PENDING |  |  |  |
 | PROD-7 Sintetinė Production užklausa | PENDING |  |  |  |
@@ -504,21 +504,27 @@ Stabilizuoti Production po cutover ir neleisti vienam sėkmingam smoke būti pal
 4. Tik izoliuotoje kopijoje paleistos visos migracijos; Production DB nepakeista.
 5. Rastos ir regresiniais testais uždarytos dvi Production schemos suderinamumo P1 kliūtys.
 6. Pridėtas suderinamumo view, kad kodo rollback atveju senas deployment vis dar galėtų pasiekti `posts_v`.
-7. PASS: TypeScript, ESLint, 536 vienetiniai testai, 34 migracijų testai ir production build/route generavimas.
+7. PASS: TypeScript, ESLint, 537 vienetiniai testai, 34 migracijų testai ir production build/route generavimas.
 8. Atliktas tik Production Vercel kintamųjų **pavadinimų** auditas; reikšmės neišvestos ir Production niekas nepakeista.
-9. Windows ARM64 kompiuterio neprieinamą `libsql` native paketą apeina oficialus Codex x64 Node runtime; papildomi native paketai įdiegti tik lokaliame `node_modules`, `package.json` ir lock failai nepakeisti. Tai nėra Production/Vercel apribojimas.
+9. Windows ARM64 kompiuterio neprieinamą `libsql` native paketą apeina oficialus Codex x64 Node runtime; papildomi native paketai įdiegti tik lokaliame `node_modules`. Tai nėra Production/Vercel apribojimas.
+10. Preview `dpl_ceQBW1D3sGJb8UTw2QWaGhtqCx9o` maršrutų smoke PASS: `/no`, `/en`, `/no/blogg`, konkretus straipsnis, `robots.txt` ir `sitemap.xml` grąžina 200; `/admin-v2` ir `/user` nukreipia į login; privatūs `/api/admin/platform-health` ir `/api/admin/blob` be sesijos grąžina 401.
+11. Užfiksuotas ir ištaisytas Payload el. pašto perspėjimas: oficialus `@payloadcms/email-resend` 3.88.0 adapteris įjungiamas tik esant `RESEND_API_KEY`, todėl administratoriaus slaptažodžio atkūrimo laiškai nebelieka tik konsolėje.
+12. `private-media` kolekcija paslėpta techniniame CMS ir jos tiesioginis create/update/delete užblokuotas. Privatūs dokumentai toliau kuriami tik serverio helperiu į privatų Vercel Blob; apsaugoti skaitymo endpointai reikalauja administratoriaus arba konkrečiam darbui autorizuoto darbuotojo sesijos.
+13. `npm audit --omit=dev`: nėra critical/high; liko 6 moderate transitive Payload/Drizzle `esbuild` dev-server įrašai, kuriems tiekėjas šiuo metu nepateikia automatinės pataisos. Tai registruota kaip priimta P3 tiekėjo priklausomybė, ne kaip Production runtime blokatorius.
 
 ### Vienas prisijungimų blokas savininkui atsikėlus
 
 Šie veiksmai atliekami tik šia eilės tvarka:
 
-1. **Neon prisijungimas** — iš naujo autorizuoti CLI / naršyklę. Tada techninė patikra sukuria naują trumpalaikę Production kopiją iš nepakeistos `production` šakos, paleidžia galutinį migracijų rinkinį ir palygina legacy eilučių skaičius. Tai uždaro PROD-2.
-2. **Vercel Production Environment Variables** — savininkas įveda tik trūkstamus slaptus raktus; techninė patikra tvarko neslaptus `false` flagus ir tikrina vardus. Esami `DATABASE_URL`, `PAYLOAD_SECRET`, Blob ir Resend secretai neperrašomi.
-3. **Cloudflare Turnstile** — sukurti Production domenams skirtą site/secret porą, jei jos dar nėra.
-4. **Upstash/Vercel KV** — prijungti atskirą Production rate-limit resursą, ne staging resursą.
-5. **Google AI Studio ir Pexels** — tik jei PROD-8 metu iškart jungsime AI juodraščius; priešingu atveju šie prisijungimai atidedami, o flagai lieka `false`.
-6. **Resend** — tik patikrinti, kad `takfornyelse.as` tebėra Verified ir Production siuntėjas yra `post@takfornyelse.as`; naujo rakto be reikalo nekurti.
-7. **GitHub/Vercel deploy** — tik po naujo RC commit/tag ir žalio CI. Produkcijos deploy vykdomas gavus atskirą veiksmo momento patvirtinimą.
+1. **Vercel Git autorizacija** — atidaryti PR #52 `Vercel – landing-no` nepavykusio check nuorodą ir leisti `darbasnorvegija4-8212s-projects` komandai deployinti GitHub fork commitą. Po autorizacijos pakartoti Preview tam pačiam SHA `a349fe6f`.
+2. **Vercel CLI autorizacija** — jei Git check neatsigauna, atlikti `vercel login` / device patvirtinimą. Tai reikalinga tik naujausio Preview paleidimui; Production deploy vis tiek atskirai neleidžiamas be veiksmo momento patvirtinimo.
+3. **Neon prisijungimas** — iš naujo autorizuoti CLI / naršyklę. Tada techninė patikra sukuria naują trumpalaikę Production kopiją iš nepakeistos `production` šakos, paleidžia galutinį migracijų rinkinį ir palygina legacy eilučių skaičius. Tai uždaro PROD-2.
+4. **Vercel Production Environment Variables** — savininkas įveda tik trūkstamus slaptus raktus; techninė patikra tvarko neslaptus `false` flagus ir tikrina vardus. Esami `DATABASE_URL`, `PAYLOAD_SECRET`, Blob ir Resend secretai neperrašomi.
+5. **Cloudflare Turnstile** — sukurti Production domenams skirtą site/secret porą, jei jos dar nėra.
+6. **Upstash/Vercel KV** — prijungti atskirą Production rate-limit resursą, ne staging resursą.
+7. **Google AI Studio ir Pexels** — tik jei PROD-8 metu iškart jungsime AI juodraščius; priešingu atveju šie prisijungimai atidedami, o flagai lieka `false`.
+8. **Resend** — patikrinti, kad `takfornyelse.as` tebėra Verified ir Production siuntėjas yra `post@takfornyelse.as`; naujo rakto be reikalo nekurti. Po naujo Preview patikrinti administratoriaus slaptažodžio atkūrimą tik į kontroliuojamą savininko adresą.
+9. **Galutinis RC ir Production deploy** — tik kai šviežios Neon kopijos, naujausio Preview ir GitHub statusai yra PASS. Produkcijos deploy vykdomas gavus atskirą veiksmo momento patvirtinimą.
 
 Kol šis blokas neužbaigtas, negalima žymėti PROD-2/PROD-3 PASS, deployinti į Production, jungti realių automatizacijų ar siųsti sintetinės Production užklausos.
 
