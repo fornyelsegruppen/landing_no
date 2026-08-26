@@ -74,4 +74,20 @@ describe("case commercial context", () => {
     expect(context.workingQuote?.id).toBe(13);
     expect(context.workingContract?.quoteId).toBe(13);
   });
+
+  it("keeps every contract version linked to its own immutable PDF", () => {
+    const context = deriveCaseCommercialContext(
+      [
+        { id: 12, reference: "T-15-V2", version: 2, status: "accepted" },
+        { id: 10, reference: "T-15-V1", version: 1, status: "accepted" },
+      ],
+      [
+        { id: 22, quoteId: 12, reference: "K-15-V2", version: 2, status: "signed", signedDocumentId: 92, documentHash: "b".repeat(64) },
+        { id: 20, quoteId: 10, reference: "K-15-V1", version: 1, status: "signed", companySignedAt: "2026-08-26T10:05:00Z", companySignedDocumentId: 90, documentHash: "a".repeat(64) },
+      ],
+    );
+
+    expect(context.contractVersions.find((item) => item.reference === "K-15-V1")).toMatchObject({ pdfHref: "/api/admin/media/90", documentHash: "a".repeat(64) });
+    expect(context.contractVersions.find((item) => item.reference === "K-15-V2")).toMatchObject({ pdfHref: "/api/admin/media/92", documentHash: "b".repeat(64) });
+  });
 });

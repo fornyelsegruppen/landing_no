@@ -19,6 +19,8 @@ export type CaseCommercialVersion = {
   depositAmountIncVatOre?: number;
   signedAt?: string;
   companySignedAt?: string;
+  createdAt?: string;
+  documentHash?: string;
 };
 
 export type CaseCommercialContext = {
@@ -40,6 +42,8 @@ export type CaseCommercialQuoteInput = {
   maximumTotalIncVatOre?: number;
   depositBasisPoints?: number;
   depositAmountIncVatOre?: number;
+  createdAt?: string;
+  documentHash?: string;
 };
 
 export type CaseCommercialContractInput = {
@@ -53,6 +57,8 @@ export type CaseCommercialContractInput = {
   companySignedAt?: string;
   signedDocumentId?: number;
   companySignedDocumentId?: number;
+  createdAt?: string;
+  documentHash?: string;
 };
 
 const closedQuoteStatuses = new Set(["superseded", "revoked", "expired"]);
@@ -126,6 +132,8 @@ export function deriveCaseCommercialContext(
     maximumTotalIncVatOre: item.maximumTotalIncVatOre,
     depositBasisPoints: item.depositBasisPoints,
     depositAmountIncVatOre: item.depositAmountIncVatOre,
+    createdAt: item.createdAt,
+    documentHash: item.documentHash,
   }));
 
   const contractVersions = sortedContracts.map<CaseCommercialVersion>((item) => {
@@ -162,6 +170,8 @@ export function deriveCaseCommercialContext(
       depositAmountIncVatOre: quote?.depositAmountIncVatOre,
       signedAt: item.signedAt,
       companySignedAt: item.companySignedAt,
+      createdAt: item.createdAt,
+      documentHash: item.documentHash,
     };
   });
 

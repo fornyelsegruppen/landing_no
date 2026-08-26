@@ -789,6 +789,8 @@ export async function loadAdminCase(
         depositAmountIncVatOre: numberValue(
           pricing?.depositAmountIncVatOre,
         ),
+        createdAt: stringValue(item.createdAt),
+        documentHash: stringValue(item.snapshotHash),
       };
     }),
     contracts.map((item) => ({
@@ -802,6 +804,8 @@ export async function loadAdminCase(
       companySignedAt: stringValue(item.companySignedAt),
       signedDocumentId: relationId(item.signedDocument),
       companySignedDocumentId: relationId(item.companySignedDocument),
+      createdAt: stringValue(item.createdAt),
+      documentHash: stringValue(item.documentHash),
     })),
   );
   const priceReferences = canonicalPriceReferences(leadId, prices, quotes);

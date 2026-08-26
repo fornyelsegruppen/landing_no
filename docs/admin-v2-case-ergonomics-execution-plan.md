@@ -166,6 +166,8 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E3 — versijų grandinė ir tiesioginė dokumento peržiūra
 
+**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e3-document-version-chain.md`.
+
 **Priklausomybė:** E2  
 **Tikslas:** administratorius vienu žvilgsniu supranta dokumentų istoriją ir vienu paspaudimu patikrina konkrečią versiją.
 

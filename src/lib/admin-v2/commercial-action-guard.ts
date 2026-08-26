@@ -78,6 +78,8 @@ async function loadCommercialContext(payload: Payload, leadId: number) {
       version: item.version,
       status: item.status,
       supersedesId: relationId(item.supersedes),
+      createdAt: stringValue(item.createdAt),
+      documentHash: stringValue(item.snapshotHash),
     })),
     contractsResult.docs.map((item) => ({
       id: Number(item.id),
@@ -90,6 +92,8 @@ async function loadCommercialContext(payload: Payload, leadId: number) {
       companySignedAt: stringValue(item.companySignedAt),
       signedDocumentId: relationId(item.signedDocument),
       companySignedDocumentId: relationId(item.companySignedDocument),
+      createdAt: stringValue(item.createdAt),
+      documentHash: stringValue(item.documentHash),
     })),
   );
 }

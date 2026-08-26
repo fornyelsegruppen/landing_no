@@ -15,6 +15,7 @@ import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
 import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
+import { CaseVersionHistory } from "@/components/admin-v2/case-version-history";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import {
@@ -371,6 +372,7 @@ export default async function AdminCasePage({
         className="bg-background-elevated/60 flex gap-2 overflow-x-auto rounded-2xl border border-white/10 p-2 text-sm font-semibold"
       >
         {[
+          ["version-history-section", copy.versionHistory],
           ["customer-section", copy.customer],
           ["measurement-section", copy.measurement],
           ["price-quote-section", copy.quote],
@@ -389,6 +391,15 @@ export default async function AdminCasePage({
           </a>
         ))}
       </nav>
+
+      <CaseVersionHistory
+        contracts={caseData.commercial.contractVersions}
+        copy={copy}
+        formatDate={formatDate}
+        formatMoney={nok}
+        locale={user.interfaceLanguage}
+        quotes={caseData.commercial.quoteVersions}
+      />
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
         <div className="min-w-0 space-y-6">
