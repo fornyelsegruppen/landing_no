@@ -10,6 +10,7 @@ import {
 } from "@/lib/content-paths";
 import type { Locale } from "@/lib/site";
 import { availablePostLocales as editorialAvailablePostLocales } from "@/lib/blog/editorial-policy";
+import { publishedPostWhere } from "@/lib/blog/publication-visibility";
 
 export type CmsContentDocument = {
   id: number | string;
@@ -31,6 +32,15 @@ export type CmsContentDocument = {
 };
 
 export type CmsPostDocument = CmsContentDocument & {
+  editorialStatus?:
+    | "draft"
+    | "ai_qa"
+    | "human_review"
+    | "rejected"
+    | "approved"
+    | "scheduled"
+    | "published"
+    | null;
   imageAlt?: string | null;
   heroImage?:
     | number
@@ -139,6 +149,12 @@ function slugWhere(slug: string, includeDrafts: boolean): Where {
     : publishedWhere(slug);
 }
 
+function postSlugWhere(slug: string, includeDrafts: boolean): Where {
+  return includeDrafts
+    ? { slug: { equals: slug } }
+    : publishedPostWhere(slug);
+}
+
 const findPageBySlug = cache(
   async (
     slug: string,
@@ -176,7 +192,7 @@ const findPostBySlug = cache(
       limit: 1,
       overrideAccess: true,
       pagination: false,
-      where: slugWhere(slug, includeDrafts),
+      where: postSlugWhere(slug, includeDrafts),
     });
 
     return (result.docs[0] as unknown as CmsPostDocument | undefined) ?? null;
@@ -194,7 +210,7 @@ const findPosts = cache(
       overrideAccess: true,
       pagination: false,
       sort: "-publishedAt",
-      where: includeDrafts ? undefined : publishedWhere(),
+      where: includeDrafts ? undefined : publishedPostWhere(),
     });
 
     return result.docs as unknown as CmsPostDocument[];
@@ -269,7 +285,7 @@ export async function getPublishedPosts(): Promise<CmsPostDocument[]> {
       overrideAccess: true,
       pagination: false,
       sort: "-publishedAt",
-      where: publishedWhere(),
+      where: publishedPostWhere(),
     });
 
     return result.docs as unknown as CmsPostDocument[];

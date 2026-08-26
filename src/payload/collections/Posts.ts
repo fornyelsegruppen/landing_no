@@ -8,7 +8,7 @@ import { reviewerNameForUser } from "../../lib/blog/reviewer";
 import {
   adminOnly,
   adminsAndEditors,
-  authenticatedOrPublished,
+  authenticatedOrPublishedPost,
   userIsAdmin,
 } from "../access/roles";
 
@@ -40,7 +40,7 @@ export const Posts: CollectionConfig = {
   access: {
     create: adminOnly,
     delete: adminOnly,
-    read: authenticatedOrPublished,
+    read: authenticatedOrPublishedPost,
     readVersions: adminsAndEditors,
     update: adminsAndEditors,
   },

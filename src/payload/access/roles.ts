@@ -1,4 +1,4 @@
-import type { Access, FieldAccess, PayloadRequest } from "payload";
+import type { Access, FieldAccess, PayloadRequest, Where } from "payload";
 
 export type UserRole = "admin" | "worker";
 
@@ -43,6 +43,17 @@ export const authenticatedOrPublished: Access = ({ req }) => {
       equals: "published",
     },
   };
+};
+
+export const authenticatedOrPublishedPost: Access = ({ req }) => {
+  if (userIsActive(req.user)) return true;
+
+  const conditions: Where[] = [
+    { _status: { equals: "published" } },
+    { editorialStatus: { equals: "published" } },
+  ];
+
+  return { and: conditions };
 };
 
 export const adminOnlyField: FieldAccess = ({ req }) => userIsAdmin(req.user);
