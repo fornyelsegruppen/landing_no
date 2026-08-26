@@ -38,6 +38,14 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
 
   async function run() {
     if (!request || busy) return;
+    if (["approve_package", "approve_quote", "issue_quote"].includes(action.kind)) {
+      const unsavedCommercialEditor = document.querySelector<HTMLElement>('#commercial-editor[data-commercial-dirty="true"]');
+      if (unsavedCommercialEditor) {
+        unsavedCommercialEditor.scrollIntoView({ behavior: "smooth", block: "center" });
+        window.alert(copy.unsavedCommercialChanges);
+        return;
+      }
+    }
     if (action.kind === "send_closure_confirmation" && !window.confirm(copy.confirmClosureSend)) return;
     if (action.kind !== "send_closure_confirmation" && caseActionRequiresConfirmation(action.kind) && !window.confirm(copy.confirmEconomicAction)) return;
     setBusy(true);
