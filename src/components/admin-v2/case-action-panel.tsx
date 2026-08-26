@@ -8,32 +8,46 @@ import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { CompanySignaturePanel } from "./company-signature-panel";
 
-function requestFor(action: CaseNextAction, leadId: number) {
+type ActionVersionContext = {
+  contractReference?: string;
+  contractVersion?: number;
+  leadRevision: number;
+  quoteDocumentHash?: string;
+  quoteReference?: string;
+  quoteVersion?: number;
+};
+
+function requestFor(action: CaseNextAction, leadId: number, version: ActionVersionContext) {
+  const leadContext = { expectedRevision: version.leadRevision };
+  const quoteContext = {
+    expectedDocumentHash: version.quoteDocumentHash,
+    expectedVersion: version.quoteVersion,
+  };
   switch (action.kind) {
-    case "generate_reply": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "generate_reply" } };
-    case "prepare_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "prepare_package" } };
-    case "approve_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_package" } };
-    case "approve_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId } };
-    case "send_closure_confirmation": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId } };
-    case "retry_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "retry_send", messageId: action.targetId } };
+    case "generate_reply": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "generate_reply", ...leadContext } };
+    case "prepare_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "prepare_package", ...leadContext } };
+    case "approve_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_package", ...leadContext } };
+    case "approve_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId, ...leadContext } };
+    case "send_closure_confirmation": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId, ...leadContext } };
+    case "retry_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "retry_send", messageId: action.targetId, ...leadContext } };
     case "approve_measurement": return { endpoint: `/api/admin/measurements/${action.targetId}`, body: { action: "approve" } };
     case "calculate_price": return { endpoint: `/api/admin/measurements/${action.targetId}`, body: { action: "calculate_price" } };
     case "create_quote": return { endpoint: "/api/admin/quotes", body: { calculationId: action.targetId } };
-    case "approve_quote": return { endpoint: `/api/admin/quotes/${action.targetId}`, body: { action: "approve" } };
-    case "issue_quote": return { endpoint: `/api/admin/quotes/${action.targetId}`, body: { action: "issue" } };
+    case "approve_quote": return { endpoint: `/api/admin/quotes/${action.targetId}`, body: { action: "approve", ...quoteContext } };
+    case "issue_quote": return { endpoint: `/api/admin/quotes/${action.targetId}`, body: { action: "issue", ...quoteContext } };
     default: return null;
   }
 }
 
-export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, leadId, locale }: { action: CaseNextAction; contractDocumentHash?: string; defaultSigner: string; leadId: number; locale: PanelLocale }) {
+export function CaseActionPanel({ action, actionLabel, contractDocumentHash, defaultSigner, leadId, locale, versionContext }: { action: CaseNextAction; actionLabel: string; contractDocumentHash?: string; defaultSigner: string; leadId: number; locale: PanelLocale; versionContext: ActionVersionContext }) {
   const copy = getAdminCaseCopy(locale);
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const request = requestFor(action, leadId);
+  const request = requestFor(action, leadId, versionContext);
 
   if (action.kind === "company_sign_contract" && action.targetId && contractDocumentHash) {
-    return <CompanySignaturePanel contractId={action.targetId} defaultSigner={defaultSigner} documentHash={contractDocumentHash} locale={locale} />;
+    return <CompanySignaturePanel actionLabel={actionLabel} contractId={action.targetId} contractReference={versionContext.contractReference} contractVersion={versionContext.contractVersion} defaultSigner={defaultSigner} documentHash={contractDocumentHash} locale={locale} />;
   }
 
   async function run() {
@@ -46,8 +60,8 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
         return;
       }
     }
-    if (action.kind === "send_closure_confirmation" && !window.confirm(copy.confirmClosureSend)) return;
-    if (action.kind !== "send_closure_confirmation" && caseActionRequiresConfirmation(action.kind) && !window.confirm(copy.confirmEconomicAction)) return;
+    if (action.kind === "send_closure_confirmation" && !window.confirm(`${copy.confirmClosureSend}\n\n${actionLabel}`)) return;
+    if (action.kind !== "send_closure_confirmation" && caseActionRequiresConfirmation(action.kind) && !window.confirm(`${copy.confirmEconomicAction}\n\n${actionLabel}`)) return;
     setBusy(true);
     setNotice("");
     try {
@@ -83,12 +97,12 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
     <div>
       {request ? (
         <button className={`min-h-12 rounded-xl px-5 font-bold shadow-lg transition disabled:opacity-60 ${action.kind === "send_closure_confirmation" ? "bg-danger text-white shadow-danger/20 hover:brightness-110" : "bg-accent text-accent-foreground shadow-accent/10 hover:bg-accent-hover"}`} disabled={busy} onClick={() => void run()} type="button">
-          {busy ? copy.processing : copy.actionLabels[action.kind]}
+          {busy ? copy.processing : actionLabel}
         </button>
       ) : technicalTarget ? (
-        <Link className="inline-flex min-h-12 items-center rounded-xl border border-accent/50 px-5 font-bold text-accent hover:bg-accent/10" href={technicalTarget}>{copy.actionLabels[action.kind]}</Link>
+        <Link className="inline-flex min-h-12 items-center rounded-xl border border-accent/50 px-5 font-bold text-accent hover:bg-accent/10" href={technicalTarget}>{actionLabel}</Link>
       ) : (
-        <p className="font-semibold text-white/80">{copy.actionLabels[action.kind]}</p>
+        <p className="font-semibold text-white/80">{actionLabel}</p>
       )}
       {notice ? <p aria-live="polite" className="mt-3 text-sm text-muted-foreground" role="status">{notice}</p> : null}
     </div>

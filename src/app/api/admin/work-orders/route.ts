@@ -18,6 +18,7 @@ const schema = z.object({
   assignedWorkerId: z.number().int().positive().optional(),
   contractId: z.number().int().positive(),
   expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  expectedVersion: z.number().int().positive().optional(),
   scheduledLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).optional(),
 }).refine((value) => !value.scheduledLocal || value.assignedWorkerId, {
   message: "An employee is required before scheduling",
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
     const leadId = typeof quote.lead === "number" ? quote.lead : quote.lead?.id;
     if (!leadId) return NextResponse.json({ error: "Contract customer case is missing" }, { status: 409 });
-    await assertWorkOrderContractTarget(payload, { leadId, contractId: parsed.data.contractId });
+    await assertWorkOrderContractTarget(payload, { leadId, contractId: parsed.data.contractId, expectedVersion: parsed.data.expectedVersion });
     assertExpectedDocumentHash({
       expectedDocumentHash: parsed.data.expectedDocumentHash,
       currentDocumentHash: typeof contract.documentHash === "string" ? contract.documentHash : undefined,

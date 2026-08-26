@@ -23,6 +23,9 @@ export function WorkOrderPlanningPanel(props: {
   arrivalWindow?: string;
   assignedWorkerId?: number;
   contractId: number;
+  contractDocumentHash?: string;
+  contractReference?: string;
+  contractVersion?: number;
   locale: PanelLocale;
   scheduledLocal?: string;
   status?: string;
@@ -60,6 +63,7 @@ export function WorkOrderPlanningPanel(props: {
       return;
     }
     const scheduledLocal = `${scheduledDate}T${arrivalStart}`;
+    if (creating && !window.confirm(`${copy.confirmEconomicAction}\n\n${copy.createAndPlan}${props.contractReference ? ` ${props.contractReference}` : ""}`)) return;
     setBusy(true);
     setNotice("");
     try {
@@ -73,6 +77,8 @@ export function WorkOrderPlanningPanel(props: {
           arrivalWindow,
           ...(workerId ? { assignedWorkerId: Number(workerId) } : {}),
           contractId: props.contractId,
+          expectedDocumentHash: props.contractDocumentHash,
+          expectedVersion: props.contractVersion,
           ...(creating ? scheduledLocal ? { scheduledLocal } : {} : { scheduledLocal }),
         }),
       });
@@ -110,6 +116,7 @@ export function WorkOrderPlanningPanel(props: {
   return (
     <div className="mt-5 rounded-2xl border border-accent/30 bg-accent/5 p-4" id="work-planning">
       <h3 className="font-bold">{copy.workPlanning}</h3>
+      {props.contractReference ? <p className="text-accent mt-1 text-sm font-bold">{props.contractReference}</p> : null}
       <div className="mt-4 grid min-w-0 gap-4">
         <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.chooseEmployee}</span><select className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} onChange={(event) => setWorkerId(event.target.value)} required value={workerId}><option value="">{copy.noEmployee}</option>{props.workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.name}{worker.phone ? ` · ${worker.phone}` : ""}</option>)}</select></label>
         <label className="grid min-w-0 gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.workDate}</span><input className="min-h-12 min-w-0 w-full rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={busy} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setScheduledDate(event.target.value)} required type="date" value={scheduledDate} /></label>

@@ -144,12 +144,16 @@ export async function assertCurrentContractTarget(
 
 export async function assertWorkOrderContractTarget(
   payload: Payload,
-  input: { leadId: number; contractId: number },
+  input: { leadId: number; contractId: number; expectedVersion?: number },
 ) {
   const context = await loadCommercialContext(payload, input.leadId);
   const effective = context.effectiveContract;
   const working = context.workingContract;
-  if (!effective || effective.id !== input.contractId) {
+  if (
+    !effective ||
+    effective.id !== input.contractId ||
+    (input.expectedVersion !== undefined && effective.version !== input.expectedVersion)
+  ) {
     throw new StaleCommercialContextError(
       effective
         ? `Arbeidsordren må opprettes fra gjeldende kontrakt ${effective.reference}.`

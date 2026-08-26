@@ -192,6 +192,8 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E4 — kontekstinis kitas veiksmas ir kontrolinė suvestinė
 
+**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e4-contextual-action-preflight.md`.
+
 **Priklausomybė:** E3  
 **Tikslas:** administratorius prieš paspausdamas aiškiai mato, ką tvirtina ir kas bus atlikta.
 

@@ -6,7 +6,10 @@ import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 export function CompanySignaturePanel(props: {
+  actionLabel: string;
   contractId: number;
+  contractReference?: string;
+  contractVersion?: number;
   defaultSigner: string;
   documentHash: string;
   locale: PanelLocale;
@@ -71,13 +74,14 @@ export function CompanySignaturePanel(props: {
       setNotice(copy.signatureRequired);
       return;
     }
+    if (!window.confirm(`${copy.confirmEconomicAction}\n\n${props.actionLabel}`)) return;
     setBusy(true);
     setNotice("");
     try {
       const response = await fetch(`/api/admin/contracts/${props.contractId}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signerName, signatureData: canvas.toDataURL("image/png"), expectedDocumentHash: props.documentHash }),
+        body: JSON.stringify({ signerName, signatureData: canvas.toDataURL("image/png"), expectedDocumentHash: props.documentHash, expectedVersion: props.contractVersion }),
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || copy.actionFailed);
@@ -92,6 +96,7 @@ export function CompanySignaturePanel(props: {
 
   return (
     <form className="w-full max-w-xl rounded-2xl border border-accent/35 bg-black/20 p-4" onSubmit={submit}>
+      {props.contractReference ? <p className="text-accent mb-3 text-sm font-bold">{props.contractReference}</p> : null}
       <label className="block text-sm font-semibold" htmlFor="companySignerName">{copy.signerName}</label>
       <input className="mt-2 min-h-12 w-full rounded-xl border border-white/15 bg-background px-4" defaultValue={props.defaultSigner} id="companySignerName" name="signerName" required />
       <fieldset className="mt-4">
@@ -99,7 +104,7 @@ export function CompanySignaturePanel(props: {
         <canvas aria-label={copy.drawSignature} className="mt-2 h-36 w-full touch-none rounded-xl bg-white" onPointerCancel={stop} onPointerDown={start} onPointerMove={move} onPointerUp={stop} ref={canvasRef} />
         <button className="mt-2 min-h-10 text-sm underline" onClick={clear} type="button">{copy.clearSignature}</button>
       </fieldset>
-      <button className="mt-3 min-h-12 w-full rounded-xl bg-accent px-5 font-bold text-accent-foreground hover:bg-accent-hover disabled:opacity-50" disabled={busy || !hasSignature} type="submit">{busy ? copy.processing : copy.signContract}</button>
+      <button className="mt-3 min-h-12 w-full rounded-xl bg-accent px-5 font-bold text-accent-foreground hover:bg-accent-hover disabled:opacity-50" disabled={busy || !hasSignature} type="submit">{busy ? copy.processing : props.actionLabel}</button>
       {notice ? <p aria-live="polite" className="mt-3 text-sm text-muted-foreground" role="status">{notice}</p> : null}
     </form>
   );

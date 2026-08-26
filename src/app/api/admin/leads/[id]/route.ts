@@ -34,7 +34,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("mark_reviewed") }),
   z.object({ action: z.literal("update_intake"), expectedRevision: z.number().int().positive(), address: z.string().trim().min(2).max(200), postal: z.string().regex(/^\d{4}$/), city: z.string().trim().max(100).optional(), inquiryType: z.enum(["takvask", "takvask_impregnering", "impregnering", "takmaling", "nytt_tak", "usikker"]) }),
   z.object({ action: z.literal("close") }),
-]);
+]).and(z.object({ expectedRevision: z.number().int().positive().optional() }));
 
 function relationId(value: unknown) {
   if (typeof value === "number") return value;
@@ -89,6 +89,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const parsed = actionSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+    const currentRevision = typeof lead.caseRevision === "number" ? lead.caseRevision : 1;
+    if (parsed.data.expectedRevision !== undefined && parsed.data.expectedRevision !== currentRevision) {
+      return NextResponse.json({
+        error: "Case was changed by another administrator. Refresh before continuing.",
+        code: "CASE_REVISION_CONFLICT",
+        expected: parsed.data.expectedRevision,
+        actual: currentRevision,
+      }, { status: 409 });
+    }
     let result: Record<string, unknown> = {};
 
     if (parsed.data.action === "generate_reply") {
