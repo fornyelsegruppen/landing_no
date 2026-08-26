@@ -3,7 +3,7 @@
 **Parengta:** 2026-08-26  
 **Aplinka:** pirmiausia tik `https://takfornyelse-staging.vercel.app`  
 **Produkcija:** neliečiama be atskiro savininko `GO`  
-**Būsena:** vykdoma; B0–B2 užbaigti, B3 yra kitas aktyvus etapas  
+**Būsena:** vykdoma; B0–B3 užbaigti, B4 yra kitas aktyvus etapas  
 **Vykdymo taisyklė:** vienu metu vykdoma tik viena fazė; nauja fazė nepradedama, kol ankstesnė neturi visų PASS įrodymų
 
 ## 1. Tikslas
@@ -170,6 +170,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 - įrašytas B2 `GO`.
 
 ### B3 — naujausių straipsnių blokas pagrindiniame puslapyje
+
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-b3-home-latest-guides.md`.
 
 **Priklausomybė:** B2  
 **Tikslas:** publikuotas turinys gauna vidines nuorodas ir matomumą iš stipriausio svetainės puslapio.
