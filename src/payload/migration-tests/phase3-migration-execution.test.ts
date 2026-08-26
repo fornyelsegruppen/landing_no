@@ -83,6 +83,58 @@ describe("phase three blog migration", () => {
     ]);
   }, 30_000);
 
+  it("adopts the legacy production posts_v table before extending versions", async () => {
+    await database.exec('ALTER TABLE "_posts_v" ADD COLUMN "autosave" boolean');
+    await database.exec('ALTER TABLE "_posts_v" RENAME TO "posts_v"');
+
+    await database.exec(migrationSql("up"));
+
+    const tables = await database.query<{ table_name: string }>(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_type = 'BASE TABLE'
+        AND table_name IN ('posts_v', '_posts_v')
+      ORDER BY table_name
+    `);
+    expect(tables.rows.map(({ table_name }) => table_name)).toEqual([
+      "_posts_v",
+    ]);
+
+    const autosave = await database.query<{
+      column_name: string;
+      data_type: string;
+    }>(`
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = '_posts_v'
+        AND column_name = 'autosave'
+    `);
+    expect(autosave.rows).toEqual([
+      { column_name: "autosave", data_type: "boolean" },
+    ]);
+
+    const compatibilityView = await database.query<{ table_name: string }>(`
+      SELECT table_name FROM information_schema.views
+      WHERE table_schema = 'public' AND table_name = 'posts_v'
+    `);
+    expect(compatibilityView.rows).toEqual([{ table_name: "posts_v" }]);
+
+    await database.exec('INSERT INTO "posts_v" ("autosave") VALUES (true)');
+    const compatibilityWrite = await database.query<{ autosave: boolean }>(
+      'SELECT "autosave" FROM "_posts_v" ORDER BY "id" DESC LIMIT 1',
+    );
+    expect(compatibilityWrite.rows).toEqual([{ autosave: true }]);
+
+    await database.exec(migrationSql("down"));
+
+    const restoredTable = await database.query<{ table_name: string }>(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'posts_v'
+    `);
+    expect(restoredTable.rows).toEqual([{ table_name: "posts_v" }]);
+  }, 30_000);
+
   it("rolls back the phase without dropping the existing CMS tables", async () => {
     await database.exec(migrationSql("up"));
     await database.exec(migrationSql("down"));

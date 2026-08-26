@@ -24,7 +24,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   DELETE FROM "users_sessions"
     WHERE "_parent_id" IN (SELECT "id" FROM "users" WHERE "role" = 'editor');
   UPDATE "users" SET "role" = 'worker', "active" = false WHERE "role" = 'editor';
-  DROP TYPE "public"."enum_users_role";
+  DROP TYPE IF EXISTS "public"."enum_users_role";
   CREATE TYPE "public"."enum_users_role" AS ENUM('admin', 'worker');
   ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'admin'::"public"."enum_users_role";
   ALTER TABLE "users" ALTER COLUMN "role" SET DATA TYPE "public"."enum_users_role" USING "role"::"public"."enum_users_role";
@@ -52,7 +52,7 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   ALTER TABLE "users" ALTER COLUMN "role" SET DATA TYPE text;
   ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'admin'::text;
   UPDATE "users" SET "role" = 'editor' WHERE "role" = 'worker';
-  DROP TYPE "public"."enum_users_role";
+  DROP TYPE IF EXISTS "public"."enum_users_role";
   CREATE TYPE "public"."enum_users_role" AS ENUM('admin', 'editor');
   ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'admin'::"public"."enum_users_role";
   ALTER TABLE "users" ALTER COLUMN "role" SET DATA TYPE "public"."enum_users_role" USING "role"::"public"."enum_users_role";

@@ -2,7 +2,17 @@ import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
 
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
-   CREATE TYPE "public"."enum_posts_editorial_status" AS ENUM('draft', 'ai_qa', 'human_review', 'approved', 'scheduled', 'published');
+   DO $legacy_posts_versions$
+   BEGIN
+     IF to_regclass('public._posts_v') IS NULL
+        AND to_regclass('public.posts_v') IS NOT NULL THEN
+       ALTER TABLE "public"."posts_v" RENAME TO "_posts_v";
+       EXECUTE 'CREATE VIEW "public"."posts_v" AS SELECT * FROM "public"."_posts_v"';
+     END IF;
+   END
+   $legacy_posts_versions$;
+
+  CREATE TYPE "public"."enum_posts_editorial_status" AS ENUM('draft', 'ai_qa', 'human_review', 'approved', 'scheduled', 'published');
   CREATE TYPE "public"."enum_posts_search_intent" AS ENUM('informational', 'commercial', 'local', 'comparison');
   CREATE TYPE "public"."enum_posts_cta_variant" AS ENUM('assessment', 'wash', 'renewal', 'new_roof');
   CREATE TYPE "public"."enum__posts_v_version_editorial_status" AS ENUM('draft', 'ai_qa', 'human_review', 'approved', 'scheduled', 'published');
@@ -171,7 +181,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   ALTER TABLE "_posts_v" ADD COLUMN "version_cta_variant" "enum__posts_v_version_cta_variant" DEFAULT 'assessment';
   ALTER TABLE "_posts_v" ADD COLUMN "version_last_content_audit_at" timestamp(3) with time zone;
   ALTER TABLE "_posts_v" ADD COLUMN "version_performance_notes" varchar;
-  ALTER TABLE "_posts_v" ADD COLUMN "autosave" boolean;
+  ALTER TABLE "_posts_v" ADD COLUMN IF NOT EXISTS "autosave" boolean;
   ALTER TABLE "leads" ADD COLUMN "content_source_path" varchar;
   ALTER TABLE "payload_locked_documents_rels" ADD COLUMN "seo_topics_id" integer;
   ALTER TABLE "payload_locked_documents_rels" ADD COLUMN "seo_runs_id" integer;
@@ -338,7 +348,6 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   ALTER TABLE "_posts_v" DROP COLUMN "version_cta_variant";
   ALTER TABLE "_posts_v" DROP COLUMN "version_last_content_audit_at";
   ALTER TABLE "_posts_v" DROP COLUMN "version_performance_notes";
-  ALTER TABLE "_posts_v" DROP COLUMN "autosave";
   ALTER TABLE "leads" DROP COLUMN "content_source_path";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "seo_topics_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "seo_runs_id";
@@ -351,5 +360,18 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP TYPE "public"."enum_seo_topics_search_intent";
   DROP TYPE "public"."enum_seo_topics_source";
   DROP TYPE "public"."enum_seo_topics_status";
-  DROP TYPE "public"."enum_seo_runs_status";`)
+  DROP TYPE "public"."enum_seo_runs_status";
+  DO $restore_legacy_posts_versions$
+  BEGIN
+    IF EXISTS (
+      SELECT 1
+      FROM pg_class
+      WHERE oid = to_regclass('public.posts_v')
+        AND relkind = 'v'
+    ) THEN
+      DROP VIEW "public"."posts_v";
+      ALTER TABLE "public"."_posts_v" RENAME TO "posts_v";
+    END IF;
+  END
+  $restore_legacy_posts_versions$;`)
 }

@@ -83,6 +83,33 @@ describe("phase two account migration", () => {
     expect(sessions.rows[0]?.count).toBe(0);
   }, 30_000);
 
+  it("migrates the production legacy varchar role when no enum type exists", async () => {
+    await database.exec(`
+      ALTER TABLE users ALTER COLUMN role DROP DEFAULT;
+      ALTER TABLE users ALTER COLUMN role SET DATA TYPE varchar USING role::text;
+      ALTER TABLE users ALTER COLUMN role SET DEFAULT 'admin';
+      DROP TYPE enum_users_role;
+    `);
+
+    await database.exec(migrationSql("up"));
+    await database.exec(migrationSql("up", defaultRoleSource));
+
+    const users = await database.query<{
+      active: boolean;
+      id: number;
+      role: string;
+    }>("SELECT id, role::text, active FROM users ORDER BY id");
+    const workOrders = await database.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM work_orders",
+    );
+
+    expect(users.rows).toEqual([
+      { id: 1, role: "admin", active: true },
+      { id: 2, role: "worker", active: false },
+    ]);
+    expect(workOrders.rows[0]?.count).toBe(0);
+  }, 30_000);
+
   it("creates the assignment model and rolls back without invalid role casts", async () => {
     await database.exec(migrationSql("up"));
     await database.exec(migrationSql("up", defaultRoleSource));
