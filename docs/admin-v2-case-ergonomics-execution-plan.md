@@ -220,6 +220,8 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E5 — automatinis rezultatas, atsinaujinimas ir tęstinumas
 
+**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e5-action-feedback-refresh.md`.
+
 **Priklausomybė:** E4  
 **Tikslas:** po paspaudimo administratorius iš karto žino, ar veiksmas suveikė ir ką daryti toliau.
 

@@ -7,6 +7,7 @@ import { caseActionRequiresConfirmation, type CaseNextAction } from "@/lib/admin
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { CompanySignaturePanel } from "./company-signature-panel";
+import { interpretAdminActionResult, type AdminActionFeedback, type AdminActionResponse } from "@/lib/admin-v2/action-result";
 
 type ActionVersionContext = {
   contractReference?: string;
@@ -39,11 +40,11 @@ function requestFor(action: CaseNextAction, leadId: number, version: ActionVersi
   }
 }
 
-export function CaseActionPanel({ action, actionLabel, contractDocumentHash, defaultSigner, leadId, locale, versionContext }: { action: CaseNextAction; actionLabel: string; contractDocumentHash?: string; defaultSigner: string; leadId: number; locale: PanelLocale; versionContext: ActionVersionContext }) {
+export function CaseActionPanel({ action, actionLabel, actionReference, contractDocumentHash, defaultSigner, leadId, locale, versionContext }: { action: CaseNextAction; actionLabel: string; actionReference?: string; contractDocumentHash?: string; defaultSigner: string; leadId: number; locale: PanelLocale; versionContext: ActionVersionContext }) {
   const copy = getAdminCaseCopy(locale);
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [feedback, setFeedback] = useState<AdminActionFeedback | null>(null);
   const request = requestFor(action, leadId, versionContext);
 
   if (action.kind === "company_sign_contract" && action.targetId && contractDocumentHash) {
@@ -63,20 +64,36 @@ export function CaseActionPanel({ action, actionLabel, contractDocumentHash, def
     if (action.kind === "send_closure_confirmation" && !window.confirm(`${copy.confirmClosureSend}\n\n${actionLabel}`)) return;
     if (action.kind !== "send_closure_confirmation" && caseActionRequiresConfirmation(action.kind) && !window.confirm(`${copy.confirmEconomicAction}\n\n${actionLabel}`)) return;
     setBusy(true);
-    setNotice("");
+    setFeedback(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
     try {
       const response = await fetch(request.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request.body),
+        signal: controller.signal,
       });
-      const result = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(result.error || copy.actionFailed);
-      setNotice(copy.actionDone);
-      router.refresh();
+      const result = await response.json().catch(() => ({})) as AdminActionResponse;
+      const nextFeedback = interpretAdminActionResult({
+        fallbackError: copy.actionFailed,
+        ok: response.ok,
+        queuedMessage: copy.actionSavedQueued,
+        reference: actionReference,
+        result,
+        staleMessage: copy.staleAction,
+        successMessage: copy.actionDone,
+      });
+      setFeedback(nextFeedback);
+      if (nextFeedback.refresh) router.refresh();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : copy.actionFailed);
+      setFeedback({
+        kind: "error",
+        message: error instanceof DOMException && error.name === "AbortError" ? copy.networkTimeout : error instanceof Error ? error.message : copy.actionFailed,
+        refresh: false,
+      });
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
     }
   }
@@ -104,7 +121,7 @@ export function CaseActionPanel({ action, actionLabel, contractDocumentHash, def
       ) : (
         <p className="font-semibold text-white/80">{actionLabel}</p>
       )}
-      {notice ? <p aria-live="polite" className="mt-3 text-sm text-muted-foreground" role="status">{notice}</p> : null}
+      {feedback ? <p aria-live="polite" className={`mt-3 rounded-xl border px-3 py-2 text-sm ${feedback.kind === "error" ? "border-danger/35 bg-danger/10 text-red-100" : feedback.kind === "stale" ? "border-warning/35 bg-warning/10 text-amber-100" : feedback.kind === "queued" ? "border-accent/35 bg-accent/10 text-white/85" : "border-success/35 bg-success/10 text-green-100"}`} role={feedback.kind === "error" ? "alert" : "status"}>{feedback.message}</p> : null}
     </div>
   );
 }

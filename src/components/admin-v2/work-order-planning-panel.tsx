@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import { interpretAdminActionResult, type AdminActionFeedback, type AdminActionResponse } from "@/lib/admin-v2/action-result";
 import {
   arrivalWindowFromTimes,
   defaultArrivalEndTime,
@@ -46,26 +47,28 @@ export function WorkOrderPlanningPanel(props: {
   const [adminNote, setAdminNote] = useState(props.adminNote || "");
   const [planningReason, setPlanningReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [feedback, setFeedback] = useState<AdminActionFeedback | null>(null);
   const creating = !props.workOrderId;
 
   async function save() {
     if (busy) return;
     if (!workerId || !scheduledDate || !arrivalStart || !arrivalEnd) {
-      setNotice(copy.completePlanningRequired);
+      setFeedback({ kind: "error", message: copy.completePlanningRequired, refresh: false });
       return;
     }
     let arrivalWindow: string;
     try {
       arrivalWindow = arrivalWindowFromTimes(arrivalStart, arrivalEnd);
     } catch {
-      setNotice(copy.arrivalEndAfterStart);
+      setFeedback({ kind: "error", message: copy.arrivalEndAfterStart, refresh: false });
       return;
     }
     const scheduledLocal = `${scheduledDate}T${arrivalStart}`;
     if (creating && !window.confirm(`${copy.confirmEconomicAction}\n\n${copy.createAndPlan}${props.contractReference ? ` ${props.contractReference}` : ""}`)) return;
     setBusy(true);
-    setNotice("");
+    setFeedback(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
     try {
       const response = await fetch(creating ? "/api/admin/work-orders" : `/api/admin/work-orders/${props.workOrderId}`, {
         method: creating ? "POST" : "PATCH",
@@ -81,14 +84,16 @@ export function WorkOrderPlanningPanel(props: {
           expectedVersion: props.contractVersion,
           ...(creating ? scheduledLocal ? { scheduledLocal } : {} : { scheduledLocal }),
         }),
+        signal: controller.signal,
       });
-      const result = await response.json().catch(() => ({})) as { error?: string; notification?: "sent" | "queued" | "skipped" };
-      if (!response.ok) throw new Error(result.error || copy.actionFailed);
-      setNotice(result.notification === "sent" ? copy.planningSavedAndNotified : result.notification === "queued" ? copy.planningSavedNotificationQueued : copy.actionDone);
-      router.refresh();
+      const result = await response.json().catch(() => ({})) as AdminActionResponse;
+      const nextFeedback = interpretAdminActionResult({ fallbackError: copy.actionFailed, ok: response.ok, queuedMessage: copy.planningSavedNotificationQueued, reference: props.contractReference, result, staleMessage: copy.staleAction, successMessage: result.notification === "sent" ? copy.planningSavedAndNotified : copy.actionDone });
+      setFeedback(nextFeedback);
+      if (nextFeedback.refresh) router.refresh();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : copy.actionFailed);
+      setFeedback({ kind: "error", message: error instanceof DOMException && error.name === "AbortError" ? copy.networkTimeout : error instanceof Error ? error.message : copy.actionFailed, refresh: false });
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
     }
   }
@@ -96,7 +101,7 @@ export function WorkOrderPlanningPanel(props: {
   async function cancel() {
     if (!props.workOrderId || busy || !window.confirm(copy.cancelWorkConfirm)) return;
     setBusy(true);
-    setNotice("");
+    setFeedback(null);
     try {
       const response = await fetch(`/api/admin/work-orders/${props.workOrderId}`, {
         method: "PATCH",
@@ -105,9 +110,10 @@ export function WorkOrderPlanningPanel(props: {
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(result.error || copy.actionFailed);
+      setFeedback({ kind: "success", message: copy.actionDone, refresh: true });
       router.refresh();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : copy.actionFailed);
+      setFeedback({ kind: "error", message: error instanceof Error ? error.message : copy.actionFailed, refresh: false });
     } finally {
       setBusy(false);
     }
@@ -132,7 +138,7 @@ export function WorkOrderPlanningPanel(props: {
         <button className="min-h-12 rounded-xl bg-accent px-5 font-bold text-accent-foreground hover:bg-accent-hover disabled:opacity-60" disabled={busy} onClick={() => void save()} type="button">{busy ? copy.processing : creating ? copy.createAndPlan : copy.savePlanning}</button>
         {!creating && ["unassigned", "assigned", "scheduled"].includes(props.status || "") ? <button className="min-h-12 rounded-xl border border-danger/40 px-5 font-bold text-danger hover:bg-danger/10 disabled:opacity-60" disabled={busy} onClick={() => void cancel()} type="button">{copy.cancelWork}</button> : null}
       </div>
-      {notice ? <p aria-live="polite" className="mt-3 text-sm text-muted-foreground" role="status">{notice}</p> : null}
+      {feedback ? <p aria-live="polite" className={`mt-3 rounded-xl border px-3 py-2 text-sm ${feedback.kind === "error" ? "border-danger/35 bg-danger/10 text-red-100" : feedback.kind === "stale" ? "border-warning/35 bg-warning/10 text-amber-100" : feedback.kind === "queued" ? "border-accent/35 bg-accent/10 text-white/85" : "border-success/35 bg-success/10 text-green-100"}`} role={feedback.kind === "error" ? "alert" : "status"}>{feedback.message}</p> : null}
     </div>
   );
 }

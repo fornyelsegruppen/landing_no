@@ -158,6 +158,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     } });
 
     const key = `contract-counter-signed:${contract.id}`;
+    let notification: "sent" | "queued" | "skipped" = "skipped";
     const prior = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });
     if (!prior.docs[0]) {
       const access = await issueQuoteAccessToken(payload, quote.id, new Date(Date.now() + 180 * 24 * 60 * 60_000).toISOString(), { purpose: "signed-contract-customer-portal", contractId: contract.id });
@@ -183,10 +184,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (provider.health().status === "ready") {
         try {
           await deliverMessage(payload, provider, message.id, correlationId);
+          notification = "sent";
         } catch (error) {
+          notification = "queued";
           captureException(error, { route: "POST /api/admin/contracts/[id]/sign", operation: "final-contract-delivery", correlationId });
         }
-      }
+      } else notification = "queued";
     }
 
     await recordAuditEvent(createPayloadAuditWriter(payload), {
@@ -197,7 +200,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       correlationId,
       changedFields: ["companySignatureEvidence", "companySignedDocument", "companySignedAt", "companySignedBy"],
     });
-    return NextResponse.json({ ok: true, status: "fully_signed", documentId: finalDocumentMedia.id });
+    return NextResponse.json({ ok: true, status: "fully_signed", documentId: finalDocumentMedia.id, notification });
   } catch (error) {
     if (!contractCommitted && finalDocumentMedia) await deletePrivateMedia(payload, finalDocumentMedia).catch(() => undefined);
     if (!contractCommitted && companySignatureMedia) await deletePrivateMedia(payload, companySignatureMedia).catch(() => undefined);

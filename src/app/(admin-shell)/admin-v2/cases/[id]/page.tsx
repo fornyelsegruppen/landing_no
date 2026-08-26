@@ -414,6 +414,7 @@ export default async function AdminCasePage({
           <CaseActionPanel
             action={caseData.nextAction}
             actionLabel={nextActionText}
+            actionReference={actionDocument?.reference}
             contractDocumentHash={actionDocument?.kind === "contract" ? actionDocument.documentHash : caseData.contract?.documentHash}
             defaultSigner={user.displayName || user.email}
             leadId={caseData.lead.id}

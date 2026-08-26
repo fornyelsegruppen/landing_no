@@ -4,6 +4,7 @@ import { type FormEvent, type PointerEvent, useEffect, useRef, useState } from "
 import { useRouter } from "next/navigation";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import { interpretAdminActionResult, type AdminActionFeedback, type AdminActionResponse } from "@/lib/admin-v2/action-result";
 
 export function CompanySignaturePanel(props: {
   actionLabel: string;
@@ -20,7 +21,7 @@ export function CompanySignaturePanel(props: {
   const drawing = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [feedback, setFeedback] = useState<AdminActionFeedback | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -71,25 +72,29 @@ export function CompanySignaturePanel(props: {
     const form = new FormData(event.currentTarget);
     const signerName = String(form.get("signerName") || "").trim();
     if (!canvas || !hasSignature || signerName.length < 3) {
-      setNotice(copy.signatureRequired);
+      setFeedback({ kind: "error", message: copy.signatureRequired, refresh: false });
       return;
     }
     if (!window.confirm(`${copy.confirmEconomicAction}\n\n${props.actionLabel}`)) return;
     setBusy(true);
-    setNotice("");
+    setFeedback(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
     try {
       const response = await fetch(`/api/admin/contracts/${props.contractId}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ signerName, signatureData: canvas.toDataURL("image/png"), expectedDocumentHash: props.documentHash, expectedVersion: props.contractVersion }),
+        signal: controller.signal,
       });
-      const result = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(result.error || copy.actionFailed);
-      setNotice(copy.actionDone);
-      router.refresh();
+      const result = await response.json().catch(() => ({})) as AdminActionResponse;
+      const nextFeedback = interpretAdminActionResult({ fallbackError: copy.actionFailed, ok: response.ok, queuedMessage: copy.actionSavedQueued, reference: props.contractReference, result, staleMessage: copy.staleAction, successMessage: copy.actionDone });
+      setFeedback(nextFeedback);
+      if (nextFeedback.refresh) router.refresh();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : copy.actionFailed);
+      setFeedback({ kind: "error", message: error instanceof DOMException && error.name === "AbortError" ? copy.networkTimeout : error instanceof Error ? error.message : copy.actionFailed, refresh: false });
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
     }
   }
@@ -105,7 +110,7 @@ export function CompanySignaturePanel(props: {
         <button className="mt-2 min-h-10 text-sm underline" onClick={clear} type="button">{copy.clearSignature}</button>
       </fieldset>
       <button className="mt-3 min-h-12 w-full rounded-xl bg-accent px-5 font-bold text-accent-foreground hover:bg-accent-hover disabled:opacity-50" disabled={busy || !hasSignature} type="submit">{busy ? copy.processing : props.actionLabel}</button>
-      {notice ? <p aria-live="polite" className="mt-3 text-sm text-muted-foreground" role="status">{notice}</p> : null}
+      {feedback ? <p aria-live="polite" className={`mt-3 rounded-xl border px-3 py-2 text-sm ${feedback.kind === "error" ? "border-danger/35 bg-danger/10 text-red-100" : feedback.kind === "stale" ? "border-warning/35 bg-warning/10 text-amber-100" : feedback.kind === "queued" ? "border-accent/35 bg-accent/10 text-white/85" : "border-success/35 bg-success/10 text-green-100"}`} role={feedback.kind === "error" ? "alert" : "status"}>{feedback.message}</p> : null}
     </form>
   );
 }
