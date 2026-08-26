@@ -65,15 +65,22 @@ export type CaseActionInput = {
 export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
   if (input.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST")
     return { kind: "review_cancellation" };
-  if (input.leadStatus === "closed") return { kind: "none" };
-  if (input.quote?.status === "declined")
-    return { kind: "follow_up_decline", targetId: input.quote.id };
   if (
     input.message &&
     ["failed", "attention"].includes(input.message.status || "")
   ) {
     return { kind: "retry_message", targetId: input.message.id };
   }
+  const measurementAiDraft =
+    input.message?.status === "draft" &&
+    input.message.category === "ai_reply" &&
+    input.canPreparePackage === true;
+  if (input.message?.status === "draft" && !measurementAiDraft) {
+    return { kind: "approve_message", targetId: input.message.id };
+  }
+  if (input.leadStatus === "closed") return { kind: "none" };
+  if (input.quote?.status === "declined")
+    return { kind: "follow_up_decline", targetId: input.quote.id };
   if (input.workOrder?.status === "unassigned")
     return { kind: "assign_worker", targetId: input.workOrder.id };
   if (input.workOrder?.status === "assigned")
@@ -111,13 +118,6 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
     !input.workOrder
   ) {
     return { kind: "create_work_order", targetId: input.contract.id };
-  }
-  const measurementAiDraft =
-    input.message?.status === "draft" &&
-    input.message.category === "ai_reply" &&
-    input.canPreparePackage === true;
-  if (input.message?.status === "draft" && !measurementAiDraft) {
-    return { kind: "approve_message", targetId: input.message.id };
   }
   if (!input.message || input.message.direction === "inbound") {
     return { kind: "generate_reply" };
