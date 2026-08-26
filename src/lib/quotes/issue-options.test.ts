@@ -13,6 +13,7 @@ function snapshot(reference: string, serviceKey: string, serviceDescription: str
 
 describe("grouped quote issuing", () => {
   beforeEach(() => {
+    mocks.revokeTokens.mockReset().mockResolvedValue(undefined);
     mocks.issueToken.mockReset().mockResolvedValueOnce({ token: "base-token", record: { id: 31 } }).mockResolvedValueOnce({ token: "recommended-token", record: { id: 32 } });
   });
 
@@ -33,6 +34,7 @@ describe("grouped quote issuing", () => {
     expect(message.bodyText).toContain("Anbefalt alternativ");
     expect(message.bodyText).toContain("base-token");
     expect(message.bodyText).toContain("recommended-token");
+    expect(mocks.revokeTokens).toHaveBeenCalledTimes(2);
   });
 
   it("labels a superseding quote as an updated proposal without implying it was the original request", async () => {
@@ -61,5 +63,6 @@ describe("grouped quote issuing", () => {
     expect(message.bodyText).toContain("Oppdatert forslag: Takvask og impregnering");
     expect(message.bodyText).toContain("Den tidligere avtalen endres ikke");
     expect(message.bodyText).not.toContain("Opprinnelig forespørsel");
+    expect(mocks.revokeTokens).toHaveBeenCalledWith(payload, 12);
   });
 });

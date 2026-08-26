@@ -17,6 +17,7 @@ export async function issueQuoteCustomerLink(payload: Payload, quoteId: number) 
   const contracts = await payload.find({ collection: "contracts", depth: 0, limit: 1, overrideAccess: true, where: { quote: { equals: quote.id } } });
   const contract = contracts.docs[0];
   if (!contract || !["draft", "issued"].includes(contract.status)) throw new Error("A valid contract draft is required");
+  await revokeQuoteAccessTokens(payload, quote.id);
   const access = await issueQuoteAccessToken(payload, quote.id, quote.validUntil, { contractId: contract.id, quoteVersion: quote.version });
   if (contract.status === "draft") await payload.update({ collection: "contracts", id: contract.id, overrideAccess: true, data: { status: "issued" } });
   const url = `${siteConfig.url.replace(/\/$/, "")}/tilbud/${access.token}`;
@@ -29,6 +30,7 @@ export async function issueQuoteCustomerLink(payload: Payload, quoteId: number) 
     const siblingContracts = await payload.find({ collection: "contracts", depth: 0, limit: 1, overrideAccess: true, where: { quote: { equals: sibling.id } } });
     const siblingContract = siblingContracts.docs[0];
     if (!siblingContract || !["draft", "issued"].includes(siblingContract.status)) throw new Error("A valid alternative contract draft is required");
+    await revokeQuoteAccessTokens(payload, sibling.id);
     const siblingAccess = await issueQuoteAccessToken(payload, sibling.id, sibling.validUntil, { contractId: siblingContract.id, quoteVersion: sibling.version });
     if (siblingContract.status === "draft") await payload.update({ collection: "contracts", id: siblingContract.id, overrideAccess: true, data: { status: "issued" } });
     alternative = { quote: sibling, contract: siblingContract, url: `${siteConfig.url.replace(/\/$/, "")}/tilbud/${siblingAccess.token}`, accessRecordId: siblingAccess.record.id };
