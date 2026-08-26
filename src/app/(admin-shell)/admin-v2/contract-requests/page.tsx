@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, CalendarClock, ShieldAlert } from "lucide-react";
 import type { Where } from "payload";
+import {
+  contractRequestReasonLabel,
+  contractRequestRecoveryLabel,
+  contractRequestStatusLabel,
+} from "@/lib/admin-v2/contract-request-labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import { getPayload } from "@/lib/payload";
@@ -37,8 +42,8 @@ export default async function ContractRequestsPage({ searchParams }: { searchPar
       const leadId = relationId(item.lead); const potential = item.recoveryPotential;
       const formatter = new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" });
       return <article className="grid gap-4 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(14rem,.8fr)_auto] lg:items-center" key={item.id}>
-        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wider text-accent">{item.reference}</span><span className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${potential === "green" ? "border-emerald-400/40 text-emerald-300" : potential === "red" ? "border-red-400/40 text-red-300" : "border-amber-400/40 text-amber-300"}`}>{potential}</span></div><strong className="mt-2 block truncate text-lg">{relationName(item.lead)}</strong><p className="mt-1 text-sm text-muted-foreground">{item.kind === "withdrawal" ? labels.withdrawal : labels.change} · {item.reasonCode}</p></div>
-        <div className="grid gap-2 text-sm"><span className="inline-flex items-center gap-2"><ShieldAlert className="size-4 text-accent" />{item.status}</span><span className="inline-flex items-center gap-2 text-muted-foreground"><CalendarClock className="size-4" />{labels.received}: {formatter.format(new Date(item.receivedAt))}</span><span className="text-muted-foreground">{item.followUpConsent ? labels.consent : labels.noConsent}{item.followUpAt ? ` · ${labels.follow}: ${formatter.format(new Date(item.followUpAt))}` : ""}</span></div>
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wider text-accent">{item.reference}</span><span className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${potential === "green" ? "border-emerald-400/40 text-emerald-300" : potential === "red" ? "border-red-400/40 text-red-300" : "border-amber-400/40 text-amber-300"}`}>{contractRequestRecoveryLabel(potential, user.interfaceLanguage)}</span></div><strong className="mt-2 block truncate text-lg">{relationName(item.lead)}</strong><p className="mt-1 text-sm text-muted-foreground">{item.kind === "withdrawal" ? labels.withdrawal : labels.change} · {contractRequestReasonLabel(item.reasonCode, user.interfaceLanguage)}</p></div>
+        <div className="grid gap-2 text-sm"><span className="inline-flex items-center gap-2"><ShieldAlert className="size-4 text-accent" />{contractRequestStatusLabel(item.status, user.interfaceLanguage)}</span><span className="inline-flex items-center gap-2 text-muted-foreground"><CalendarClock className="size-4" />{labels.received}: {formatter.format(new Date(item.receivedAt))}</span><span className="text-muted-foreground">{item.followUpConsent ? labels.consent : labels.noConsent}{item.followUpAt ? ` · ${labels.follow}: ${formatter.format(new Date(item.followUpAt))}` : ""}</span></div>
         <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-4 font-bold text-black" href={`/admin-v2/cases/${leadId}#contract-request-section`}>{labels.open}<ArrowRight className="size-4" /></Link>
       </article>;
     })}</div> : <div className="rounded-3xl border border-dashed border-white/15 p-8 text-center text-muted-foreground">{labels.empty}</div>}

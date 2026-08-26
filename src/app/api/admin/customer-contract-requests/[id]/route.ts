@@ -85,9 +85,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         ? contractRequest.kind === "withdrawal" ? "Bekreftelse på behandlet angremelding" : "Bekreftelse på avsluttet bestilling"
         : resumes ? "Avklaring – avtalen fortsetter" : "Vi vurderer en alternativ løsning";
       const bodyText = closes
-        ? `Hei ${lead.name},\n\nVi har behandlet meldingen din og bekrefter at avtalen avsluttes.\n\nAvklaring: ${parsed.data.reason}\n\nDette er en skriftlig bekreftelse fra Takfornyelse.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
+        ? contractRequest.kind === "withdrawal"
+          ? `Hei ${lead.name},\n\nVi har behandlet angremeldingen din og bekrefter at avtalen er avsluttet. Eventuell planlagt arbeidsstart er stoppet. Dersom det er registrert en betaling, følger vi opp tilbakebetaling eller avregning separat skriftlig.\n\nDette er en skriftlig bekreftelse fra Takfornyelse.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
+          : `Hei ${lead.name},\n\nVi har behandlet forespørselen din og bekrefter at bestillingen er avsluttet. Eventuell planlagt arbeidsstart er stoppet. Dersom det er registrert en betaling, følger vi opp tilbakebetaling eller avregning separat skriftlig.\n\nDette er en skriftlig bekreftelse fra Takfornyelse.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
         : resumes
-          ? `Hei ${lead.name},\n\nVi har avklart forespørselen din. Avtalen fortsetter, og vi følger opp videre planlegging.\n\nAvklaring: ${parsed.data.reason}\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
+          ? `Hei ${lead.name},\n\nVi har avklart forespørselen din. Avtalen fortsetter, og vi følger opp videre planlegging skriftlig.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
           : `Hei ${lead.name},\n\nTakk for tilbakemeldingen. Vi undersøker nå om vi kan tilby en løsning som passer bedre. Du mottar ikke en ny bestilling eller endring uten at du selv godkjenner den skriftlig.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`;
       const message = await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId,

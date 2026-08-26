@@ -25,11 +25,18 @@ describe("administrator customer contract request decision", () => {
   });
 
   it("closes the order, clears the work hold and creates a reviewable customer confirmation", async () => {
-    const response = await POST(request({ decision: "close", reason: "Avtalen og arbeidsstatusen er kontrollert." }), { params: Promise.resolve({ id: "10" }) });
+    const internalDecision = "Sutartis ir darbų būsena patikrinta administratoriaus.";
+    const response = await POST(request({ decision: "close", reason: internalDecision }), { params: Promise.resolve({ id: "10" }) });
     expect(response.status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "work-orders", id: 7, data: expect.objectContaining({ status: "cancelled", blockingReasons: [] }) }));
-    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "customer-contract-requests", id: 10, data: expect.objectContaining({ status: "closed", reviewedBy: 3 }) }));
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "messages", data: expect.objectContaining({ status: "draft", subject: "Bekreftelse på behandlet angremelding" }) }));
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "customer-contract-requests", id: 10, data: expect.objectContaining({ status: "closed", reviewedBy: 3, administratorDecision: internalDecision }) }));
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "messages", data: expect.objectContaining({
+      status: "draft",
+      subject: "Bekreftelse på behandlet angremelding",
+      bodyText: expect.stringContaining("bekrefter at avtalen er avsluttet"),
+    }) }));
+    const customerMessage = mocks.create.mock.calls.find(([input]) => input.collection === "messages")?.[0].data.bodyText;
+    expect(customerMessage).not.toContain(internalDecision);
     expect(mocks.updateCase).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ leadId: 2, patch: expect.objectContaining({ status: "closed", nextActionBlocker: null }) }));
   });
 
