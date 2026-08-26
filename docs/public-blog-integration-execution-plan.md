@@ -249,6 +249,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 **Priklausomybė:** B5  
 **Tikslas:** sujungti blogo integraciją ir Admin V2 į vieną aiškiai identifikuotą produkcijos kandidatą.
 
+**Vykdymo būsena:** TECHNICAL PASS — 2026-08-26; savininko `Staging GO` dar laukiamas. Įrodymai `docs/implementation/phase-b6-public-blog-staging-acceptance.md`.
+
 **Darbai:**
 
 - deployinti vieną galutinį staging commit;
