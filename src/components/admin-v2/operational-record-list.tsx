@@ -5,7 +5,7 @@ import type { OperationalListItem } from "@/lib/admin-v2/operational-lists";
 import { panelDateLocale, type PanelLocale } from "@/lib/panel-i18n";
 
 export function OperationalRecordList({ empty, items, locale, open }: { empty: string; items: OperationalListItem[]; locale: PanelLocale; open: string }) {
-  const formatter = new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short" });
+  const formatter = new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" });
   const labels = {
     nb: { employee: "Ansatt", scheduled: "Besøk" },
     lt: { employee: "Darbuotojas", scheduled: "Vizitas" },

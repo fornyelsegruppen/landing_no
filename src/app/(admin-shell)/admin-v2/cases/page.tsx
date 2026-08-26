@@ -79,7 +79,7 @@ export default async function AdminCasesPage({ searchParams }: { searchParams: S
   const result = await loadAdminCaseList(await getPayload(), filters);
   const locale = panelDateLocale(user.interfaceLanguage);
   const formatDate = (date?: string) => date
-    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(date))
     : "—";
   const dueLabel = (date?: string, overdue = false) => {
     if (!date) return copy.cases.noDue;

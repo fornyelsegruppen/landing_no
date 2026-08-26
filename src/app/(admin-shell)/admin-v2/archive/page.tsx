@@ -21,7 +21,7 @@ export default async function AdminArchivePage({ searchParams }: { searchParams:
   const query = first(params.q);
   const result = await loadAdminCaseList(await getPayload(), { query, recordState: state, status: "all" });
   const locale = panelDateLocale(user.interfaceLanguage);
-  const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+  const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : "—";
   return <div className="mx-auto max-w-7xl space-y-6">
     <header><p className="text-xs font-bold uppercase tracking-[.2em] text-accent">{copy.control}</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{copy.archive.title}</h1><p className="mt-2 max-w-2xl text-muted-foreground">{copy.archive.intro}</p></header>
     <section className="rounded-3xl border border-white/10 bg-background-elevated/75 p-4 sm:p-6">

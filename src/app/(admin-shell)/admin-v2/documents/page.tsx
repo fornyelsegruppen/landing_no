@@ -40,7 +40,7 @@ export default async function AdminDocumentsPage({ searchParams }: { searchParam
   }, new Map<number, { caseHref: string; customer: string; leadId: number; documents: typeof documents }>()).values()];
   const locale = panelDateLocale(user.interfaceLanguage);
   const formatDate = (date?: string) => date
-    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(date))
     : "—";
   const exportCopy = user.interfaceLanguage === "lt"
     ? { title: "Mėnesio buhalterinis eksportas", help: "Atsisiųskite ZIP su originaliais Fiken PDF ir CSV su patvirtintais duomenimis.", button: "Atsisiųsti ZIP" }

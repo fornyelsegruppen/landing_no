@@ -80,6 +80,7 @@ export default async function AdminV2Page({ searchParams }: { searchParams: Sear
   const dateFormatter = new Intl.DateTimeFormat(panelDateLocale(user.interfaceLanguage), {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Europe/Oslo",
   });
 
   return (

@@ -18,7 +18,7 @@ function tone(ok: boolean) {
 
 export function PlatformHealthPanel({ health, locale, operational, releaseGate }: { health: PlatformHealth; locale: PanelLocale; operational: OperationalHealth; releaseGate: ReleaseGate }) {
   const t = copy[locale];
-  const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : t.missing;
+  const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : t.missing;
   const stats = [
     [t.lastJob, formatDate(operational.jobs.lastCompletedAt), operational.jobs.failed === 0 && operational.jobs.overdue === 0],
     [t.overdueJobs, String(operational.jobs.overdue), operational.jobs.overdue === 0],
@@ -38,6 +38,6 @@ export function PlatformHealthPanel({ health, locale, operational, releaseGate }
     <div><h3 className="mb-3 font-bold">{t.operations}</h3><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{stats.map(([label, value, ok]) => <article className={`rounded-2xl border p-4 ${tone(ok)}`} key={label}><Clock3 aria-hidden="true" className="size-4"/><p className="mt-3 text-xs font-bold uppercase tracking-wider opacity-70">{label}</p><strong className="mt-1 block break-words text-lg">{value}</strong></article>)}</div></div>
     <div className={`flex items-start gap-3 rounded-2xl border p-4 ${tone(Boolean(operational.backup.lastVerifiedAt && operational.backup.referenceConfigured))}`}><DatabaseBackup aria-hidden="true" className="mt-0.5 size-5 shrink-0"/><div><strong>{t.backup}: {formatDate(operational.backup.lastVerifiedAt)}</strong><p className="mt-1 text-sm opacity-80">{operational.backup.referenceConfigured ? t.evidence : t.noEvidence}</p></div></div>
     {blockers.length ? <details className="rounded-2xl border border-danger/30 p-4"><summary className="cursor-pointer font-bold text-danger">{t.blockers} ({blockers.length})</summary><div className="mt-3 grid gap-2">{blockers.map(([name, item]) => <div className="rounded-xl bg-black/20 p-3 text-sm" key={name}><strong>{name}</strong><p className="mt-1 break-words text-muted-foreground">{[...item.unavailableIntegrations, ...item.missingEvidence].join(", ")}</p></div>)}</div></details> : null}
-    <p className="flex items-center gap-2 text-xs text-muted-foreground"><MailCheck aria-hidden="true" className="size-4"/> {new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short" }).format(new Date(health.generatedAt))}</p>
+    <p className="flex items-center gap-2 text-xs text-muted-foreground"><MailCheck aria-hidden="true" className="size-4"/> {new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(health.generatedAt))}</p>
   </section>;
 }
