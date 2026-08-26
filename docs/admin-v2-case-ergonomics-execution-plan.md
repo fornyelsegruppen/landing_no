@@ -138,6 +138,8 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E2 — pilna bylos suvestinė ir prisegta kompaktiška juosta
 
+**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; staging vizualinė patikra vykdoma E6. Įrodymai `docs/implementation/phase-e2-case-summary-command-bar.md`.
+
 **Priklausomybė:** E1  
 **Tikslas:** administratorius visada žino, kurioje byloje ir dokumento versijoje dirba.
 

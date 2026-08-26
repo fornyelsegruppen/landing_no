@@ -14,6 +14,7 @@ import { InformationRequestButton } from "@/components/admin-v2/information-requ
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
+import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import {
@@ -71,7 +72,7 @@ function Section({
   return (
     <section
       aria-labelledby={id}
-      className="bg-background-elevated/75 min-w-0 rounded-3xl border border-white/10 p-5 sm:p-6"
+      className="bg-background-elevated/75 min-w-0 scroll-mt-36 rounded-3xl border border-white/10 p-5 sm:p-6"
     >
       <h2 className="text-xl font-bold" id={id}>
         {title}
@@ -223,6 +224,22 @@ export default async function AdminCasePage({
   const activeContractRequest = caseData.contractRequests.find((item) =>
     !["closed", "recovered", "do_not_contact"].includes(item.status || ""),
   );
+  const workingCommercial =
+    caseData.commercial.workingContract || caseData.commercial.workingQuote;
+  const effectiveCommercial = caseData.commercial.effectiveContract;
+  const workingQuote = caseData.commercial.workingQuote;
+  const workingReference = workingCommercial?.reference || copy.notCreated;
+  const workingStatus = workingCommercial
+    ? statusLabel(user.interfaceLanguage, workingCommercial.status, {
+        contract: workingCommercial.kind === "contract",
+        companySignedAt: workingCommercial.companySignedAt,
+      })
+    : copy.notCreated;
+  const effectiveReference = effectiveCommercial?.reference || copy.noneEffective;
+  const commercialAmount = nok(workingQuote?.totalIncVatOre);
+  const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
+  const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
+  const nextActionText = copy.actionLabels[caseData.nextAction.kind];
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -268,11 +285,61 @@ export default async function AdminCasePage({
             </strong>
           </div>
         </div>
+        <dl className="mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl bg-black/15 p-3">
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.workingVersion}
+            </dt>
+            <dd className="mt-1 font-bold">{workingReference}</dd>
+            <dd className="text-muted-foreground mt-1 text-xs">{workingStatus}</dd>
+          </div>
+          <div className="rounded-2xl bg-black/15 p-3">
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.effectiveContract}
+            </dt>
+            <dd className="mt-1 font-bold">{effectiveReference}</dd>
+            <dd className="text-muted-foreground mt-1 text-xs">
+              {effectiveCommercial ? copy.signedByBoth : copy.noneEffectiveHelp}
+            </dd>
+          </div>
+          <div className="rounded-2xl bg-black/15 p-3">
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.priceIncVat}
+            </dt>
+            <dd className="mt-1 font-bold">{commercialAmount}</dd>
+          </div>
+          <div className="rounded-2xl bg-black/15 p-3">
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.maximum}
+            </dt>
+            <dd className="mt-1 font-bold">{commercialMaximum}</dd>
+          </div>
+          <div className="rounded-2xl bg-black/15 p-3">
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.deposit}
+            </dt>
+            <dd className="mt-1 font-bold">{commercialDeposit}</dd>
+          </div>
+        </dl>
       </header>
+
+      <CaseCommandBar
+        action={nextActionText}
+        amount={commercialAmount}
+        caseLabel={copy.case}
+        caseNumber={caseData.lead.id}
+        customer={caseData.lead.name}
+        effectiveLabel={copy.effectiveContract}
+        effectiveReference={effectiveReference}
+        nextActionLabel={copy.nextAction}
+        status={workingStatus}
+        workingLabel={copy.workingVersion}
+        workingReference={workingReference}
+      />
 
       <section
         aria-labelledby="next-action-title"
-        className={`rounded-3xl border p-5 sm:p-6 ${caseData.nextAction.kind === "send_closure_confirmation" ? "border-danger/50 bg-danger/10" : "border-accent/35 bg-accent/8"}`}
+        className={`scroll-mt-36 rounded-3xl border p-5 sm:p-6 ${caseData.nextAction.kind === "send_closure_confirmation" ? "border-danger/50 bg-danger/10" : "border-accent/35 bg-accent/8"}`}
       >
         <p
           className={`${caseData.nextAction.kind === "send_closure_confirmation" ? "text-danger" : "text-accent"} text-xs font-bold tracking-[.18em] uppercase`}
@@ -283,10 +350,10 @@ export default async function AdminCasePage({
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold">
-              {copy.actionLabels[caseData.nextAction.kind]}
+              {nextActionText}
             </h2>
             <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-              {copy.actionLabels[caseData.nextAction.kind]}
+              {nextActionText}
             </p>
           </div>
           <CaseActionPanel
