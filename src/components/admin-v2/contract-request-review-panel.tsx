@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CaseContractRequest } from "@/lib/admin-v2/case-read-model";
+import { formatNorwayDateTime } from "@/lib/norway-time";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 const copy = {
@@ -59,15 +60,16 @@ export function ContractRequestReviewPanel({ locale, request }: { locale: PanelL
   }
 
   const potentialLabel = request.recoveryPotential === "green" ? labels.green : request.recoveryPotential === "red" ? labels.red : labels.yellow;
+  const dateLocale = locale === "lt" ? "lt-LT" : locale === "en" ? "en-GB" : "nb-NO";
   return <section className="scroll-mt-24 rounded-3xl border border-danger/40 bg-danger/5 p-5 sm:p-6" id="contract-request-section">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-xl font-bold">{labels.title}</h2><p className="mt-1 text-sm text-muted-foreground">{request.kind === "withdrawal" ? labels.withdrawal : labels.change} · {request.reference}</p></div>
       <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase ${request.recoveryPotential === "green" ? "border-emerald-400/40 text-emerald-300" : request.recoveryPotential === "red" ? "border-red-400/40 text-red-300" : "border-amber-400/40 text-amber-300"}`}>{potentialLabel}</span>
     </div>
     <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-      <div className="rounded-xl border border-white/10 bg-black/15 p-3"><dt className="text-muted-foreground">{labels.received}</dt><dd className="mt-1 font-semibold">{new Date(request.receivedAt).toLocaleString(locale === "lt" ? "lt-LT" : locale === "en" ? "en-GB" : "nb-NO")}</dd></div>
+      <div className="rounded-xl border border-white/10 bg-black/15 p-3"><dt className="text-muted-foreground">{labels.received}</dt><dd className="mt-1 font-semibold">{formatNorwayDateTime(request.receivedAt, dateLocale)}</dd></div>
       <div className="rounded-xl border border-white/10 bg-black/15 p-3"><dt className="text-muted-foreground">{labels.reason}</dt><dd className="mt-1 font-semibold">{reasonLabels[request.reasonCode]?.[locale] || request.reasonCode}</dd></div>
-      <div className="rounded-xl border border-white/10 bg-black/15 p-3"><dt className="text-muted-foreground">{labels.deadline}</dt><dd className="mt-1 font-semibold">{request.withinNominalWithdrawalPeriod === true ? labels.inside : request.withinNominalWithdrawalPeriod === false ? labels.outside : labels.unknown}</dd>{request.nominalWithdrawalDeadline ? <p className="mt-1 text-xs text-muted-foreground">{new Date(request.nominalWithdrawalDeadline).toLocaleString(locale === "lt" ? "lt-LT" : locale === "en" ? "en-GB" : "nb-NO")}</p> : null}</div>
+      <div className="rounded-xl border border-white/10 bg-black/15 p-3"><dt className="text-muted-foreground">{labels.deadline}</dt><dd className="mt-1 font-semibold">{request.withinNominalWithdrawalPeriod === true ? labels.inside : request.withinNominalWithdrawalPeriod === false ? labels.outside : labels.unknown}</dd>{request.nominalWithdrawalDeadline ? <p className="mt-1 text-xs text-muted-foreground">{formatNorwayDateTime(request.nominalWithdrawalDeadline, dateLocale)}</p> : null}</div>
       <div className="rounded-xl border border-white/10 bg-black/15 p-3"><dt className="text-muted-foreground">{labels.work}</dt><dd className="mt-1 font-semibold">{request.workStatusAtReceipt || "—"}</dd></div>
     </dl>
     {request.reasonText ? <div className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3"><p className="text-xs font-bold uppercase text-muted-foreground">{labels.comment}</p><p className="mt-2 whitespace-pre-wrap text-sm">{request.reasonText}</p></div> : null}

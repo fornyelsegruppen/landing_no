@@ -1,5 +1,6 @@
 import { rgb, type PDFImage } from "pdf-lib";
 import { createBrandedPdf, PDF_MARGIN, pdfSafe } from "@/lib/pdf/branded-pdf";
+import { formatNorwayDateTime } from "@/lib/norway-time";
 import { withdrawalFormCopy } from "@/content/withdrawal";
 import {
   quoteDisplayModel,
@@ -80,7 +81,12 @@ function drawSignatureBox(
       color: rgb(0.08, 0.09, 0.12),
     });
     page.drawText(
-      pdfSafe(new Date(signature.evidence.signedAt).toLocaleString("nb-NO")),
+      pdfSafe(
+        `${formatNorwayDateTime(signature.evidence.signedAt, "nb-NO", {
+          dateStyle: "medium",
+          timeStyle: "medium",
+        })} (norsk tid)`,
+      ),
       {
         x: x + 12,
         y: top - 116,
@@ -192,7 +198,10 @@ export async function buildQuoteContractPdf(input: {
     pdf.field(
       "Kontrollert",
       measurement.approvedAt
-        ? new Date(measurement.approvedAt).toLocaleString("nb-NO")
+        ? `${formatNorwayDateTime(measurement.approvedAt, "nb-NO", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })} (norsk tid)`
         : undefined,
     );
   }
@@ -321,7 +330,9 @@ export async function buildQuoteContractPdf(input: {
   pdf.field(
     withdrawal.fields.agreementDate,
     input.evidence
-      ? new Date(input.evidence.signedAt).toLocaleDateString("nb-NO")
+      ? formatNorwayDateTime(input.evidence.signedAt, "nb-NO", {
+          dateStyle: "short",
+        })
       : "________________________________",
   );
   pdf.field(withdrawal.fields.customerName, input.contract.customer.name);

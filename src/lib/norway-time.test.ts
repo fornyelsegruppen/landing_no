@@ -29,4 +29,13 @@ describe("Norway time", () => {
     expect(formatNorwayDateTime(instant, "lt-LT")).toContain("00:00");
     expect(formatNorwayDateTime(instant, "en-GB")).toContain("00:00");
   });
+
+  it("formats legal signature instants in Norwegian summer time", () => {
+    expect(
+      formatNorwayDateTime("2026-08-26T10:57:22.000Z", "nb-NO", {
+        dateStyle: "medium",
+        timeStyle: "medium",
+      }),
+    ).toContain("12:57:22");
+  });
 });
