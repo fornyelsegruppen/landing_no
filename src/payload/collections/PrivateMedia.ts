@@ -5,6 +5,7 @@ export const PrivateMedia: CollectionConfig = {
   slug: "private-media",
   labels: { singular: "Private file", plural: "Private files" },
   admin: {
+    hidden: true,
     group: "Innstillinger",
     useAsTitle: "filename",
     defaultColumns: ["filename", "classification", "createdAt"],
@@ -12,10 +13,12 @@ export const PrivateMedia: CollectionConfig = {
       "Customer, contract and work files. Access must always be authorized server-side.",
   },
   access: {
-    create: adminOnly,
+    // Files are created only by the controlled server-side storage helper.
+    // Direct Payload uploads would bypass the private Vercel Blob workflow.
+    create: () => false,
     read: adminOnly,
-    update: adminOnly,
-    delete: adminOnly,
+    update: () => false,
+    delete: () => false,
   },
   upload: {
     staticDir: "private-media",

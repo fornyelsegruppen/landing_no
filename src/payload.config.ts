@@ -1,6 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
+import { resendAdapter } from "@payloadcms/email-resend";
 import { vercelBlobStorage } from "@payloadcms/storage-vercel-blob";
 import { en } from "@payloadcms/translations/languages/en";
 import { lt } from "@payloadcms/translations/languages/lt";
@@ -51,6 +52,14 @@ const rawDatabaseUrl = process.env.DATABASE_URL || "file:./takfornying.db";
 const databaseUrl = rawDatabaseUrl;
 const usePostgres = databaseUrl.startsWith("postgres");
 const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+
+function payloadFromAddress() {
+  const configured = process.env.PAYLOAD_FROM_EMAIL?.trim();
+  if (configured) return configured;
+  const leadFrom = process.env.LEAD_FROM_EMAIL?.trim() || "";
+  return leadFrom.match(/<([^>]+)>/)?.[1] || leadFrom || "post@takfornyelse.as";
+}
 
 const serverURL =
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -106,6 +115,13 @@ const databaseAdapter = usePostgres
 
 export default buildConfig({
   serverURL,
+  email: resendApiKey
+    ? resendAdapter({
+        apiKey: resendApiKey,
+        defaultFromAddress: payloadFromAddress(),
+        defaultFromName: "Takfornyelse",
+      })
+    : undefined,
   csrf: trustedOrigins,
   cors: trustedOrigins,
   i18n: {
