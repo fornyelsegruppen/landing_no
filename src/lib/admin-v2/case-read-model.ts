@@ -19,6 +19,7 @@ export type CaseNextActionKind =
   | "review_completion"
   | "resolve_work_block"
   | "schedule_work"
+  | "send_closure_confirmation"
   | "none"
   | "retry_message"
   | "wait_customer"
@@ -56,7 +57,7 @@ export type CaseActionInput = {
   leadStatus?: string;
   nextActionBlocker?: string;
   measurement?: StatusRecord;
-  message?: StatusRecord & { category?: string; direction?: string };
+  message?: StatusRecord & { category?: string; closesContract?: boolean; direction?: string };
   price?: StatusRecord;
   quote?: StatusRecord;
   workOrder?: StatusRecord & { documentationSubmittedAt?: string };
@@ -75,6 +76,9 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
     input.message?.status === "draft" &&
     input.message.category === "ai_reply" &&
     input.canPreparePackage === true;
+  if (input.message?.status === "draft" && input.message.closesContract) {
+    return { kind: "send_closure_confirmation", targetId: input.message.id };
+  }
   if (input.message?.status === "draft" && !measurementAiDraft) {
     return { kind: "approve_message", targetId: input.message.id };
   }
@@ -1019,6 +1023,14 @@ export async function loadAdminCase(
           id: numericId(currentMessageRaw.id),
           status: stringValue(currentMessageRaw.status),
           category: stringValue(currentMessageRaw.category),
+          closesContract: (() => {
+            if (!currentMessageRaw.aiAnalysis || typeof currentMessageRaw.aiAnalysis !== "object") return false;
+            const analysis = asRecord(currentMessageRaw.aiAnalysis);
+            return Boolean(
+              numericId(analysis.customerContractRequestId) &&
+              ["close", "do_not_contact"].includes(stringValue(analysis.decision) || ""),
+            );
+          })(),
           direction: stringValue(currentMessageRaw.direction),
           createdAt: stringValue(currentMessageRaw.createdAt),
         }

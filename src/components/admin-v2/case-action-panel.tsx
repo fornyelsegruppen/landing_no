@@ -14,6 +14,7 @@ function requestFor(action: CaseNextAction, leadId: number) {
     case "prepare_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "prepare_package" } };
     case "approve_package": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_package" } };
     case "approve_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId } };
+    case "send_closure_confirmation": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "approve_send", messageId: action.targetId } };
     case "retry_message": return { endpoint: `/api/admin/leads/${leadId}`, body: { action: "retry_send", messageId: action.targetId } };
     case "approve_measurement": return { endpoint: `/api/admin/measurements/${action.targetId}`, body: { action: "approve" } };
     case "calculate_price": return { endpoint: `/api/admin/measurements/${action.targetId}`, body: { action: "calculate_price" } };
@@ -37,7 +38,8 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
 
   async function run() {
     if (!request || busy) return;
-    if (caseActionRequiresConfirmation(action.kind) && !window.confirm(copy.confirmEconomicAction)) return;
+    if (action.kind === "send_closure_confirmation" && !window.confirm(copy.confirmClosureSend)) return;
+    if (action.kind !== "send_closure_confirmation" && caseActionRequiresConfirmation(action.kind) && !window.confirm(copy.confirmEconomicAction)) return;
     setBusy(true);
     setNotice("");
     try {
@@ -72,7 +74,7 @@ export function CaseActionPanel({ action, contractDocumentHash, defaultSigner, l
   return (
     <div>
       {request ? (
-        <button className="min-h-12 rounded-xl bg-accent px-5 font-bold text-accent-foreground shadow-lg shadow-accent/10 transition hover:bg-accent-hover disabled:opacity-60" disabled={busy} onClick={() => void run()} type="button">
+        <button className={`min-h-12 rounded-xl px-5 font-bold shadow-lg transition disabled:opacity-60 ${action.kind === "send_closure_confirmation" ? "bg-danger text-white shadow-danger/20 hover:brightness-110" : "bg-accent text-accent-foreground shadow-accent/10 hover:bg-accent-hover"}`} disabled={busy} onClick={() => void run()} type="button">
           {busy ? copy.processing : copy.actionLabels[action.kind]}
         </button>
       ) : technicalTarget ? (

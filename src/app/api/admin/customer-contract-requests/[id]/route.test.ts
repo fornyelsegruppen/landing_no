@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), create: vi.fn(), find: vi.fn(), findByID: vi.fn(), update: vi.fn(), updateCase: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), create: vi.fn(), deliver: vi.fn(), enqueue: vi.fn(), find: vi.fn(), findByID: vi.fn(), update: vi.fn(), updateCase: vi.fn() }));
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ auth: mocks.auth, create: mocks.create, find: mocks.find, findByID: mocks.findByID, update: mocks.update })) }));
 vi.mock("@/lib/cases/case-command", () => ({ updateCaseState: mocks.updateCase }));
+vi.mock("@/lib/messages/message-engine", () => ({ deliverMessage: mocks.deliver, enqueueMessageJob: mocks.enqueue }));
+vi.mock("@/lib/providers/email-provider", () => ({ createEmailProvider: vi.fn(() => ({ health: () => ({ status: "ready" }) })) }));
 
 import { POST } from "./route";
 
@@ -21,23 +23,30 @@ describe("administrator customer contract request decision", () => {
     mocks.find.mockReset().mockResolvedValue({ docs: [{ id: 7, status: "blocked", statusBeforeCustomerCancellation: "scheduled", blockingReasons: ["CUSTOMER_CANCELLATION_REQUEST"] }] });
     mocks.update.mockReset().mockImplementation(async ({ id, data }: { id: number; data: Record<string, unknown> }) => ({ id, ...data }));
     mocks.create.mockReset().mockImplementation(async ({ collection, data }: { collection: string; data: Record<string, unknown> }) => ({ id: collection === "messages" ? 20 : 21, ...data }));
+    mocks.enqueue.mockReset().mockResolvedValue({ id: 30, status: "pending" });
+    mocks.deliver.mockReset().mockResolvedValue({ duplicate: false, message: { id: 20, status: "sent" } });
     mocks.updateCase.mockReset().mockResolvedValue({});
   });
 
-  it("closes the order, clears the work hold and creates a reviewable customer confirmation", async () => {
+  it("closes the order, clears the work hold and automatically sends the customer confirmation", async () => {
     const internalDecision = "Sutartis ir darbų būsena patikrinta administratoriaus.";
     const response = await POST(request({ decision: "close", reason: internalDecision }), { params: Promise.resolve({ id: "10" }) });
     expect(response.status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "work-orders", id: 7, data: expect.objectContaining({ status: "cancelled", blockingReasons: [] }) }));
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "customer-contract-requests", id: 10, data: expect.objectContaining({ status: "closed", reviewedBy: 3, administratorDecision: internalDecision }) }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "messages", data: expect.objectContaining({
-      status: "draft",
+      status: "queued",
       subject: "Bekreftelse på behandlet angremelding",
       bodyText: expect.stringContaining("bekrefter at avtalen er avsluttet"),
+      bodyHtml: expect.stringContaining("Takfornyelse"),
+      approvedBy: 3,
     }) }));
     const customerMessage = mocks.create.mock.calls.find(([input]) => input.collection === "messages")?.[0].data.bodyText;
     expect(customerMessage).not.toContain(internalDecision);
+    expect(mocks.enqueue).toHaveBeenCalledWith(expect.anything(), 20, expect.any(String));
+    expect(mocks.deliver).toHaveBeenCalledWith(expect.anything(), expect.anything(), 20, expect.any(String));
     expect(mocks.updateCase).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ leadId: 2, patch: expect.objectContaining({ status: "closed", nextActionBlocker: null }) }));
+    await expect(response.json()).resolves.toMatchObject({ delivery: "sent", status: "closed" });
   });
 
   it("keeps work frozen while a consented follow-up is scheduled", async () => {

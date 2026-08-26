@@ -272,10 +272,10 @@ export default async function AdminCasePage({
 
       <section
         aria-labelledby="next-action-title"
-        className="border-accent/35 bg-accent/8 rounded-3xl border p-5 sm:p-6"
+        className={`rounded-3xl border p-5 sm:p-6 ${caseData.nextAction.kind === "send_closure_confirmation" ? "border-danger/50 bg-danger/10" : "border-accent/35 bg-accent/8"}`}
       >
         <p
-          className="text-accent text-xs font-bold tracking-[.18em] uppercase"
+          className={`${caseData.nextAction.kind === "send_closure_confirmation" ? "text-danger" : "text-accent"} text-xs font-bold tracking-[.18em] uppercase`}
           id="next-action-title"
         >
           {copy.nextAction}

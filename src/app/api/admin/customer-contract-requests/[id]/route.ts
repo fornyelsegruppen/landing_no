@@ -4,10 +4,15 @@ import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { updateCaseState } from "@/lib/cases/case-command";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
+import { buildBrandedEmailHtml } from "@/lib/messages/email-template";
+import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
 import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
+import { createEmailProvider } from "@/lib/providers/email-provider";
 import { userIsAdmin } from "@/payload/access/roles";
+
+export const maxDuration = 60;
 
 const schema = z.object({
   decision: z.enum(["close", "continue", "alternative", "schedule_follow_up", "do_not_contact"]),
@@ -49,6 +54,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const now = new Date().toISOString();
     const closes = parsed.data.decision === "close" || parsed.data.decision === "do_not_contact";
     const resumes = parsed.data.decision === "continue";
+    if (closes && !lead.email) {
+      throw new TypeError("Customer email is required before the closure can be confirmed");
+    }
 
     if ((closes || resumes) && workOrder && workOrder.status === "blocked" && Array.isArray(workOrder.blockingReasons) && workOrder.blockingReasons.includes("CUSTOMER_CANCELLATION_REQUEST")) {
       const previousStatus = workOrder.statusBeforeCustomerCancellation;
@@ -79,6 +87,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       ...(parsed.data.decision === "continue" ? { recoveryPotential: "green", followUpOutcome: "Avtalen fortsetter etter administratoravklaring." } : {}),
     } });
 
+    let delivery: "draft" | "queued" | "sent" | undefined;
     let messageId: number | undefined;
     if (closes || resumes || parsed.data.decision === "alternative") {
       const subject = closes
@@ -99,16 +108,31 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         channel: lead.email ? "email" : "sms",
         subject,
         bodyText,
-        status: "draft",
+        bodyHtml: buildBrandedEmailHtml({ subject, text: bodyText }),
+        status: closes ? "queued" : "draft",
         idempotencyKey: makeIdempotencyKey("contract-request.decision", { requestId: contractRequest.id, decision: parsed.data.decision }),
         aiAssisted: false,
         aiAnalysis: { customerContractRequestId: contractRequest.id, decision: parsed.data.decision },
+        ...(closes ? { approvedBy: user.id, approvedAt: now, queuedAt: now } : {}),
       } });
       messageId = message.id;
+      delivery = closes ? "queued" : "draft";
+      if (closes) {
+        await enqueueMessageJob(payload, message.id, correlationId);
+        const provider = createEmailProvider();
+        if (provider.health().status === "ready") {
+          try {
+            await deliverMessage(payload, provider, message.id, correlationId);
+            delivery = "sent";
+          } catch (error) {
+            captureException(error, { route: "POST /api/admin/customer-contract-requests/[id]", operation: "closure-confirmation-delivery", correlationId });
+          }
+        }
+      }
     }
 
     await updateCaseState(payload, { leadId, actorId: user.id, command: "resolve_customer_contract_request", idempotencyKey: `${correlationId}:contract-request:${contractRequest.id}`, patch: closes ? {
-      status: "closed", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: "Kontroller og send sluttbekreftelsen. Arkiver deretter saken.", nextActionAt: now, closedAt: now,
+      status: "closed", nextActionOwner: "system", nextActionBlocker: null, nextAction: "Sluttbekreftelsen er sendt eller lagt i utsendingskø. Saken kan arkiveres.", nextActionAt: null, closedAt: now,
     } : resumes ? {
       status: "converted", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: workOrder ? "Kontroller gjenopptatt arbeidsplan og send kundemeldingen." : "Fortsett planleggingen og send kundemeldingen.", nextActionAt: now, closedAt: null,
     } : {
@@ -125,7 +149,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       changedFields: ["status", "administratorDecision", "reviewedAt", "workHold"],
       metadata: { decision: parsed.data.decision, leadId, workOrderId: workOrder?.id || null },
     });
-    return NextResponse.json({ ok: true, status, messageId });
+    return NextResponse.json({ ok: true, status, messageId, delivery });
   } catch (error) {
     captureException(error, { route: "POST /api/admin/customer-contract-requests/[id]", correlationId });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Decision failed", correlationId }, { status: error instanceof TypeError ? 409 : 500 });
