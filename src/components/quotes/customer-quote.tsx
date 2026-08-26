@@ -7,7 +7,7 @@ type Display = {
   reference: string; service: string; address: string; estimatedAreaMin: number; estimatedAreaMax: number;
   unitPriceExVatNok: number; subtotalExVatNok: number; vatPercent: number; vatNok: number; totalIncVatNok: number;
   tolerancePercent: number; maximumTotalIncVatNok: number | null; assumptions: string[]; source: string; credits: string;
-  validUntil: string; termsVersion: string;
+  validUntil: string; termsVersion: string; measurementReference: string;
   measurement: {
     id: number; version: number; inputHash: string; horizontalAreaTenths: number; actualAreaMinTenths: number; actualAreaMaxTenths: number;
     mode?: "legacy" | "schematic" | "schematic_with_context" | "manual_no_visual"; buildingIdentifier?: string; evidenceAttribution?: string;
@@ -226,7 +226,7 @@ export function CustomerQuote(props: {
     <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7">
       <h2 className="text-xl font-bold">Beregnet tak</h2>
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <p><span className="text-muted-foreground">Måleversjon:</span> <strong>TM-{d.measurement.id}-V{d.measurement.version}</strong></p>
+        <p><span className="text-muted-foreground">Måleversjon:</span> <strong>{d.measurementReference}</strong></p>
         {d.measurement.buildingIdentifier ? <p><span className="text-muted-foreground">Valgt bygg:</span> <strong>{d.measurement.buildingIdentifier}</strong></p> : null}
         <p><span className="text-muted-foreground">Horisontalt areal:</span> <strong>{d.measurement.horizontalAreaTenths / 10} m²</strong></p>
         {d.measurement.angleMinDegrees != null && d.measurement.angleMaxDegrees != null ? <p><span className="text-muted-foreground">Takvinkel:</span> <strong>{d.measurement.angleMinDegrees}–{d.measurement.angleMaxDegrees}°</strong></p> : null}

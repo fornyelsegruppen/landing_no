@@ -84,6 +84,7 @@ export function quoteDisplayModel(snapshotInput: unknown) {
     credits: snapshot.measurement.credits,
     validUntil: snapshot.validUntil,
     termsVersion: snapshot.termsVersion,
+    measurementReference: `TM-${snapshot.leadId}-V${snapshot.measurement.version}`,
     measurement: snapshot.measurement,
   };
 }
