@@ -1,0 +1,12 @@
+.agents/
+.tmp-playwright-*/
+skills-lock.json
+node_modules/
+.next/
+.env*
+coverage/
+test-results/
+playwright-report/
+blob-report/
+*.db
+*.db-*
