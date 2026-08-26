@@ -3,7 +3,7 @@
 **Parengta:** 2026-08-26  
 **Aplinka:** pirmiausia tik `https://takfornyelse-staging.vercel.app`  
 **Produkcija:** neliečiama be atskiro savininko `GO`  
-**Būsena:** vykdoma; B0–B4 užbaigti, B5 yra kitas aktyvus etapas  
+**Būsena:** vykdoma; B0–B5 užbaigti, B6 yra aktyvus galutinio staging priėmimo etapas
 **Vykdymo taisyklė:** vienu metu vykdoma tik viena fazė; nauja fazė nepradedama, kol ankstesnė neturi visų PASS įrodymų
 
 ## 1. Tikslas
@@ -223,6 +223,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 
 **Priklausomybė:** B4  
 **Tikslas:** įrodyti, kad integracija nesugadino svetainės, blogo variklio ar ankstesnio Admin V2 paketo.
+
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-b5-blog-regression-accessibility.md`.
 
 **Darbai:**
 
