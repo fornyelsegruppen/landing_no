@@ -27,7 +27,10 @@ export function resolvePostImage(
     };
   }
 
-  const stockUrl = approvedPexelsImageUrl(post.stockImage?.imageUrl);
+  const stockUrl =
+    post.stockImage?.provider === "pexels"
+      ? approvedPexelsImageUrl(post.stockImage.imageUrl)
+      : null;
   return stockUrl
     ? {
         url: stockUrl,

@@ -65,17 +65,25 @@ describe("latest public guides", () => {
         post(2, {
           imageAlt: "Et rengjort tak",
           stockImage: {
+            provider: "pexels",
             imageUrl: "https://images.pexels.com/photos/123/roof.jpeg",
+          },
+        }),
+        post(3, {
+          stockImage: {
+            provider: "manual",
+            imageUrl: "https://images.pexels.com/photos/456/roof.jpeg",
           },
         }),
       ],
       "no",
     );
 
-    expect(cards[0].image).toEqual({
+    expect(cards.find((card) => card.id === 2)?.image).toEqual({
       url: "https://images.pexels.com/photos/123/roof.jpeg",
       alt: "Et rengjort tak",
     });
-    expect(cards[1].image).toBeUndefined();
+    expect(cards.find((card) => card.id === 1)?.image).toBeUndefined();
+    expect(cards.find((card) => card.id === 3)?.image).toBeUndefined();
   });
 });

@@ -3,13 +3,11 @@ import { getPayload } from "@/lib/payload";
 import {
   getPublishedPages,
   getPublishedPosts,
-  availablePostLocales,
   type CmsContentDocument,
-  type CmsPostDocument,
 } from "@/lib/cms-pages";
 import { siteConfig } from "@/lib/site";
 import { seoLandingSlugs } from "@/content/seo-landing-pages";
-import { blogPostLanguageUrls } from "@/lib/blog/routing";
+import { localizedBlogPostEntries } from "@/lib/blog/sitemap";
 
 export const revalidate = 300;
 
@@ -65,29 +63,6 @@ function localizedEntries(
   }));
 }
 
-export function localizedBlogPostEntries(
-  post: CmsPostDocument,
-  lastModified: Date,
-): MetadataRoute.Sitemap {
-  const locales = availablePostLocales(post);
-  const languages = blogPostLanguageUrls(post, siteConfig.url);
-
-  return locales.map((locale) => ({
-    url: `${siteConfig.url}/${locale}/blogg/${post.slug}`,
-    lastModified,
-    changeFrequency: "weekly",
-    priority: 0.7,
-    alternates: {
-      languages: {
-        ...languages,
-        ...(locales.includes("no")
-          ? { "x-default": `${siteConfig.url}/no/blogg/${post.slug}` }
-          : {}),
-      },
-    },
-  }));
-}
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = await getLastModified();
   const staticPages = [
@@ -99,7 +74,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     { path: "/personvern", changeFrequency: "monthly" as const, priority: 0.5 },
-    { path: "/angreskjema", changeFrequency: "monthly" as const, priority: 0.4 },
+    {
+      path: "/angreskjema",
+      changeFrequency: "monthly" as const,
+      priority: 0.4,
+    },
   ];
 
   const staticEntries = staticPages.flatMap((page) =>
@@ -135,6 +114,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       localizedBlogPostEntries(
         post,
         validDate(post.updatedAt, lastModified),
+        siteConfig.url,
       ),
     );
 

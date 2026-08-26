@@ -3,7 +3,7 @@ export type PublicNavigationItem = {
   label: string;
 };
 
-const guideLabels = {
+export const guideLabels = {
   no: "Råd og guider",
   en: "Advice & guides",
 } as const;

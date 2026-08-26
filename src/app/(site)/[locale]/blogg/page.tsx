@@ -4,6 +4,7 @@ import { setRequestLocale } from "next-intl/server";
 import { Link, routing } from "@/i18n/routing";
 import { getPosts, localizeContent, postHasLocale } from "@/lib/cms-pages";
 import { siteConfig, type Locale } from "@/lib/site";
+import { guideLabels } from "@/lib/public-navigation";
 
 export const revalidate = 60;
 export const dynamic = "force-dynamic";
@@ -102,12 +103,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     alternates: {
       canonical: `${siteConfig.url}/${locale}/blogg`,
-      languages: Object.fromEntries(
-        routing.locales.map((language) => [
-          language,
-          `${siteConfig.url}/${language}/blogg`,
-        ]),
-      ),
+      languages: {
+        ...Object.fromEntries(
+          routing.locales.map((language) => [
+            language,
+            `${siteConfig.url}/${language}/blogg`,
+          ]),
+        ),
+        "x-default": `${siteConfig.url}/no/blogg`,
+      },
     },
     openGraph: {
       title,
@@ -129,112 +133,164 @@ export default async function BlogIndexPage({ params }: Props) {
   setRequestLocale(locale);
   const loc = locale as Locale;
   const posts = (await getPosts()).filter((post) => postHasLocale(post, loc));
+  const pageUrl = `${siteConfig.url}/${locale}/blogg`;
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": `${pageUrl}#collection`,
+        url: pageUrl,
+        name:
+          loc === "no"
+            ? "Takguide for boligeiere"
+            : "Roof guide for homeowners",
+        inLanguage: loc === "no" ? "nb-NO" : "en",
+        breadcrumb: { "@id": `${pageUrl}#breadcrumb` },
+        mainEntity: {
+          "@type": "ItemList",
+          itemListElement: posts.map((post, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            name: localizeContent(post, loc).title,
+            url: `${pageUrl}/${post.slug}`,
+          })),
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${pageUrl}#breadcrumb`,
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: loc === "no" ? "Forside" : "Home",
+            item: `${siteConfig.url}/${locale}`,
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: guideLabels[loc],
+            item: pageUrl,
+          },
+        ],
+      },
+    ],
+  };
 
   return (
-    <section className="section-pad">
-      <div className="container-narrow">
-        <p className="eyebrow">
-          <Link href="/" className="hover:text-accent-hover">
-            {loc === "no" ? "Forside" : "Home"}
-          </Link>
-        </p>
-        <h1 className="heading-display mt-3">
-          {loc === "no"
-            ? "Takguide for boligeiere"
-            : "Roof guide for homeowners"}
-        </h1>
-        <p className="text-muted-foreground mt-4 max-w-2xl">
-          {loc === "no"
-            ? "Finn riktig startpunkt før du bestiller arbeid. Guidene forklarer hva som kan vedlikeholdes, hva som bør undersøkes nærmere og når større tiltak kan være nødvendig."
-            : "Find the right starting point before booking work. These guides explain what can be maintained, what needs closer inspection and when larger measures may be necessary."}
-        </p>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(schema).replace(/</g, "\\u003c"),
+        }}
+      />
+      <section className="section-pad">
+        <div className="container-narrow">
+          <p className="eyebrow">
+            <Link href="/" className="hover:text-accent-hover">
+              {loc === "no" ? "Forside" : "Home"}
+            </Link>
+          </p>
+          <h1 className="heading-display mt-3">
+            {loc === "no"
+              ? "Takguide for boligeiere"
+              : "Roof guide for homeowners"}
+          </h1>
+          <p className="text-muted-foreground mt-4 max-w-2xl">
+            {loc === "no"
+              ? "Finn riktig startpunkt før du bestiller arbeid. Guidene forklarer hva som kan vedlikeholdes, hva som bør undersøkes nærmere og når større tiltak kan være nødvendig."
+              : "Find the right starting point before booking work. These guides explain what can be maintained, what needs closer inspection and when larger measures may be necessary."}
+          </p>
 
-        <section className="mt-12" aria-labelledby="guide-topics">
-          <div className="flex items-center gap-3">
-            <BookOpen className="text-accent size-6" aria-hidden />
-            <h2 id="guide-topics" className="text-2xl font-semibold">
-              {loc === "no" ? "Velg tema" : "Choose a topic"}
-            </h2>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {guideLinks.map((guide) => (
-              <article
-                key={guide.href}
-                className="surface-card flex flex-col p-6"
-              >
-                <h3 className="text-xl font-semibold tracking-tight">
-                  {guide.title[loc]}
-                </h3>
-                <p className="text-muted-foreground mt-3 text-sm leading-6">
-                  {guide.description[loc]}
-                </p>
-                <Link
-                  href={guide.href}
-                  className="text-accent hover:text-accent-hover mt-auto inline-flex items-center gap-2 pt-6 text-sm font-semibold"
+          <section className="mt-12" aria-labelledby="guide-topics">
+            <div className="flex items-center gap-3">
+              <BookOpen className="text-accent size-6" aria-hidden />
+              <h2 id="guide-topics" className="text-2xl font-semibold">
+                {loc === "no" ? "Velg tema" : "Choose a topic"}
+              </h2>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {guideLinks.map((guide) => (
+                <article
+                  key={guide.href}
+                  className="surface-card flex flex-col p-6"
                 >
-                  {loc === "no" ? "Les guiden" : "Read the guide"}
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {posts.length > 0 ? (
-          <section className="mt-16" aria-labelledby="latest-articles">
-            <h2 id="latest-articles" className="text-2xl font-semibold">
-              {loc === "no" ? "Nye artikler" : "Latest articles"}
-            </h2>
-            <div className="mt-6 grid gap-5 md:grid-cols-2">
-              {posts.map((post) => {
-                const localized = localizeContent(post, loc);
-                const date = post.publishedAt || post.createdAt;
-
-                return (
-                  <article
-                    key={String(post.id)}
-                    className="surface-card p-6 sm:p-8"
+                  <h3 className="text-xl font-semibold tracking-tight">
+                    {guide.title[loc]}
+                  </h3>
+                  <p className="text-muted-foreground mt-3 text-sm leading-6">
+                    {guide.description[loc]}
+                  </p>
+                  <Link
+                    href={guide.href}
+                    className="text-accent hover:text-accent-hover mt-auto inline-flex items-center gap-2 pt-6 text-sm font-semibold"
                   >
-                    <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
-                      <time dateTime={date}>{formatDate(date, loc)}</time>
-                      {post._status === "draft" && (
-                        <span className="border-accent/40 text-accent rounded-full border px-2 py-0.5 text-xs font-semibold">
-                          Draft
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="mt-3 text-2xl font-semibold tracking-tight">
-                      <Link
-                        href={`/blogg/${post.slug}`}
-                        className="hover:text-accent transition-colors"
-                      >
-                        {localized.title}
-                      </Link>
-                    </h3>
-                    {localized.excerpt && (
-                      <p className="text-muted-foreground mt-3 leading-7">
-                        {localized.excerpt}
-                      </p>
-                    )}
-                    <Link
-                      href={`/blogg/${post.slug}`}
-                      className="text-accent hover:text-accent-hover mt-6 inline-flex text-sm font-semibold"
-                    >
-                      {loc === "no" ? "Les mer" : "Read more"}
-                    </Link>
-                  </article>
-                );
-              })}
+                    {loc === "no" ? "Les guiden" : "Read the guide"}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                </article>
+              ))}
             </div>
           </section>
-        ) : (
-          <p className="text-muted-foreground mt-10 max-w-2xl text-sm leading-6">
-            {loc === "no"
-              ? "Vi utvider takguiden med dokumenterte prosjekter og svar på spørsmål vi møter under befaringer."
-              : "We are expanding the roof guide with documented projects and answers to questions we receive during inspections."}
-          </p>
-        )}
-      </div>
-    </section>
+
+          {posts.length > 0 ? (
+            <section className="mt-16" aria-labelledby="latest-articles">
+              <h2 id="latest-articles" className="text-2xl font-semibold">
+                {loc === "no" ? "Nye artikler" : "Latest articles"}
+              </h2>
+              <div className="mt-6 grid gap-5 md:grid-cols-2">
+                {posts.map((post) => {
+                  const localized = localizeContent(post, loc);
+                  const date = post.publishedAt || post.createdAt;
+
+                  return (
+                    <article
+                      key={String(post.id)}
+                      className="surface-card p-6 sm:p-8"
+                    >
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+                        <time dateTime={date}>{formatDate(date, loc)}</time>
+                        {post._status === "draft" && (
+                          <span className="border-accent/40 text-accent rounded-full border px-2 py-0.5 text-xs font-semibold">
+                            Draft
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+                        <Link
+                          href={`/blogg/${post.slug}`}
+                          className="hover:text-accent transition-colors"
+                        >
+                          {localized.title}
+                        </Link>
+                      </h3>
+                      {localized.excerpt && (
+                        <p className="text-muted-foreground mt-3 leading-7">
+                          {localized.excerpt}
+                        </p>
+                      )}
+                      <Link
+                        href={`/blogg/${post.slug}`}
+                        className="text-accent hover:text-accent-hover mt-6 inline-flex text-sm font-semibold"
+                      >
+                        {loc === "no" ? "Les mer" : "Read more"}
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : (
+            <p className="text-muted-foreground mt-10 max-w-2xl text-sm leading-6">
+              {loc === "no"
+                ? "Vi utvider takguiden med dokumenterte prosjekter og svar på spørsmål vi møter under befaringer."
+                : "We are expanding the roof guide with documented projects and answers to questions we receive during inspections."}
+            </p>
+          )}
+        </div>
+      </section>
+    </>
   );
 }

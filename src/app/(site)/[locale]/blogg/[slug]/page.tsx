@@ -21,6 +21,9 @@ import { redirectPathCandidates } from "@/lib/content-paths";
 import { siteConfig, type Locale } from "@/lib/site";
 import { safeContentHref } from "@/lib/safe-content-link";
 import { getSeoServiceHref } from "@/content/seo-landing-pages";
+import { blogPostLanguageUrls } from "@/lib/blog/routing";
+import { guideLabels } from "@/lib/public-navigation";
+import { publicRelatedPosts } from "@/lib/blog/related-posts";
 
 export const revalidate = 60;
 
@@ -57,18 +60,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? new URL(hero.url, siteConfig.url).toString()
     : undefined;
   const availableLocales = availablePostLocales(post);
+  const languageUrls = blogPostLanguageUrls(post, siteConfig.url);
 
   return {
     title: localized.seoTitle,
     description: localized.seoDescription,
     alternates: {
       canonical: postUrl,
-      languages: Object.fromEntries(
-        availableLocales.map((language) => [
-          language,
-          `${siteConfig.url}/${language}/blogg/${slug}`,
-        ]),
-      ),
+      languages: {
+        ...languageUrls,
+        ...(availableLocales.includes("no")
+          ? { "x-default": `${siteConfig.url}/no/blogg/${slug}` }
+          : {}),
+      },
     },
     openGraph: {
       title: localized.seoTitle,
@@ -76,6 +80,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "article",
       url: postUrl,
       publishedTime: post.publishedAt || undefined,
+      modifiedTime: post.updatedAt,
+      authors: post.authorName ? [post.authorName] : undefined,
       images: heroUrl
         ? [{ url: heroUrl, alt: hero?.alt || localized.title }]
         : undefined,
@@ -173,11 +179,7 @@ export default async function BlogPostPage({ params }: Props) {
       answer: (loc === "no" ? faq.answerNo : faq.answerEn)?.trim() || "",
     }))
     .filter((faq) => faq.question && faq.answer);
-  const relatedPosts = (post.relatedPosts || [])
-    .map((relation) => relatedDocument(relation))
-    .filter((relation): relation is typeof post =>
-      Boolean(relation && relation.slug && postHasLocale(relation, loc)),
-    );
+  const relatedPosts = publicRelatedPosts(post.relatedPosts, loc);
   const relatedServices = (post.relatedServices || [])
     .map((relation) => relatedDocument(relation))
     .filter(
@@ -237,7 +239,7 @@ export default async function BlogPostPage({ params }: Props) {
           {
             "@type": "ListItem",
             position: 2,
-            name: loc === "no" ? "Takguide" : "Roof guide",
+            name: guideLabels[loc],
             item: `${siteConfig.url}/${locale}/blogg`,
           },
           {
@@ -276,7 +278,9 @@ export default async function BlogPostPage({ params }: Props) {
         <div className="container-narrow max-w-3xl">
           <p className="eyebrow">
             <Link href="/blogg" className="hover:text-accent-hover">
-              {loc === "no" ? "Tilbake til bloggen" : "Back to the blog"}
+              {loc === "no"
+                ? "Tilbake til råd og guider"
+                : "Back to advice and guides"}
             </Link>
           </p>
           <h1 className="heading-display mt-3 text-balance">
