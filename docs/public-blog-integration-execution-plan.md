@@ -121,6 +121,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 
 ### B1 — publikavimo ir matomumo saugos vartas
 
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-b1-blog-publication-visibility.md`.
+
 **Priklausomybė:** B0  
 **Tikslas:** prieš plečiant matomumą įrodyti, kad viešai negali patekti nepatvirtintas turinys.
 
