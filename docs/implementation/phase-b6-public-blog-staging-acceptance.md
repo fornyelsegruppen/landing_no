@@ -58,7 +58,7 @@ Po release commit deploy dar kartą patikrinta:
 
 ## Savininko priėmimas
 
-Techninis paketas paruoštas savininko vizualinei patikrai. B6 neuždaroma ir produkcija nekeičiama, kol savininkas aiškiai neparašo:
+Savininkas 2026-08-27 aiškiai patvirtino:
 
 ```text
 Staging GO
@@ -69,8 +69,10 @@ FUNCTIONAL_RESULT=PASS
 TARGET_ACHIEVED=YES
 REGRESSION_TESTS=PASS
 TECHNICAL_STAGING_ACCEPTANCE=PASS
-OWNER_STAGING_APPROVAL=PENDING
+OWNER_STAGING_APPROVAL=GO
 SECURITY_AND_PRIVACY=PASS
 ROLLBACK_READY=YES
-NEXT_PHASE_ALLOWED=NO
+NEXT_PHASE_ALLOWED=YES
 ```
+
+Šis patvirtinimas uždaro B6 staging fazę. Produkcija tebėra nepakeista ir jai reikalingas atskiras aiškus `Production GO`.

@@ -3,7 +3,7 @@
 **Parengta:** 2026-08-26  
 **Aplinka:** pirmiausia tik `https://takfornyelse-staging.vercel.app`  
 **Produkcija:** neliečiama be atskiro savininko `GO`  
-**Būsena:** vykdoma; B0–B5 užbaigti, B6 yra aktyvus galutinio staging priėmimo etapas
+**Būsena:** PASS; B0–B6 užbaigti, savininko `Staging GO` gautas 2026-08-27; produkcija nepakeista
 **Vykdymo taisyklė:** vienu metu vykdoma tik viena fazė; nauja fazė nepradedama, kol ankstesnė neturi visų PASS įrodymų
 
 ## 1. Tikslas
@@ -249,7 +249,7 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 **Priklausomybė:** B5  
 **Tikslas:** sujungti blogo integraciją ir Admin V2 į vieną aiškiai identifikuotą produkcijos kandidatą.
 
-**Vykdymo būsena:** TECHNICAL PASS — 2026-08-26; savininko `Staging GO` dar laukiamas. Įrodymai `docs/implementation/phase-b6-public-blog-staging-acceptance.md`.
+**Vykdymo būsena:** PASS — techninis priėmimas 2026-08-26, savininko `Staging GO` 2026-08-27. Įrodymai `docs/implementation/phase-b6-public-blog-staging-acceptance.md`.
 
 **Darbai:**
 
