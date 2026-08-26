@@ -21,6 +21,9 @@ export async function issueQuoteCustomerLink(payload: Payload, quoteId: number) 
   if (contract.status === "draft") await payload.update({ collection: "contracts", id: contract.id, overrideAccess: true, data: { status: "issued" } });
   const url = `${siteConfig.url.replace(/\/$/, "")}/tilbud/${access.token}`;
   const display = quoteDisplayModel(quote.snapshot);
+  const isRevisedQuote = Boolean(
+    typeof quote.supersedes === "number" || quote.supersedes?.id,
+  );
   let alternative: { quote: typeof quote; contract: typeof contract; url: string; accessRecordId: number } | null = null;
   if (sibling) {
     const siblingContracts = await payload.find({ collection: "contracts", depth: 0, limit: 1, overrideAccess: true, where: { quote: { equals: sibling.id } } });
@@ -33,13 +36,18 @@ export async function issueQuoteCustomerLink(payload: Payload, quoteId: number) 
   const displays = [{ quote, display, url }, ...(alternative ? [{ quote: alternative.quote, display: quoteDisplayModel(alternative.quote.snapshot), url: alternative.url }] : [])]
     .sort((left, right) => left.quote.optionKind === "base" ? -1 : right.quote.optionKind === "base" ? 1 : 0);
   const optionLines = displays.flatMap((item, index) => [
-    `${index + 1}. ${item.quote.optionKind === "recommended" ? "Anbefalt alternativ" : "Opprinnelig forespørsel"}: ${item.display.service}`,
+    `${index + 1}. ${isRevisedQuote ? "Oppdatert forslag" : item.quote.optionKind === "recommended" ? "Anbefalt alternativ" : "Opprinnelig forespørsel"}: ${item.display.service}`,
     `Pris inkludert mva.: ${item.display.totalIncVatNok.toLocaleString("nb-NO", { minimumFractionDigits: 2 })} kr.`,
     `Åpne, kontroller og velg dette alternativet: ${item.url}`,
     "",
   ]);
   const body = [
-    `Hei ${lead.name},`, "", displays.length > 1 ? "Vi har laget to tydelige alternativer. Velg bare det alternativet du ønsker å signere." : `Tilbud ${quote.reference} for ${display.service} er klart.`,
+    `Hei ${lead.name},`, "",
+    isRevisedQuote
+      ? `Vi har laget et oppdatert tilbud ${quote.reference} basert på endringen du ba om. Den tidligere avtalen endres ikke før du eventuelt godkjenner og signerer den nye versjonen.`
+      : displays.length > 1
+        ? "Vi har laget to tydelige alternativer. Velg bare det alternativet du ønsker å signere."
+        : `Tilbud ${quote.reference} for ${display.service} er klart.`,
     "", ...optionLines,
     `Lenken er personlig og gyldig til ${new Date(quote.validUntil).toLocaleDateString("nb-NO")}.`,
     "", "Vennlig hilsen", "Takfornyelse", siteConfig.phone,

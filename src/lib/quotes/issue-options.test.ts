@@ -34,4 +34,32 @@ describe("grouped quote issuing", () => {
     expect(message.bodyText).toContain("base-token");
     expect(message.bodyText).toContain("recommended-token");
   });
+
+  it("labels a superseding quote as an updated proposal without implying it was the original request", async () => {
+    mocks.issueToken.mockReset().mockResolvedValueOnce({ token: "revised-token", record: { id: 41 } });
+    const revised = {
+      id: 12,
+      reference: "T-1-V2",
+      lead: 1,
+      version: 2,
+      supersedes: 10,
+      validUntil: "2099-09-01T00:00:00Z",
+      status: "approved",
+      snapshot: snapshot("T-1-V2", "takvask_impregnering", "Takvask og impregnering", 1_750_000),
+    };
+    const create = vi.fn().mockImplementation(async ({ data }: { data: unknown }) => ({ id: 91, ...(data as object) }));
+    const payload = {
+      findByID: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => collection === "leads" ? { id: 1, name: "Test Kunde", email: "test@example.no" } : revised),
+      find: vi.fn().mockResolvedValue({ docs: [{ id: 22, status: "draft" }] }),
+      update: vi.fn().mockResolvedValue({}),
+      create,
+    };
+
+    await issueQuoteCustomerLink(payload as never, 12);
+    const message = create.mock.calls[0][0].data as { bodyText: string };
+    expect(message.bodyText).toContain("oppdatert tilbud T-1-V2");
+    expect(message.bodyText).toContain("Oppdatert forslag: Takvask og impregnering");
+    expect(message.bodyText).toContain("Den tidligere avtalen endres ikke");
+    expect(message.bodyText).not.toContain("Opprinnelig forespørsel");
+  });
 });
