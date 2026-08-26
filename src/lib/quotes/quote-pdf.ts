@@ -243,6 +243,11 @@ export async function buildQuoteContractPdf(input: {
 
   pdf.section("Avtalevilkår");
   pdf.text(input.contract.terms.text, { gap: 8 });
+
+  // Keep the withdrawal information and its form together as one intentional
+  // document section. Without this break, a long terms version can leave only
+  // one or two continuation lines on an otherwise empty page before the form.
+  pdf.addPage();
   pdf.section("Angrerett");
   pdf.text(input.contract.terms.withdrawalInstructions);
   pdf.field("Standard angreskjema", input.contract.terms.withdrawalFormUrl);
@@ -296,7 +301,10 @@ export async function buildQuoteContractPdf(input: {
     );
   }
 
-  pdf.addPage();
+  // In an unsigned draft the form fits below the withdrawal information. A
+  // signed document includes the signature block above, so ensure() starts a
+  // fresh page only when the complete form would no longer fit.
+  pdf.ensure(330);
   const withdrawal = withdrawalFormCopy.no;
   pdf.text(withdrawal.title, { size: 16, strong: true, gap: 12 });
   pdf.text(`${withdrawal.intro} ${withdrawal.deadline}`);

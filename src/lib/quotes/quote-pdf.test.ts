@@ -8,6 +8,7 @@ import {
   documentHash,
 } from "./document";
 import { buildQuoteContractPdf } from "./quote-pdf";
+import { PRODUCTION_PILOT_TERMS } from "@/content/production-pilot-terms";
 import { pdfSafe } from "@/lib/pdf/branded-pdf";
 
 describe("quote PDF", () => {
@@ -48,7 +49,7 @@ describe("quote PDF", () => {
         toleranceBasisPoints: 1000,
         maximumTotalIncVatOre: 2237153,
       },
-      termsVersion: "legal-v1",
+      termsVersion: PRODUCTION_PILOT_TERMS.version,
       validUntil: "2099-09-01T00:00:00Z",
     });
     const contract = buildContractSnapshot({
@@ -56,16 +57,17 @@ describe("quote PDF", () => {
       quote,
       customer: { name: "Test Kunde", address: "Testveien 1" },
       terms: {
-        version: "legal-v1",
-        text: "Dette er juridisk kontrollert kontraktstekst som beskriver oppdrag, betaling, ansvar, endringer og kundens ufravikelige rettigheter.",
+        version: PRODUCTION_PILOT_TERMS.version,
+        text: PRODUCTION_PILOT_TERMS.contractText,
         withdrawalInstructions:
-          "Du kan normalt gå fra fjernsalgsavtalen innen 14 dager. Bruk skjemaet eller send en annen tydelig melding til leverandøren.",
-        withdrawalFormUrl: "https://example.test/form",
+          PRODUCTION_PILOT_TERMS.withdrawalInstructions,
+        withdrawalFormUrl: PRODUCTION_PILOT_TERMS.withdrawalFormUrl,
       },
     });
     const bytes = await buildQuoteContractPdf({ contract });
     const pdf = await PDFDocument.load(bytes);
-    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(5);
+    expect(pdf.getPageCount()).toBeLessThanOrEqual(6);
     expect(pdf.getTitle()).toContain(contract.contractReference);
     expect(documentHash(contract)).toHaveLength(64);
   });
