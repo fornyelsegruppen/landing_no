@@ -144,6 +144,15 @@ export async function recordCustomerContractRequest(payload: Payload, input: {
   });
   if (existing.docs[0]) return { duplicate: true as const, request: existing.docs[0] };
 
+  const requestHistory = await payload.find({
+    collection: "customer-contract-requests",
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    where: { lead: { equals: input.leadId } },
+  });
+  const requestVersion = requestHistory.totalDocs + 1;
+
   const workOrders = await payload.find({ collection: "work-orders", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: input.leadId } } });
   const workOrder = workOrders.docs[0];
   const reasonLabel = reasonLabelsNo[input.request.reasonCode];
@@ -191,7 +200,7 @@ export async function recordCustomerContractRequest(payload: Payload, input: {
   const depositBasisPoints = typeof quotePricing?.depositBasisPoints === "number" ? quotePricing.depositBasisPoints : 0;
   const potential = recoveryPotential(input.request);
   const requestRecord = await payload.create({ collection: "customer-contract-requests", overrideAccess: true, data: {
-    reference: `${input.request.action === "withdrawal" ? "ANG" : "END"}-${input.contractId}-${fingerprint.slice(0, 8).toUpperCase()}`,
+    reference: `${input.request.action === "withdrawal" ? "ANG" : "END"}-${input.leadId}-V${requestVersion}`,
     lead: input.leadId,
     quote: input.quoteId,
     contract: input.contractId,

@@ -2,7 +2,7 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 
 const statuses: Record<PanelLocale, Record<string, string>> = {
   nb: {
-    new: "Ny", contacted: "Kontaktet", qualified: "Kvalifisert", measuring: "Måles", draft_ready: "Utkast klart", customer_waiting: "Kunden venter på svar", waiting_customer: "Venter på kunden", converted: "Bekreftet kunde", closed: "Lukket",
+    new: "Ny", contacted: "Kontaktet", qualified: "Kvalifisert", measuring: "Måles", draft_ready: "Utkast klart", quoted: "Tilbud klargjort", customer_waiting: "Kunden venter på svar", waiting_customer: "Venter på kunden", converted: "Bekreftet kunde", closed: "Lukket",
     draft: "Utkast", review_required: "Må kontrolleres", approved: "Godkjent", blocked: "Blokkert", ready: "Klar", sent: "Sendt", viewed: "Sett", accepted: "Akseptert", declined: "Avslått", expired: "Utløpt", revoked: "Tilbakekalt", superseded: "Erstattet", issued: "Utstedt",
     signed: "Signert", customer_signed: "Kunden signerte", fully_signed: "Begge parter signerte", queued: "I sendekø", delivered: "Levert", failed: "Mislykket", attention: "Krever oppfølging", pending: "Venter",
     unassigned: "Ikke tildelt", assigned: "Tildelt", scheduled: "Planlagt", on_way: "På vei", arrived: "Ankommet", precheck: "Forhåndskontroll", in_progress: "Pågår", completed: "Fullført", documented: "Dokumentert", cancelled: "Kansellert",
@@ -11,7 +11,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     received: "Mottatt", admin_review: "Til administratorvurdering", alternative_requested: "Alternativt tilbud ønsket", follow_up_scheduled: "Oppfølging planlagt", recovered: "Kunden beholdt", do_not_contact: "Ikke kontakt",
   },
   lt: {
-    new: "Nauja", contacted: "Susisiekta", qualified: "Tinkama", measuring: "Matuojama", draft_ready: "Juodraštis paruoštas", customer_waiting: "Klientas laukia atsakymo", waiting_customer: "Laukiama kliento", converted: "Patvirtintas klientas", closed: "Uždaryta",
+    new: "Nauja", contacted: "Susisiekta", qualified: "Tinkama", measuring: "Matuojama", draft_ready: "Juodraštis paruoštas", quoted: "Pasiūlymas paruoštas", customer_waiting: "Klientas laukia atsakymo", waiting_customer: "Laukiama kliento", converted: "Patvirtintas klientas", closed: "Uždaryta",
     draft: "Juodraštis", review_required: "Reikia patikrinti", approved: "Patvirtinta", blocked: "Sustabdyta", ready: "Paruošta", sent: "Išsiųsta", viewed: "Peržiūrėta", accepted: "Priimta", declined: "Atmesta", expired: "Nebegalioja", revoked: "Atšaukta", superseded: "Pakeista nauja versija", issued: "Pateikta klientui",
     signed: "Pasirašyta", customer_signed: "Klientas pasirašė", fully_signed: "Pasirašė abi šalys", queued: "Laukia siuntimo", delivered: "Pristatyta", failed: "Nepavyko", attention: "Reikia dėmesio", pending: "Laukiama",
     unassigned: "Nepriskirta", assigned: "Priskirta", scheduled: "Suplanuota", on_way: "Vykstama", arrived: "Atvykta", precheck: "Pirminė patikra", in_progress: "Vykdoma", completed: "Baigta", documented: "Dokumentuota", cancelled: "Atšaukta",
@@ -20,7 +20,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     received: "Gauta", admin_review: "Laukia administratoriaus sprendimo", alternative_requested: "Ruošiamas alternatyvus pasiūlymas", follow_up_scheduled: "Kontaktas suplanuotas", recovered: "Klientas išsaugotas", do_not_contact: "Nebekontaktuoti",
   },
   en: {
-    new: "New", contacted: "Contacted", qualified: "Qualified", measuring: "Measuring", draft_ready: "Draft ready", customer_waiting: "Customer awaiting reply", waiting_customer: "Waiting for customer", converted: "Confirmed customer", closed: "Closed",
+    new: "New", contacted: "Contacted", qualified: "Qualified", measuring: "Measuring", draft_ready: "Draft ready", quoted: "Quote prepared", customer_waiting: "Customer awaiting reply", waiting_customer: "Waiting for customer", converted: "Confirmed customer", closed: "Closed",
     draft: "Draft", review_required: "Review required", approved: "Approved", blocked: "Blocked", ready: "Ready", sent: "Sent", viewed: "Viewed", accepted: "Accepted", declined: "Declined", expired: "Expired", revoked: "Revoked", superseded: "Superseded", issued: "Issued",
     signed: "Signed", customer_signed: "Customer signed", fully_signed: "Both parties signed", queued: "Queued", delivered: "Delivered", failed: "Failed", attention: "Needs attention", pending: "Pending",
     unassigned: "Unassigned", assigned: "Assigned", scheduled: "Scheduled", on_way: "On the way", arrived: "Arrived", precheck: "Pre-check", in_progress: "In progress", completed: "Completed", documented: "Documented", cancelled: "Cancelled",

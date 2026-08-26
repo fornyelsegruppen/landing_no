@@ -483,6 +483,57 @@ function latest<T>(items: T[]) {
   return items[0];
 }
 
+function oldestFirst(items: Array<Record<string, unknown>>) {
+  return [...items].sort((left, right) => {
+    const leftAt = new Date(
+      stringValue(left.createdAt) || stringValue(left.updatedAt) || 0,
+    ).getTime();
+    const rightAt = new Date(
+      stringValue(right.createdAt) || stringValue(right.updatedAt) || 0,
+    ).getTime();
+    return leftAt - rightAt || numericId(left.id) - numericId(right.id);
+  });
+}
+
+function canonicalPriceReferences(
+  leadId: number,
+  prices: Array<Record<string, unknown>>,
+  quotes: Array<Record<string, unknown>>,
+) {
+  const references = new Map<number, string>();
+  const usedVersions = new Set<number>();
+
+  for (const quote of quotes) {
+    const calculationId = relationId(quote.priceCalculation);
+    const version = numberValue(quote.version);
+    if (!calculationId || !version) continue;
+    references.set(calculationId, `PB-${leadId}-V${version}`);
+    usedVersions.add(version);
+  }
+
+  let fallbackVersion = 1;
+  for (const price of oldestFirst(prices)) {
+    const priceId = numericId(price.id);
+    if (references.has(priceId)) continue;
+    while (usedVersions.has(fallbackVersion)) fallbackVersion += 1;
+    references.set(priceId, `PB-${leadId}-V${fallbackVersion}`);
+    usedVersions.add(fallbackVersion);
+  }
+  return references;
+}
+
+function canonicalContractRequestReferences(
+  leadId: number,
+  requests: Array<Record<string, unknown>>,
+) {
+  return new Map(
+    oldestFirst(requests).map((request, index) => [
+      numericId(request.id),
+      `${stringValue(request.kind) === "withdrawal" ? "ANG" : "END"}-${leadId}-V${index + 1}`,
+    ]),
+  );
+}
+
 function timelineDate(record: Record<string, unknown>) {
   return (
     stringValue(record.updatedAt) ||
@@ -709,6 +760,11 @@ export async function loadAdminCase(
   const invoices = invoicesResult.docs.map(asRecord);
   const warranties = warrantiesResult.docs.map(asRecord);
   const officialInvoices = officialInvoicesResult.docs.map(asRecord);
+  const priceReferences = canonicalPriceReferences(leadId, prices, quotes);
+  const contractRequestReferences = canonicalContractRequestReferences(
+    leadId,
+    contractRequests,
+  );
 
   const ownerPairs = [
     { ownerType: "lead", ids: [leadId] },
@@ -848,6 +904,9 @@ export async function loadAdminCase(
   const price = latestPriceRaw
     ? {
         ...entity("price-calculations", latestPriceRaw),
+        reference:
+          priceReferences.get(numericId(latestPriceRaw.id)) ||
+          `PB-${leadId}-V1`,
         adjustmentReason: stringValue(priceAdjustment?.reason),
         discountOre: numberValue(priceAdjustment?.discountOre),
         subtotalExVatOre: numberValue(latestPriceRaw.subtotalExVatOre),
@@ -1073,7 +1132,7 @@ export async function loadAdminCase(
         "price",
         "price-calculations",
         item,
-        stringValue(item.reference) || "Prisberegning",
+        priceReferences.get(numericId(item.id)) || "Prisberegning",
       ),
     ),
     ...quotes.map((item) =>
@@ -1115,7 +1174,8 @@ export async function loadAdminCase(
         "contract_request",
         "customer-contract-requests",
         item,
-        stringValue(item.reference) || "Angre- eller endringsmelding",
+        contractRequestReferences.get(numericId(item.id)) ||
+          "Angre- eller endringsmelding",
       ),
     ),
     ...workOrders.map((item) =>
@@ -1246,6 +1306,9 @@ export async function loadAdminCase(
     }),
     contractRequests: contractRequests.map((item) => ({
       ...entity("customer-contract-requests", item),
+      reference:
+        contractRequestReferences.get(numericId(item.id)) ||
+        `END-${leadId}-V1`,
       administratorDecision: stringValue(item.administratorDecision),
       aiSuggestedAction: stringValue(item.aiSuggestedAction),
       aiSummary: stringValue(item.aiSummary),

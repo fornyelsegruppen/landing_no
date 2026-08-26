@@ -148,7 +148,10 @@ export async function createQuoteDraft(
         if (["draft", "issued"].includes(old.status)) await payload.update({ collection: "contracts", id: old.id, overrideAccess: true, data: { status: "superseded" } });
       }
     }
-    await payload.update({ collection: "price-calculations", id: calculation.id, overrideAccess: true, data: { status: "superseded" } });
+    await payload.update({ collection: "price-calculations", id: calculation.id, overrideAccess: true, data: {
+      reference: `PB-${leadId}-V${version}`,
+      status: "superseded",
+    } });
     return { quote, contract, snapshot };
   } catch (error) {
     await payload.delete({ collection: "quotes", id: quote.id, overrideAccess: true }).catch(() => undefined);
