@@ -90,7 +90,11 @@ export function ReferencesSection({ projects }: Props) {
                 {copy.references.note}
               </p>
             ) : null}
-            <Button asChild size="lg" className="mt-6">
+            <Button
+              asChild
+              size="lg"
+              className="mt-6 h-auto max-w-full whitespace-normal px-5 py-3 text-center leading-snug sm:whitespace-nowrap sm:px-7"
+            >
               <Link href="/#kontakt">
                 {locale === "no"
                   ? "Få gratis taksjekk og pristilbud"
