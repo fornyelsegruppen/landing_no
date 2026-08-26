@@ -17,6 +17,44 @@ type Display = {
 
 const nok = (value: number) => value.toLocaleString("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+function LegalDisclosure(props: {
+  pdfHref: string;
+  terms: { version: string; text: string; withdrawalInstructions: string; withdrawalFormUrl: string };
+}) {
+  return <section aria-labelledby="legal-disclosure-title" className="rounded-2xl border border-white/10 bg-black/15 p-4 sm:p-5">
+    <h3 className="text-lg font-bold" id="legal-disclosure-title">Viktig før signering</h3>
+    <p className="mt-2 text-sm text-muted-foreground">Kort oppsummert:</p>
+    <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6">
+      <li>Avtalen gjelder tjenesten, arbeidsstedet og prisene som er vist ovenfor.</li>
+      <li>Takarealet kontrolleres på stedet. Arbeid over maksimalprisen krever en ny skriftlig avtale.</li>
+      <li>Du har normalt 14 dagers angrerett ved fjernsalg.</li>
+    </ul>
+
+    <div className="mt-4 grid gap-3">
+      <details className="group rounded-xl border border-white/10 bg-white/[.03]">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+          <span>Les fullstendige avtalevilkår <span className="text-sm font-normal text-muted-foreground">({props.terms.version})</span></span>
+          <svg aria-hidden="true" className="size-5 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+        </summary>
+        <div className="border-t border-white/10 px-4 py-5 text-sm leading-7 text-muted-foreground whitespace-pre-wrap">{props.terms.text}</div>
+      </details>
+
+      <details className="group rounded-xl border border-white/10 bg-white/[.03]">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+          <span>Les informasjon om angrerett</span>
+          <svg aria-hidden="true" className="size-5 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
+        </summary>
+        <div className="border-t border-white/10 px-4 py-5 text-sm leading-7 text-muted-foreground whitespace-pre-wrap">{props.terms.withdrawalInstructions}</div>
+      </details>
+    </div>
+
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <a className="inline-flex min-h-12 items-center justify-center rounded-xl border border-accent/50 px-4 text-center font-semibold text-accent hover:bg-accent/10" href={props.pdfHref} target="_blank">Last ned tilbud og kontrakt som PDF</a>
+      <a className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/15 px-4 text-center font-semibold hover:bg-white/5" href={props.terms.withdrawalFormUrl} rel="noreferrer" target="_blank">Åpne standard angreskjema</a>
+    </div>
+  </section>;
+}
+
 export function CustomerQuote(props: {
   token: string; quoteStatus: string; contractStatus: string; contractReference: string; documentHash: string;
   customerName: string; display: Display; supplier: { name: string; orgNumber: string; address: string; email: string; phone: string };
@@ -173,20 +211,22 @@ export function CustomerQuote(props: {
       <p className="mt-5">Takareal og takvinkel kontrolleres på stedet før arbeid starter. Et vesentlig avvik utover avtalt toleranse eller maksimalpris krever en skriftlig endringsavtale før arbeidet fortsetter.</p>
       <h3 className="mt-6 font-bold">Forutsetninger</h3><ul className="mt-3 list-disc space-y-2 pl-5">{d.assumptions.map((item) => <li key={item}>{item}</li>)}</ul><p className="mt-4 text-sm text-muted-foreground">Kilde: {d.source}. {d.measurement.evidenceAttribution || d.credits}</p>
     </section>
-    <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7"><h2 className="text-xl font-bold">Avtalevilkår og angrerett</h2><p className="mt-4 whitespace-pre-wrap leading-7">{props.terms.text}</p><h3 className="mt-6 font-bold">Angrerett</h3><p className="mt-2 whitespace-pre-wrap leading-7">{props.terms.withdrawalInstructions}</p><a className="mt-4 inline-flex min-h-11 items-center underline" href={props.terms.withdrawalFormUrl} rel="noreferrer" target="_blank">Åpne standard angreskjema</a><div><a className="mt-2 inline-flex min-h-11 items-center underline" href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`} target="_blank">Last ned tilbud og kontrakt som PDF</a></div></section>
-
     {!signed && !declined ? <>
       <form className="mt-8 rounded-2xl border-2 border-accent/50 bg-[#12151c] p-5 sm:p-7" onSubmit={submitSign}>
         <h2 className="text-2xl font-bold">Godta og signer</h2>
-        <label className="mt-5 block font-semibold" htmlFor="signerName">Fullt navn</label><input className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-black/20 px-4" defaultValue={props.customerName} id="signerName" name="signerName" required />
-        <fieldset className="mt-5"><legend className="font-semibold">Tegn signaturen i feltet</legend><canvas aria-label="Signaturfelt" className="mt-2 h-44 w-full touch-none rounded-lg bg-white" onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} ref={canvasRef} /><button className="mt-2 min-h-11 underline" onClick={clearSignature} type="button">Tøm signaturfeltet</button></fieldset>
-        <div className="mt-5 space-y-4">
+        <p className="mt-2 text-sm text-muted-foreground">Kontroller sammendraget og velg selv om du vil åpne den fullstendige teksten før du bekrefter.</p>
+        <div className="mt-5">
+          <LegalDisclosure pdfHref={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`} terms={props.terms} />
+        </div>
+        <div className="mt-5 space-y-4 rounded-2xl border border-white/10 p-4 sm:p-5">
           <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="terms" required type="checkbox" /><span>Jeg har lest og godtar tilbudet og avtalevilkårene (versjon {props.terms.version}).</span></label>
           <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="withdrawal" required type="checkbox" /><span>Jeg har mottatt informasjon om 14 dagers angrerett og standard angreskjema.</span></label>
           <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="payment" required type="checkbox" /><span>Jeg forstår at bestillingen medfører plikt til å betale avtalt pris.</span></label>
           <label className="flex gap-3"><input checked={earlyStart} className="mt-1 size-5 shrink-0" onChange={(event) => setEarlyStart(event.target.checked)} type="checkbox" /><span>Jeg ber uttrykkelig om at arbeidet kan starte før angrefristen er utløpt (valgfritt).</span></label>
           {earlyStart ? <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="earlyLoss" required type="checkbox" /><span>Jeg forstår at angreretten går tapt når tjenesten er fullt utført, og at jeg kan måtte betale forholdsmessig for arbeid som er utført før jeg angrer.</span></label> : null}
         </div>
+        <label className="mt-5 block font-semibold" htmlFor="signerName">Fullt navn</label><input className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-black/20 px-4" defaultValue={props.customerName} id="signerName" name="signerName" required />
+        <fieldset className="mt-5"><legend className="font-semibold">Tegn signaturen i feltet</legend><canvas aria-label="Signaturfelt" className="mt-2 h-44 w-full touch-none rounded-lg bg-white" onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} ref={canvasRef} /><button className="mt-2 min-h-11 underline" onClick={clearSignature} type="button">Tøm signaturfeltet</button></fieldset>
         <button className="mt-6 min-h-14 w-full rounded-xl bg-accent px-5 text-base font-black text-black hover:bg-accent-hover disabled:opacity-50" disabled={pending || !hasSignature} type="submit">{pending ? "Signerer …" : "Bestilling med forpliktelse til å betale og signer"}</button>
       </form>
       {!declineOpen ? <button className="mt-8 min-h-12 text-sm text-muted-foreground underline" disabled={pending} onClick={() => setDeclineOpen(true)} type="button">Jeg ønsker å avslå tilbudet</button> : (
