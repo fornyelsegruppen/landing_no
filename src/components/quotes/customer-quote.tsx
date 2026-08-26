@@ -117,7 +117,7 @@ export function CustomerQuote(props: {
     const form = new FormData(event.currentTarget); setPending(true); setNotice("");
     try {
       const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        action: "sign", signerName: form.get("signerName"), signatureData: canvasRef.current.toDataURL("image/png"), expectedDocumentHash: props.documentHash,
+        action: "sign", signatureData: canvasRef.current.toDataURL("image/png"), expectedDocumentHash: props.documentHash,
         paymentObligationAccepted: form.get("payment") === "on", termsAccepted: form.get("terms") === "on",
         withdrawalInformationReceived: form.get("withdrawal") === "on", earlyStartRequested: earlyStart,
         earlyStartLossAcknowledged: earlyStart ? form.get("earlyLoss") === "on" : false,
@@ -253,7 +253,11 @@ export function CustomerQuote(props: {
           <label className="flex gap-3"><input checked={earlyStart} className="mt-1 size-5 shrink-0" onChange={(event) => setEarlyStart(event.target.checked)} type="checkbox" /><span>Jeg ber uttrykkelig om at arbeidet kan starte før angrefristen er utløpt (valgfritt).</span></label>
           {earlyStart ? <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="earlyLoss" required type="checkbox" /><span>Jeg forstår at angreretten går tapt når tjenesten er fullt utført, og at jeg kan måtte betale forholdsmessig for arbeid som er utført før jeg angrer.</span></label> : null}
         </div>
-        <label className="mt-5 block font-semibold" htmlFor="signerName">Fullt navn</label><input className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-black/20 px-4" defaultValue={props.customerName} id="signerName" name="signerName" required />
+        <div className="mt-5">
+          <p className="font-semibold">Avtalepart og underskriver</p>
+          <p className="mt-2 min-h-12 rounded-lg border border-white/20 bg-black/20 px-4 py-3 font-bold" aria-label="Navn på avtalepart">{props.customerName}</p>
+          <p className="mt-2 text-sm text-muted-foreground">Navnet er hentet fra henvendelsen og låst til dette dokumentet. Kontakt Takfornyelse før signering dersom navnet må korrigeres.</p>
+        </div>
         <fieldset className="mt-5"><legend className="font-semibold">Tegn signaturen i feltet</legend><canvas aria-label="Signaturfelt" className="mt-2 h-44 w-full touch-none rounded-lg bg-white" onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} ref={canvasRef} /><button className="mt-2 min-h-11 underline" onClick={clearSignature} type="button">Tøm signaturfeltet</button></fieldset>
         <button className="mt-6 min-h-14 w-full rounded-xl bg-accent px-5 text-base font-black text-black hover:bg-accent-hover disabled:opacity-50" disabled={pending || !hasSignature} type="submit">{pending ? "Signerer …" : "Bestilling med forpliktelse til å betale og signer"}</button>
       </form>

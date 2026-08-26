@@ -31,7 +31,7 @@ const actionSchema = z.union([z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("cancel_request"), message: z.string().trim().min(10).max(2_000) }),
   z.object({
-    action: z.literal("sign"), signerName: z.string().trim().min(3).max(160),
+    action: z.literal("sign"), signerName: z.string().trim().min(3).max(160).optional(),
     signatureData: z.string().min(100).max(1_500_000), expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/),
     paymentObligationAccepted: z.literal(true), termsAccepted: z.literal(true), withdrawalInformationReceived: z.literal(true),
     earlyStartRequested: z.boolean(), earlyStartLossAcknowledged: z.boolean(),
@@ -191,7 +191,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     if (view.contractStatus !== "issued" || !["sent", "viewed"].includes(view.quoteStatus)) throw new Error("Contract is not available for signing");
     const evidence = createSignatureEvidence({
       contract: view.snapshot as ContractSnapshot, expectedDocumentHash: parsed.data.expectedDocumentHash,
-      signatureData: parsed.data.signatureData, signerName: parsed.data.signerName,
+      signatureData: parsed.data.signatureData, signerName: view.customerName,
       paymentObligationAccepted: parsed.data.paymentObligationAccepted, termsAccepted: parsed.data.termsAccepted,
       withdrawalInformationReceived: parsed.data.withdrawalInformationReceived,
       earlyStartRequested: parsed.data.earlyStartRequested, earlyStartLossAcknowledged: parsed.data.earlyStartLossAcknowledged,

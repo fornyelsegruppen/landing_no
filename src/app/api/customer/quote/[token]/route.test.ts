@@ -39,9 +39,13 @@ describe("customer quote signing route", () => {
   });
 
   it("stores an immutable signed PDF and queues one durable confirmation", async () => {
-    const response = await POST(request({ action: "sign", signerName: "Test Kunde", signatureData, expectedDocumentHash: documentHash(contract), paymentObligationAccepted: true, termsAccepted: true, withdrawalInformationReceived: true, earlyStartRequested: false, earlyStartLossAcknowledged: false }), { params: Promise.resolve({ token: "t".repeat(43) }) });
+    const response = await POST(request({ action: "sign", signerName: "Et manipulert navn", signatureData, expectedDocumentHash: documentHash(contract), paymentObligationAccepted: true, termsAccepted: true, withdrawalInformationReceived: true, earlyStartRequested: false, earlyStartLossAcknowledged: false }), { params: Promise.resolve({ token: "t".repeat(43) }) });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: "signed" });
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "contracts",
+      data: expect.objectContaining({ signatureEvidence: expect.objectContaining({ signerName: "Test Kunde" }) }),
+    }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "private-media", file: expect.objectContaining({ mimetype: "application/pdf" }) }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "messages", data: expect.objectContaining({ attachments: [77], idempotencyKey: "contract-signed:2" }) }));
     expect(mocks.enqueue).toHaveBeenCalledWith(expect.anything(), 88, expect.any(String));
