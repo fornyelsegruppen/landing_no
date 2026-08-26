@@ -174,12 +174,12 @@ function Chain({
     (left, right) => left.version - right.version || left.id - right.id,
   );
   return (
-    <div>
+    <div className="min-w-0">
       <h3 className="text-sm font-bold tracking-wider uppercase text-white/80">
         {title}
       </h3>
       {ordered.length ? (
-        <div className="mt-3 flex items-stretch gap-2 overflow-x-auto pb-2">
+        <div className="mt-3 flex min-w-0 max-w-full items-stretch gap-2 overflow-x-auto pb-2">
           {ordered.map((version, index) => (
             <div className="contents" key={`${version.kind}-${version.id}`}>
               {index ? (
@@ -229,7 +229,7 @@ export function CaseVersionHistory({
       <h2 className="text-xl font-bold" id="version-history-title">
         {copy.versionHistory}
       </h2>
-      <div className="mt-5 grid gap-6">
+      <div className="mt-5 grid min-w-0 gap-6">
         <Chain
           copy={copy}
           formatDate={formatDate}
