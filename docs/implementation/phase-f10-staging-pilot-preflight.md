@@ -2,8 +2,8 @@
 
 Data: 2026-08-26  
 Būsena: **IN PROGRESS — Production NO-GO**  
-Paskutinis patvirtintas šakos CI: [GitHub Quality run 32903823308](https://github.com/fornyelsegruppen/landing_no/actions/runs/32903823308)
-Staging deployment: `landing-6r1ahdg42-darbasnorvegija4-8212s-projects.vercel.app`
+Paskutinis patvirtintas šakos CI: [GitHub Quality run 32914425681](https://github.com/fornyelsegruppen/landing_no/actions/runs/32914425681)
+Staging deployment: `landing-n30jxnzj5-darbasnorvegija4-8212s-projects.vercel.app`
 Stabili staging nuoroda: `https://takfornyelse-staging.vercel.app`
 
 ## Preflight rezultatas
@@ -93,6 +93,6 @@ Tai nėra realaus 20–30 užklausų piloto pakaitalas. Bandymas atliktas tik Pr
 
 FUNCTIONAL_RESULT=IN_PROGRESS  
 TARGET_ACHIEVED=NO  
-REGRESSION_TESTS=PASS (158 failai / 507 testai; galutinis CI numeris atnaujinamas po push)
+REGRESSION_TESTS=PASS (158 failai / 507 testai lokaliai; visas Linux/PostgreSQL/Chromium Quality gate `32914425681` taip pat PASS)
 STAGING_ACCEPTANCE=PENDING_HUMAN_SIGNOFF  
 ROLLBACK_READY=YES
