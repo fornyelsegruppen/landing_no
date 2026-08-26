@@ -160,6 +160,12 @@ Visi scenarijai atliekami staging aplinkoje. Naudojami sintetiniai duomenys ir k
 | UAT-21 | Mokėjimo ir vėlavimo kontrolė | rankinis banko patikrinimas, mokėjimo registracija ir priminimo kladė | suma ir data privalomos, banko nuoroda neprivaloma; priminimo mygtukas blokuotas be tos dienos banko patikros; laiškas siunčiamas tik po admin patvirtinimo ir tik vieną kartą |
 | UAT-22 | Mėnesio buhalterijos eksportas | mėnesio filtras, PDF/CSV paketas, kreditinės ir mokėjimai | pakete tik pasirinkto mėnesio bylos; originalūs dokumentai ir kontrolinės sumos sutampa; eksportas audituotas ir nekeičia sąskaitų būsenų |
 
+#### Faktinės UAT išvados
+
+| ID | Rezultatas | Faktinis įrodymas | Patvirtino | Laikas |
+|---|---|---|---|---|
+| UAT-01 | PASS | Staging byla `#13`: gautas tik gavimo patvirtinimas; Gemini sukūrė santrauką be trūkstamų duomenų; `TM-13-V1` automatiškai nustatė pasirinktą pastatą, horizontalų 86,7 m² plotą ir 93,5–102,3 m² stogo intervalą su `high` patikimumu; `T-13-V1` ir `K-13-V1` liko juodraščiai. PDF turi prekės ženklą, matavimo vizualą, 99,00 kr/m² be MVA, 12 659,63 kr su MVA ir 14 558,58 kr maksimalią kainą; admin kortelėje tos pačios sumos rodomos suapvalintos. | Įmonės savininkas ir techninė patikra | 2026-08-26 08:55 CEST |
+
 **P3 PASS**
 
 - UAT-01–UAT-22 turi faktinę PASS išvadą arba aiškiai dokumentuotą `N/A` su savininko sprendimu;
