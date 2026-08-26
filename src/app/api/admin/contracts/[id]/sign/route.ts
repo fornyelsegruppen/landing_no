@@ -18,6 +18,11 @@ import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 import { userIsAdmin } from "@/payload/access/roles";
 import { updateCaseState } from "@/lib/cases/case-command";
 import { issueQuoteAccessToken } from "@/lib/quotes/customer-access";
+import {
+  assertCurrentContractTarget,
+  assertExpectedDocumentHash,
+  StaleCommercialContextError,
+} from "@/lib/admin-v2/commercial-action-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,6 +31,7 @@ const schema = z.object({
   signerName: z.string().trim().min(3).max(160),
   signatureData: z.string().min(100).max(1_500_000),
   expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/),
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 function relationId(value: unknown) {
@@ -52,10 +58,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const contract = await payload.findByID({ collection: "contracts", id: Number(id), depth: 0, overrideAccess: true });
     if (contract.status !== "signed") throw new TypeError("The customer must sign before the supplier can sign");
-    if (contract.companySignedAt) return NextResponse.json({ ok: true, status: "fully_signed", idempotent: true });
     const quoteId = relationId(contract.quote);
     if (!quoteId) throw new TypeError("Contract quote is missing");
     const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
+    const leadId = relationId(quote.lead);
+    if (!leadId) throw new TypeError("Contract lead is missing");
+    await assertCurrentContractTarget(payload, {
+      leadId,
+      contractId: contract.id,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    assertExpectedDocumentHash({
+      expectedDocumentHash: parsed.data.expectedDocumentHash,
+      currentDocumentHash: typeof contract.documentHash === "string" ? contract.documentHash : undefined,
+      currentReference: contract.reference,
+    });
+    if (contract.companySignedAt) return NextResponse.json({ ok: true, status: "fully_signed", idempotent: true });
     if (quote.status !== "accepted") throw new TypeError("The customer has not accepted the quote");
     const snapshot = contract.snapshot as unknown as ContractSnapshot;
     const customerEvidence = contract.signatureEvidence as unknown as SignatureEvidenceRecord | null;
@@ -135,8 +153,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
     contractCommitted = true;
 
-    const leadId = relationId(quote.lead);
-    if (!leadId) throw new TypeError("Contract lead is missing");
     await updateCaseState(payload, { leadId, actorId: user.id, command: "company_countersigned", idempotencyKey: `company-countersign:${contract.id}`, patch: {
       status: "converted", nextActionOwner: "administrator", nextAction: "Kontrakten er signert av begge parter. Opprett og planlegg arbeidsordre.", nextActionAt: evidence.signedAt,
     } });
@@ -186,6 +202,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!contractCommitted && finalDocumentMedia) await deletePrivateMedia(payload, finalDocumentMedia).catch(() => undefined);
     if (!contractCommitted && companySignatureMedia) await deletePrivateMedia(payload, companySignatureMedia).catch(() => undefined);
     captureException(error, { route: "POST /api/admin/contracts/[id]/sign", correlationId });
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Contract signing failed", correlationId }, { status: error instanceof TypeError ? 409 : 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Contract signing failed", ...(error instanceof StaleCommercialContextError ? { code: "STALE_COMMERCIAL_CONTEXT", currentReference: error.currentReference } : {}), correlationId }, { status: error instanceof TypeError ? 409 : 500 });
   }
 }

@@ -1,4 +1,8 @@
 import type { Payload, Where } from "payload";
+import {
+  deriveCaseCommercialContext,
+  type CaseCommercialContext,
+} from "./case-commercial-context";
 
 export type CaseNextActionKind =
   | "approve_measurement"
@@ -242,6 +246,7 @@ export type CaseContractRequest = CaseEntity & {
 
 export type AdminCase = {
   changes: CaseChangeAgreement[];
+  commercial: CaseCommercialContext;
   contractRequests: CaseContractRequest[];
   contract?: CaseEntity & {
     companySignedAt?: string;
@@ -410,6 +415,14 @@ function manualOverride(value: unknown) {
   if (!snapshot.manualOverride || typeof snapshot.manualOverride !== "object")
     return undefined;
   return snapshot.manualOverride as Record<string, unknown>;
+}
+
+function quotePricing(value: unknown) {
+  if (!value || typeof value !== "object") return undefined;
+  const snapshot = value as Record<string, unknown>;
+  if (!snapshot.pricing || typeof snapshot.pricing !== "object")
+    return undefined;
+  return snapshot.pricing as Record<string, unknown>;
 }
 
 function numericId(value: unknown) {
@@ -760,6 +773,37 @@ export async function loadAdminCase(
   const invoices = invoicesResult.docs.map(asRecord);
   const warranties = warrantiesResult.docs.map(asRecord);
   const officialInvoices = officialInvoicesResult.docs.map(asRecord);
+  const commercial = deriveCaseCommercialContext(
+    quotes.map((item) => {
+      const pricing = quotePricing(item.snapshot);
+      return {
+        id: numericId(item.id),
+        reference: stringValue(item.reference),
+        version: numberValue(item.version),
+        status: stringValue(item.status),
+        supersedesId: relationId(item.supersedes),
+        serviceDescription: stringValue(item.serviceDescription),
+        totalIncVatOre: numberValue(item.totalIncVatOre),
+        maximumTotalIncVatOre: numberValue(item.maximumTotalIncVatOre),
+        depositBasisPoints: numberValue(pricing?.depositBasisPoints),
+        depositAmountIncVatOre: numberValue(
+          pricing?.depositAmountIncVatOre,
+        ),
+      };
+    }),
+    contracts.map((item) => ({
+      id: numericId(item.id),
+      quoteId: relationId(item.quote),
+      reference: stringValue(item.reference),
+      version: numberValue(item.version),
+      status: stringValue(item.status),
+      supersedesId: relationId(item.supersedes),
+      signedAt: stringValue(item.signedAt),
+      companySignedAt: stringValue(item.companySignedAt),
+      signedDocumentId: relationId(item.signedDocument),
+      companySignedDocumentId: relationId(item.companySignedDocument),
+    })),
+  );
   const priceReferences = canonicalPriceReferences(leadId, prices, quotes);
   const contractRequestReferences = canonicalContractRequestReferences(
     leadId,
@@ -814,9 +858,13 @@ export async function loadAdminCase(
     latest(prices.filter((item) => item.status !== "superseded")) ||
     latest(prices);
   const latestQuoteRaw =
+    quotes.find((item) => numericId(item.id) === commercial.workingQuote?.id) ||
     latest(quotes.filter((item) => item.status !== "superseded")) ||
     latest(quotes);
   const latestContractRaw =
+    contracts.find(
+      (item) => numericId(item.id) === commercial.workingContract?.id,
+    ) ||
     latest(contracts.filter((item) => item.status !== "superseded")) ||
     latest(contracts);
   const latestWorkRaw =
@@ -1223,6 +1271,7 @@ export async function loadAdminCase(
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return {
+    commercial,
     lead: {
       id: leadId,
       name: stringValue(lead.name) || `#${leadId}`,

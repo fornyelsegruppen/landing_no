@@ -10,12 +10,14 @@ import { userIsAdmin } from "@/payload/access/roles";
 import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
 import { dispatchWorkOrderCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { captureException } from "@/lib/monitoring";
+import { assertExpectedDocumentHash, assertWorkOrderContractTarget } from "@/lib/admin-v2/commercial-action-guard";
 
 const schema = z.object({
   adminNote: z.string().trim().max(1000).optional(),
   arrivalWindow: z.string().trim().max(120).optional(),
   assignedWorkerId: z.number().int().positive().optional(),
   contractId: z.number().int().positive(),
+  expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   scheduledLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).optional(),
 }).refine((value) => !value.scheduledLocal || value.assignedWorkerId, {
   message: "An employee is required before scheduling",
@@ -29,6 +31,18 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid work order" }, { status: 400 });
   try {
+    const contract = await payload.findByID({ collection: "contracts", id: parsed.data.contractId, depth: 0, overrideAccess: true });
+    const quoteId = typeof contract.quote === "number" ? contract.quote : contract.quote?.id;
+    if (!quoteId) return NextResponse.json({ error: "Contract quote is missing" }, { status: 409 });
+    const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
+    const leadId = typeof quote.lead === "number" ? quote.lead : quote.lead?.id;
+    if (!leadId) return NextResponse.json({ error: "Contract customer case is missing" }, { status: 409 });
+    await assertWorkOrderContractTarget(payload, { leadId, contractId: parsed.data.contractId });
+    assertExpectedDocumentHash({
+      expectedDocumentHash: parsed.data.expectedDocumentHash,
+      currentDocumentHash: typeof contract.documentHash === "string" ? contract.documentHash : undefined,
+      currentReference: contract.reference,
+    });
     const scheduledAt = parsed.data.scheduledLocal ? norwayLocalDateTimeToIso(parsed.data.scheduledLocal) : undefined;
     const arrivalWindow = validateArrivalWindowForSchedule(parsed.data.scheduledLocal, parsed.data.arrivalWindow);
     if (parsed.data.assignedWorkerId && (!scheduledAt || !arrivalWindow)) {

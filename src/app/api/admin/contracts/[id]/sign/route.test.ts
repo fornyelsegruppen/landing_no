@@ -17,6 +17,13 @@ vi.mock("@/lib/quotes/quote-pdf", () => ({ buildQuoteContractPdf: vi.fn(async ()
 vi.mock("@/lib/rate-limit", () => ({ clientIp: vi.fn(() => "192.0.2.1") }));
 vi.mock("@/lib/audit/payload-audit-writer", () => ({ createPayloadAuditWriter: vi.fn(() => vi.fn()) }));
 vi.mock("@/lib/audit/audit-event", () => ({ recordAuditEvent: vi.fn(async () => undefined) }));
+vi.mock("@/lib/admin-v2/commercial-action-guard", () => ({
+  assertCurrentContractTarget: vi.fn(async () => undefined),
+  assertExpectedDocumentHash: vi.fn(() => undefined),
+  StaleCommercialContextError: class StaleCommercialContextError extends TypeError {
+    currentReference?: string;
+  },
+}));
 
 import { POST } from "./route";
 

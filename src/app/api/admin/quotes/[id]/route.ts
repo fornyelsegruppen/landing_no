@@ -8,8 +8,23 @@ import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/feat
 import { documentHash } from "@/lib/quotes/document";
 import { issueQuoteCustomerLink, revokeIssuedQuote } from "@/lib/quotes/issue";
 import { userIsAdmin } from "@/payload/access/roles";
+import {
+  assertCurrentQuoteTarget,
+  assertExpectedDocumentHash,
+  StaleCommercialContextError,
+} from "@/lib/admin-v2/commercial-action-guard";
 
-const schema = z.object({ action: z.enum(["approve", "issue", "regenerate_link", "revoke"]) });
+const schema = z.object({
+  action: z.enum(["approve", "issue", "regenerate_link", "revoke"]),
+  expectedDocumentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  expectedVersion: z.number().int().positive().optional(),
+});
+
+function relationId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
+  return undefined;
+}
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const correlationId = correlationIdFromHeaders(request.headers);
@@ -23,6 +38,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     const quote = await payload.findByID({ collection: "quotes", id: Number(id), depth: 0, overrideAccess: true });
+    const leadId = relationId(quote.lead);
+    if (!leadId) throw new TypeError("Quote customer case is missing");
+    await assertCurrentQuoteTarget(payload, {
+      leadId,
+      quoteId: quote.id,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    assertExpectedDocumentHash({
+      expectedDocumentHash: parsed.data.expectedDocumentHash,
+      currentDocumentHash: typeof quote.snapshotHash === "string" ? quote.snapshotHash : undefined,
+      currentReference: quote.reference,
+    });
     let result: Record<string, unknown>;
     if (parsed.data.action === "approve") {
       if (quote.status !== "draft") throw new Error("Only a draft can be approved");
@@ -46,6 +73,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof FeatureUnavailableError) return NextResponse.json({ error: error.reason, missing: error.unavailable }, { status: 503 });
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Quote action failed", correlationId }, { status: 409 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Quote action failed", ...(error instanceof StaleCommercialContextError ? { code: "STALE_COMMERCIAL_CONTEXT", currentReference: error.currentReference } : {}), correlationId }, { status: 409 });
   }
 }
