@@ -98,6 +98,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 
 ### B0 — baseline, faktinis turinys ir rollback
 
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-b0-public-blog-baseline.md`.
+
 **Tikslas:** užfiksuoti esamą blogo, navigacijos ir produkcijos būseną prieš pakeitimus.
 
 **Darbai:**
