@@ -89,6 +89,8 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E0 — baseline, informacijos architektūra ir rollback
 
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-e0-case-ergonomics-baseline.md`.
+
 **Tikslas:** prieš keičiant UI užfiksuoti dabartinę būseną ir vienareikšmiškai aprašyti, ką juosta turi rodyti kiekvienoje bylos stadijoje.
 
 **Darbai:**
@@ -138,7 +140,7 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E2 — pilna bylos suvestinė ir prisegta kompaktiška juosta
 
-**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; staging vizualinė patikra vykdoma E6. Įrodymai `docs/implementation/phase-e2-case-summary-command-bar.md`.
+**Vykdymo būsena:** techninė ir staging patikra PASS — 2026-08-26; 320, 375, 768 ir 1280 px, lipni juosta bei horizontalus plotis patikrinti E6. Įrodymai `docs/implementation/phase-e2-case-summary-command-bar.md` ir `docs/implementation/phase-e6-regression-staging-acceptance.md`.
 
 **Priklausomybė:** E1  
 **Tikslas:** administratorius visada žino, kurioje byloje ir dokumento versijoje dirba.
@@ -166,7 +168,7 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E3 — versijų grandinė ir tiesioginė dokumento peržiūra
 
-**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e3-document-version-chain.md`.
+**Vykdymo būsena:** techninė ir staging patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e3-document-version-chain.md` ir `docs/implementation/phase-e6-regression-staging-acceptance.md`.
 
 **Priklausomybė:** E2  
 **Tikslas:** administratorius vienu žvilgsniu supranta dokumentų istoriją ir vienu paspaudimu patikrina konkrečią versiją.
@@ -192,7 +194,7 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E4 — kontekstinis kitas veiksmas ir kontrolinė suvestinė
 
-**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e4-contextual-action-preflight.md`.
+**Vykdymo būsena:** techninė ir staging patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e4-contextual-action-preflight.md` ir `docs/implementation/phase-e6-regression-staging-acceptance.md`.
 
 **Priklausomybė:** E3  
 **Tikslas:** administratorius prieš paspausdamas aiškiai mato, ką tvirtina ir kas bus atlikta.
@@ -220,7 +222,7 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 
 ### E5 — automatinis rezultatas, atsinaujinimas ir tęstinumas
 
-**Vykdymo būsena:** lokali patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e5-action-feedback-refresh.md`.
+**Vykdymo būsena:** techninė ir staging patikra PASS — 2026-08-26; įrodymai `docs/implementation/phase-e5-action-feedback-refresh.md` ir `docs/implementation/phase-e6-regression-staging-acceptance.md`.
 
 **Priklausomybė:** E4  
 **Tikslas:** po paspaudimo administratorius iš karto žino, ar veiksmas suveikė ir ką daryti toliau.
@@ -246,6 +248,8 @@ Bet kuris `FAIL`, nepatikrintas scenarijus arba klaidinanti būsena palieka faz�
 - įrašytas E5 `GO`.
 
 ### E6 — regresija, prieinamumas ir galutinis staging priėmimas
+
+**Vykdymo būsena:** techninė patikra PASS — 2026-08-26; savininko galutinis vizualinis `GO` laukiamas, produkcija nepakeista. Įrodymai `docs/implementation/phase-e6-regression-staging-acceptance.md`.
 
 **Priklausomybė:** E5  
 **Tikslas:** įrodyti, kad ergonomikos pataisymas nepakeitė verslo logikos ir veikia visame bylos cikle.
