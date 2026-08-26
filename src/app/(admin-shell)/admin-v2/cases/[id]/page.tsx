@@ -14,6 +14,7 @@ import { InformationRequestButton } from "@/components/admin-v2/information-requ
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
+import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import {
   metadataLabel,
@@ -219,6 +220,9 @@ export default async function AdminCasePage({
     : caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST"
       ? caseData.messages.find((message) => message.direction === "inbound")
       : undefined;
+  const activeContractRequest = caseData.contractRequests.find((item) =>
+    !["closed", "recovered", "do_not_contact"].includes(item.status || ""),
+  );
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -745,7 +749,9 @@ export default async function AdminCasePage({
               <p className="text-muted-foreground">{copy.noMessages}</p>
             )}
           </Section>
-          {caseData.lead.nextActionBlocker ===
+          {caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST" && activeContractRequest ? (
+            <ContractRequestReviewPanel locale={user.interfaceLanguage} request={activeContractRequest} />
+          ) : caseData.lead.nextActionBlocker ===
           "CUSTOMER_CANCELLATION_REQUEST" ? (
             <CancellationReviewPanel
               customerMessage={cancellationSource?.bodyText}

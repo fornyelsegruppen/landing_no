@@ -17,6 +17,7 @@ const copies = {
     navigation: {
       overview: "Oversikt",
       leads: "Alle saker",
+      contractRequests: "Angre- og endringsmeldinger",
       quotes: "Tilbud",
       contracts: "Kontrakter",
       work: "Arbeid",
@@ -123,6 +124,7 @@ const copies = {
     navigation: {
       overview: "Apžvalga",
       leads: "Visos bylos",
+      contractRequests: "Atsisakymai ir pakeitimai",
       quotes: "Pasiūlymai",
       contracts: "Sutartys",
       work: "Darbai",
@@ -229,6 +231,7 @@ const copies = {
     navigation: {
       overview: "Overview",
       leads: "All cases",
+      contractRequests: "Withdrawals and changes",
       quotes: "Quotes",
       contracts: "Contracts",
       work: "Work",

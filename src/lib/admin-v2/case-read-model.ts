@@ -201,6 +201,7 @@ export type CaseTimelineItem = {
   type:
     | "change"
     | "contract"
+    | "contract_request"
     | "invoice"
     | "lead"
     | "measurement"
@@ -211,8 +212,33 @@ export type CaseTimelineItem = {
     | "work";
 };
 
+export type CaseContractRequest = CaseEntity & {
+  administratorDecision?: string;
+  aiSuggestedAction?: string;
+  aiSummary?: string;
+  closedAt?: string;
+  companySignedAt?: string;
+  contractSignedAt?: string;
+  followUpAt?: string;
+  followUpAttempts?: number;
+  followUpConsent: boolean;
+  followUpOutcome?: string;
+  kind: string;
+  nominalWithdrawalDeadline?: string;
+  preferredFollowUp?: string;
+  preferredFollowUpAt?: string;
+  reasonCode: string;
+  reasonText?: string;
+  receivedAt: string;
+  recoveryPotential: string;
+  reviewedAt?: string;
+  withinNominalWithdrawalPeriod?: boolean;
+  workStatusAtReceipt?: string;
+};
+
 export type AdminCase = {
   changes: CaseChangeAgreement[];
+  contractRequests: CaseContractRequest[];
   contract?: CaseEntity & {
     companySignedAt?: string;
     documentHash?: string;
@@ -485,8 +511,10 @@ function makeTimeline(
             : type === "price" || type === "quote"
               ? "#price-quote-section"
               : type === "contract"
-                ? "#contract-section"
-                : type === "work"
+          ? "#contract-section"
+          : type === "contract_request"
+            ? "#contract-request-section"
+          : type === "work"
                   ? "#work-section"
                   : type === "invoice"
                     ? `#invoice-${id}`
@@ -583,6 +611,7 @@ export async function loadAdminCase(
     quotesResult,
     messagesResult,
     workOrdersResult,
+    contractRequestsResult,
   ] = await Promise.all([
     payload.find({
       ...common,
@@ -610,6 +639,11 @@ export async function loadAdminCase(
       collection: "work-orders",
       where: { lead: { equals: leadId } },
     }),
+    payload.find({
+      ...common,
+      collection: "customer-contract-requests",
+      where: { lead: { equals: leadId } },
+    }),
   ]);
 
   const measurements = measurementsResult.docs.map(asRecord);
@@ -617,6 +651,7 @@ export async function loadAdminCase(
   const quotes = quotesResult.docs.map(asRecord);
   const messages = messagesResult.docs.map(asRecord);
   const workOrders = workOrdersResult.docs.map(asRecord);
+  const contractRequests = contractRequestsResult.docs.map(asRecord);
   const quoteIds = quotes
     .map((quote) => numericId(quote.id))
     .filter(Number.isFinite);
@@ -1063,6 +1098,14 @@ export async function loadAdminCase(
         ),
       ].filter((event): event is CaseTimelineItem => Boolean(event)),
     ),
+    ...contractRequests.map((item) =>
+      makeTimeline(
+        "contract_request",
+        "customer-contract-requests",
+        item,
+        stringValue(item.reference) || "Angre- eller endringsmelding",
+      ),
+    ),
     ...workOrders.map((item) =>
       makeTimeline(
         "work",
@@ -1189,6 +1232,30 @@ export async function loadAdminCase(
           numberValue(after?.totalIncVatOre),
       };
     }),
+    contractRequests: contractRequests.map((item) => ({
+      ...entity("customer-contract-requests", item),
+      administratorDecision: stringValue(item.administratorDecision),
+      aiSuggestedAction: stringValue(item.aiSuggestedAction),
+      aiSummary: stringValue(item.aiSummary),
+      closedAt: stringValue(item.closedAt),
+      companySignedAt: stringValue(item.companySignedAt),
+      contractSignedAt: stringValue(item.contractSignedAt),
+      followUpAt: stringValue(item.followUpAt),
+      followUpAttempts: numberValue(item.followUpAttempts),
+      followUpConsent: Boolean(item.followUpConsent),
+      followUpOutcome: stringValue(item.followUpOutcome),
+      kind: stringValue(item.kind) || "change_or_cancel",
+      nominalWithdrawalDeadline: stringValue(item.nominalWithdrawalDeadline),
+      preferredFollowUp: stringValue(item.preferredFollowUp),
+      preferredFollowUpAt: stringValue(item.preferredFollowUpAt),
+      reasonCode: stringValue(item.reasonCode) || "prefer_not_to_say",
+      reasonText: stringValue(item.reasonText),
+      receivedAt: stringValue(item.receivedAt) || stringValue(item.createdAt) || new Date(0).toISOString(),
+      recoveryPotential: stringValue(item.recoveryPotential) || "yellow",
+      reviewedAt: stringValue(item.reviewedAt),
+      withinNominalWithdrawalPeriod: typeof item.withinNominalWithdrawalPeriod === "boolean" ? item.withinNominalWithdrawalPeriod : undefined,
+      workStatusAtReceipt: stringValue(item.workStatusAtReceipt),
+    })),
     messages: mappedMessages,
     documents: mediaResult.docs.map((raw) => {
       const item = asRecord(raw);

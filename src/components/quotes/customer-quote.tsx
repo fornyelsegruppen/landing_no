@@ -74,6 +74,11 @@ export function CustomerQuote(props: {
   const [declined, setDeclined] = useState(props.quoteStatus === "declined");
   const [declineOpen, setDeclineOpen] = useState(false);
   const [earlyStart, setEarlyStart] = useState(false);
+  const [contractRequestOpen, setContractRequestOpen] = useState<"withdrawal" | "change_or_cancel" | null>(null);
+  const [contractRequestReason, setContractRequestReason] = useState("");
+  const [followUpConsent, setFollowUpConsent] = useState(false);
+  const [doNotContact, setDoNotContact] = useState(false);
+  const [followUpChoice, setFollowUpChoice] = useState("");
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -155,23 +160,42 @@ export function CustomerQuote(props: {
     }
   }
 
-  async function requestCancellation(event: FormEvent<HTMLFormElement>) {
+  async function submitContractRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    if (!contractRequestOpen) return;
     setPending(true);
     setNotice("");
     try {
+      const customDate = data.get("preferredFollowUpAt");
       const response = await fetch(`/api/customer/quote/${encodeURIComponent(props.token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel_request", message: data.get("message") }),
+        body: JSON.stringify({
+          action: contractRequestOpen,
+          reasonCode: data.get("reasonCode"),
+          reasonText: data.get("reasonText") || undefined,
+          followUpConsent: followUpConsent && !doNotContact,
+          preferredFollowUp: doNotContact ? "never" : followUpConsent ? data.get("preferredFollowUp") || undefined : undefined,
+          preferredFollowUpAt: followUpConsent && followUpChoice === "custom" && customDate
+            ? new Date(`${String(customDate)}T12:00:00Z`).toISOString()
+            : undefined,
+        }),
       });
-      if (!response.ok) throw new Error("request failed");
+      const result = await response.json().catch(() => ({})) as { error?: string; requestReference?: string };
+      if (!response.ok) throw new Error(result.error || "request failed");
       form.reset();
-      setNotice("Forespørselen er mottatt. Arbeidet blir ikke startet automatisk mens Takfornyelse vurderer saken. Vi sender en egen skriftlig avklaring.");
+      setContractRequestOpen(null);
+      setContractRequestReason("");
+      setFollowUpConsent(false);
+      setDoNotContact(false);
+      setFollowUpChoice("");
+      setNotice(contractRequestOpen === "withdrawal"
+        ? `Angremeldingen er mottatt${result.requestReference ? ` (${result.requestReference})` : ""}. Eventuell arbeidsstart er satt på pause, og en mottaksbekreftelse er sendt på e-post.`
+        : `Forespørselen er mottatt${result.requestReference ? ` (${result.requestReference})` : ""}. Eventuell arbeidsstart er satt på pause mens vi vurderer saken.`);
     } catch {
-      setNotice("Forespørselen kunne ikke registreres. Kontakt oss på telefon eller e-post.");
+      setNotice("Meldingen kunne ikke registreres. Kontakt oss på telefon eller e-post.");
     } finally {
       setPending(false);
     }
@@ -254,7 +278,51 @@ export function CustomerQuote(props: {
       )}
     </> : null}
     {!declined ? <form className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7" onSubmit={sendQuestion}><h2 className="text-xl font-bold">Har du spørsmål?</h2><p className="mt-2 text-sm text-muted-foreground">Meldingen går til saken din og besvares etter kontroll av Takfornyelse.</p><textarea className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-white/5 p-4" maxLength={2000} minLength={5} name="message" required /><button className="mt-3 min-h-12 rounded-lg border border-white/20 px-5 font-bold" disabled={pending} type="submit">Send spørsmål</button></form> : null}
-    {signed ? <form className="mt-8 rounded-2xl border border-red-400/30 bg-red-400/5 p-5 sm:p-7" onSubmit={requestCancellation}><h2 className="text-xl font-bold">Be om endring eller kansellering</h2><p className="mt-2 text-sm text-muted-foreground">Dette er en forespørsel til manuell vurdering og ikke en automatisk bekreftelse på at avtalen er avsluttet. Planlagt arbeidsstart sperres mens forespørselen vurderes.</p><textarea className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-black/20 p-4" maxLength={2000} minLength={10} name="message" placeholder="Beskriv hva du ønsker å endre eller hvorfor du ber om kansellering" required /><button className="mt-3 min-h-12 rounded-lg border border-red-400/50 px-5 font-bold text-red-200" disabled={pending} type="submit">Send forespørsel til vurdering</button></form> : null}
+    {signed ? <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7">
+      <h2 className="text-xl font-bold">Vil du endre eller avslutte avtalen?</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Velg handlingen som passer. Begge alternativene registreres med tidspunkt og setter eventuell arbeidsstart på pause.</p>
+      {!contractRequestOpen ? <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <button className="min-h-14 rounded-xl border border-red-400/50 px-5 font-bold text-red-200 hover:bg-red-400/10" onClick={() => setContractRequestOpen("withdrawal")} type="button">Bruk angreretten</button>
+        <button className="min-h-14 rounded-xl border border-white/20 px-5 font-bold hover:bg-white/5" onClick={() => setContractRequestOpen("change_or_cancel")} type="button">Be om endring eller kansellering</button>
+      </div> : <form className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4 sm:p-5" onSubmit={submitContractRequest}>
+        <h3 className="text-lg font-bold">{contractRequestOpen === "withdrawal" ? "Melding om bruk av angreretten" : "Forespørsel om endring eller kansellering"}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{contractRequestOpen === "withdrawal"
+          ? "Du trenger ikke å oppgi noen grunn. Velg «Jeg ønsker ikke å oppgi årsak» dersom du ikke vil opplyse om den. Valget påvirker ikke selve meldingen om angrerett."
+          : "Dette er en forespørsel til vurdering. Avtalen endres eller avsluttes først når du mottar en skriftlig bekreftelse."}</p>
+        <label className="mt-5 block font-semibold" htmlFor="contractRequestReason">Hva er hovedårsaken?</label>
+        <select className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-[#12151c] px-4" id="contractRequestReason" name="reasonCode" onChange={(event) => setContractRequestReason(event.target.value)} required value={contractRequestReason}>
+          <option disabled value="">Velg årsak</option>
+          <option value="price">Prisen passer ikke</option>
+          <option value="wait">Jeg vil vente / ikke gjøre dette nå</option>
+          <option value="timing">Tidspunktet passer ikke</option>
+          <option value="other_supplier">Jeg har valgt en annen leverandør</option>
+          <option value="scope">Tilbudet eller omfanget passer ikke</option>
+          <option value="need_information">Jeg trenger mer informasjon</option>
+          <option value="personal_financial">Personlige eller økonomiske årsaker</option>
+          <option value="communication">Kommunikasjonen fungerte ikke som forventet</option>
+          <option value="not_needed">Tjenesten er ikke lenger nødvendig</option>
+          <option value="other">Annen årsak</option>
+          <option value="prefer_not_to_say">Jeg ønsker ikke å oppgi årsak</option>
+        </select>
+        {contractRequestReason === "other" ? <><label className="mt-5 block font-semibold" htmlFor="contractRequestReasonText">Beskriv kort</label><textarea className="mt-2 min-h-24 w-full rounded-lg border border-white/20 bg-[#12151c] p-4" id="contractRequestReasonText" maxLength={2000} minLength={3} name="reasonText" required /></> : null}
+        <div className="mt-5 space-y-3 rounded-xl border border-white/10 p-4">
+          <label className="flex gap-3"><input checked={followUpConsent} className="mt-1 size-5 shrink-0" disabled={doNotContact} onChange={(event) => { setFollowUpConsent(event.target.checked); if (!event.target.checked) setFollowUpChoice(""); }} type="checkbox" /><span>Jeg ønsker at Takfornyelse kontakter meg én gang for å se om vi kan finne en bedre løsning.</span></label>
+          <label className="flex gap-3"><input checked={doNotContact} className="mt-1 size-5 shrink-0" onChange={(event) => { setDoNotContact(event.target.checked); if (event.target.checked) { setFollowUpConsent(false); setFollowUpChoice(""); } }} type="checkbox" /><span>Ikke kontakt meg om alternative tilbud eller senere oppfølging.</span></label>
+        </div>
+        {followUpConsent && !doNotContact ? <div className="mt-5">
+          <label className="block font-semibold" htmlFor="preferredFollowUp">Når passer det best at vi følger opp?</label>
+          <select className="mt-2 min-h-12 w-full rounded-lg border border-white/20 bg-[#12151c] px-4" id="preferredFollowUp" name="preferredFollowUp" onChange={(event) => setFollowUpChoice(event.target.value)} required value={followUpChoice}>
+            <option disabled value="">Velg tidspunkt</option>
+            <option value="one_month">Om 1 måned</option><option value="three_months">Om 3 måneder</option><option value="six_months">Om 6 måneder</option><option value="next_spring">Neste vår</option><option value="custom">Velg dato</option>
+          </select>
+          {followUpChoice === "custom" ? <input aria-label="Ønsket oppfølgingsdato" className="mt-3 min-h-12 w-full rounded-lg border border-white/20 bg-[#12151c] px-4" min={new Date().toISOString().slice(0, 10)} name="preferredFollowUpAt" required type="date" /> : null}
+        </div> : null}
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button className={`min-h-12 rounded-lg px-5 font-bold disabled:opacity-50 ${contractRequestOpen === "withdrawal" ? "border border-red-400/50 text-red-200" : "bg-accent text-black"}`} disabled={pending} type="submit">{pending ? "Sender …" : contractRequestOpen === "withdrawal" ? "Send angremelding" : "Send forespørsel"}</button>
+          <button className="min-h-12 rounded-lg border border-white/20 px-5" disabled={pending} onClick={() => setContractRequestOpen(null)} type="button">Avbryt</button>
+        </div>
+      </form>}
+    </section> : null}
     <footer className="mt-12 border-t border-white/10 pt-6 text-sm text-muted-foreground"><p>{props.supplier.name} · Org.nr. {props.supplier.orgNumber}</p><p>{props.supplier.address} · {props.supplier.email} · {props.supplier.phone}</p></footer>
   </main>;
 }

@@ -1,0 +1,131 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { recordAuditEvent } from "@/lib/audit/audit-event";
+import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
+import { updateCaseState } from "@/lib/cases/case-command";
+import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
+import { captureException } from "@/lib/monitoring";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
+import { getPayload } from "@/lib/payload";
+import { userIsAdmin } from "@/payload/access/roles";
+
+const schema = z.object({
+  decision: z.enum(["close", "continue", "alternative", "schedule_follow_up", "do_not_contact"]),
+  reason: z.string().trim().min(10).max(2_000),
+  followUpAt: z.string().datetime().optional(),
+}).superRefine((value, context) => {
+  if (value.decision === "schedule_follow_up" && !value.followUpAt) {
+    context.addIssue({ code: "custom", message: "Follow-up date is required", path: ["followUpAt"] });
+  }
+});
+
+function relationId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") return (value as { id: number }).id;
+  return null;
+}
+
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const correlationId = correlationIdFromHeaders(request.headers);
+  try {
+    const payload = await getPayload();
+    const { user } = await payload.auth({ headers: request.headers });
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userIsAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { id } = await context.params;
+    if (!/^\d+$/.test(id)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: "Invalid decision", details: parsed.error.flatten() }, { status: 400 });
+
+    const contractRequest = await payload.findByID({ collection: "customer-contract-requests", id: Number(id), depth: 0, overrideAccess: true });
+    const leadId = relationId(contractRequest.lead);
+    if (!leadId) throw new TypeError("The request has no customer case");
+    if (["closed", "recovered", "do_not_contact"].includes(contractRequest.status)) {
+      return NextResponse.json({ ok: true, status: contractRequest.status, idempotent: true });
+    }
+    const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+    const workOrders = await payload.find({ collection: "work-orders", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: leadId } } });
+    const workOrder = workOrders.docs[0];
+    const now = new Date().toISOString();
+    const closes = parsed.data.decision === "close" || parsed.data.decision === "do_not_contact";
+    const resumes = parsed.data.decision === "continue";
+
+    if ((closes || resumes) && workOrder && workOrder.status === "blocked" && Array.isArray(workOrder.blockingReasons) && workOrder.blockingReasons.includes("CUSTOMER_CANCELLATION_REQUEST")) {
+      const previousStatus = workOrder.statusBeforeCustomerCancellation;
+      const restored: "unassigned" | "assigned" | "scheduled" | "on_way" = previousStatus && ["unassigned", "assigned", "scheduled", "on_way"].includes(previousStatus)
+        ? previousStatus as "unassigned" | "assigned" | "scheduled" | "on_way"
+        : "unassigned";
+      await payload.update({ collection: "work-orders", id: workOrder.id, overrideAccess: true, data: {
+        status: closes ? "cancelled" : restored,
+        blockingReasons: workOrder.blockingReasons.filter((item) => item !== "CUSTOMER_CANCELLATION_REQUEST"),
+        customerCancellationResolvedAt: now,
+        customerCancellationResolution: `${parsed.data.decision}: ${parsed.data.reason}`,
+      } });
+    }
+
+    const status = parsed.data.decision === "close" ? "closed"
+      : parsed.data.decision === "continue" ? "recovered"
+      : parsed.data.decision === "alternative" ? "alternative_requested"
+      : parsed.data.decision === "schedule_follow_up" ? "follow_up_scheduled"
+      : "do_not_contact";
+    await payload.update({ collection: "customer-contract-requests", id: contractRequest.id, overrideAccess: true, data: {
+      status,
+      administratorDecision: parsed.data.reason,
+      reviewedBy: user.id,
+      reviewedAt: now,
+      ...(parsed.data.followUpAt ? { followUpAt: parsed.data.followUpAt } : {}),
+      ...(closes ? { closedAt: now } : {}),
+      ...(parsed.data.decision === "do_not_contact" ? { recoveryPotential: "red" } : {}),
+      ...(parsed.data.decision === "continue" ? { recoveryPotential: "green", followUpOutcome: "Avtalen fortsetter etter administratoravklaring." } : {}),
+    } });
+
+    let messageId: number | undefined;
+    if (closes || resumes || parsed.data.decision === "alternative") {
+      const subject = closes
+        ? contractRequest.kind === "withdrawal" ? "Bekreftelse på behandlet angremelding" : "Bekreftelse på avsluttet bestilling"
+        : resumes ? "Avklaring – avtalen fortsetter" : "Vi vurderer en alternativ løsning";
+      const bodyText = closes
+        ? `Hei ${lead.name},\n\nVi har behandlet meldingen din og bekrefter at avtalen avsluttes.\n\nAvklaring: ${parsed.data.reason}\n\nDette er en skriftlig bekreftelse fra Takfornyelse.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
+        : resumes
+          ? `Hei ${lead.name},\n\nVi har avklart forespørselen din. Avtalen fortsetter, og vi følger opp videre planlegging.\n\nAvklaring: ${parsed.data.reason}\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
+          : `Hei ${lead.name},\n\nTakk for tilbakemeldingen. Vi undersøker nå om vi kan tilby en løsning som passer bedre. Du mottar ikke en ny bestilling eller endring uten at du selv godkjenner den skriftlig.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`;
+      const message = await payload.create({ collection: "messages", overrideAccess: true, data: {
+        lead: leadId,
+        replyToMessage: relationId(contractRequest.sourceMessage) || undefined,
+        direction: "outbound",
+        category: "follow_up",
+        channel: lead.email ? "email" : "sms",
+        subject,
+        bodyText,
+        status: "draft",
+        idempotencyKey: makeIdempotencyKey("contract-request.decision", { requestId: contractRequest.id, decision: parsed.data.decision }),
+        aiAssisted: false,
+        aiAnalysis: { customerContractRequestId: contractRequest.id, decision: parsed.data.decision },
+      } });
+      messageId = message.id;
+    }
+
+    await updateCaseState(payload, { leadId, actorId: user.id, command: "resolve_customer_contract_request", idempotencyKey: `${correlationId}:contract-request:${contractRequest.id}`, patch: closes ? {
+      status: "closed", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: "Kontroller og send sluttbekreftelsen. Arkiver deretter saken.", nextActionAt: now, closedAt: now,
+    } : resumes ? {
+      status: "converted", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: workOrder ? "Kontroller gjenopptatt arbeidsplan og send kundemeldingen." : "Fortsett planleggingen og send kundemeldingen.", nextActionAt: now, closedAt: null,
+    } : {
+      status: "customer_waiting", nextActionOwner: "administrator", nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST",
+      nextAction: parsed.data.decision === "alternative" ? "Lag et alternativt tilbud. Arbeidet forblir sperret." : "Følg opp på valgt dato. Arbeidet forblir sperret.",
+      nextActionAt: parsed.data.followUpAt || now, closedAt: null,
+    } });
+    await recordAuditEvent(createPayloadAuditWriter(payload), {
+      actorId: user.id,
+      action: "customer.contract_request_reviewed",
+      entityType: "customer_contract_request",
+      entityId: contractRequest.id,
+      correlationId,
+      changedFields: ["status", "administratorDecision", "reviewedAt", "workHold"],
+      metadata: { decision: parsed.data.decision, leadId, workOrderId: workOrder?.id || null },
+    });
+    return NextResponse.json({ ok: true, status, messageId });
+  } catch (error) {
+    captureException(error, { route: "POST /api/admin/customer-contract-requests/[id]", correlationId });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Decision failed", correlationId }, { status: error instanceof TypeError ? 409 : 500 });
+  }
+}

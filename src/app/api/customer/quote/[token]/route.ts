@@ -17,11 +17,12 @@ import { hashOpaqueToken } from "@/lib/security/opaque-token";
 import { createPrivateMedia, deletePrivateMedia } from "@/lib/private-media-storage";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { updateCaseState } from "@/lib/cases/case-command";
+import { customerContractRequestSchema, recordCustomerContractRequest, type CustomerContractRequestInput } from "@/lib/contracts/customer-contract-request";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const actionSchema = z.discriminatedUnion("action", [
+const actionSchema = z.union([z.discriminatedUnion("action", [
   z.object({ action: z.literal("question"), message: z.string().trim().min(5).max(2_000) }),
   z.object({
     action: z.literal("decline"),
@@ -35,7 +36,7 @@ const actionSchema = z.discriminatedUnion("action", [
     paymentObligationAccepted: z.literal(true), termsAccepted: z.literal(true), withdrawalInformationReceived: z.literal(true),
     earlyStartRequested: z.boolean(), earlyStartLossAcknowledged: z.boolean(),
   }),
-]);
+]), customerContractRequestSchema]);
 
 export async function GET(_request: Request, context: { params: Promise<{ token: string }> }) {
   const { token } = await context.params;
@@ -148,51 +149,43 @@ export async function POST(request: Request, context: { params: Promise<{ token:
       return NextResponse.json({ ok: true, status: "declined" });
     }
 
-    if (parsed.data.action === "cancel_request") {
+    if (parsed.data.action === "withdrawal" || parsed.data.action === "change_or_cancel" || parsed.data.action === "cancel_request") {
       if (view.contractStatus !== "signed" || view.quoteStatus !== "accepted") {
-        throw new Error("A cancellation request is only available after customer signing");
+        throw new Error("This action is only available after customer signing");
       }
-      const now = new Date().toISOString();
-      const digest = createHash("sha256").update(parsed.data.message).digest("hex").slice(0, 24);
-      const key = `customer-cancellation:${view.contractId}:${digest}`;
-      const existing = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });
-      const sourceMessage = existing.docs[0] || await payload.create({ collection: "messages", overrideAccess: true, data: {
-        lead: leadId,
-        direction: "inbound",
-        category: "customer_question",
-        channel: "email",
-        subject: `Forespørsel om kansellering av ${view.contractReference}`,
-        bodyText: parsed.data.message,
-        status: "delivered",
-        idempotencyKey: key,
-        aiAssisted: false,
-        aiAnalysis: { purpose: "cancellation", contractId: view.contractId },
-        deliveredAt: now,
-      } });
-      const workOrders = await payload.find({ collection: "work-orders", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: leadId } } });
-      const workOrder = workOrders.docs[0];
-      if (workOrder && !["completed", "documented", "cancelled"].includes(workOrder.status)) {
-        await payload.update({ collection: "work-orders", id: workOrder.id, overrideAccess: true, data: {
-          statusBeforeCustomerCancellation: workOrder.status === "blocked"
-            ? workOrder.statusBeforeCustomerCancellation || "blocked"
-            : workOrder.status,
-          status: "blocked",
-          customerCancellationRequestedAt: now,
-          cancellationRequestMessage: sourceMessage.id,
-          blockingReasons: [...new Set([...(Array.isArray(workOrder.blockingReasons) ? workOrder.blockingReasons : []), "CUSTOMER_CANCELLATION_REQUEST"])],
-        } });
+      let structured: CustomerContractRequestInput;
+      if (parsed.data.action === "cancel_request") {
+        structured = customerContractRequestSchema.parse({ action: "change_or_cancel", reasonCode: "other", reasonText: parsed.data.message, followUpConsent: false });
+      } else {
+        structured = parsed.data;
       }
-      await enqueueCustomerReplyDraft(payload, { correlationId, leadId, purpose: "cancellation", sourceMessageId: sourceMessage.id });
-      await updateCaseState(payload, { leadId, command: "customer_cancellation_requested", idempotencyKey: key, patch: {
-        status: "customer_waiting",
-        nextActionOwner: "administrator",
-        nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST",
-        nextAction: `Kunden ber om å kansellere ${view.contractReference}. Arbeidsstart er sperret til administrator har vurdert forespørselen.`,
-        nextActionAt: now,
-      } });
-      return NextResponse.json({ ok: true, status: "review_required" });
+      const recorded = await recordCustomerContractRequest(payload, {
+        correlationId,
+        customer: view.customerName,
+        leadId,
+        quoteId: view.quoteId,
+        contractId: view.contractId,
+        contractReference: view.contractReference,
+        contractSignedAt: view.signedAt,
+        companySignedAt: view.companySignedAt,
+        signatureEvidence: view.signatureEvidence,
+        quoteSnapshot: view.snapshot.quote,
+        request: structured,
+      });
+      if (!recorded.duplicate) {
+        const provider = createEmailProvider();
+        if (provider.health().status === "ready") {
+          try {
+            await deliverMessage(payload, provider, recorded.acknowledgementMessage.id, correlationId);
+          } catch (error) {
+            captureException(error, { route: "POST /api/customer/quote/[token]", operation: "contract-request-receipt", correlationId });
+          }
+        }
+      }
+      return NextResponse.json({ ok: true, status: "review_required", requestReference: recorded.request.reference, idempotent: recorded.duplicate });
     }
 
+    if (parsed.data.action !== "sign") throw new TypeError("Unsupported customer action");
     assertFeatureReady("contractSigning");
     if (view.contractStatus === "signed" && view.quoteStatus === "accepted") return NextResponse.json({ ok: true, status: "signed", idempotent: true });
     if (view.contractStatus !== "issued" || !["sent", "viewed"].includes(view.quoteStatus)) throw new Error("Contract is not available for signing");

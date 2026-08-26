@@ -88,6 +88,7 @@ export interface Config {
     'work-orders': WorkOrder;
     'invoice-records': InvoiceRecord;
     'official-invoices': OfficialInvoice;
+    'customer-contract-requests': CustomerContractRequest;
     warranties: Warranty;
     'seo-topics': SeoTopic;
     'seo-runs': SeoRun;
@@ -123,6 +124,7 @@ export interface Config {
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'invoice-records': InvoiceRecordsSelect<false> | InvoiceRecordsSelect<true>;
     'official-invoices': OfficialInvoicesSelect<false> | OfficialInvoicesSelect<true>;
+    'customer-contract-requests': CustomerContractRequestsSelect<false> | CustomerContractRequestsSelect<true>;
     warranties: WarrantiesSelect<false> | WarrantiesSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
     'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
@@ -1374,6 +1376,67 @@ export interface OfficialInvoice {
   createdAt: string;
 }
 /**
+ * Strukturerte, tidsstemplete kundemeldinger om angrerett, endring eller kansellering.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customer-contract-requests".
+ */
+export interface CustomerContractRequest {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  quote: number | Quote;
+  contract: number | Contract;
+  workOrder?: (number | null) | WorkOrder;
+  kind: 'withdrawal' | 'change_or_cancel';
+  reasonCode:
+    | 'price'
+    | 'wait'
+    | 'timing'
+    | 'other_supplier'
+    | 'scope'
+    | 'need_information'
+    | 'personal_financial'
+    | 'communication'
+    | 'not_needed'
+    | 'other'
+    | 'prefer_not_to_say';
+  reasonText?: string | null;
+  followUpConsent: boolean;
+  preferredFollowUp?: ('one_month' | 'three_months' | 'six_months' | 'next_spring' | 'custom' | 'never') | null;
+  preferredFollowUpAt?: string | null;
+  status:
+    | 'received'
+    | 'admin_review'
+    | 'alternative_requested'
+    | 'follow_up_scheduled'
+    | 'recovered'
+    | 'closed'
+    | 'do_not_contact';
+  recoveryPotential: 'green' | 'yellow' | 'red';
+  receivedAt: string;
+  contractSignedAt?: string | null;
+  companySignedAt?: string | null;
+  nominalWithdrawalDeadline?: string | null;
+  withinNominalWithdrawalPeriod?: boolean | null;
+  earlyStartRequested?: boolean | null;
+  workStatusAtReceipt?: string | null;
+  depositStatusAtReceipt?: string | null;
+  sourceMessage: number | Message;
+  requestFingerprint: string;
+  administratorDecision?: string | null;
+  reviewedBy?: (number | null) | User;
+  reviewedAt?: string | null;
+  followUpAt?: string | null;
+  followUpAttempts?: number | null;
+  followUpOutcome?: string | null;
+  closedAt?: string | null;
+  aiSummary?: string | null;
+  aiSuggestedAction?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Saksbekreftede garantier. Omfang og varighet må kontrolleres av administrator før aktivering.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1631,6 +1694,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'official-invoices';
         value: number | OfficialInvoice;
+      } | null)
+    | ({
+        relationTo: 'customer-contract-requests';
+        value: number | CustomerContractRequest;
       } | null)
     | ({
         relationTo: 'warranties';
@@ -2408,6 +2475,46 @@ export interface OfficialInvoicesSelect<T extends boolean = true> {
   bankCheckedAt?: T;
   bankCheckedBy?: T;
   adminNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customer-contract-requests_select".
+ */
+export interface CustomerContractRequestsSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  quote?: T;
+  contract?: T;
+  workOrder?: T;
+  kind?: T;
+  reasonCode?: T;
+  reasonText?: T;
+  followUpConsent?: T;
+  preferredFollowUp?: T;
+  preferredFollowUpAt?: T;
+  status?: T;
+  recoveryPotential?: T;
+  receivedAt?: T;
+  contractSignedAt?: T;
+  companySignedAt?: T;
+  nominalWithdrawalDeadline?: T;
+  withinNominalWithdrawalPeriod?: T;
+  earlyStartRequested?: T;
+  workStatusAtReceipt?: T;
+  depositStatusAtReceipt?: T;
+  sourceMessage?: T;
+  requestFingerprint?: T;
+  administratorDecision?: T;
+  reviewedBy?: T;
+  reviewedAt?: T;
+  followUpAt?: T;
+  followUpAttempts?: T;
+  followUpOutcome?: T;
+  closedAt?: T;
+  aiSummary?: T;
+  aiSuggestedAction?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -17,6 +17,7 @@ import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 import { userIsAdmin } from "@/payload/access/roles";
 import { updateCaseState } from "@/lib/cases/case-command";
+import { issueQuoteAccessToken } from "@/lib/quotes/customer-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -143,13 +144,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const key = `contract-counter-signed:${contract.id}`;
     const prior = await payload.find({ collection: "messages", depth: 0, limit: 1, overrideAccess: true, where: { idempotencyKey: { equals: key } } });
     if (!prior.docs[0]) {
+      const access = await issueQuoteAccessToken(payload, quote.id, new Date(Date.now() + 180 * 24 * 60 * 60_000).toISOString(), { purpose: "signed-contract-customer-portal", contractId: contract.id });
+      const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.takfornyelse.as").replace(/\/$/, "");
+      const customerPortalUrl = `${siteUrl}/tilbud/${encodeURIComponent(access.token)}`;
       const message = await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId,
         direction: "outbound",
         category: "contract",
         channel: "email",
         subject: `Endelig signert kontrakt ${contract.reference}`,
-        bodyText: `Hei ${snapshot.customer.name},\n\nKontrakten ${contract.reference} er nå signert av både deg og Takfornyelse. Den endelige kontrakten er vedlagt. Vi følger opp med avtalt eller planlagt oppstart.\n\nVennlig hilsen\nTakfornyelse\n${snapshot.supplier.phone}`,
+        bodyText: `Hei ${snapshot.customer.name},\n\nKontrakten ${contract.reference} er nå signert av både deg og Takfornyelse. Den endelige kontrakten er vedlagt. Vi følger opp med avtalt eller planlagt oppstart.\n\nAdministrer avtalen, still spørsmål eller send en angre-/endringsmelding via din sikre kundelenke:\n${customerPortalUrl}\n\nVennlig hilsen\nTakfornyelse\n${snapshot.supplier.phone}`,
         attachments: [finalDocumentMedia.id],
         status: "queued",
         idempotencyKey: key,

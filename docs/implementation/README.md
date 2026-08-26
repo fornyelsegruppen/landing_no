@@ -41,6 +41,7 @@ Den autentiserte helhetsrevisjonen 25. august 2026 avdekket gjenstående avvik i
 F0–F9 har egne `GO`-rapporter. F10 stagingpilot og Production gate er nå neste og eneste aktive FULL-audit-fase; Production er fortsatt uendret.
 
 - [F10 – staging pilot and Production gate preflight](./phase-f10-staging-pilot-preflight.md) — `IN PROGRESS`, Production `NO-GO`
+- [F11 – withdrawal, change and controlled customer recovery](./phase-f11-withdrawal-change-recovery.md) — teknisk implementert; staging UAT gjenstår
 - [F10 pilot evidence template](../operations/f10-pilot-evidence-template.md)
 
 ## Operativ admin A0–A9

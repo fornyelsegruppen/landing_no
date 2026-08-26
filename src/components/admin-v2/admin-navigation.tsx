@@ -8,6 +8,7 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 export const adminNavigationLinks = [
   { key: "overview", href: "/admin-v2", queue: null },
   { key: "leads", href: "/admin-v2/cases", queue: "cases" },
+  { key: "contractRequests", href: "/admin-v2/contract-requests", queue: "contractRequests" },
   { key: "quotes", href: "/admin-v2/offers", queue: "offers" },
   { key: "contracts", href: "/admin-v2/contracts", queue: "contracts" },
   { key: "work", href: "/admin-v2/work", queue: "work" },
@@ -33,7 +34,7 @@ export function AdminNavigation({ locale, mobile = false }: { locale: PanelLocal
           ? pathname.startsWith("/admin-v2/documents")
           : link.queue === "archive"
           ? pathname.startsWith("/admin-v2/archive")
-          : ["offers", "contracts", "work", "blog", "employees", "settings"].includes(link.queue || "")
+          : ["contractRequests", "offers", "contracts", "work", "blog", "employees", "settings"].includes(link.queue || "")
           ? pathname.startsWith(link.href)
           : link.queue === null
           ? pathname === "/admin-v2" && !selectedQueue

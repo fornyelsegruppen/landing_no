@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildContractSnapshot, buildQuoteSnapshot, documentHash } from "@/lib/quotes/document";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(), remove: vi.fn(), load: vi.fn(), enqueue: vi.fn(), enqueueReply: vi.fn(), deliver: vi.fn(), provider: { health: vi.fn(() => ({ status: "ready" })) } }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), find: vi.fn(), findByID: vi.fn(), remove: vi.fn(), load: vi.fn(), enqueue: vi.fn(), enqueueReply: vi.fn(), deliver: vi.fn(), recordContractRequest: vi.fn(), provider: { health: vi.fn(() => ({ status: "ready" })) } }));
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ create: mocks.create, update: mocks.update, find: mocks.find, findByID: mocks.findByID, delete: mocks.remove })) }));
 vi.mock("@/lib/quotes/customer-view", () => ({ loadCustomerQuote: mocks.load }));
 vi.mock("@/lib/messages/message-engine", () => ({ enqueueMessageJob: mocks.enqueue, enqueueCustomerReplyDraft: mocks.enqueueReply, deliverMessage: mocks.deliver }));
@@ -12,6 +12,10 @@ vi.mock("@/lib/platform/features", async (importOriginal) => {
   return { ...actual, assertFeatureReady: vi.fn() };
 });
 vi.mock("@/lib/quotes/quote-pdf", () => ({ buildQuoteContractPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
+vi.mock("@/lib/contracts/customer-contract-request", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/contracts/customer-contract-request")>();
+  return { ...actual, recordCustomerContractRequest: mocks.recordContractRequest };
+});
 
 import { POST } from "./route";
 
@@ -31,6 +35,7 @@ describe("customer quote signing route", () => {
     mocks.update.mockReset().mockImplementation(async ({ collection, where }: { collection: string; where?: unknown }) => collection === "contracts" && where ? { docs: [{ id: 2, status: "signed" }], errors: [] } : { id: 1 });
     mocks.find.mockReset().mockResolvedValue({ docs: [] }); mocks.findByID.mockReset(); mocks.remove.mockReset(); mocks.enqueue.mockReset(); mocks.enqueueReply.mockReset(); mocks.deliver.mockReset(); mocks.provider.health.mockClear();
     mocks.load.mockReset().mockResolvedValue({ ...baseView });
+    mocks.recordContractRequest.mockReset().mockResolvedValue({ duplicate: false, request: { id: 10, reference: "ANG-2-TEST" }, acknowledgementMessage: { id: 11 } });
   });
 
   it("stores an immutable signed PDF and queues one durable confirmation", async () => {
@@ -84,5 +89,17 @@ describe("customer quote signing route", () => {
     expect(mocks.enqueue).toHaveBeenCalled();
     expect(mocks.enqueueReply).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ purpose: "decline", sourceMessageId: 88 }));
     expect(mocks.deliver).toHaveBeenCalled();
+  });
+
+  it("records a structured withdrawal and immediately delivers the receipt", async () => {
+    mocks.load.mockResolvedValue({ ...baseView, quoteStatus: "accepted", contractStatus: "signed", signedAt: "2026-08-20T10:00:00.000Z" });
+    const response = await POST(request({ action: "withdrawal", reasonCode: "prefer_not_to_say", followUpConsent: false }), { params: Promise.resolve({ token: "w".repeat(43) }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: "review_required", requestReference: "ANG-2-TEST" });
+    expect(mocks.recordContractRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      contractId: 2,
+      request: expect.objectContaining({ action: "withdrawal", reasonCode: "prefer_not_to_say", followUpConsent: false }),
+    }));
+    expect(mocks.deliver).toHaveBeenCalledWith(expect.anything(), mocks.provider, 11, expect.any(String));
   });
 });
