@@ -8,6 +8,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     unassigned: "Ikke tildelt", assigned: "Tildelt", scheduled: "Planlagt", on_way: "På vei", arrived: "Ankommet", precheck: "Forhåndskontroll", in_progress: "Pågår", completed: "Fullført", documented: "Dokumentert", cancelled: "Kansellert",
     ai_qa: "AI-kontroll", human_review: "Menneskelig kontroll", published: "Publisert",
     active: "Aktiv", exported: "Eksportert", needs_review: "Må kontrolleres", awaiting_payment: "Venter på betaling", paid: "Betalt", overdue: "Forfalt", credited: "Kreditert",
+    received: "Mottatt", admin_review: "Til administratorvurdering", alternative_requested: "Alternativt tilbud ønsket", follow_up_scheduled: "Oppfølging planlagt", recovered: "Kunden beholdt", do_not_contact: "Ikke kontakt",
   },
   lt: {
     new: "Nauja", contacted: "Susisiekta", qualified: "Tinkama", measuring: "Matuojama", draft_ready: "Juodraštis paruoštas", customer_waiting: "Klientas laukia atsakymo", waiting_customer: "Laukiama kliento", converted: "Patvirtintas klientas", closed: "Uždaryta",
@@ -16,6 +17,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     unassigned: "Nepriskirta", assigned: "Priskirta", scheduled: "Suplanuota", on_way: "Vykstama", arrived: "Atvykta", precheck: "Pirminė patikra", in_progress: "Vykdoma", completed: "Baigta", documented: "Dokumentuota", cancelled: "Atšaukta",
     ai_qa: "DI patikra", human_review: "Žmogaus peržiūra", published: "Publikuota",
     active: "Aktyvi", exported: "Eksportuota", needs_review: "Reikia patikrinti", awaiting_payment: "Laukiama apmokėjimo", paid: "Apmokėta", overdue: "Vėluoja", credited: "Kredituota",
+    received: "Gauta", admin_review: "Laukia administratoriaus sprendimo", alternative_requested: "Ruošiamas alternatyvus pasiūlymas", follow_up_scheduled: "Kontaktas suplanuotas", recovered: "Klientas išsaugotas", do_not_contact: "Nebekontaktuoti",
   },
   en: {
     new: "New", contacted: "Contacted", qualified: "Qualified", measuring: "Measuring", draft_ready: "Draft ready", customer_waiting: "Customer awaiting reply", waiting_customer: "Waiting for customer", converted: "Confirmed customer", closed: "Closed",
@@ -24,13 +26,14 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     unassigned: "Unassigned", assigned: "Assigned", scheduled: "Scheduled", on_way: "On the way", arrived: "Arrived", precheck: "Pre-check", in_progress: "In progress", completed: "Completed", documented: "Documented", cancelled: "Cancelled",
     ai_qa: "AI QA", human_review: "Human review", published: "Published",
     active: "Active", exported: "Exported", needs_review: "Review required", awaiting_payment: "Awaiting payment", paid: "Paid", overdue: "Overdue", credited: "Credited",
+    received: "Received", admin_review: "Awaiting administrator review", alternative_requested: "Alternative quote requested", follow_up_scheduled: "Follow-up scheduled", recovered: "Customer retained", do_not_contact: "Do not contact",
   },
 };
 
 const types: Record<PanelLocale, Record<string, string>> = {
-  nb: { lead: "Henvendelse", message: "Melding", measurement: "Takmåling", price: "Prisberegning", quote: "Tilbud", contract: "Kontrakt", work: "Arbeid", change: "Endringsavtale", invoice: "Fakturautkast", warranty: "Garanti" },
-  lt: { lead: "Užklausa", message: "Žinutė", measurement: "Stogo matavimas", price: "Kainos skaičiavimas", quote: "Pasiūlymas", contract: "Sutartis", work: "Darbas", change: "Pakeitimų susitarimas", invoice: "Sąskaitos juodraštis", warranty: "Garantija" },
-  en: { lead: "Enquiry", message: "Message", measurement: "Roof measurement", price: "Price calculation", quote: "Quote", contract: "Contract", work: "Work", change: "Change agreement", invoice: "Invoice draft", warranty: "Warranty" },
+  nb: { lead: "Henvendelse", message: "Melding", measurement: "Takmåling", price: "Prisberegning", quote: "Tilbud", contract: "Kontrakt", contract_request: "Angre- eller endringsmelding", work: "Arbeid", change: "Endringsavtale", invoice: "Fakturautkast", warranty: "Garanti" },
+  lt: { lead: "Užklausa", message: "Žinutė", measurement: "Stogo matavimas", price: "Kainos skaičiavimas", quote: "Pasiūlymas", contract: "Sutartis", contract_request: "Atsisakymo arba pakeitimo pranešimas", work: "Darbas", change: "Pakeitimų susitarimas", invoice: "Sąskaitos juodraštis", warranty: "Garantija" },
+  en: { lead: "Enquiry", message: "Message", measurement: "Roof measurement", price: "Price calculation", quote: "Quote", contract: "Contract", contract_request: "Withdrawal or change notice", work: "Work", change: "Change agreement", invoice: "Invoice draft", warranty: "Warranty" },
 };
 
 const metadata: Record<PanelLocale, Record<string, string>> = {
