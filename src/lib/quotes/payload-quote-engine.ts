@@ -38,6 +38,7 @@ export async function createQuoteDraft(
     preservePrevious?: boolean;
     retainPreviousStatus?: boolean;
     siblingQuoteId?: number;
+    depositBasisPoints?: number;
   } = {},
 ) {
   const calculation = await payload.findByID({ collection: "price-calculations", id: calculationId, depth: 0, overrideAccess: true });
@@ -101,6 +102,8 @@ export async function createQuoteDraft(
       unitPriceExVatOre: rule.unitPriceExVatOre, subtotalExVatOre: calculation.subtotalExVatOre,
       vatBasisPoints: rule.vatBasisPoints, vatOre: calculation.vatOre, totalIncVatOre: calculation.totalIncVatOre,
       toleranceBasisPoints: rule.toleranceBasisPoints, maximumTotalIncVatOre: calculation.maximumTotalIncVatOre ?? null,
+      depositBasisPoints: options.depositBasisPoints ?? 0,
+      depositAmountIncVatOre: Math.round(calculation.totalIncVatOre * (options.depositBasisPoints ?? 0) / 10000),
     },
     termsVersion: terms.version,
     validUntil: new Date(now.getTime() + 14 * 24 * 60 * 60_000).toISOString(),

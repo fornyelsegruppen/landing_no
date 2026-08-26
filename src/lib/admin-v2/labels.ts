@@ -7,7 +7,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     signed: "Signert", customer_signed: "Kunden signerte", fully_signed: "Begge parter signerte", queued: "I sendekø", delivered: "Levert", failed: "Mislykket", attention: "Krever oppfølging", pending: "Venter",
     unassigned: "Ikke tildelt", assigned: "Tildelt", scheduled: "Planlagt", on_way: "På vei", arrived: "Ankommet", precheck: "Forhåndskontroll", in_progress: "Pågår", completed: "Fullført", documented: "Dokumentert", cancelled: "Kansellert",
     ai_qa: "AI-kontroll", human_review: "Menneskelig kontroll", published: "Publisert",
-    active: "Aktiv", exported: "Eksportert", paid: "Betalt", overdue: "Forfalt",
+    active: "Aktiv", exported: "Eksportert", needs_review: "Må kontrolleres", awaiting_payment: "Venter på betaling", paid: "Betalt", overdue: "Forfalt", credited: "Kreditert",
   },
   lt: {
     new: "Nauja", contacted: "Susisiekta", qualified: "Tinkama", measuring: "Matuojama", draft_ready: "Juodraštis paruoštas", customer_waiting: "Klientas laukia atsakymo", waiting_customer: "Laukiama kliento", converted: "Patvirtintas klientas", closed: "Uždaryta",
@@ -15,7 +15,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     signed: "Pasirašyta", customer_signed: "Klientas pasirašė", fully_signed: "Pasirašė abi šalys", queued: "Laukia siuntimo", delivered: "Pristatyta", failed: "Nepavyko", attention: "Reikia dėmesio", pending: "Laukiama",
     unassigned: "Nepriskirta", assigned: "Priskirta", scheduled: "Suplanuota", on_way: "Vykstama", arrived: "Atvykta", precheck: "Pirminė patikra", in_progress: "Vykdoma", completed: "Baigta", documented: "Dokumentuota", cancelled: "Atšaukta",
     ai_qa: "DI patikra", human_review: "Žmogaus peržiūra", published: "Publikuota",
-    active: "Aktyvi", exported: "Eksportuota", paid: "Apmokėta", overdue: "Vėluoja",
+    active: "Aktyvi", exported: "Eksportuota", needs_review: "Reikia patikrinti", awaiting_payment: "Laukiama apmokėjimo", paid: "Apmokėta", overdue: "Vėluoja", credited: "Kredituota",
   },
   en: {
     new: "New", contacted: "Contacted", qualified: "Qualified", measuring: "Measuring", draft_ready: "Draft ready", customer_waiting: "Customer awaiting reply", waiting_customer: "Waiting for customer", converted: "Confirmed customer", closed: "Closed",
@@ -23,7 +23,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     signed: "Signed", customer_signed: "Customer signed", fully_signed: "Both parties signed", queued: "Queued", delivered: "Delivered", failed: "Failed", attention: "Needs attention", pending: "Pending",
     unassigned: "Unassigned", assigned: "Assigned", scheduled: "Scheduled", on_way: "On the way", arrived: "Arrived", precheck: "Pre-check", in_progress: "In progress", completed: "Completed", documented: "Documented", cancelled: "Cancelled",
     ai_qa: "AI QA", human_review: "Human review", published: "Published",
-    active: "Active", exported: "Exported", paid: "Paid", overdue: "Overdue",
+    active: "Active", exported: "Exported", needs_review: "Review required", awaiting_payment: "Awaiting payment", paid: "Paid", overdue: "Overdue", credited: "Credited",
   },
 };
 
@@ -34,9 +34,9 @@ const types: Record<PanelLocale, Record<string, string>> = {
 };
 
 const metadata: Record<PanelLocale, Record<string, string>> = {
-  nb: { inbound: "Innkommende", outbound: "Utgående", email: "E-post", sms: "SMS", receipt: "Mottaksbekreftelse", ai_reply: "AI-svar", quote: "Tilbud", contract: "Kontrakt", customer_question: "Kundespørsmål", follow_up: "Oppfølging", information_request: "Informasjonsforespørsel", completion: "Sluttdokumentasjon" },
-  lt: { inbound: "Gaunama", outbound: "Siunčiama klientui", email: "El. paštas", sms: "SMS", receipt: "Užklausos patvirtinimas", ai_reply: "DI atsakymas", quote: "Pasiūlymas", contract: "Sutartis", customer_question: "Kliento klausimas", follow_up: "Tolesnis susisiekimas", information_request: "Informacijos prašymas", completion: "Baigiamieji dokumentai" },
-  en: { inbound: "Inbound", outbound: "Outbound", email: "Email", sms: "SMS", receipt: "Receipt", ai_reply: "AI reply", quote: "Quote", contract: "Contract", customer_question: "Customer question", follow_up: "Follow-up", information_request: "Information request", completion: "Completion documents" },
+  nb: { inbound: "Innkommende", outbound: "Utgående", email: "E-post", sms: "SMS", receipt: "Mottaksbekreftelse", ai_reply: "AI-svar", quote: "Tilbud", contract: "Kontrakt", customer_question: "Kundespørsmål", follow_up: "Oppfølging", information_request: "Informasjonsforespørsel", completion: "Sluttdokumentasjon", invoice: "Faktura", reminder: "Påminnelse" },
+  lt: { inbound: "Gaunama", outbound: "Siunčiama klientui", email: "El. paštas", sms: "SMS", receipt: "Užklausos patvirtinimas", ai_reply: "DI atsakymas", quote: "Pasiūlymas", contract: "Sutartis", customer_question: "Kliento klausimas", follow_up: "Tolesnis susisiekimas", information_request: "Informacijos prašymas", completion: "Baigiamieji dokumentai", invoice: "Sąskaita", reminder: "Priminimas" },
+  en: { inbound: "Inbound", outbound: "Outbound", email: "Email", sms: "SMS", receipt: "Receipt", ai_reply: "AI reply", quote: "Quote", contract: "Contract", customer_question: "Customer question", follow_up: "Follow-up", information_request: "Information request", completion: "Completion documents", invoice: "Invoice", reminder: "Reminder" },
 };
 
 export function statusLabel(locale: PanelLocale, value?: string, options: { contract?: boolean; companySignedAt?: string } = {}) {

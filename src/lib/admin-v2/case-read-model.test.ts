@@ -74,6 +74,7 @@ describe("admin case read model", () => {
       { docs: [{ id: 6, reference: "K-1-V1", status: "draft", createdAt: "2026-08-24T11:01:00.000Z" }] },
       { docs: [] },
       { docs: [] },
+      { docs: [] },
       { docs: [{ id: 7, filename: "tilbud.pdf", classification: "contract", mimeType: "application/pdf", url: "https://safe.blob.vercel-storage.com/private/file.pdf" }] },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
@@ -103,6 +104,7 @@ describe("admin case read model", () => {
       { docs: [] },
       { docs: [] },
       { docs: [] },
+      { docs: [] },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
     const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
@@ -122,6 +124,7 @@ describe("admin case read model", () => {
       ] },
       { docs: [] },
       { docs: [{ id: 25, reference: "K-8-V1", status: "draft", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [] },
       { docs: [] },
       { docs: [] },
       { docs: [] },
@@ -145,6 +148,7 @@ describe("admin case read model", () => {
       ] },
       { docs: [{ id: 36, reference: "A-K-9-V1", status: "documented", documentationSubmittedAt: "2026-08-25T11:00:00.000Z", createdAt: "2026-08-25T10:00:00.000Z" }] },
       { docs: [{ id: 35, reference: "K-9-V1", status: "signed", companySignedAt: "2026-08-25T09:30:00.000Z", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [] },
       { docs: [] },
       { docs: [] },
       { docs: [] },

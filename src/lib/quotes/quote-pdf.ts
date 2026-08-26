@@ -1,5 +1,6 @@
 import { rgb, type PDFImage } from "pdf-lib";
 import { createBrandedPdf, PDF_MARGIN, pdfSafe } from "@/lib/pdf/branded-pdf";
+import { withdrawalFormCopy } from "@/content/withdrawal";
 import {
   quoteDisplayModel,
   type CompanySignatureEvidenceRecord,
@@ -97,6 +98,12 @@ export async function buildQuoteContractPdf(input: {
   pdf.field(`Mva. ${model.vatPercent}%`, `${formatNok(model.vatNok)} kr`);
   pdf.field("Pris inkl. mva.", `${formatNok(model.totalIncVatNok)} kr`);
   if (model.maximumTotalIncVatNok != null) pdf.field("Avtalt maksimalpris inkl. mva.", `${formatNok(model.maximumTotalIncVatNok)} kr`);
+  if (model.depositPercent > 0) {
+    pdf.field(`Avtalt forskudd (${formatNok(model.depositPercent)} %)`, `${formatNok(model.depositAmountIncVatNok)} kr`);
+    pdf.text("Forskuddet forfaller senest 2 kalenderdager etter at avtalen er signert. Betaling og mottak følges opp skriftlig av Takfornyelse.");
+  } else {
+    pdf.field("Forskudd", "Ingen forskuddsbetaling avtalt");
+  }
   pdf.field("Tillatt måleavvik", `${model.tolerancePercent}%`);
   pdf.field("Tilbud gyldig til", new Date(model.validUntil).toLocaleDateString("nb-NO"));
 
@@ -130,14 +137,17 @@ export async function buildQuoteContractPdf(input: {
   }
 
   pdf.addPage();
-  pdf.text("Standard angreskjema - tjenesteavtale", { size: 16, strong: true, gap: 12 });
-  pdf.text("Fyll ut og send denne siden eller en annen utvetydig melding dersom du vil bruke angreretten. Fristen er normalt 14 dager fra avtaleinngåelsen, med forbehold om gjeldende lov og opplysningene du har mottatt.");
+  const withdrawal = withdrawalFormCopy.no;
+  pdf.text(withdrawal.title, { size: 16, strong: true, gap: 12 });
+  pdf.text(`${withdrawal.intro} ${withdrawal.deadline}`);
   pdf.field("Til", `${input.contract.supplier.name}, ${input.contract.supplier.address}, ${input.contract.supplier.email}`);
-  pdf.text("Jeg meddeler herved at jeg ønsker å gå fra avtalen om følgende tjeneste:", { gap: 20 });
-  pdf.field("Tilbuds-/kontraktsreferanse", input.contract.contractReference);
-  pdf.field("Kundens navn", input.contract.customer.name);
-  pdf.field("Kundens adresse", input.contract.customer.address);
-  pdf.text("Dato: ______________________________________________", { gap: 16 });
-  pdf.text("Signatur (bare dersom skjemaet sendes på papir): ______________________________");
+  pdf.text(withdrawal.declaration, { gap: 20 });
+  pdf.field(withdrawal.fields.reference, input.contract.contractReference);
+  pdf.field(withdrawal.fields.service, `${model.service} – ${input.contract.quote.propertyAddress}`);
+  pdf.field(withdrawal.fields.agreementDate, input.evidence ? new Date(input.evidence.signedAt).toLocaleDateString("nb-NO") : "________________________________");
+  pdf.field(withdrawal.fields.customerName, input.contract.customer.name);
+  pdf.field(withdrawal.fields.customerAddress, input.contract.customer.address);
+  pdf.text(`${withdrawal.fields.date}: ______________________________________________`, { gap: 16 });
+  pdf.text(`${withdrawal.fields.signature}: ______________________________`);
   return pdf.finish();
 }

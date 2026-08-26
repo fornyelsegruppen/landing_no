@@ -3,14 +3,12 @@ import { createPrivateMedia } from "@/lib/private-media-storage";
 import { documentHash } from "@/lib/quotes/document";
 import { appendTimeline } from "@/lib/work-orders/access";
 import { dispatchCompletionCommunicationNow } from "@/lib/work-orders/communications";
-import { buildInvoiceDraftPdf, buildWarrantyPdf, type InvoiceDraftSnapshot, type WarrantySnapshot } from "./completion-documents";
+import { buildCompletionConfirmationPdf, buildInvoiceDraftPdf, type CompletionConfirmationSnapshot, type InvoiceDraftSnapshot } from "./completion-documents";
 
 type CompletionReviewInput = {
   workOrderId: number;
   actorId: number;
   invoiceDueDays: number;
-  warrantyMonths: number;
-  warrantyScope: string;
   reviewNote: string;
   correlationId: string;
   now?: Date;
@@ -28,16 +26,6 @@ function relationCount(value: unknown) {
 
 function addDays(value: Date, days: number) {
   return new Date(value.getTime() + days * 86_400_000);
-}
-
-function addMonths(value: Date, months: number) {
-  const result = new Date(value);
-  const day = result.getUTCDate();
-  result.setUTCDate(1);
-  result.setUTCMonth(result.getUTCMonth() + months);
-  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
-  result.setUTCDate(Math.min(day, lastDay));
-  return result;
 }
 
 export async function finalizeWorkOrderReview(payload: Payload, input: CompletionReviewInput) {
@@ -72,10 +60,8 @@ export async function finalizeWorkOrderReview(payload: Payload, input: Completio
 
   const customerAddress = [lead.address, lead.houseNumber, lead.postal, lead.city].filter(Boolean).join(" ");
   const dueAt = addDays(now, input.invoiceDueDays).toISOString();
-  const warrantyStartsAt = new Date(order.completedAt).toISOString();
-  const warrantyEndsAt = addMonths(new Date(order.completedAt), input.warrantyMonths).toISOString();
   const invoiceReference = `FU-${order.id}-V1`;
-  const warrantyReference = `G-${order.id}-V1`;
+  const completionReference = `FD-${order.id}-V1`;
   const invoiceSnapshot: InvoiceDraftSnapshot = {
     schemaVersion: "invoice-draft.v1",
     reference: invoiceReference,
@@ -88,22 +74,26 @@ export async function finalizeWorkOrderReview(payload: Payload, input: Completio
     amounts: { subtotalExVatOre: order.actualSubtotalExVatOre, vatOre: order.actualVatOre, totalIncVatOre: order.actualTotalIncVatOre },
     notice: "Internt fakturautkast – ikke bokført og ikke sendt som betalingskrav.",
   };
-  const warrantySnapshot: WarrantySnapshot = {
-    schemaVersion: "warranty.v1",
-    reference: warrantyReference,
+  const completionSnapshot: CompletionConfirmationSnapshot = {
+    schemaVersion: "completion-confirmation.v1",
+    reference: completionReference,
     workOrderReference: order.reference,
     contractReference: contract.reference,
     customer: { name: lead.name, address: customerAddress },
     serviceDescription: order.workSummary,
-    scope: input.warrantyScope,
-    startsAt: warrantyStartsAt,
-    endsAt: warrantyEndsAt,
-    termsVersion: "SAKSBEKREFTET-V1",
+    completedAt: new Date(order.completedAt).toISOString(),
+    reviewedAt: nowIso,
+    ...(typeof order.actualAreaTenths === "number" ? { actualAreaTenths: order.actualAreaTenths } : {}),
+    amounts: { subtotalExVatOre: order.actualSubtotalExVatOre, vatOre: order.actualVatOre, totalIncVatOre: order.actualTotalIncVatOre },
+    beforePhotoCount: relationCount(order.beforePhotos),
+    afterPhotoCount: relationCount(order.afterPhotos),
+    completionNotes: order.completionNotes,
+    reviewNote: input.reviewNote,
   };
 
-  const [invoiceExisting, warrantyExisting] = await Promise.all([
+  const [invoiceExisting, completionExisting] = await Promise.all([
     payload.find({ collection: "invoice-records", depth: 0, limit: 1, overrideAccess: true, where: { workOrder: { equals: order.id } } }),
-    payload.find({ collection: "warranties", depth: 0, limit: 1, overrideAccess: true, where: { workOrder: { equals: order.id } } }),
+    payload.find({ collection: "private-media", depth: 0, limit: 1, overrideAccess: true, where: { and: [{ ownerType: { equals: "completion-certificate" } }, { ownerId: { equals: String(order.id) } }] } }),
   ]);
   let invoice = invoiceExisting.docs[0];
   if (!invoice) invoice = await payload.create({ collection: "invoice-records", overrideAccess: true, data: { reference: invoiceReference, lead: lead.id, workOrder: order.id, status: "draft", snapshot: invoiceSnapshot, documentHash: documentHash(invoiceSnapshot), subtotalExVatOre: order.actualSubtotalExVatOre, vatOre: order.actualVatOre, totalIncVatOre: order.actualTotalIncVatOre, issuedAt: nowIso, dueAt, assignedTo: input.actorId, adminNote: input.reviewNote } });
@@ -114,14 +104,7 @@ export async function finalizeWorkOrderReview(payload: Payload, input: Completio
     invoice = await payload.update({ collection: "invoice-records", id: invoice.id, overrideAccess: true, data: { document: media.id } });
   }
 
-  let warranty = warrantyExisting.docs[0];
-  if (!warranty) warranty = await payload.create({ collection: "warranties", overrideAccess: true, data: { reference: warrantyReference, lead: lead.id, workOrder: order.id, status: "active", scope: input.warrantyScope, startsAt: warrantyStartsAt, endsAt: warrantyEndsAt, termsVersion: warrantySnapshot.termsVersion, snapshot: warrantySnapshot, documentHash: documentHash(warrantySnapshot), approvedBy: input.actorId, approvedAt: nowIso } });
-  if (!relationId(warranty.document)) {
-    const persistedWarrantySnapshot = warranty.snapshot as WarrantySnapshot;
-    if (documentHash(persistedWarrantySnapshot) !== warranty.documentHash) throw new Error("Warranty document hash mismatch");
-    const media = await createPrivateMedia(payload, { classification: "warranty", ownerType: "warranty", ownerId: String(warranty.id), alt: `Garantibekreftelse ${warranty.reference}` }, { data: await buildWarrantyPdf(persistedWarrantySnapshot), mimeType: "application/pdf", filename: `${warranty.reference.toLowerCase()}-garanti.pdf` });
-    warranty = await payload.update({ collection: "warranties", id: warranty.id, overrideAccess: true, data: { document: media.id } });
-  }
+  const completionDocument = completionExisting.docs[0] || await createPrivateMedia(payload, { classification: "work", ownerType: "completion-certificate", ownerId: String(order.id), alt: `Arbeids- og ferdigbekreftelse ${completionReference}` }, { data: await buildCompletionConfirmationPdf(completionSnapshot), mimeType: "application/pdf", filename: `${completionReference.toLowerCase()}-ferdigbekreftelse.pdf` });
 
   const updated = await payload.update({ collection: "work-orders", id: order.id, overrideAccess: true, context: { trustedCompletionReview: true }, data: {
     status: "documented",
@@ -131,5 +114,5 @@ export async function finalizeWorkOrderReview(payload: Payload, input: Completio
     eventTimeline: appendTimeline(order.eventTimeline, { action: "admin_completion_review", actorId: input.actorId, changedFields: ["status", "completionReviewedBy", "completionReviewedAt", "completionReviewNote"], at: nowIso }),
   } });
   const communication = await dispatchCompletionCommunicationNow(payload, updated, input.correlationId);
-  return { workOrder: updated, invoice, warranty, communication };
+  return { workOrder: updated, invoice, completionDocument, communication };
 }

@@ -34,6 +34,7 @@ import * as migration_20260825_230000_measurement_evidence from "./20260825_2300
 import * as migration_20260825_235000_admin_operations from "./20260825_235000_admin_operations";
 import * as migration_20260825_235100_admin_review_backfill from "./20260825_235100_admin_review_backfill";
 import * as migration_20260825_235200_customer_reply_workflow from "./20260825_235200_customer_reply_workflow";
+import * as migration_20260826_090000_official_invoice_control from "./20260826_090000_official_invoice_control";
 
 export const migrations = [
   {
@@ -215,5 +216,10 @@ export const migrations = [
     up: migration_20260825_235200_customer_reply_workflow.up,
     down: migration_20260825_235200_customer_reply_workflow.down,
     name: "20260825_235200_customer_reply_workflow",
+  },
+  {
+    up: migration_20260826_090000_official_invoice_control.up,
+    down: migration_20260826_090000_official_invoice_control.down,
+    name: "20260826_090000_official_invoice_control",
   },
 ];

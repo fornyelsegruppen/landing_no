@@ -87,6 +87,7 @@ export interface Config {
     'contract-terms': ContractTerm;
     'work-orders': WorkOrder;
     'invoice-records': InvoiceRecord;
+    'official-invoices': OfficialInvoice;
     warranties: Warranty;
     'seo-topics': SeoTopic;
     'seo-runs': SeoRun;
@@ -121,6 +122,7 @@ export interface Config {
     'contract-terms': ContractTermsSelect<false> | ContractTermsSelect<true>;
     'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
     'invoice-records': InvoiceRecordsSelect<false> | InvoiceRecordsSelect<true>;
+    'official-invoices': OfficialInvoicesSelect<false> | OfficialInvoicesSelect<true>;
     warranties: WarrantiesSelect<false> | WarrantiesSelect<true>;
     'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
     'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
@@ -779,6 +781,7 @@ export interface Message {
     | 'measurement_confirmation'
     | 'schedule_confirmation'
     | 'completion'
+    | 'invoice'
     | 'reminder';
   channel: 'email' | 'sms';
   subject: string;
@@ -1328,6 +1331,49 @@ export interface InvoiceRecord {
   createdAt: string;
 }
 /**
+ * Originale Fiken-PDF-er og operativ betalingsoppfølging. Originalfilen kan ikke erstattes etter bekreftelse.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "official-invoices".
+ */
+export interface OfficialInvoice {
+  id: number;
+  reference: string;
+  lead: number | Lead;
+  workOrder: number | WorkOrder;
+  invoiceRecord: number | InvoiceRecord;
+  status: 'needs_review' | 'issued' | 'sent' | 'awaiting_payment' | 'paid' | 'overdue' | 'credited' | 'cancelled';
+  originalDocument: number | PrivateMedia;
+  originalHash: string;
+  extractionStatus: 'needs_review' | 'confirmed' | 'failed';
+  extractedData?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  invoiceNumber?: string | null;
+  issuedAt?: string | null;
+  dueAt?: string | null;
+  subtotalExVatOre?: number | null;
+  vatOre?: number | null;
+  totalIncVatOre?: number | null;
+  confirmedBy?: (number | null) | User;
+  confirmedAt?: string | null;
+  sentAt?: string | null;
+  paidAmountOre?: number | null;
+  paidAt?: string | null;
+  bankReference?: string | null;
+  bankCheckedAt?: string | null;
+  bankCheckedBy?: (number | null) | User;
+  adminNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Saksbekreftede garantier. Omfang og varighet må kontrolleres av administrator før aktivering.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1581,6 +1627,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'invoice-records';
         value: number | InvoiceRecord;
+      } | null)
+    | ({
+        relationTo: 'official-invoices';
+        value: number | OfficialInvoice;
       } | null)
     | ({
         relationTo: 'warranties';
@@ -2326,6 +2376,38 @@ export interface InvoiceRecordsSelect<T extends boolean = true> {
   approvedAt?: T;
   sentAt?: T;
   paidAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "official-invoices_select".
+ */
+export interface OfficialInvoicesSelect<T extends boolean = true> {
+  reference?: T;
+  lead?: T;
+  workOrder?: T;
+  invoiceRecord?: T;
+  status?: T;
+  originalDocument?: T;
+  originalHash?: T;
+  extractionStatus?: T;
+  extractedData?: T;
+  invoiceNumber?: T;
+  issuedAt?: T;
+  dueAt?: T;
+  subtotalExVatOre?: T;
+  vatOre?: T;
+  totalIncVatOre?: T;
+  confirmedBy?: T;
+  confirmedAt?: T;
+  sentAt?: T;
+  paidAmountOre?: T;
+  paidAt?: T;
+  bankReference?: T;
+  bankCheckedAt?: T;
+  bankCheckedBy?: T;
+  adminNote?: T;
   updatedAt?: T;
   createdAt?: T;
 }

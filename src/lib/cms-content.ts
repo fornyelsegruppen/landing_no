@@ -3,7 +3,7 @@ import { draftMode } from "next/headers";
 import { getPayload } from "@/lib/payload";
 import { siteConfig } from "@/lib/site";
 import { siteImages } from "@/content/images";
-import { privacyFallback } from "@/content/privacy";
+import { privacyAcknowledgement, privacyFallback } from "@/content/privacy";
 import {
   faqItems as fallbackFaq,
   products as fallbackProducts,
@@ -483,12 +483,14 @@ export const getSiteContent = cache(async (): Promise<SiteContent> => {
             fallback.settings.privacy.linkLabel.en,
         },
         consentLabel: {
-          no:
-            (settingsDoc.consentLabelNo as string | undefined)?.trim() ||
-            fallback.settings.privacy.consentLabel.no,
-          en:
-            (settingsDoc.consentLabelEn as string | undefined)?.trim() ||
-            fallback.settings.privacy.consentLabel.en,
+          no: privacyAcknowledgement(
+            "no",
+            settingsDoc.consentLabelNo as string | undefined,
+          ),
+          en: privacyAcknowledgement(
+            "en",
+            settingsDoc.consentLabelEn as string | undefined,
+          ),
         },
       },
       retentionMonths:

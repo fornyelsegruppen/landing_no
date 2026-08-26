@@ -43,6 +43,8 @@ export const quoteSnapshotSchema = z.object({
     calculationId: z.number().int().positive(), inputHash: z.string().length(64), ruleId: z.number().int().positive(), ruleVersion: z.number().int().positive(),
     unitPriceExVatOre: integer, subtotalExVatOre: integer, vatBasisPoints: integer, vatOre: integer,
     totalIncVatOre: integer, toleranceBasisPoints: integer, maximumTotalIncVatOre: integer.nullable(),
+    depositBasisPoints: integer.max(10000).optional().default(0),
+    depositAmountIncVatOre: integer.optional().default(0),
   }),
   termsVersion: z.string(),
   validUntil: z.string(),
@@ -55,6 +57,8 @@ export function buildQuoteSnapshot(input: QuoteSnapshotInput): QuoteSnapshot {
   const snapshot = quoteSnapshotSchema.parse({ schemaVersion: "quote-v2", ...input });
   if (new Date(snapshot.validUntil).getTime() <= Date.now()) throw new TypeError("Quote validity must be in the future");
   if (snapshot.measurement.actualAreaMinTenths > snapshot.measurement.actualAreaMaxTenths) throw new TypeError("Minimum area cannot exceed maximum area");
+  const expectedDeposit = Math.round(snapshot.pricing.totalIncVatOre * snapshot.pricing.depositBasisPoints / 10000);
+  if (snapshot.pricing.depositAmountIncVatOre !== expectedDeposit) throw new TypeError("Deposit amount does not match the selected percentage");
   return snapshot;
 }
 
@@ -73,6 +77,8 @@ export function quoteDisplayModel(snapshotInput: unknown) {
     totalIncVatNok: snapshot.pricing.totalIncVatOre / 100,
     tolerancePercent: snapshot.pricing.toleranceBasisPoints / 100,
     maximumTotalIncVatNok: snapshot.pricing.maximumTotalIncVatOre == null ? null : snapshot.pricing.maximumTotalIncVatOre / 100,
+    depositPercent: snapshot.pricing.depositBasisPoints / 100,
+    depositAmountIncVatNok: snapshot.pricing.depositAmountIncVatOre / 100,
     assumptions: snapshot.measurement.assumptions,
     source: snapshot.measurement.source,
     credits: snapshot.measurement.credits,

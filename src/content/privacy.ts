@@ -27,7 +27,7 @@ Selve signaturtegningen brukes til å lage den signerte PDF-kopien. Systemet lag
 Hvis du samtykker i informasjonskapselbanneret, bruker vi Google Ads og Meta Pixel til å måle sidevisninger, henvendelser og klikk på telefon- og e-postlenker. Vi sender ikke navn, telefonnummer, e-postadresse, adresse, melding eller bilder til disse annonsetjenestene. Markedsføringssporing aktiveres ikke hvis du avslår.
 
 ## 3. Formål og rettslig grunnlag
-Opplysningene brukes for å besvare henvendelsen din og følge opp tilbud om takarbeid. Rettslig grunnlag er ditt samtykke (GDPR art. 6 (1) a) og/eller berettiget interesse i å følge opp forespørselen (art. 6 (1) f).
+Opplysningene brukes for å besvare forespørselen din, forberede og inngå en eventuell avtale, gjennomføre arbeidet, fakturere, dokumentere kommunikasjon og ivareta rettskrav. Behandling som er nødvendig for forespørselen og avtalen bygger normalt på GDPR art. 6 (1) b. Sikkerhet, misbruksforebygging og nødvendig dokumentasjon kan bygge på berettiget interesse etter art. 6 (1) f, og lovpålagt regnskapsføring på art. 6 (1) c. Samtykke brukes separat for valgfrie markedsførings- og analyseformål.
 
 ## 4. Lagringstid
 Henvendelser og tilhørende bilder slettes automatisk etter den lagringstiden som er satt i våre systemer (som standard 24 måneder), med mindre vi har en pågående dialog eller lovpålagt oppbevaringsplikt. Aksepterte tilbud, signerte kontrakter, regnskapsgrunnlag og tilhørende bevis oppbevares separat så lenge det er nødvendig for å oppfylle avtalen, håndtere rettskrav og følge lovpålagte krav.
@@ -59,7 +59,7 @@ The signature drawing is used to create the signed PDF copy. The system retains 
 If you consent in the cookie banner, we use Google Ads and Meta Pixel to measure page views, enquiries, and clicks on phone and email links. We do not send names, phone numbers, email addresses, addresses, messages, or photos to these advertising services. Marketing tracking is not activated if you decline.
 
 ## 3. Purpose and legal basis
-Data is used to answer your enquiry and follow up on roofing quotes. Legal basis is your consent (GDPR Art. 6 (1) a) and/or legitimate interest in following up the request (Art. 6 (1) f).
+Data is used to answer your enquiry, prepare and enter into an agreement, carry out the work, invoice, document communications and handle legal claims. Processing needed for the enquiry and contract normally relies on GDPR Art. 6 (1) b. Security, abuse prevention and necessary documentation may rely on legitimate interests under Art. 6 (1) f, and statutory accounting on Art. 6 (1) c. Consent is used separately for optional marketing and analytics purposes.
 
 ## 4. Retention
 Enquiries and related photos are deleted automatically after the configured period (24 months by default), unless there is an ongoing dialogue or legal retention duty. Accepted quotes, signed contracts, accounting material and related evidence are retained separately for as long as needed to perform the agreement, handle legal claims and meet statutory duties.
@@ -78,7 +78,16 @@ You may lodge a complaint with the Norwegian Data Protection Authority (datatils
     en: "Privacy",
   },
   consentLabel: {
-    no: "Jeg godtar at Takfornyelse lagrer opplysningene og bildene mine for å behandle henvendelsen. Se personvernerklæringen.",
-    en: "I agree that Takfornyelse may store my details and photos to process this enquiry. See the privacy policy.",
+    no: "Jeg bekrefter at opplysningene er riktige og at jeg har lest personvernerklæringen.",
+    en: "I confirm that the information is correct and that I have read the privacy policy.",
   },
 } as const;
+
+export function privacyAcknowledgement(locale: "no" | "en", configured?: string | null) {
+  const candidate = configured?.trim();
+  if (!candidate) return privacyFallback.consentLabel[locale];
+  const legacyConsent = locale === "no"
+    ? /jeg\s+godtar\s+at.+(?:lagrer|behandler)/i.test(candidate)
+    : /i\s+(?:agree|consent)\s+that.+(?:store|process)/i.test(candidate);
+  return legacyConsent ? privacyFallback.consentLabel[locale] : candidate;
+}

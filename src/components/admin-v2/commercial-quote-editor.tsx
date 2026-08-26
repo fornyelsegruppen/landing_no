@@ -20,6 +20,7 @@ export function CommercialQuoteEditor(props: {
   const [unitPrice, setUnitPrice] = useState(((props.unitPriceExVatOre || defaultRule?.unitPriceExVatOre || 0) / 100).toFixed(2));
   const [discountKind, setDiscountKind] = useState<"none" | "percent" | "fixed">("none");
   const [discountValue, setDiscountValue] = useState("0");
+  const [depositPercent, setDepositPercent] = useState("0");
   const [reason, setReason] = useState("");
   const defaultRecommendation = props.currentService === "takvask" && props.rules.some((rule) => rule.serviceKey === "takvask_impregnering") ? "takvask_impregnering" : "";
   const [recommendedService, setRecommendedService] = useState(defaultRecommendation);
@@ -39,6 +40,7 @@ export function CommercialQuoteEditor(props: {
           baseUnitPriceExVatOre: Math.round(Number(unitPrice.replace(",", ".")) * 100),
           discountKind,
           discountValue: Number(discountValue.replace(",", ".")),
+          depositPercent: Number(depositPercent.replace(",", ".")),
           reason,
           ...(recommendedService ? { recommendedServiceKey: recommendedService } : {}),
         }),
@@ -60,6 +62,7 @@ export function CommercialQuoteEditor(props: {
       <label className="grid gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.unitPrice}</span><input className="min-h-12 rounded-xl border border-white/10 bg-[#0d1118] px-3" inputMode="decimal" min="0.01" onChange={(event) => setUnitPrice(event.target.value)} required step="0.01" value={unitPrice} /></label>
       <label className="grid gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.discountType}</span><select className="min-h-12 rounded-xl border border-white/10 bg-[#0d1118] px-3" onChange={(event) => setDiscountKind(event.target.value as typeof discountKind)} value={discountKind}><option value="none">{copy.noDiscount}</option><option value="percent">{copy.percentDiscount}</option><option value="fixed">{copy.fixedDiscount}</option></select></label>
       <label className="grid gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.discountValue}</span><input className="min-h-12 rounded-xl border border-white/10 bg-[#0d1118] px-3" disabled={discountKind === "none"} inputMode="decimal" min="0" onChange={(event) => setDiscountValue(event.target.value)} step="0.01" value={discountValue} /></label>
+      <label className="grid gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Avansas / forskudd (%)</span><input className="min-h-12 rounded-xl border border-white/10 bg-[#0d1118] px-3" inputMode="decimal" max="100" min="0" onChange={(event) => setDepositPercent(event.target.value)} step="0.01" value={depositPercent} /></label>
       <label className="grid gap-1.5"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.recommendedOption}</span><select className="min-h-12 rounded-xl border border-white/10 bg-[#0d1118] px-3" onChange={(event) => setRecommendedService(event.target.value)} value={recommendedService}><option value="">{copy.noRecommendedOption}</option>{props.rules.filter((rule) => rule.serviceKey !== props.currentService).map((rule) => <option key={rule.serviceKey} value={rule.serviceKey}>{rule.serviceName}</option>)}</select></label>
       <label className="grid gap-1.5 sm:col-span-2"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.commercialReason}</span><textarea className="min-h-24 rounded-xl border border-white/10 bg-[#0d1118] p-3" maxLength={500} minLength={10} onChange={(event) => setReason(event.target.value)} placeholder={copy.commercialReasonPlaceholder} required value={reason} /></label>
     </div>

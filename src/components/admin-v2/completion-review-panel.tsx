@@ -39,8 +39,6 @@ export function CompletionReviewPanel(props: Props) {
           confirmPrice: formData.get("confirmPrice") === "on",
           invoiceDueDays: Number(formData.get("invoiceDueDays")),
           reviewNote: formData.get("reviewNote"),
-          warrantyMonths: Number(formData.get("warrantyMonths")),
-          warrantyScope: formData.get("warrantyScope"),
         }),
       });
       const result = await response.json().catch(() => ({})) as { error?: string };
@@ -68,11 +66,8 @@ export function CompletionReviewPanel(props: Props) {
       </dl>
       {props.completionNotes ? <div className="rounded-xl border border-white/10 p-3"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{copy.workerCompletionNote}</p><p className="mt-2 whitespace-pre-wrap text-sm">{props.completionNotes}</p></div> : null}
       <label className="grid gap-1.5 text-sm font-semibold">{copy.reviewNote}<textarea className="min-h-24 rounded-xl border border-white/10 bg-background p-3" minLength={10} name="reviewNote" required /></label>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-1.5 text-sm font-semibold">{copy.invoiceDueDays}<select className="min-h-12 rounded-xl border border-white/10 bg-background px-3" defaultValue="14" name="invoiceDueDays"><option value="7">7</option><option value="10">10</option><option value="14">14</option><option value="30">30</option></select></label>
-        <label className="grid gap-1.5 text-sm font-semibold">{copy.warrantyMonths}<input className="min-h-12 rounded-xl border border-white/10 bg-background px-3" max="120" min="1" name="warrantyMonths" required type="number" /></label>
-      </div>
-      <label className="grid gap-1.5 text-sm font-semibold">{copy.warrantyScope}<textarea className="min-h-28 rounded-xl border border-white/10 bg-background p-3" defaultValue={props.workSummary} minLength={10} name="warrantyScope" required /></label>
+      <label className="grid gap-1.5 text-sm font-semibold">{copy.invoiceDueDays}<select className="min-h-12 rounded-xl border border-white/10 bg-background px-3" defaultValue="14" name="invoiceDueDays"><option value="7">7</option><option value="10">10</option><option value="14">14</option><option value="30">30</option></select></label>
+      <p className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm text-muted-foreground">{copy.completionCertificateNotice}</p>
       <label className="flex items-start gap-3 rounded-xl border border-white/10 p-3 text-sm"><input className="mt-1 size-4 accent-[var(--color-accent)]" name="confirmDocumentation" required type="checkbox" /><span>{copy.confirmDocumentation}</span></label>
       <label className="flex items-start gap-3 rounded-xl border border-white/10 p-3 text-sm"><input className="mt-1 size-4 accent-[var(--color-accent)]" name="confirmPrice" required type="checkbox" /><span>{copy.confirmFinalPrice}</span></label>
       <p className="text-xs text-muted-foreground">{copy.invoiceDraftNotice}</p>

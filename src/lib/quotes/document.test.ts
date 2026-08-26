@@ -12,10 +12,16 @@ const signatureData = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQ
 
 describe("locked quote and contract documents", () => {
   it("shows the exact same totals from the locked quote snapshot", () => {
-    expect(quoteDisplayModel(quote)).toMatchObject({ totalIncVatNok: 20337.75, maximumTotalIncVatNok: 22371.53, vatPercent: 25 });
+    expect(quoteDisplayModel(quote)).toMatchObject({ totalIncVatNok: 20337.75, maximumTotalIncVatNok: 22371.53, vatPercent: 25, depositPercent: 0, depositAmountIncVatNok: 0 });
     expect(quote.schemaVersion).toBe("quote-v2");
     expect(contract.schemaVersion).toBe("contract-v2");
     expect(quote.measurement.mode).toBe("legacy");
+  });
+
+  it("locks an administrator-selected deposit to the exact quote total", () => {
+    const withDeposit = buildQuoteSnapshot({ ...quote, pricing: { ...quote.pricing, depositBasisPoints: 2000, depositAmountIncVatOre: 406755 } });
+    expect(quoteDisplayModel(withDeposit)).toMatchObject({ depositPercent: 20, depositAmountIncVatNok: 4067.55 });
+    expect(() => buildQuoteSnapshot({ ...quote, pricing: { ...quote.pricing, depositBasisPoints: 2000, depositAmountIncVatOre: 1 } })).toThrow(/Deposit amount/);
   });
 
   it("hashes canonical content deterministically", () => {

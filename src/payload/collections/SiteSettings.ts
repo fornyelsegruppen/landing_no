@@ -267,12 +267,12 @@ export const SiteSettings: GlobalConfig = {
             {
               name: "consentLabelNo",
               type: "textarea",
-              label: "Form consent checkbox (NO)",
+              label: "Form privacy acknowledgement (NO)",
             },
             {
               name: "consentLabelEn",
               type: "textarea",
-              label: "Form consent checkbox (EN)",
+              label: "Form privacy acknowledgement (EN)",
             },
             {
               name: "retentionMonths",

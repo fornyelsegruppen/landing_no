@@ -19,6 +19,7 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
   leadId: number;
   reason: string;
   recommendedServiceKey?: string;
+  depositBasisPoints?: number;
 }) {
   const [lead, measurementResult, quoteResult] = await Promise.all([
     payload.findByID({ collection: "leads", id: input.leadId, depth: 0, overrideAccess: true }),
@@ -81,11 +82,12 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
     optionGroup: group,
     optionKind: "base",
     retainPreviousStatus: currentQuote.status === "declined",
+    depositBasisPoints: input.depositBasisPoints,
   });
   let recommended: typeof base | undefined;
   if (input.recommendedServiceKey && input.recommendedServiceKey !== requestedService) {
     const recommendedCalculation = await createCalculation(input.recommendedServiceKey, false);
-    recommended = await createQuoteDraft(payload, recommendedCalculation.id, now, { allowPendingMeasurement: true, optionGroup: group, optionKind: "recommended", preservePrevious: true, siblingQuoteId: base.quote.id });
+    recommended = await createQuoteDraft(payload, recommendedCalculation.id, now, { allowPendingMeasurement: true, optionGroup: group, optionKind: "recommended", preservePrevious: true, siblingQuoteId: base.quote.id, depositBasisPoints: input.depositBasisPoints });
     await Promise.all([
       payload.update({ collection: "quotes", id: base.quote.id, depth: 0, overrideAccess: true, data: { siblingQuote: recommended.quote.id } }),
       payload.update({ collection: "quotes", id: recommended.quote.id, depth: 0, overrideAccess: true, data: { siblingQuote: base.quote.id } }),

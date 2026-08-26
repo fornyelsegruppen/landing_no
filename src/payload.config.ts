@@ -36,6 +36,7 @@ import { ChangeAgreements } from "./payload/collections/ChangeAgreements";
 import { ContractTerms } from "./payload/collections/ContractTerms";
 import { InvoiceRecords } from "./payload/collections/InvoiceRecords";
 import { Warranties } from "./payload/collections/Warranties";
+import { OfficialInvoices } from "./payload/collections/OfficialInvoices";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -152,6 +153,7 @@ export default buildConfig({
     ContractTerms,
     WorkOrders,
     InvoiceRecords,
+    OfficialInvoices,
     Warranties,
     SeoTopics,
     SeoRuns,

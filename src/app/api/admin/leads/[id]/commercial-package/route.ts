@@ -13,6 +13,7 @@ const schema = z.object({
   discountValue: z.number().min(0),
   reason: z.string().trim().min(10).max(500),
   recommendedServiceKey: z.enum(["takvask", "takvask_impregnering", "impregnering", "takmaling", "nytt_tak"]).optional(),
+  depositPercent: z.number().min(0).max(100).default(0),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,14 +26,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid commercial package" }, { status: 400 });
   try {
-    const result = await rebuildCommercialPackage(payload, { administratorId: user.id, leadId: Number(id), ...parsed.data });
+    const result = await rebuildCommercialPackage(payload, { administratorId: user.id, leadId: Number(id), ...parsed.data, depositBasisPoints: Math.round(parsed.data.depositPercent * 100) });
     await recordAuditEvent(createPayloadAuditWriter(payload), {
       actorId: user.id,
       action: "quote.commercial-package-rebuilt",
       entityType: "lead",
       entityId: Number(id),
       correlationId: correlationIdFromHeaders(request.headers),
-      changedFields: ["unitPriceExVatOre", "discount", "quoteVersion", "contractVersion", "commercialOptions"],
+      changedFields: ["unitPriceExVatOre", "discount", "deposit", "quoteVersion", "contractVersion", "commercialOptions"],
       before: { sourceQuoteId: result.sourceQuoteId },
       after: { baseQuoteId: result.base.quote.id, recommendedQuoteId: result.recommended?.quote.id ?? null },
       metadata: { optionCount: result.recommended ? 2 : 1 },

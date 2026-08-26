@@ -206,6 +206,9 @@ export function Footer() {
             <Link href="/personvern" className="hover:text-accent">
               {settings.privacy.linkLabel[locale]}
             </Link>
+            <Link href="/angreskjema" className="hover:text-accent">
+              {locale === "no" ? "Angreskjema" : "Withdrawal form"}
+            </Link>
             <MarketingSettingsButton />
           </div>
           <p>{copy.footer.warrantyNote}</p>

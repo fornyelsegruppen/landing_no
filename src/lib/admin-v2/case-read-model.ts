@@ -263,6 +263,7 @@ export type AdminCase = {
     workSummary: string;
   };
   invoice?: CaseEntity & { adminNote?: string; documentId?: number; dueAt?: string; externalReference?: string; subtotalExVatOre?: number; totalIncVatOre?: number; vatOre?: number };
+  officialInvoices: Array<CaseEntity & { extractionStatus?: string; extractedData?: Record<string, unknown>; invoiceNumber?: string; issuedAt?: string; dueAt?: string; originalDocumentId?: number; subtotalExVatOre?: number; vatOre?: number; totalIncVatOre?: number; sentAt?: string; paidAt?: string; paidAmountOre?: number; bankReference?: string; bankCheckedAt?: string }>;
   warranty?: CaseEntity & { documentId?: number; endsAt?: string; scope?: string; startsAt?: string; termsVersion?: string };
 };
 
@@ -429,7 +430,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const workOrderIds = workOrders.map((work) => numericId(work.id)).filter(Number.isFinite);
   const measurementIds = measurements.map((item) => numericId(item.id)).filter(Number.isFinite);
 
-  const [contractsResult, changesResult, invoicesResult, warrantiesResult] = await Promise.all([
+  const [contractsResult, changesResult, invoicesResult, warrantiesResult, officialInvoicesResult] = await Promise.all([
     quoteIds.length
       ? payload.find({ ...common, collection: "contracts", sort: "-version", where: { quote: { in: quoteIds } } })
       : Promise.resolve({ docs: [] }),
@@ -438,11 +439,13 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
       : Promise.resolve({ docs: [] }),
     payload.find({ ...common, collection: "invoice-records", where: { lead: { equals: leadId } } }),
     payload.find({ ...common, collection: "warranties", where: { lead: { equals: leadId } } }),
+    payload.find({ ...common, collection: "official-invoices", where: { lead: { equals: leadId } } }),
   ]);
   const contracts = contractsResult.docs.map(asRecord);
   const changes = changesResult.docs.map(asRecord);
   const invoices = invoicesResult.docs.map(asRecord);
   const warranties = warrantiesResult.docs.map(asRecord);
+  const officialInvoices = officialInvoicesResult.docs.map(asRecord);
 
   const ownerPairs = [
     { ownerType: "lead", ids: [leadId] },
@@ -602,6 +605,23 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     scope: stringValue(latestWarrantyRaw.scope),
     termsVersion: stringValue(latestWarrantyRaw.termsVersion),
   } : undefined;
+  const mappedOfficialInvoices = officialInvoices.map((item) => ({
+    ...entity("official-invoices", item),
+    extractionStatus: stringValue(item.extractionStatus),
+    extractedData: item.extractedData && typeof item.extractedData === "object" ? asRecord(item.extractedData) : undefined,
+    invoiceNumber: stringValue(item.invoiceNumber),
+    issuedAt: stringValue(item.issuedAt),
+    dueAt: stringValue(item.dueAt),
+    originalDocumentId: relationId(item.originalDocument) || undefined,
+    subtotalExVatOre: numberValue(item.subtotalExVatOre),
+    vatOre: numberValue(item.vatOre),
+    totalIncVatOre: numberValue(item.totalIncVatOre),
+    sentAt: stringValue(item.sentAt),
+    paidAt: stringValue(item.paidAt),
+    paidAmountOre: numberValue(item.paidAmountOre),
+    bankReference: stringValue(item.bankReference),
+    bankCheckedAt: stringValue(item.bankCheckedAt),
+  }));
 
   const mappedMessages: CaseMessage[] = visibleMessages.map((message) => ({
     ...entity("messages", message),
@@ -662,6 +682,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     ...workOrders.map((item) => makeTimeline("work", "work-orders", item, stringValue(item.reference) || "Arbeid")),
     ...changes.map((item) => makeTimeline("change", "change-agreements", item, stringValue(item.reference) || "Endringsavtale")),
     ...invoices.map((item) => makeTimeline("invoice", "invoice-records", item, stringValue(item.reference) || "Fakturautkast")),
+    ...officialInvoices.map((item) => makeTimeline("invoice", "official-invoices", item, stringValue(item.invoiceNumber) || stringValue(item.reference) || "Fiken-faktura")),
     ...warranties.map((item) => makeTimeline("warranty", "warranties", item, stringValue(item.reference) || "Garanti")),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -702,6 +723,7 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
     contract,
     workOrder,
     invoice,
+    officialInvoices: mappedOfficialInvoices,
     warranty,
     changes: changes.map((item) => {
       const snapshot = item.snapshot && typeof item.snapshot === "object" ? asRecord(item.snapshot) : undefined;

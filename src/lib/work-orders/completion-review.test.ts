@@ -5,14 +5,14 @@ const mocks = vi.hoisted(() => ({
   createMedia: vi.fn(),
   dispatch: vi.fn(),
   invoicePdf: vi.fn(),
-  warrantyPdf: vi.fn(),
+  completionPdf: vi.fn(),
 }));
 
 vi.mock("@/lib/private-media-storage", () => ({ createPrivateMedia: mocks.createMedia }));
 vi.mock("@/lib/work-orders/communications", () => ({ dispatchCompletionCommunicationNow: mocks.dispatch }));
 vi.mock("./completion-documents", async (load) => {
   const actual = await load<typeof import("./completion-documents")>();
-  return { ...actual, buildInvoiceDraftPdf: mocks.invoicePdf, buildWarrantyPdf: mocks.warrantyPdf };
+  return { ...actual, buildInvoiceDraftPdf: mocks.invoicePdf, buildCompletionConfirmationPdf: mocks.completionPdf };
 });
 
 import { finalizeWorkOrderReview } from "./completion-review";
@@ -37,15 +37,16 @@ describe("admin completion review", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.invoicePdf.mockResolvedValue(new Uint8Array([37, 80, 68, 70]));
-    mocks.warrantyPdf.mockResolvedValue(new Uint8Array([37, 80, 68, 70]));
+    mocks.completionPdf.mockResolvedValue(new Uint8Array([37, 80, 68, 70]));
     mocks.dispatch.mockResolvedValue({ delivered: true });
   });
 
-  it("creates an invoice draft and warranty before finalizing documented work", async () => {
+  it("creates an invoice draft and a non-warranty completion confirmation", async () => {
     const { payload, create, update } = fixture();
-    const result = await finalizeWorkOrderReview(payload, { workOrderId: 7, actorId: 9, invoiceDueDays: 14, warrantyMonths: 24, warrantyScope: "Gjelder dokumentert takvask.", reviewNote: "Kontrollert bilder og sluttbeløp.", correlationId: "test", now: new Date("2026-08-25T12:00:00Z") });
+    const result = await finalizeWorkOrderReview(payload, { workOrderId: 7, actorId: 9, invoiceDueDays: 14, reviewNote: "Kontrollert bilder og sluttbeløp.", correlationId: "test", now: new Date("2026-08-25T12:00:00Z") });
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ collection: "invoice-records", data: expect.objectContaining({ status: "draft", totalIncVatOre: 125000 }) }));
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ collection: "warranties", data: expect.objectContaining({ status: "active", scope: "Gjelder dokumentert takvask." }) }));
+    expect(create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: "warranties" }));
+    expect(mocks.completionPdf).toHaveBeenCalledOnce();
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ collection: "work-orders", context: { trustedCompletionReview: true }, data: expect.objectContaining({ status: "documented", completionReviewedBy: 9 }) }));
     expect(result.workOrder.status).toBe("documented");
     expect(mocks.dispatch).toHaveBeenCalledOnce();
@@ -53,7 +54,7 @@ describe("admin completion review", () => {
 
   it("blocks a final amount above the signed maximum without an accepted change", async () => {
     const { payload } = fixture(120000);
-    await expect(finalizeWorkOrderReview(payload, { workOrderId: 7, actorId: 9, invoiceDueDays: 14, warrantyMonths: 12, warrantyScope: "Gjelder dokumentert takvask.", reviewNote: "Kontrollert bilder og sluttbeløp.", correlationId: "test" })).rejects.toThrow(/exceeds the signed maximum/);
+    await expect(finalizeWorkOrderReview(payload, { workOrderId: 7, actorId: 9, invoiceDueDays: 14, reviewNote: "Kontrollert bilder og sluttbeløp.", correlationId: "test" })).rejects.toThrow(/exceeds the signed maximum/);
     expect(mocks.createMedia).not.toHaveBeenCalled();
   });
 });

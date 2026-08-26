@@ -120,13 +120,22 @@ When you request a quote, the address may be used for address lookup and a contr
   return `${body.trim()}\n\n${disclosure}`;
 }
 
+function withCorrectLegalBasis(body: string, locale: "no" | "en") {
+  const heading = locale === "no" ? "## 3. Formål og rettslig grunnlag" : "## 3. Purpose and legal basis";
+  if (!body.includes(heading)) return body;
+  const replacement = locale === "no"
+    ? `${heading}\nOpplysningene brukes for å besvare forespørselen din, forberede og inngå en eventuell avtale, gjennomføre arbeidet, fakturere, dokumentere kommunikasjon og ivareta rettskrav. Behandling som er nødvendig for forespørselen og avtalen bygger normalt på GDPR art. 6 (1) b. Sikkerhet, misbruksforebygging og nødvendig dokumentasjon kan bygge på berettiget interesse etter art. 6 (1) f, og lovpålagt regnskapsføring på art. 6 (1) c. Samtykke brukes separat for valgfrie markedsførings- og analyseformål.`
+    : `${heading}\nData is used to answer your enquiry, prepare and enter into an agreement, carry out the work, invoice, document communications and handle legal claims. Processing needed for the enquiry and contract normally relies on GDPR Art. 6 (1) b. Security, abuse prevention and necessary documentation may rely on legitimate interests under Art. 6 (1) f, and statutory accounting on Art. 6 (1) c. Consent is used separately for optional marketing and analytics purposes.`;
+  return body.replace(new RegExp(`${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n[\\s\\S]*?(?=\\n\\n## 4\\.)`), replacement);
+}
+
 export default async function PrivacyPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const loc = locale as "no" | "en";
   const content = await getSiteContent();
   const privacy = content.settings.privacy;
-  const privacyBody = withOperationalDisclosure(withAiDisclosure(withMarketingDisclosure(privacy.body[loc], loc), loc), loc);
+  const privacyBody = withOperationalDisclosure(withAiDisclosure(withMarketingDisclosure(withCorrectLegalBasis(privacy.body[loc], loc), loc), loc), loc);
 
   return (
     <section className="section-pad">

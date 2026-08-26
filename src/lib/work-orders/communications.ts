@@ -316,7 +316,7 @@ function copyFor(kind: WorkOrderCommunicationKind, input: { leadName: string; sc
   if (kind === "on_way") return { category: "reminder" as const, subject: "Medarbeideren er på vei", body: `Hei ${input.leadName},\n\n${workerName} er nå på vei til eiendommen din. Planlagt ankomst er ${window}.\n\n${contact}\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
   if (kind === "arrived") return { category: "reminder" as const, subject: "Medarbeideren har ankommet", body: `Hei ${input.leadName},\n\n${workerName} har nå ankommet eiendommen og starter den avtalte kontrollen før arbeidet.\n\nVed behov kan du kontakte medarbeideren på ${workerPhone}.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
   if (kind === "work_started") return { category: "reminder" as const, subject: "Takarbeidet er startet", body: `Hei ${input.leadName},\n\n${workerName} har nå fullført kontrollen på stedet, og det avtalte takarbeidet er startet. Vi gir deg en ny oppdatering når arbeidet er ferdig og sluttkontrollert.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}` };
-  return { category: "completion" as const, subject: "Takarbeidet er fullført og dokumentert", body: `Hei ${input.leadName},\n\nArbeidet er fullført og sluttkontrollert. Garantibekreftelse, relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Eventuell faktura sendes separat etter godkjent bokføring. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n${siteConfig.phone}` };
+  return { category: "completion" as const, subject: "Takarbeidet er fullført og dokumentert", body: `Hei ${input.leadName},\n\nArbeidet er fullført og sluttkontrollert. Arbeids- og ferdigbekreftelse, relevant kontraktsdokumentasjon og etterbilder følger vedlagt. Dokumentet er ikke et kommersielt garantibevis og begrenser ikke rettighetene dine etter håndverkertjenesteloven. Eventuell faktura sendes separat etter godkjent bokføring. Ta kontakt dersom du har spørsmål.\n\nTakk for oppdraget!\nTakfornyelse\n${siteConfig.phone}` };
 }
 
 export async function processWorkOrderCommunicationJob(payload: Payload, value: unknown, correlationId: string, clock = new Date()) {
@@ -348,9 +348,9 @@ export async function processWorkOrderCommunicationJob(payload: Payload, value: 
       if (signedDocumentId) attachments.push(signedDocumentId);
     }
     for (const photo of (order.afterPhotos || []).slice(0, 4)) { const id = relationId(photo); if (id) attachments.push(id); }
-    const warranties = await payload.find({ collection: "warranties", depth: 0, limit: 1, overrideAccess: true, where: { and: [{ workOrder: { equals: order.id } }, { status: { equals: "active" } }] } });
-    const warrantyDocumentId = relationId(warranties.docs[0]?.document);
-    if (warrantyDocumentId) attachments.push(warrantyDocumentId);
+    const completionDocuments = await payload.find({ collection: "private-media", depth: 0, limit: 1, overrideAccess: true, where: { and: [{ ownerType: { equals: "completion-certificate" } }, { ownerId: { equals: String(order.id) } }] } });
+    const completionDocumentId = relationId(completionDocuments.docs[0]);
+    if (completionDocumentId) attachments.push(completionDocumentId);
   }
   const nowIso = clock.toISOString();
   const message = await payload.create({ collection: "messages", overrideAccess: true, data: { lead: lead.id, direction: "outbound", category: copy.category, channel: "email", subject: copy.subject, bodyText: copy.body, bodyHtml: buildBrandedEmailHtml({ subject: copy.subject, text: copy.body }), attachments, status: "queued", idempotencyKey, aiAssisted: false, approvedAt: nowIso, queuedAt: nowIso, aiAnalysis: { workOrderId: order.id, communicationKind: input.kind, scheduleVersion: input.scheduleVersion } } });

@@ -50,6 +50,7 @@ export const Messages: CollectionConfig = {
         { label: "Målebekreftelse", value: "measurement_confirmation" },
         { label: "Planleggingsbekreftelse", value: "schedule_confirmation" },
         { label: "Ferdigmelding", value: "completion" },
+        { label: "Faktura", value: "invoice" },
         { label: "Påminnelse", value: "reminder" },
       ],
     },

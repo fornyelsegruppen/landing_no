@@ -99,6 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     { path: "/personvern", changeFrequency: "monthly" as const, priority: 0.5 },
+    { path: "/angreskjema", changeFrequency: "monthly" as const, priority: 0.4 },
   ];
 
   const staticEntries = staticPages.flatMap((page) =>

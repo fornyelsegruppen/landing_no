@@ -1,6 +1,6 @@
 import type { Payload } from "payload";
 
-export const adminDocumentTypes = ["all", "quote", "contract_draft", "customer_signed", "final_contract", "change_agreement", "work_documentation", "measurement", "invoice_draft", "warranty"] as const;
+export const adminDocumentTypes = ["all", "quote", "contract_draft", "customer_signed", "final_contract", "change_agreement", "work_documentation", "measurement", "invoice_draft", "official_invoice", "warranty"] as const;
 export type AdminDocumentType = (typeof adminDocumentTypes)[number];
 
 export type AdminDocumentItem = {
@@ -36,7 +36,7 @@ function fileHref(media: Record<string, unknown>) {
 
 export async function loadAdminDocuments(payload: Pick<Payload, "find">, filters: Filters = {}) {
   const common = { depth: 1, limit: 500, overrideAccess: true, pagination: false, sort: "-createdAt" as const };
-  const [leadsResult, quotesResult, contractsResult, workResult, changesResult, measurementsResult, invoicesResult, warrantiesResult, mediaResult] = await Promise.all([
+  const [leadsResult, quotesResult, contractsResult, workResult, changesResult, measurementsResult, invoicesResult, officialInvoicesResult, warrantiesResult, mediaResult] = await Promise.all([
     payload.find({ ...common, collection: "leads" }),
     payload.find({ ...common, collection: "quotes", sort: "-version" }),
     payload.find({ ...common, collection: "contracts", sort: "-version" }),
@@ -44,6 +44,7 @@ export async function loadAdminDocuments(payload: Pick<Payload, "find">, filters
     payload.find({ ...common, collection: "change-agreements", sort: "-version" }),
     payload.find({ ...common, collection: "roof-measurements", sort: "-version" }),
     payload.find({ ...common, collection: "invoice-records" }),
+    payload.find({ ...common, collection: "official-invoices" }),
     payload.find({ ...common, collection: "warranties" }),
     payload.find({ ...common, collection: "private-media" }),
   ]);
@@ -129,6 +130,15 @@ export async function loadAdminDocuments(payload: Pick<Payload, "find">, filters
     const document = media.get(id(invoice.document) || 0);
     if (!invoiceId || !leadId || !document) continue;
     add({ id: `invoice-${invoiceId}`, leadId, customer: customer(leadId), caseHref: `/admin-v2/cases/${leadId}`, reference: text(invoice.reference) || `#${invoiceId}`, filename: text(document.filename) || `${text(invoice.reference) || invoiceId}.pdf`, href: fileHref(document), type: "invoice_draft", status: text(invoice.status), createdAt: text(invoice.createdAt), hash: text(invoice.documentHash) });
+  }
+
+  for (const raw of officialInvoicesResult.docs) {
+    const invoice = record(raw);
+    const invoiceId = id(invoice);
+    const leadId = id(invoice.lead);
+    const document = media.get(id(invoice.originalDocument) || 0);
+    if (!invoiceId || !leadId || !document) continue;
+    add({ id: `official-invoice-${invoiceId}`, leadId, customer: customer(leadId), caseHref: `/admin-v2/cases/${leadId}`, reference: text(invoice.invoiceNumber) || text(invoice.reference) || `#${invoiceId}`, filename: text(document.filename) || `${text(invoice.invoiceNumber) || invoiceId}.pdf`, href: fileHref(document), type: "official_invoice", status: text(invoice.status), createdAt: text(invoice.createdAt), hash: text(invoice.originalHash) });
   }
 
   for (const raw of warrantiesResult.docs) {

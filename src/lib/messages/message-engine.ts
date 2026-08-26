@@ -369,8 +369,20 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       },
     });
     const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
-      ? message.aiAnalysis as { alternativeQuoteId?: number; cancellationDecision?: string; recommendedNextAction?: string; quoteId?: number }
+      ? message.aiAnalysis as { alternativeQuoteId?: number; cancellationDecision?: string; recommendedNextAction?: string; quoteId?: number; officialInvoiceId?: number }
       : {};
+    if (message.category === "invoice" && typeof analysis.officialInvoiceId === "number") {
+      const invoice = await payload.findByID({ collection: "official-invoices", id: analysis.officialInvoiceId, depth: 0, overrideAccess: true });
+      if (invoice.status === "issued") {
+        await payload.update({ collection: "official-invoices", id: invoice.id, depth: 0, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
+        await payload.update({ collection: "official-invoices", id: invoice.id, depth: 0, overrideAccess: true, data: { status: "awaiting_payment" } });
+      }
+      const invoiceRecordId = relationId(invoice.invoiceRecord);
+      if (invoiceRecordId) {
+        const basis = await payload.findByID({ collection: "invoice-records", id: invoiceRecordId, depth: 0, overrideAccess: true });
+        if (basis.status === "exported") await payload.update({ collection: "invoice-records", id: basis.id, depth: 0, overrideAccess: true, data: { status: "sent" } });
+      }
+    }
     const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
     if (message.category === "quote" && typeof analysis.quoteId === "number") {
       const quoteIds = [analysis.quoteId, analysis.alternativeQuoteId].filter((value): value is number => typeof value === "number");

@@ -12,8 +12,6 @@ const schema = z.object({
   confirmPrice: z.literal(true),
   invoiceDueDays: z.number().int().min(1).max(90),
   reviewNote: z.string().trim().min(10).max(2000),
-  warrantyMonths: z.number().int().min(1).max(120),
-  warrantyScope: z.string().trim().min(10).max(3000),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -35,9 +33,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       entityId: Number(id),
       correlationId,
       changedFields: ["status", "completionReviewedBy", "completionReviewedAt", "completionReviewNote"],
-      metadata: { invoiceRecordId: result.invoice.id, warrantyId: result.warranty.id },
+      metadata: { invoiceRecordId: result.invoice.id, completionDocumentId: result.completionDocument.id },
     });
-    return NextResponse.json({ ok: true, status: result.workOrder.status, invoiceId: result.invoice.id, warrantyId: result.warranty.id, communicationDelivered: "delivered" in result.communication ? result.communication.delivered : false });
+    return NextResponse.json({ ok: true, status: result.workOrder.status, invoiceId: result.invoice.id, completionDocumentId: result.completionDocument.id, communicationDelivered: "delivered" in result.communication ? result.communication.delivered : false });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Completion review failed", correlationId }, { status: 409 });
   }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, FileCheck2, FileSearch, Filter, FolderOpen, Search } from "lucide-react";
+import { Download, ExternalLink, FileCheck2, FileSearch, Filter, FolderOpen, Search } from "lucide-react";
 import { adminDocumentTypes, loadAdminDocuments, type AdminDocumentType } from "@/lib/admin-v2/documents";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { statusLabel } from "@/lib/admin-v2/labels";
@@ -42,6 +42,12 @@ export default async function AdminDocumentsPage({ searchParams }: { searchParam
   const formatDate = (date?: string) => date
     ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
     : "—";
+  const exportCopy = user.interfaceLanguage === "lt"
+    ? { title: "Mėnesio buhalterinis eksportas", help: "Atsisiųskite ZIP su originaliais Fiken PDF ir CSV su patvirtintais duomenimis.", button: "Atsisiųsti ZIP" }
+    : user.interfaceLanguage === "en"
+      ? { title: "Monthly accounting export", help: "Download a ZIP with the original Fiken PDFs and a CSV of confirmed fields.", button: "Download ZIP" }
+      : { title: "Månedlig regnskapseksport", help: "Last ned ZIP med originale Fiken-PDF-er og CSV med bekreftede opplysninger.", button: "Last ned ZIP" };
+  const currentMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit" }).format(new Date());
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -79,6 +85,15 @@ export default async function AdminDocumentsPage({ searchParams }: { searchParam
             <Link className="grid min-h-12 place-items-center rounded-xl border border-white/10 px-5 text-sm font-semibold hover:border-accent/50" href="/admin-v2/documents">{copy.documents.clear}</Link>
             <button className="min-h-12 rounded-xl bg-accent px-5 font-bold text-accent-foreground hover:bg-accent-hover" type="submit">{copy.documents.apply}</button>
           </div>
+        </form>
+      </section>
+
+      <section className="rounded-3xl border border-accent/25 bg-accent/5 p-4 sm:p-6">
+        <h2 className="flex items-center gap-2 text-lg font-bold"><Download aria-hidden="true" className="size-5 text-accent" />{exportCopy.title}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{exportCopy.help}</p>
+        <form action="/api/admin/official-invoices/export" className="mt-4 flex flex-wrap gap-3" method="get">
+          <input className="min-h-12 rounded-xl border border-white/10 bg-[#11151d] px-3" defaultValue={currentMonth} max={currentMonth} name="month" required type="month" />
+          <button className="min-h-12 rounded-xl bg-accent px-5 font-bold text-accent-foreground hover:bg-accent-hover" type="submit">{exportCopy.button}</button>
         </form>
       </section>
 
