@@ -3,7 +3,7 @@
 **Parengta:** 2026-08-26  
 **Aplinka:** pirmiausia tik `https://takfornyelse-staging.vercel.app`  
 **Produkcija:** neliečiama be atskiro savininko `GO`  
-**Būsena:** vykdoma; B0–B3 užbaigti, B4 yra kitas aktyvus etapas  
+**Būsena:** vykdoma; B0–B4 užbaigti, B5 yra kitas aktyvus etapas  
 **Vykdymo taisyklė:** vienu metu vykdoma tik viena fazė; nauja fazė nepradedama, kol ankstesnė neturi visų PASS įrodymų
 
 ## 1. Tikslas
@@ -195,6 +195,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 - įrašytas B3 `GO`.
 
 ### B4 — katalogo, straipsnio ir SEO nuoseklumo užbaigimas
+
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-b4-guide-ux-seo.md`.
 
 **Priklausomybė:** B3  
 **Tikslas:** visas viešas kelias atrodo kaip viena profesionali žinių bazė ir perduoda teisingus SEO signalus.
