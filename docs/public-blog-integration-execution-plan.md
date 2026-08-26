@@ -3,7 +3,7 @@
 **Parengta:** 2026-08-26  
 **Aplinka:** pirmiausia tik `https://takfornyelse-staging.vercel.app`  
 **Produkcija:** neliečiama be atskiro savininko `GO`  
-**Būsena:** planas parengtas; funkcijų įgyvendinimas dar nepradėtas  
+**Būsena:** vykdoma; B0–B2 užbaigti, B3 yra kitas aktyvus etapas  
 **Vykdymo taisyklė:** vienu metu vykdoma tik viena fazė; nauja fazė nepradedama, kol ankstesnė neturi visų PASS įrodymų
 
 ## 1. Tikslas
@@ -144,6 +144,8 @@ Bet kuris `FAIL`, nepatikrintas publikavimo scenarijus, matomas draft arba klaid
 - įrašytas B1 `GO`.
 
 ### B2 — vieninga desktop, mobile ir footer navigacija
+
+**Vykdymo būsena:** PASS — 2026-08-26; įrodymai `docs/implementation/phase-b2-public-guide-navigation.md`.
 
 **Priklausomybė:** B1  
 **Tikslas:** lankytojas iš bet kurios svetainės vietos vienu aiškiu veiksmu randa `Råd og guider`.
