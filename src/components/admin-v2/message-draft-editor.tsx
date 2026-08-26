@@ -14,10 +14,13 @@ const copy = {
     save: "Lagre utkast",
     regenerate: "Lag nytt AI-utkast",
     send: "Godkjenn og send",
+    cancel: "Forkast utkast",
+    cancelConfirm: "Forkaste dette utkastet? Det sendes ikke til kunden.",
     sendingConfirm: "Jeg har kontrollert fakta og godkjenner at denne meldingen sendes til kunden.",
     saved: "Utkastet er lagret.",
     regenerated: "Et nytt AI-utkast er opprettet.",
     sent: "Meldingen er godkjent og lagt til utsending.",
+    cancelled: "Utkastet er forkastet.",
     failed: "Handlingen kunne ikke fullføres.",
     processing: "Behandler …",
   },
@@ -30,10 +33,13 @@ const copy = {
     save: "Išsaugoti juodraštį",
     regenerate: "Sukurti naują DI juodraštį",
     send: "Patvirtinti ir išsiųsti",
+    cancel: "Atšaukti juodraštį",
+    cancelConfirm: "Atšaukti šį juodraštį? Klientui jis nebus siunčiamas.",
     sendingConfirm: "Patvirtinu, kad patikrinau faktus ir leidžiu išsiųsti šią žinutę klientui.",
     saved: "Juodraštis išsaugotas.",
     regenerated: "Sukurtas naujas DI juodraštis.",
     sent: "Žinutė patvirtinta ir perduota siuntimui.",
+    cancelled: "Juodraštis atšauktas.",
     failed: "Veiksmo atlikti nepavyko.",
     processing: "Vykdoma …",
   },
@@ -46,10 +52,13 @@ const copy = {
     save: "Save draft",
     regenerate: "Generate a new AI draft",
     send: "Approve and send",
+    cancel: "Discard draft",
+    cancelConfirm: "Discard this draft? It will not be sent to the customer.",
     sendingConfirm: "I have checked the facts and approve sending this message to the customer.",
     saved: "The draft was saved.",
     regenerated: "A new AI draft was created.",
     sent: "The message was approved and queued for delivery.",
+    cancelled: "The draft was discarded.",
     failed: "The action could not be completed.",
     processing: "Processing …",
   },
@@ -70,10 +79,10 @@ export function MessageDraftEditor(props: {
   const router = useRouter();
   const [subject, setSubject] = useState(props.subject);
   const [bodyText, setBodyText] = useState(props.bodyText);
-  const [busy, setBusy] = useState<"save" | "regenerate" | "send" | null>(null);
+  const [busy, setBusy] = useState<"cancel" | "save" | "regenerate" | "send" | null>(null);
   const [notice, setNotice] = useState("");
 
-  async function post(action: "save_draft" | "regenerate_reply" | "approve_send") {
+  async function post(action: "cancel_draft" | "save_draft" | "regenerate_reply" | "approve_send") {
     const response = await fetch(`/api/admin/leads/${props.leadId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -85,13 +94,17 @@ export function MessageDraftEditor(props: {
     if (!response.ok) throw new Error(result.error || labels.failed);
   }
 
-  async function run(kind: "save" | "regenerate" | "send") {
+  async function run(kind: "cancel" | "save" | "regenerate" | "send") {
     if (busy) return;
     if (kind === "send" && !window.confirm(labels.sendingConfirm)) return;
+    if (kind === "cancel" && !window.confirm(labels.cancelConfirm)) return;
     setBusy(kind);
     setNotice("");
     try {
-      if (kind === "regenerate") {
+      if (kind === "cancel") {
+        await post("cancel_draft");
+        setNotice(labels.cancelled);
+      } else if (kind === "regenerate") {
         await post("regenerate_reply");
         setNotice(labels.regenerated);
       } else {
@@ -124,6 +137,7 @@ export function MessageDraftEditor(props: {
         <button className="min-h-11 rounded-xl border border-white/15 px-4 font-bold hover:border-accent/50 disabled:opacity-50" disabled={Boolean(busy) || subject.trim().length < 5 || bodyText.trim().length < 20} onClick={() => void run("save")} type="button">{busy === "save" ? labels.processing : labels.save}</button>
         {props.aiAssisted && props.sourceBody ? <button className="min-h-11 rounded-xl border border-accent/40 px-4 font-bold text-accent hover:bg-accent/10 disabled:opacity-50" disabled={Boolean(busy)} onClick={() => void run("regenerate")} type="button">{busy === "regenerate" ? labels.processing : labels.regenerate}</button> : null}
         <button className="min-h-11 rounded-xl bg-accent px-4 font-bold text-accent-foreground hover:bg-accent-hover disabled:opacity-50" disabled={Boolean(busy) || subject.trim().length < 5 || bodyText.trim().length < 20} onClick={() => void run("send")} type="button">{busy === "send" ? labels.processing : labels.send}</button>
+        <button className="min-h-11 rounded-xl border border-red-400/40 px-4 font-bold text-red-200 hover:bg-red-400/10 disabled:opacity-50" disabled={Boolean(busy)} onClick={() => void run("cancel")} type="button">{busy === "cancel" ? labels.processing : labels.cancel}</button>
       </div>
       {notice ? <p aria-live="polite" className="mt-3 text-sm text-muted-foreground" role="status">{notice}</p> : null}
     </div>

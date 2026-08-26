@@ -102,6 +102,7 @@ describe("admin case read model", () => {
       { docs: [] },
       { docs: [] },
       { docs: [] },
+      { docs: [] },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
     const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
@@ -130,5 +131,29 @@ describe("admin case read model", () => {
     expect(result?.messages.map((message) => message.id)).toEqual([23]);
     expect(result?.timeline.some((item) => item.id === "message-24")).toBe(false);
     expect(result?.nextAction.kind).toBe("approve_package");
+  });
+
+  it("ignores an obsolete intake AI draft after the commercial journey has started", async () => {
+    const findByID = vi.fn().mockResolvedValue({ id: 9, name: "Test", address: "Testveien", postal: "0001", inquiryType: "takvask", status: "converted", createdAt: "2026-08-25T08:00:00.000Z" });
+    const responses = [
+      { docs: [{ id: 30, reference: "TM-9-V1", status: "approved", createdAt: "2026-08-25T09:00:00.000Z" }] },
+      { docs: [{ id: 31, reference: "PB-9", status: "ready", createdAt: "2026-08-25T09:01:00.000Z" }] },
+      { docs: [{ id: 32, reference: "T-9-V1", status: "accepted", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [
+        { id: 34, subject: "Angående din forespørsel", category: "ai_reply", bodyText: "Draft", direction: "outbound", channel: "email", status: "draft", createdAt: "2026-08-25T09:03:00.000Z" },
+        { id: 33, subject: "Ferdig", category: "completion", bodyText: "Sent", direction: "outbound", channel: "email", status: "delivered", createdAt: "2026-08-25T12:00:00.000Z" },
+      ] },
+      { docs: [{ id: 36, reference: "A-K-9-V1", status: "documented", documentationSubmittedAt: "2026-08-25T11:00:00.000Z", createdAt: "2026-08-25T10:00:00.000Z" }] },
+      { docs: [{ id: 35, reference: "K-9-V1", status: "signed", companySignedAt: "2026-08-25T09:30:00.000Z", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      { docs: [] },
+      { docs: [] },
+      { docs: [] },
+      { docs: [] },
+    ];
+    const result = await loadAdminCase({ findByID, find: vi.fn().mockImplementation(async () => responses.shift()) } as unknown as Payload, 9);
+
+    expect(result?.messages.map((message) => message.id)).toEqual([33]);
+    expect(result?.timeline.some((item) => item.id === "message-34")).toBe(false);
+    expect(result?.nextAction.kind).toBe("none");
   });
 });

@@ -24,6 +24,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("prepare_package") }),
   z.object({ action: z.literal("approve_package") }),
   z.object({ action: z.literal("approve_send"), messageId: z.number().int().positive() }),
+  z.object({ action: z.literal("cancel_draft"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("retry_send"), messageId: z.number().int().positive() }),
   z.object({ action: z.literal("save_draft"), messageId: z.number().int().positive(), subject: z.string().trim().min(5).max(160), bodyText: z.string().trim().min(20).max(3_000) }),
   z.object({ action: z.literal("regenerate_reply"), messageId: z.number().int().positive() }),
@@ -125,6 +126,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
       await payload.update({ collection: "messages", id: message.id, overrideAccess: true, data: { status: "cancelled" } });
       result = { messageId: regenerated.message.id, regenerated: true };
+    } else if (parsed.data.action === "cancel_draft") {
+      const message = await payload.findByID({ collection: "messages", id: parsed.data.messageId, depth: 0, overrideAccess: true });
+      if (relationId(message.lead) !== leadId || message.status !== "draft") {
+        throw new TypeError("Only a draft in this customer case can be cancelled");
+      }
+      const cancelled = await payload.update({
+        collection: "messages",
+        id: message.id,
+        overrideAccess: true,
+        data: { status: "cancelled" },
+      });
+      result = { messageId: cancelled.id, cancelled: true };
     } else if (parsed.data.action === "approve_send" || parsed.data.action === "retry_send") {
       const message = await payload.findByID({ collection: "messages", id: parsed.data.messageId, depth: 0, overrideAccess: true });
       if (relationId(message.lead) !== leadId) return NextResponse.json({ error: "Message does not belong to lead" }, { status: 409 });
@@ -262,7 +275,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       entityType: "lead",
       entityId: leadId,
       correlationId,
-      changedFields: ["approve_send", "retry_send", "save_draft", "regenerate_reply"].includes(parsed.data.action)
+      changedFields: ["approve_send", "cancel_draft", "retry_send", "save_draft", "regenerate_reply"].includes(parsed.data.action)
         ? ["message.status", "message.approvedAt"]
         : parsed.data.action === "resolve_cancellation"
           ? ["nextActionBlocker", "workOrder.status", "message.status"]

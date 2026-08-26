@@ -2,8 +2,8 @@
 
 Data: 2026-08-26  
 Būsena: **IN PROGRESS — Production NO-GO**  
-Galutinis šakos CI: [GitHub Quality run 32903823308](https://github.com/fornyelsegruppen/landing_no/actions/runs/32903823308)  
-Staging deployment: `landing-qso18lkhl-darbasnorvegija4-8212s-projects.vercel.app`  
+Paskutinis patvirtintas šakos CI: [GitHub Quality run 32903823308](https://github.com/fornyelsegruppen/landing_no/actions/runs/32903823308)
+Staging deployment: `landing-6r1ahdg42-darbasnorvegija4-8212s-projects.vercel.app`
 Stabili staging nuoroda: `https://takfornyelse-staging.vercel.app`
 
 ## Preflight rezultatas
@@ -22,6 +22,37 @@ F10 dar nėra užbaigta. Nė vienas žmogaus, teisinis, fizinio matavimo, realau
 - `RESTORE_TEST_REFERENCE` — sintetinės PostgreSQL bazės dump/restore CI;
 - Preview platform health: AI, Resend, adresai, pastatų poligonai, vidinis parašas, teisinis šablonas, job, Upstash, Turnstile ir privatus Blob pažymėti paruoštais;
 - Production nebuvo diegta ir jokie jos feature flags nebuvo pakeisti.
+
+## 2026-08-26 kontroliuojamas sintetinis E2E bandymas
+
+Tai nėra realaus 20–30 užklausų piloto pakaitalas. Bandymas atliktas tik Preview su sintetine byla `#12`, sintetine darbuotojo paskyra ir be tikro kliento ar objekto duomenų.
+
+- Užklausa priimta, gavimo patvirtinimas pristatytas el. paštu.
+- Rankiniu būdu nurodytas `150 m²` plotas korektiškai sukūrė matavimą `TM-12-V1`, kainos skaičiavimą, pasiūlymą `T-12-V1` ir sutartį `K-12-V1`.
+- Patvirtintas matavimas ir kainos paketas; pasiūlymo PDF atsisiųstas bei patikrintas kaip galiojantis PDF.
+- Kliento ir tiekėjo parašai įrašyti į galutinę sutartį; abiem parašais pasirašyta kopija pristatyta kontroliuojamu el. paštu.
+- Sukurtas darbo užsakymas `#4`, priskirtas sintetinis darbuotojas, išsaugota `2026-08-27 09:00–11:00` Norway planavimo informacija.
+- Klientui pristatyti planavimo, „darbuotojas vyksta“, „darbuotojas atvyko“, „darbas pradėtas“ ir užbaigimo laiškai; darbuotojo paskyrimo laišką el. pašto teikėjas priėmė siuntimui į kontroliuojamą testavimo adresą.
+- Darbuotojo eiga praėjo būsenas `scheduled → on_way → arrived → precheck → ready → in_progress → completed → documented`.
+- Įkelta po 2 sintetines prieš ir po nuotraukas, užfiksuotas kontrolinis plotas, sauga, kainos rezultatas `within_contract` ir galutinė suma, sutampanti su patvirtintu pasiūlymu.
+- Administratoriaus galutinė kontrolė sukūrė sąskaitos juodraštį `FU-4-V1` ir aktyvią garantiją `G-4-V1`; abiem dokumentams sugeneruoti PDF, o užbaigimo laiškas pristatytas.
+- Po bandymo sisteminiai invariantai grąžino `ok: true`; Preview release gate sąmoningai liko `Production NO-GO`, nes žmogaus, realaus piloto ir savininko įrodymai dar nepateikti.
+
+### Bandymo metu rastos ir pataisytos regresijos
+
+- Legacy Preview aplinkoje atlaisvintas teisėtas bylos atnaujinimas, kai `FEATURE_CASE_STATE_ENGINE_V2` išjungtas; įjungto V2 režimo monotoniška revizijų apsauga išliko.
+- Nepavykus išsaugoti rankinio matavimo, jo dalinis įrašas dabar pašalinamas.
+- Pilnai dokumentuotą rankinį matavimą galima patvirtinti be žemėlapio vaizdo, kaip numatyta rankinio fallback taisyklėje.
+- Dokumentų hash suvienodintas su JSON saugojimo semantika, todėl persistuoto pasiūlymo ir sutarties snapshotai patikrinami stabiliai.
+- Sėkmingai paruošus arba išsiuntus komercinį paketą, nebeaktualūs AI atsakymo juodraščiai atšaukiami.
+- Darbuotojo API dabar griežtai tikrina veiksmų seką; dokumentacijos nebegalima pateikti prieš aiškų darbo užbaigimą ar kitaip apeiti būsenų eigą.
+
+### Sąmoningai palikti F10 apribojimai
+
+- Sintetinė byla nėra realus klientas ir nėra įtraukiama į 20–30 realių užklausų piloto imtį.
+- `LEAD_INBOX_PILOT_REFERENCE`, fiziniai 3 stogų matavimai, kainų, teisinių tekstų, parašo, komunikacijos ir savininko galutiniai patvirtinimai lieka nepateikti.
+- Sąskaita šiame etape yra tik vidinis juodraštis; ji nebuvo išsiųsta kaip mokėjimo reikalavimas.
+- Preview turi istorinių operacinių perspėjimų, todėl jie turi būti atskirai peržiūrėti prieš realų pilotą; pats sintetinis kelias nepaliko nepavykusių el. laiškų.
 
 ## Likę privalomi vartai
 
@@ -62,7 +93,6 @@ F10 dar nėra užbaigta. Nė vienas žmogaus, teisinis, fizinio matavimo, realau
 
 FUNCTIONAL_RESULT=IN_PROGRESS  
 TARGET_ACHIEVED=NO  
-REGRESSION_TESTS=PASS  
+REGRESSION_TESTS=PASS (158 failai / 507 testai; galutinis CI numeris atnaujinamas po push)
 STAGING_ACCEPTANCE=PENDING_HUMAN_SIGNOFF  
 ROLLBACK_READY=YES
-

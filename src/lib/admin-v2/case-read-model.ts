@@ -480,10 +480,18 @@ export async function loadAdminCase(payload: Payload, leadId: number): Promise<A
   const latestWorkRaw = latest(workOrders.filter((item) => item.status !== "cancelled")) || latest(workOrders);
   const latestInvoiceRaw = latest(invoices);
   const latestWarrantyRaw = latest(warranties);
-  const currentMessageRaw = currentMessage(messages);
-  const visibleMessages = messages.filter((message) =>
-    !(stringValue(message.category) === "ai_reply" && stringValue(message.status) === "cancelled"),
-  );
+  const commercialStageStarted = Boolean(latestQuoteRaw && stringValue(latestQuoteRaw.status) !== "draft");
+  const visibleMessages = messages.filter((message) => {
+    const isAiReply = stringValue(message.category) === "ai_reply";
+    const status = stringValue(message.status);
+    if (isAiReply && status === "cancelled") return false;
+    const isObsoleteIntakeDraft = isAiReply
+      && status === "draft"
+      && !relationId(message.replyToMessage)
+      && commercialStageStarted;
+    return !isObsoleteIntakeDraft;
+  });
+  const currentMessageRaw = currentMessage(visibleMessages);
 
   const latestManualOverride = latestMeasurementRaw ? manualOverride(latestMeasurementRaw.calculationSnapshot) : undefined;
   const evidenceMediaId = latestMeasurementRaw ? relationId(latestMeasurementRaw.evidenceSnapshot) : undefined;

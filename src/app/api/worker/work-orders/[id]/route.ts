@@ -32,6 +32,23 @@ const precheckSchema = z.object({
 const documentationSchema = z.object({ action: z.literal("submit_documentation"), afterPhotoIds: z.array(z.number().int().positive()).min(2).max(20), completionNotes: z.string().trim().min(10).max(4_000) });
 const actionSchema = z.union([simpleActionSchema, precheckSchema, documentationSchema]);
 
+const allowedStatusesByAction = {
+  on_way: ["scheduled"],
+  arrive: ["on_way"],
+  begin_precheck: ["arrived"],
+  submit_precheck: ["precheck", "blocked"],
+  start: ["ready"],
+  mark_completed: ["in_progress"],
+  submit_documentation: ["completed"],
+} as const;
+
+function assertActionAllowed(status: string, action: keyof typeof allowedStatusesByAction) {
+  const allowed = allowedStatusesByAction[action] as readonly string[];
+  if (!allowed.includes(status)) {
+    throw new Error("Handlingen kan ikke utføres i oppdragets nåværende status");
+  }
+}
+
 async function verifyWorkMedia(payload: Awaited<ReturnType<typeof getPayload>>, orderId: number, ids: number[]) {
   const uniqueIds = [...new Set(ids)];
   const result = await payload.find({ collection: "private-media", depth: 0, limit: uniqueIds.length, overrideAccess: true, where: { and: [
@@ -54,6 +71,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const parsed = actionSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Ugyldig eller mangelfull registrering", issues: parsed.error.issues.map((issue) => issue.message) }, { status: 400 });
+    assertActionAllowed(order.status, parsed.data.action);
     const now = new Date().toISOString();
     let data: Record<string, unknown>;
     let changedFields: string[];

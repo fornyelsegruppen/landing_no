@@ -44,6 +44,43 @@ describe("worker work-order API", () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
+  it("rejects completion documentation until the worker has marked the work completed", async () => {
+    mocks.findByID.mockResolvedValueOnce({
+      id: 9,
+      assignedWorker: 2,
+      status: "in_progress",
+      eventTimeline: [],
+    });
+    const response = await POST(
+      request({
+        action: "submit_documentation",
+        afterPhotoIds: [11, 12],
+        completionNotes: "Arbeidet er ferdig dokumentert.",
+      }),
+      { params: Promise.resolve({ id: "9" }) },
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "Handlingen kan ikke utføres i oppdragets nåværende status",
+    });
+    expect(mocks.find).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects out-of-order worker status actions", async () => {
+    mocks.findByID.mockResolvedValueOnce({
+      id: 9,
+      assignedWorker: 2,
+      status: "scheduled",
+      eventTimeline: [],
+    });
+    const response = await POST(request({ action: "start" }), {
+      params: Promise.resolve({ id: "9" }),
+    });
+    expect(response.status).toBe(409);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
   it("calculates and stores a ready onsite precheck from the signed price rule", async () => {
     const order = { id: 9, assignedWorker: 2, status: "precheck", quote: 5, eventTimeline: [] };
     mocks.findByID.mockImplementation(async ({ collection }: { collection: string }) => {
