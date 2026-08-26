@@ -50,3 +50,14 @@ Spalva yra darbo prioritetas, o ne kliento vertės ar teisių vertinimas.
 ## Produkcijos vartai
 
 Funkcija gali būti keliama į produkciją tik kai abu UAT scenarijai patvirtinti, gavimo el. laiškai gauti, darbo blokavimas ir administratoriaus sprendimo juodraščiai patikrinti, o staging migracija įvykdyta be klaidų.
+
+## Stagingbevis 2026-08-26
+
+- Commit: `475e68a`.
+- Vercel Preview: `dpl_EAsZ6DoLqJD1bn1Ebvhhc8CkfXyW` (`Ready`).
+- Stabil stagingalias: `https://takfornyelse-staging.vercel.app`.
+- Enhet/API: `148` testfiler, `498` tester bestått.
+- Migrasjoner: `19` testfiler, `32` tester bestått.
+- TypeScript, ESLint og Next.js Linux-build: bestått.
+- Smoke: offentlig side svarer `200`; den nye administratorruten svarer korrekt med autentiseringsredirect.
+- Produksjon er ikke endret. Begge menneskelige UAT-scenarier gjenstår.
