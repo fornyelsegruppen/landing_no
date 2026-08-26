@@ -7,6 +7,7 @@ import { useLocale } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { withGuideNavigation } from "@/lib/public-navigation";
 import {
   usePageCopy,
   useSiteSettings,
@@ -29,7 +30,7 @@ export function Navbar() {
   const otherLocale = locale === "no" ? "en" : "no";
   const otherLocaleLabel =
     otherLocale === "no" ? copy.nav.localeNo : copy.nav.localeEn;
-  const links =
+  const baseLinks =
     settings.navItems.length > 0
       ? settings.navItems
           .filter((item) => item.visible)
@@ -41,6 +42,7 @@ export function Navbar() {
           href: item.href,
           label: copy.nav[item.key],
         }));
+  const links = withGuideNavigation(baseLinks, locale as "no" | "en");
 
   const parentLine = settings.parentOrg
     ? locale === "no"
