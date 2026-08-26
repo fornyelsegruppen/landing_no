@@ -3,6 +3,8 @@ import { z } from "zod";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { updateCaseState } from "@/lib/cases/case-command";
+import { prepareContractChangePackage } from "@/lib/contracts/contract-change-package";
+import { contractChangeServiceKeys } from "@/lib/contracts/contract-change-service";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { buildBrandedEmailHtml } from "@/lib/messages/email-template";
 import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
@@ -18,9 +20,13 @@ const schema = z.object({
   decision: z.enum(["close", "continue", "alternative", "schedule_follow_up", "do_not_contact"]),
   reason: z.string().trim().min(10).max(2_000),
   followUpAt: z.string().datetime().optional(),
+  targetServiceKey: z.enum(contractChangeServiceKeys).optional(),
 }).superRefine((value, context) => {
   if (value.decision === "schedule_follow_up" && !value.followUpAt) {
     context.addIssue({ code: "custom", message: "Follow-up date is required", path: ["followUpAt"] });
+  }
+  if (value.decision === "alternative" && !value.targetServiceKey) {
+    context.addIssue({ code: "custom", message: "Replacement service is required", path: ["targetServiceKey"] });
   }
 });
 
@@ -58,6 +64,28 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       throw new TypeError("Customer email is required before the closure can be confirmed");
     }
 
+    let revisedPackage: Awaited<ReturnType<typeof prepareContractChangePackage>> | undefined;
+    if (parsed.data.decision === "alternative") {
+      if (workOrder) throw new TypeError("A started work flow must be changed through a controlled work change agreement");
+      revisedPackage = await prepareContractChangePackage(payload, {
+        administratorId: user.id,
+        contractRequestId: contractRequest.id,
+        leadId,
+        targetServiceKey: parsed.data.targetServiceKey!,
+      });
+      const staleHoldingDrafts = await payload.find({ collection: "messages", depth: 0, limit: 20, overrideAccess: true, where: { and: [
+        { lead: { equals: leadId } },
+        { category: { equals: "follow_up" } },
+        { status: { equals: "draft" } },
+      ] } });
+      for (const draft of staleHoldingDrafts.docs) {
+        const analysis = draft.aiAnalysis && typeof draft.aiAnalysis === "object" ? draft.aiAnalysis as Record<string, unknown> : {};
+        if (analysis.customerContractRequestId === contractRequest.id && analysis.decision === "alternative") {
+          await payload.update({ collection: "messages", id: draft.id, overrideAccess: true, data: { status: "cancelled" } });
+        }
+      }
+    }
+
     if ((closes || resumes) && workOrder && workOrder.status === "blocked" && Array.isArray(workOrder.blockingReasons) && workOrder.blockingReasons.includes("CUSTOMER_CANCELLATION_REQUEST")) {
       const previousStatus = workOrder.statusBeforeCustomerCancellation;
       const restored: "unassigned" | "assigned" | "scheduled" | "on_way" = previousStatus && ["unassigned", "assigned", "scheduled", "on_way"].includes(previousStatus)
@@ -85,21 +113,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       ...(closes ? { closedAt: now } : {}),
       ...(parsed.data.decision === "do_not_contact" ? { recoveryPotential: "red" } : {}),
       ...(parsed.data.decision === "continue" ? { recoveryPotential: "green", followUpOutcome: "Avtalen fortsetter etter administratoravklaring." } : {}),
+      ...(parsed.data.decision === "alternative" && revisedPackage ? {
+        followUpOutcome: `Revidert tilbud ${revisedPackage.quote.reference} er klargjort for administratorkontroll.`,
+      } : {}),
     } });
 
     let delivery: "draft" | "queued" | "sent" | undefined;
     let messageId: number | undefined;
-    if (closes || resumes || parsed.data.decision === "alternative") {
+    if (closes || resumes) {
       const subject = closes
         ? contractRequest.kind === "withdrawal" ? "Bekreftelse på behandlet angremelding" : "Bekreftelse på avsluttet bestilling"
-        : resumes ? "Avklaring – avtalen fortsetter" : "Vi vurderer en alternativ løsning";
+        : "Avklaring – avtalen fortsetter";
       const bodyText = closes
         ? contractRequest.kind === "withdrawal"
           ? `Hei ${lead.name},\n\nVi har behandlet angremeldingen din og bekrefter at avtalen er avsluttet. Eventuell planlagt arbeidsstart er stoppet. Dersom det er registrert en betaling, følger vi opp tilbakebetaling eller avregning separat skriftlig.\n\nDette er en skriftlig bekreftelse fra Takfornyelse.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
           : `Hei ${lead.name},\n\nVi har behandlet forespørselen din og bekrefter at bestillingen er avsluttet. Eventuell planlagt arbeidsstart er stoppet. Dersom det er registrert en betaling, følger vi opp tilbakebetaling eller avregning separat skriftlig.\n\nDette er en skriftlig bekreftelse fra Takfornyelse.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
-        : resumes
-          ? `Hei ${lead.name},\n\nVi har avklart forespørselen din. Avtalen fortsetter, og vi følger opp videre planlegging skriftlig.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`
-          : `Hei ${lead.name},\n\nTakk for tilbakemeldingen. Vi undersøker nå om vi kan tilby en løsning som passer bedre. Du mottar ikke en ny bestilling eller endring uten at du selv godkjenner den skriftlig.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`;
+        : `Hei ${lead.name},\n\nVi har avklart forespørselen din. Avtalen fortsetter, og vi følger opp videre planlegging skriftlig.\n\nVennlig hilsen\nTakfornyelse\n47 73 58 88`;
       const message = await payload.create({ collection: "messages", overrideAccess: true, data: {
         lead: leadId,
         replyToMessage: relationId(contractRequest.sourceMessage) || undefined,
@@ -135,6 +164,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       status: "closed", nextActionOwner: "system", nextActionBlocker: null, nextAction: "Sluttbekreftelsen er sendt eller lagt i utsendingskø. Saken kan arkiveres.", nextActionAt: null, closedAt: now,
     } : resumes ? {
       status: "converted", nextActionOwner: "administrator", nextActionBlocker: null, nextAction: workOrder ? "Kontroller gjenopptatt arbeidsplan og send kundemeldingen." : "Fortsett planleggingen og send kundemeldingen.", nextActionAt: now, closedAt: null,
+    } : parsed.data.decision === "alternative" && revisedPackage ? {
+      status: "quoted",
+      inquiryType: parsed.data.targetServiceKey,
+      nextActionOwner: "administrator",
+      nextActionBlocker: null,
+      nextAction: `Kontroller revidert tilbud ${revisedPackage.quote.reference} og kontraktsutkast ${revisedPackage.contract.reference}. Godkjenn først etter at pris og vilkår er kontrollert.`,
+      nextActionAt: now,
+      closedAt: null,
     } : {
       status: "customer_waiting", nextActionOwner: "administrator", nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST",
       nextAction: parsed.data.decision === "alternative" ? "Lag et alternativt tilbud. Arbeidet forblir sperret." : "Følg opp på valgt dato. Arbeidet forblir sperret.",
@@ -147,9 +184,24 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       entityId: contractRequest.id,
       correlationId,
       changedFields: ["status", "administratorDecision", "reviewedAt", "workHold"],
-      metadata: { decision: parsed.data.decision, leadId, workOrderId: workOrder?.id || null },
+      metadata: {
+        decision: parsed.data.decision,
+        leadId,
+        workOrderId: workOrder?.id || null,
+        revisedQuoteId: revisedPackage?.quote.id || null,
+        revisedContractId: revisedPackage?.contract.id || null,
+        targetServiceKey: parsed.data.targetServiceKey || null,
+      },
     });
-    return NextResponse.json({ ok: true, status, messageId, delivery });
+    return NextResponse.json({
+      ok: true,
+      status,
+      messageId,
+      delivery,
+      revisedQuoteId: revisedPackage?.quote.id,
+      revisedContractId: revisedPackage?.contract.id,
+      duplicate: revisedPackage?.duplicate,
+    });
   } catch (error) {
     captureException(error, { route: "POST /api/admin/customer-contract-requests/[id]", correlationId });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Decision failed", correlationId }, { status: error instanceof TypeError ? 409 : 500 });

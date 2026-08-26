@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), create: vi.fn(), deliver: vi.fn(), enqueue: vi.fn(), find: vi.fn(), findByID: vi.fn(), update: vi.fn(), updateCase: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), create: vi.fn(), deliver: vi.fn(), enqueue: vi.fn(), find: vi.fn(), findByID: vi.fn(), prepareChange: vi.fn(), update: vi.fn(), updateCase: vi.fn() }));
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ auth: mocks.auth, create: mocks.create, find: mocks.find, findByID: mocks.findByID, update: mocks.update })) }));
 vi.mock("@/lib/cases/case-command", () => ({ updateCaseState: mocks.updateCase }));
+vi.mock("@/lib/contracts/contract-change-package", () => ({ prepareContractChangePackage: mocks.prepareChange }));
 vi.mock("@/lib/messages/message-engine", () => ({ deliverMessage: mocks.deliver, enqueueMessageJob: mocks.enqueue }));
 vi.mock("@/lib/providers/email-provider", () => ({ createEmailProvider: vi.fn(() => ({ health: () => ({ status: "ready" }) })) }));
 
@@ -25,6 +26,7 @@ describe("administrator customer contract request decision", () => {
     mocks.create.mockReset().mockImplementation(async ({ collection, data }: { collection: string; data: Record<string, unknown> }) => ({ id: collection === "messages" ? 20 : 21, ...data }));
     mocks.enqueue.mockReset().mockResolvedValue({ id: 30, status: "pending" });
     mocks.deliver.mockReset().mockResolvedValue({ duplicate: false, message: { id: 20, status: "sent" } });
+    mocks.prepareChange.mockReset().mockResolvedValue({ quote: { id: 31, reference: "T-2-V2" }, contract: { id: 41, reference: "K-2-V2" }, sourceQuote: { id: 11 }, duplicate: false });
     mocks.updateCase.mockReset().mockResolvedValue({});
   });
 
@@ -55,5 +57,34 @@ describe("administrator customer contract request decision", () => {
     expect(mocks.update).not.toHaveBeenCalledWith(expect.objectContaining({ collection: "work-orders" }));
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "customer-contract-requests", data: expect.objectContaining({ status: "follow_up_scheduled", followUpAt: "2026-11-26T10:00:00.000Z" }) }));
     expect(mocks.updateCase).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ patch: expect.objectContaining({ nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST" }) }));
+  });
+
+  it("prepares a complete controlled replacement package without sending a holding email", async () => {
+    mocks.find.mockImplementation(async ({ collection }: { collection: string }) => ({ docs: collection === "messages" ? [] : [] }));
+    const response = await POST(request({
+      decision: "alternative",
+      reason: "Kunden har uttrykkelig bedt om en oppdatert tjeneste.",
+      targetServiceKey: "takvask_impregnering",
+    }), { params: Promise.resolve({ id: "10" }) });
+    expect(response.status).toBe(200);
+    expect(mocks.prepareChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      administratorId: 3,
+      contractRequestId: 10,
+      leadId: 2,
+      targetServiceKey: "takvask_impregnering",
+    }));
+    expect(mocks.create).not.toHaveBeenCalledWith(expect.objectContaining({ collection: "messages" }));
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "customer-contract-requests",
+      data: expect.objectContaining({ status: "alternative_requested", followUpOutcome: expect.stringContaining("T-2-V2") }),
+    }));
+    expect(mocks.updateCase).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      patch: expect.objectContaining({
+        status: "quoted",
+        inquiryType: "takvask_impregnering",
+        nextActionBlocker: null,
+      }),
+    }));
+    await expect(response.json()).resolves.toMatchObject({ revisedQuoteId: 31, revisedContractId: 41, status: "alternative_requested" });
   });
 });

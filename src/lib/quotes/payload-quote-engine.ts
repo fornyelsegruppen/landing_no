@@ -39,6 +39,7 @@ export async function createQuoteDraft(
     retainPreviousStatus?: boolean;
     siblingQuoteId?: number;
     depositBasisPoints?: number;
+    controlledChangeFromQuoteId?: number;
   } = {},
 ) {
   const calculation = await payload.findByID({ collection: "price-calculations", id: calculationId, depth: 0, overrideAccess: true });
@@ -67,7 +68,15 @@ export async function createQuoteDraft(
     throw new Error("Approved legally reviewed contract terms are required");
   }
   const previous = existing.docs[0];
-  if (previous?.status === "accepted") throw new Error("An accepted quote requires a controlled change agreement");
+  const controlledChange = Boolean(
+    options.controlledChangeFromQuoteId
+      && previous?.id === options.controlledChangeFromQuoteId
+      && previous.status === "accepted",
+  );
+  if (options.controlledChangeFromQuoteId && !controlledChange) {
+    throw new Error("The controlled change source must be the latest accepted quote");
+  }
+  if (previous?.status === "accepted" && !controlledChange) throw new Error("An accepted quote requires a controlled change agreement");
   const version = (previous?.version ?? 0) + 1;
   const quoteReference = `T-${leadId}-V${version}`;
   const assumptions = [
@@ -110,7 +119,7 @@ export async function createQuoteDraft(
   });
   const quote = await payload.create({ collection: "quotes", overrideAccess: true, data: {
     reference: quoteReference, lead: leadId, measurement: measurement.id, priceCalculation: calculation.id,
-    version, supersedes: options.preservePrevious ? undefined : previous?.id,
+    version, supersedes: controlledChange ? previous?.id : options.preservePrevious ? undefined : previous?.id,
     optionGroup: options.optionGroup, optionKind: options.optionKind, siblingQuote: options.siblingQuoteId,
     snapshot, snapshotHash: documentHash(snapshot),
     serviceDescription: snapshot.serviceDescription, totalIncVatOre: snapshot.pricing.totalIncVatOre,
@@ -124,11 +133,15 @@ export async function createQuoteDraft(
       customer: { name: lead.name, address: measurement.normalizedAddress, email: lead.email, phone: lead.phone },
       terms: { version: terms.version, text: terms.contractText, withdrawalInstructions: terms.withdrawalInstructions, withdrawalFormUrl: terms.withdrawalFormUrl },
     });
+    const previousContracts = controlledChange && previous
+      ? await payload.find({ collection: "contracts", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { quote: { equals: previous.id } } })
+      : { docs: [] };
     const contract = await payload.create({ collection: "contracts", overrideAccess: true, data: {
       reference: contractSnapshot.contractReference, quote: quote.id, version,
+      supersedes: previousContracts.docs[0]?.id,
       snapshot: contractSnapshot, documentHash: documentHash(contractSnapshot), termsVersion: terms.version, status: "draft",
     } });
-    if (previous && !options.preservePrevious && !options.retainPreviousStatus) {
+    if (previous && !controlledChange && !options.preservePrevious && !options.retainPreviousStatus) {
       await payload.update({ collection: "quotes", id: previous.id, overrideAccess: true, data: { status: "superseded" } });
       const oldContracts = await payload.find({ collection: "contracts", depth: 0, limit: 10, overrideAccess: true, where: { quote: { equals: previous.id } } });
       for (const old of oldContracts.docs) {

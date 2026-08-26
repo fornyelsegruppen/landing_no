@@ -750,7 +750,7 @@ export default async function AdminCasePage({
             )}
           </Section>
           {caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST" && activeContractRequest ? (
-            <ContractRequestReviewPanel locale={user.interfaceLanguage} request={activeContractRequest} />
+            <ContractRequestReviewPanel currentService={caseData.lead.inquiryType} locale={user.interfaceLanguage} request={activeContractRequest} />
           ) : caseData.lead.nextActionBlocker ===
           "CUSTOMER_CANCELLATION_REQUEST" ? (
             <CancellationReviewPanel
