@@ -15,6 +15,7 @@ import {
   localizeContent,
   postHasLocale,
 } from "@/lib/cms-pages";
+import { resolvePostImage } from "@/lib/blog/post-image";
 import { resolveMedia } from "@/lib/cms-content";
 import { redirectPathCandidates } from "@/lib/content-paths";
 import { siteConfig, type Locale } from "@/lib/site";
@@ -26,18 +27,6 @@ export const revalidate = 60;
 type Props = {
   params: Promise<{ locale: string; slug: string }>;
 };
-
-function approvedPexelsImageUrl(value?: string | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "images.pexels.com"
-      ? url.toString()
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function generateStaticParams() {
   try {
@@ -61,16 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { robots: { index: false, follow: false } };
   }
   const localized = localizeContent(post, loc);
-  const uploadedHero = resolveMedia(post.heroImage, "hero");
-  const remoteStockUrl = approvedPexelsImageUrl(post.stockImage?.imageUrl);
-  const hero =
-    uploadedHero ||
-    (remoteStockUrl
-      ? {
-          url: remoteStockUrl,
-          alt: post.imageAlt?.trim() || localized.title,
-        }
-      : null);
+  const hero = resolvePostImage(post, "hero", localized.title);
   const { isEnabled: isDraftMode } = await draftMode();
   const postUrl = `${siteConfig.url}/${locale}/blogg/${slug}`;
   const heroUrl = hero
@@ -148,15 +128,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   const localized = localizeContent(post, loc);
   const uploadedHero = resolveMedia(post.heroImage, "hero");
-  const remoteStockUrl = approvedPexelsImageUrl(post.stockImage?.imageUrl);
-  const hero =
-    uploadedHero ||
-    (remoteStockUrl
-      ? {
-          url: remoteStockUrl,
-          alt: post.imageAlt?.trim() || localized.title,
-        }
-      : null);
+  const hero = resolvePostImage(post, "hero", localized.title);
   const heroDocument =
     post.heroImage && typeof post.heroImage === "object"
       ? post.heroImage

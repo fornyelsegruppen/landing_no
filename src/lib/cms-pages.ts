@@ -32,6 +32,7 @@ export type CmsContentDocument = {
 };
 
 export type CmsPostDocument = CmsContentDocument & {
+  category?: string | null;
   editorialStatus?:
     | "draft"
     | "ai_qa"
@@ -150,9 +151,7 @@ function slugWhere(slug: string, includeDrafts: boolean): Where {
 }
 
 function postSlugWhere(slug: string, includeDrafts: boolean): Where {
-  return includeDrafts
-    ? { slug: { equals: slug } }
-    : publishedPostWhere(slug);
+  return includeDrafts ? { slug: { equals: slug } } : publishedPostWhere(slug);
 }
 
 const findPageBySlug = cache(
@@ -291,6 +290,32 @@ export async function getPublishedPosts(): Promise<CmsPostDocument[]> {
     return result.docs as unknown as CmsPostDocument[];
   } catch (error) {
     console.error("Published CMS posts could not be loaded:", error);
+    return [];
+  }
+}
+
+export async function getLatestPublishedPosts(
+  locale: Locale,
+  limit = 3,
+): Promise<CmsPostDocument[]> {
+  try {
+    const payload = await getPayload();
+    const result = await payload.find({
+      collection: "posts",
+      depth: 1,
+      draft: false,
+      limit: 100,
+      overrideAccess: true,
+      pagination: false,
+      sort: "-publishedAt",
+      where: publishedPostWhere(),
+    });
+
+    return (result.docs as unknown as CmsPostDocument[])
+      .filter((post) => postHasLocale(post, locale))
+      .slice(0, Math.max(0, limit));
+  } catch (error) {
+    console.error("Latest published CMS posts could not be loaded:", error);
     return [];
   }
 }
