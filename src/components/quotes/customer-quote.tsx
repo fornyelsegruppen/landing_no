@@ -2,6 +2,8 @@
 
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { CalendarDays } from "lucide-react";
+import { norwayDateKey } from "@/lib/norway-time";
 
 type Display = {
   reference: string; service: string; address: string; estimatedAreaMin: number; estimatedAreaMax: number;
@@ -66,6 +68,7 @@ export function CustomerQuote(props: {
   measurementEvidenceHref?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const followUpDateRef = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [pending, setPending] = useState(false);
@@ -315,7 +318,10 @@ export function CustomerQuote(props: {
             <option disabled value="">Velg tidspunkt</option>
             <option value="one_month">Om 1 måned</option><option value="three_months">Om 3 måneder</option><option value="six_months">Om 6 måneder</option><option value="next_spring">Neste vår</option><option value="custom">Velg dato</option>
           </select>
-          {followUpChoice === "custom" ? <input aria-label="Ønsket oppfølgingsdato" className="mt-3 min-h-12 w-full rounded-lg border border-white/20 bg-[#12151c] px-4" min={new Date().toISOString().slice(0, 10)} name="preferredFollowUpAt" required type="date" /> : null}
+          {followUpChoice === "custom" ? <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <input aria-label="Ønsket oppfølgingsdato" className="min-h-12 w-full rounded-lg border border-white/20 bg-[#12151c] px-4" min={norwayDateKey(new Date())} name="preferredFollowUpAt" ref={followUpDateRef} required type="date" />
+            <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-accent/50 px-4 font-semibold text-accent hover:bg-accent/10" onClick={() => { const input = followUpDateRef.current; if (!input) return; if (typeof input.showPicker === "function") input.showPicker(); else input.focus(); }} type="button"><CalendarDays aria-hidden="true" className="size-5" />Velg dato i kalender</button>
+          </div> : null}
         </div> : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <button className={`min-h-12 rounded-lg px-5 font-bold disabled:opacity-50 ${contractRequestOpen === "withdrawal" ? "border border-red-400/50 text-red-200" : "bg-accent text-black"}`} disabled={pending} type="submit">{pending ? "Sender …" : contractRequestOpen === "withdrawal" ? "Send angremelding" : "Send forespørsel"}</button>
