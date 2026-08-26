@@ -65,6 +65,12 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion"],
   },
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf",
+      "./node_modules/pdfjs-dist/standard_fonts/LiberationSans-Bold.ttf",
+    ],
+  },
   async headers() {
     return [
       {
