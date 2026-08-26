@@ -33,7 +33,7 @@ function LegalDisclosure(props: {
     <div className="mt-4 grid gap-3">
       <details className="group rounded-xl border border-white/10 bg-white/[.03]">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-          <span>Les fullstendige avtalevilkår <span className="text-sm font-normal text-muted-foreground">({props.terms.version})</span></span>
+          <span>Les fullstendige avtalevilkår</span>
           <svg aria-hidden="true" className="size-5 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /></svg>
         </summary>
         <div className="border-t border-white/10 px-4 py-5 text-sm leading-7 text-muted-foreground whitespace-pre-wrap">{props.terms.text}</div>
@@ -50,8 +50,9 @@ function LegalDisclosure(props: {
 
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <a className="inline-flex min-h-12 items-center justify-center rounded-xl border border-accent/50 px-4 text-center font-semibold text-accent hover:bg-accent/10" href={props.pdfHref} target="_blank">Last ned tilbud og kontrakt som PDF</a>
-      <a className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/15 px-4 text-center font-semibold hover:bg-white/5" href={props.terms.withdrawalFormUrl} rel="noreferrer" target="_blank">Åpne standard angreskjema</a>
+      <a className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/15 px-4 text-center font-semibold hover:bg-white/5" href="/no/angreskjema" target="_blank">Åpne standard angreskjema</a>
     </div>
+    <p className="mt-3 text-xs leading-5 text-muted-foreground">Dette er et standard angreskjema som du skal motta før du bestemmer deg. Du trenger bare å bruke det dersom du inngår avtalen og senere ønsker å gå fra den.</p>
   </section>;
 }
 
@@ -219,7 +220,7 @@ export function CustomerQuote(props: {
           <LegalDisclosure pdfHref={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`} terms={props.terms} />
         </div>
         <div className="mt-5 space-y-4 rounded-2xl border border-white/10 p-4 sm:p-5">
-          <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="terms" required type="checkbox" /><span>Jeg har lest og godtar tilbudet og avtalevilkårene (versjon {props.terms.version}).</span></label>
+          <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="terms" required type="checkbox" /><span>Jeg har lest og godtar tilbudet og avtalevilkårene.</span></label>
           <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="withdrawal" required type="checkbox" /><span>Jeg har mottatt informasjon om 14 dagers angrerett og standard angreskjema.</span></label>
           <label className="flex gap-3"><input className="mt-1 size-5 shrink-0" name="payment" required type="checkbox" /><span>Jeg forstår at bestillingen medfører plikt til å betale avtalt pris.</span></label>
           <label className="flex gap-3"><input checked={earlyStart} className="mt-1 size-5 shrink-0" onChange={(event) => setEarlyStart(event.target.checked)} type="checkbox" /><span>Jeg ber uttrykkelig om at arbeidet kan starte før angrefristen er utløpt (valgfritt).</span></label>

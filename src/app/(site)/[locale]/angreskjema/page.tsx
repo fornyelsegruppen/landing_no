@@ -55,6 +55,10 @@ export default async function WithdrawalFormPage({ params }: Props) {
         <article className="mt-4 rounded-3xl border border-white/15 bg-background-elevated/75 p-6 sm:p-10 print:mt-0 print:rounded-none print:border-0 print:bg-white print:p-0">
           <p className="eyebrow print:text-black">{copy.eyebrow}</p>
           <h1 className="heading-display mt-3 text-balance text-3xl sm:text-5xl print:text-3xl">{copy.title}</h1>
+          <div className="mt-6 rounded-2xl border border-accent/35 bg-accent/10 p-5 print:border-black/30 print:bg-white">
+            <h2 className="text-lg font-bold">{copy.statusTitle}</h2>
+            <p className="mt-2 leading-7 text-muted-foreground print:text-black">{copy.statusText}</p>
+          </div>
           <p className="mt-5 leading-7 text-muted-foreground print:text-black">{copy.intro}</p>
           <p className="mt-3 leading-7 text-muted-foreground print:text-black">{copy.deadline}</p>
 
@@ -92,4 +96,3 @@ export default async function WithdrawalFormPage({ params }: Props) {
     </section>
   );
 }
-

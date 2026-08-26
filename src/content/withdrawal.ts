@@ -6,6 +6,9 @@ export const withdrawalFormCopy = {
       "Fyll ut og send skjemaet bare dersom du ønsker å gå fra avtalen. Du kan også sende en annen tydelig melding til Takfornyelse innen fristen.",
     deadline:
       "Angrefristen er normalt 14 dager fra avtalen ble inngått. Se angrerettinformasjonen du mottok sammen med tilbudet og kontrakten.",
+    statusTitle: "Avtalen avsluttes ikke ved å åpne denne siden",
+    statusText:
+      "Dersom du ennå ikke har signert, er avtalen ikke inngått. Har du signert og ønsker å bruke angreretten, må du fylle ut og sende skjemaet eller sende oss en annen tydelig angremelding.",
     fields: {
       reference: "Tilbuds-/kontraktsreferanse",
       service: "Tjeneste og arbeidssted",
@@ -29,6 +32,9 @@ export const withdrawalFormCopy = {
       "Complete and send this form only if you wish to withdraw from the agreement. You may also send another clear statement to Takfornyelse within the deadline.",
     deadline:
       "The withdrawal period is normally 14 days from the date the agreement was concluded. See the withdrawal information supplied with your quote and contract.",
+    statusTitle: "Opening this page does not cancel an agreement",
+    statusText:
+      "If you have not signed yet, the agreement has not been concluded. If you have signed and wish to exercise the right of withdrawal, complete and send the form or send us another clear withdrawal statement.",
     fields: {
       reference: "Quote/contract reference",
       service: "Service and work address",
@@ -46,4 +52,3 @@ export const withdrawalFormCopy = {
     home: "Home",
   },
 } as const;
-
