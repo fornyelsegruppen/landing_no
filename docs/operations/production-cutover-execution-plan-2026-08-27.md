@@ -361,6 +361,8 @@ Patikrinti vieną pilną, savininko kontroliuojamą Production lead kelią be re
 
 ### PROD-8 — laipsniškas funkcijų įjungimas
 
+Detalus vykdymo, PASS/STOP ir rollback planas: [PROD-8 kontroliuojamo funkcijų įjungimo planas](./prod8-controlled-feature-activation-plan-2026-08-27.md).
+
 **Tikslas**
 
 Įjungti tik tas funkcijas, kurių Production priklausomybės ir konkretus kelias yra patikrinti.
