@@ -71,7 +71,7 @@ describe("admin case read model", () => {
       { docs: [{ id: 2, reference: "TM-1-V1", status: "approved", actualAreaMinTenths: 1000, actualAreaMaxTenths: 1200, createdAt: "2026-08-24T09:00:00.000Z" }] },
       { docs: [{ id: 3, reference: "PB-1-RAW-TIMESTAMP", status: "superseded", totalIncVatOre: 1250000, createdAt: "2026-08-24T10:00:00.000Z" }] },
       { docs: [{ id: 4, reference: "T-1-V1", version: 1, priceCalculation: 3, status: "approved", createdAt: "2026-08-24T11:00:00.000Z" }] },
-      { docs: [{ id: 5, subject: "Takk", bodyText: "Hei", direction: "outbound", category: "receipt", channel: "email", status: "sent", createdAt: "2026-08-24T08:01:00.000Z" }] },
+      { docs: [{ id: 5, subject: "Takk", bodyText: "Hei", direction: "outbound", category: "receipt", channel: "email", status: "sent", aiAnalysis: { recommendedNextAction: "start_measurement" }, createdAt: "2026-08-24T08:01:00.000Z" }] },
       { docs: [] },
       { docs: [{ id: 8, reference: "END-6-RAW-HASH", kind: "change_or_cancel", status: "admin_review", createdAt: "2026-08-24T12:00:00.000Z" }] },
       { docs: [{ id: 6, reference: "K-1-V1", status: "draft", createdAt: "2026-08-24T11:01:00.000Z" }] },

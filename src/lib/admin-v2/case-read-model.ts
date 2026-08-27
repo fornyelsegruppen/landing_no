@@ -634,7 +634,11 @@ function makeTimedEvent(
 
 function messageManualRecovery(value: unknown): CaseMessage["manualRecovery"] {
   if (!value || typeof value !== "object") return undefined;
-  const manualRecovery = asRecord(asRecord(value).manualRecovery);
+  const rawRecovery = asRecord(value).manualRecovery;
+  if (!rawRecovery || typeof rawRecovery !== "object" || Array.isArray(rawRecovery)) {
+    return undefined;
+  }
+  const manualRecovery = asRecord(rawRecovery);
   if (!Object.keys(manualRecovery).length) return undefined;
   return {
     channel: stringValue(manualRecovery.channel),
