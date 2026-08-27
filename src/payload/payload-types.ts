@@ -668,6 +668,12 @@ export interface Lead {
   id: number;
   name: string;
   email?: string | null;
+  /**
+   * Address supplied by the customer through a secure manual-contact recovery link.
+   */
+  communicationEmail?: string | null;
+  communicationEmailUpdatedAt?: string | null;
+  communicationEmailSourceMessage?: (number | null) | Message;
   phone?: string | null;
   preferredChannel?: ('email' | 'sms') | null;
   address: string;
@@ -2089,6 +2095,9 @@ export interface RedirectsSelect<T extends boolean = true> {
 export interface LeadsSelect<T extends boolean = true> {
   name?: T;
   email?: T;
+  communicationEmail?: T;
+  communicationEmailUpdatedAt?: T;
+  communicationEmailSourceMessage?: T;
   phone?: T;
   preferredChannel?: T;
   address?: T;

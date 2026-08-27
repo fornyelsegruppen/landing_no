@@ -13,6 +13,7 @@ import { ChangeAgreementPanel } from "@/components/admin-v2/change-agreement-pan
 import { InformationRequestButton } from "@/components/admin-v2/information-request-button";
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
+import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
 import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
 import { CaseVersionHistory } from "@/components/admin-v2/case-version-history";
@@ -529,6 +530,25 @@ export default async function AdminCasePage({
                       {caseData.lead.email}
                     </a>
                   ) : null}
+                  {caseData.lead.communicationEmail &&
+                  caseData.lead.communicationEmail !== caseData.lead.email ? (
+                    <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 p-3">
+                      <p className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
+                        {user.interfaceLanguage === "lt"
+                          ? "Aktyvus komunikacijos el. paštas"
+                          : user.interfaceLanguage === "en"
+                            ? "Active communication email"
+                            : "Aktiv e-post for kommunikasjon"}
+                      </p>
+                      <a
+                        className="mt-1 inline-flex items-center gap-2 font-semibold text-emerald-50"
+                        href={`mailto:${caseData.lead.communicationEmail}`}
+                      >
+                        <Mail aria-hidden="true" className="size-4" />
+                        {caseData.lead.communicationEmail}
+                      </a>
+                    </div>
+                  ) : null}
                   {caseData.lead.phone ? (
                     <a
                       className="hover:text-accent inline-flex items-center gap-2"
@@ -923,6 +943,15 @@ export default async function AdminCasePage({
                         <p className="text-danger mt-3 text-sm">
                           {message.failureMessage}
                         </p>
+                      ) : null}
+                      {message.direction === "outbound" &&
+                      message.channel === "email" &&
+                      !["draft", "cancelled"].includes(message.status || "") ? (
+                        <ManualContactRecoveryPanel
+                          locale={user.interfaceLanguage}
+                          messageId={message.id}
+                          recovery={message.manualRecovery}
+                        />
                       ) : null}
                       <TechnicalLink
                         entity={message}

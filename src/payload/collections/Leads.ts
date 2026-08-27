@@ -5,7 +5,6 @@ import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 const adminManagedField = {
   update: adminOnlyField,
 };
-
 const caseStateFields = new Set([
   "status", "recordState", "archiveClassification", "archiveReason", "assignedTo",
   "nextAction", "nextActionAt", "nextActionOwner", "nextActionBlocker", "caseRevision",
@@ -114,6 +113,32 @@ export const Leads: CollectionConfig = {
   fields: [
     { name: "name", type: "text", required: true, access: adminManagedField },
     { name: "email", type: "email", access: adminManagedField },
+    {
+      name: "communicationEmail",
+      type: "email",
+      label: "Aktiv e-post for kommunikasjon",
+      access: adminManagedField,
+      admin: {
+        readOnly: true,
+        description:
+          "Adresse kunden har oppgitt via en sikker kontaktlenke. Nye meldinger bruker denne adressen uten å endre signerte dokumenter.",
+      },
+    },
+    {
+      name: "communicationEmailUpdatedAt",
+      type: "date",
+      label: "Kommunikasjonsadresse oppdatert",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "communicationEmailSourceMessage",
+      type: "relationship",
+      relationTo: "messages",
+      label: "Kildemelding for kontaktgjenoppretting",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
     { name: "phone", type: "text", access: adminManagedField },
     {
       name: "preferredChannel",

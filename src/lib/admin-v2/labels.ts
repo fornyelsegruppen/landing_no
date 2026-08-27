@@ -8,7 +8,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     unassigned: "Ikke tildelt", assigned: "Tildelt", scheduled: "Planlagt", on_way: "På vei", arrived: "Ankommet", precheck: "Forhåndskontroll", in_progress: "Pågår", completed: "Fullført", documented: "Dokumentert", cancelled: "Kansellert",
     ai_qa: "AI-kontroll", human_review: "Menneskelig kontroll", published: "Publisert",
     active: "Aktiv", exported: "Eksportert", needs_review: "Må kontrolleres", awaiting_payment: "Venter på betaling", paid: "Betalt", overdue: "Forfalt", credited: "Kreditert",
-    received: "Mottatt", admin_review: "Til administratorvurdering", alternative_requested: "Alternativt tilbud ønsket", follow_up_scheduled: "Oppfølging planlagt", recovered: "Kunden beholdt", do_not_contact: "Ikke kontakt",
+    received: "Mottatt", admin_review: "Til administratorvurdering", alternative_requested: "Alternativt tilbud ønsket", follow_up_scheduled: "Oppfølging planlagt", recovered: "Kunden beholdt", do_not_contact: "Ikke kontakt", whatsapp: "WhatsApp", phone: "Telefon", other: "Annet",
   },
   lt: {
     new: "Nauja", contacted: "Susisiekta", qualified: "Tinkama", measuring: "Matuojama", draft_ready: "Juodraštis paruoštas", quoted: "Pasiūlymas paruoštas", customer_waiting: "Klientas laukia atsakymo", waiting_customer: "Laukiama kliento", converted: "Patvirtintas klientas", closed: "Uždaryta",
@@ -17,7 +17,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     unassigned: "Nepriskirta", assigned: "Priskirta", scheduled: "Suplanuota", on_way: "Vykstama", arrived: "Atvykta", precheck: "Pirminė patikra", in_progress: "Vykdoma", completed: "Baigta", documented: "Dokumentuota", cancelled: "Atšaukta",
     ai_qa: "DI patikra", human_review: "Žmogaus peržiūra", published: "Publikuota",
     active: "Aktyvi", exported: "Eksportuota", needs_review: "Reikia patikrinti", awaiting_payment: "Laukiama apmokėjimo", paid: "Apmokėta", overdue: "Vėluoja", credited: "Kredituota",
-    received: "Gauta", admin_review: "Laukia administratoriaus sprendimo", alternative_requested: "Ruošiamas alternatyvus pasiūlymas", follow_up_scheduled: "Kontaktas suplanuotas", recovered: "Klientas išsaugotas", do_not_contact: "Nebekontaktuoti",
+    received: "Gauta", admin_review: "Laukia administratoriaus sprendimo", alternative_requested: "Ruošiamas alternatyvus pasiūlymas", follow_up_scheduled: "Kontaktas suplanuotas", recovered: "Klientas išsaugotas", do_not_contact: "Nebekontaktuoti", whatsapp: "WhatsApp", phone: "Telefonas", other: "Kita",
   },
   en: {
     new: "New", contacted: "Contacted", qualified: "Qualified", measuring: "Measuring", draft_ready: "Draft ready", quoted: "Quote prepared", customer_waiting: "Customer awaiting reply", waiting_customer: "Waiting for customer", converted: "Confirmed customer", closed: "Closed",
@@ -26,7 +26,7 @@ const statuses: Record<PanelLocale, Record<string, string>> = {
     unassigned: "Unassigned", assigned: "Assigned", scheduled: "Scheduled", on_way: "On the way", arrived: "Arrived", precheck: "Pre-check", in_progress: "In progress", completed: "Completed", documented: "Documented", cancelled: "Cancelled",
     ai_qa: "AI QA", human_review: "Human review", published: "Published",
     active: "Active", exported: "Exported", needs_review: "Review required", awaiting_payment: "Awaiting payment", paid: "Paid", overdue: "Overdue", credited: "Credited",
-    received: "Received", admin_review: "Awaiting administrator review", alternative_requested: "Alternative quote requested", follow_up_scheduled: "Follow-up scheduled", recovered: "Customer retained", do_not_contact: "Do not contact",
+    received: "Received", admin_review: "Awaiting administrator review", alternative_requested: "Alternative quote requested", follow_up_scheduled: "Follow-up scheduled", recovered: "Customer retained", do_not_contact: "Do not contact", whatsapp: "WhatsApp", phone: "Phone", other: "Other",
   },
 };
 

@@ -61,7 +61,11 @@ export type CaseActionInput = {
   leadStatus?: string;
   nextActionBlocker?: string;
   measurement?: StatusRecord;
-  message?: StatusRecord & { category?: string; closesContract?: boolean; direction?: string };
+  message?: StatusRecord & {
+    category?: string;
+    closesContract?: boolean;
+    direction?: string;
+  };
   price?: StatusRecord;
   quote?: StatusRecord;
   workOrder?: StatusRecord & { documentationSubmittedAt?: string };
@@ -186,7 +190,18 @@ export type CaseMessage = CaseEntity & {
   category: string;
   channel: string;
   direction: string;
+  failureCode?: string;
   failureMessage?: string;
+  manualRecovery?: {
+    channel?: string;
+    communicationEmailUpdatedAt?: string;
+    contactedAt?: string;
+    expiresAt?: string;
+    preparedAt?: string;
+    recoveryMessageId?: number;
+    resentAt?: string;
+    status?: string;
+  };
   replyToMessageId?: number;
   sentAt?: string;
   subject: string;
@@ -263,6 +278,8 @@ export type AdminCase = {
     adminReviewedAt?: string;
     assignedTo?: string;
     createdAt?: string;
+    communicationEmail?: string;
+    communicationEmailUpdatedAt?: string;
     email?: string;
     id: number;
     inquiryType?: string;
@@ -579,16 +596,16 @@ function makeTimeline(
             : type === "price" || type === "quote"
               ? "#price-quote-section"
               : type === "contract"
-          ? "#contract-section"
-          : type === "contract_request"
-            ? "#contract-request-section"
-          : type === "work"
-                  ? "#work-section"
-                  : type === "invoice"
-                    ? `#invoice-${id}`
-                    : type === "warranty"
-                      ? `#warranty-${id}`
-                      : "#changes-section",
+                ? "#contract-section"
+                : type === "contract_request"
+                  ? "#contract-request-section"
+                  : type === "work"
+                    ? "#work-section"
+                    : type === "invoice"
+                      ? `#invoice-${id}`
+                      : type === "warranty"
+                        ? `#warranty-${id}`
+                        : "#changes-section",
   };
 }
 
@@ -612,6 +629,24 @@ function makeTimedEvent(
       type === "contract"
         ? "#contract-section"
         : `/admin/collections/${collection}/${id}`,
+  };
+}
+
+function messageManualRecovery(value: unknown): CaseMessage["manualRecovery"] {
+  if (!value || typeof value !== "object") return undefined;
+  const manualRecovery = asRecord(asRecord(value).manualRecovery);
+  if (!Object.keys(manualRecovery).length) return undefined;
+  return {
+    channel: stringValue(manualRecovery.channel),
+    communicationEmailUpdatedAt: stringValue(
+      manualRecovery.communicationEmailUpdatedAt,
+    ),
+    contactedAt: stringValue(manualRecovery.contactedAt),
+    expiresAt: stringValue(manualRecovery.expiresAt),
+    preparedAt: stringValue(manualRecovery.preparedAt),
+    recoveryMessageId: numberValue(manualRecovery.recoveryMessageId),
+    resentAt: stringValue(manualRecovery.resentAt),
+    status: stringValue(manualRecovery.status),
   };
 }
 
@@ -786,9 +821,7 @@ export async function loadAdminCase(
         totalIncVatOre: numberValue(item.totalIncVatOre),
         maximumTotalIncVatOre: numberValue(item.maximumTotalIncVatOre),
         depositBasisPoints: numberValue(pricing?.depositBasisPoints),
-        depositAmountIncVatOre: numberValue(
-          pricing?.depositAmountIncVatOre,
-        ),
+        depositAmountIncVatOre: numberValue(pricing?.depositAmountIncVatOre),
         createdAt: stringValue(item.createdAt),
         documentHash: stringValue(item.snapshotHash),
       };
@@ -1108,7 +1141,9 @@ export async function loadAdminCase(
     category: stringValue(message.category) || "",
     channel: stringValue(message.channel) || "",
     sentAt: stringValue(message.sentAt),
+    failureCode: stringValue(message.failureCode),
     failureMessage: stringValue(message.failureMessage),
+    manualRecovery: messageManualRecovery(message.aiAnalysis),
     aiAssisted: Boolean(message.aiAssisted),
     aiAnalysis: message.aiAnalysis,
     replyToMessageId: relationId(message.replyToMessage) || undefined,
@@ -1135,11 +1170,17 @@ export async function loadAdminCase(
           status: stringValue(currentMessageRaw.status),
           category: stringValue(currentMessageRaw.category),
           closesContract: (() => {
-            if (!currentMessageRaw.aiAnalysis || typeof currentMessageRaw.aiAnalysis !== "object") return false;
+            if (
+              !currentMessageRaw.aiAnalysis ||
+              typeof currentMessageRaw.aiAnalysis !== "object"
+            )
+              return false;
             const analysis = asRecord(currentMessageRaw.aiAnalysis);
             return Boolean(
               numericId(analysis.customerContractRequestId) &&
-              ["close", "do_not_contact"].includes(stringValue(analysis.decision) || ""),
+              ["close", "do_not_contact"].includes(
+                stringValue(analysis.decision) || "",
+              ),
             );
           })(),
           direction: stringValue(currentMessageRaw.direction),
@@ -1171,6 +1212,21 @@ export async function loadAdminCase(
         stringValue(item.subject) || "Melding",
       ),
     ),
+    ...visibleMessages.flatMap((item) => {
+      const recovery = messageManualRecovery(item.aiAnalysis);
+      if (!recovery?.contactedAt) return [];
+      const id = numericId(item.id);
+      return [
+        {
+          id: `message-${id}-manual-contact`,
+          type: "message" as const,
+          title: `Manuell kontakt · ${stringValue(item.subject) || `#${id}`}`,
+          status: recovery.channel || "contacted",
+          at: recovery.contactedAt,
+          href: `#message-${id}`,
+        },
+      ];
+    }),
     ...measurements.map((item) =>
       makeTimeline(
         "measurement",
@@ -1280,6 +1336,10 @@ export async function loadAdminCase(
       id: leadId,
       name: stringValue(lead.name) || `#${leadId}`,
       email: stringValue(lead.email),
+      communicationEmail: stringValue(lead.communicationEmail),
+      communicationEmailUpdatedAt: stringValue(
+        lead.communicationEmailUpdatedAt,
+      ),
       phone: stringValue(lead.phone),
       address: [
         stringValue(lead.address),
@@ -1360,8 +1420,7 @@ export async function loadAdminCase(
     contractRequests: contractRequests.map((item) => ({
       ...entity("customer-contract-requests", item),
       reference:
-        contractRequestReferences.get(numericId(item.id)) ||
-        `END-${leadId}-V1`,
+        contractRequestReferences.get(numericId(item.id)) || `END-${leadId}-V1`,
       administratorDecision: stringValue(item.administratorDecision),
       aiSuggestedAction: stringValue(item.aiSuggestedAction),
       aiSummary: stringValue(item.aiSummary),
@@ -1378,10 +1437,16 @@ export async function loadAdminCase(
       preferredFollowUpAt: stringValue(item.preferredFollowUpAt),
       reasonCode: stringValue(item.reasonCode) || "prefer_not_to_say",
       reasonText: stringValue(item.reasonText),
-      receivedAt: stringValue(item.receivedAt) || stringValue(item.createdAt) || new Date(0).toISOString(),
+      receivedAt:
+        stringValue(item.receivedAt) ||
+        stringValue(item.createdAt) ||
+        new Date(0).toISOString(),
       recoveryPotential: stringValue(item.recoveryPotential) || "yellow",
       reviewedAt: stringValue(item.reviewedAt),
-      withinNominalWithdrawalPeriod: typeof item.withinNominalWithdrawalPeriod === "boolean" ? item.withinNominalWithdrawalPeriod : undefined,
+      withinNominalWithdrawalPeriod:
+        typeof item.withinNominalWithdrawalPeriod === "boolean"
+          ? item.withinNominalWithdrawalPeriod
+          : undefined,
       workStatusAtReceipt: stringValue(item.workStatusAtReceipt),
     })),
     messages: mappedMessages,

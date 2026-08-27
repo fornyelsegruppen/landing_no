@@ -22,7 +22,6 @@ function relationId(value: unknown): number | undefined {
   }
   return undefined;
 }
-
 function photoCount(value: string | null | undefined) {
   return (value || "").split(/\r?\n/).filter(Boolean).length;
 }
@@ -337,7 +336,8 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
   const leadId = relationId(message.lead);
   if (!leadId) throw new TypeError("Message has no lead");
   const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
-  if (!lead.email) throw new TypeError("Lead has no email address");
+  const deliveryEmail = lead.communicationEmail || lead.email;
+  if (!deliveryEmail) throw new TypeError("Lead has no email address");
   try {
     const attachments = [];
     for (const relation of message.attachments ?? []) {
@@ -349,7 +349,7 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
     }
     const result = await provider.send({
       template: message.category,
-      to: lead.email,
+      to: deliveryEmail,
       subject: message.subject,
       text: message.bodyText,
       html:

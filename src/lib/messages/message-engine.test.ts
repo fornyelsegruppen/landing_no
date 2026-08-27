@@ -79,6 +79,30 @@ describe("message engine", () => {
     expect(state.messages[0]?.status).toBe("sent");
   });
 
+  it("prefers the customer-confirmed communication email for future delivery", async () => {
+    const state = repository();
+    state.leads[0]!.communicationEmail = "confirmed@example.no";
+    await createReceiptMessage(state.payload, 1, "communication-email");
+    const recipients: string[] = [];
+    await deliverMessage(
+      state.payload,
+      {
+        health: () => ({ status: "ready", provider: "test" }),
+        send: async (message) => {
+          recipients.push(message.to);
+          return {
+            acceptedAt: new Date().toISOString(),
+            provider: "test",
+            providerMessageId: "delivery-1",
+          };
+        },
+      },
+      1,
+      "communication-email",
+    );
+    expect(recipients).toEqual(["confirmed@example.no"]);
+  });
+
   it("stores a validated AI reply as a draft and never sends it", async () => {
     const state = repository();
     const result = await createLeadAiReply(state.payload, new DeterministicAiProvider(validAiReply), 1, "ai-test");
