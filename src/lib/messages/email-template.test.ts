@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildBrandedEmailHtml } from "./email-template";
+import {
+  buildBrandedEmailHtml,
+  secureCustomerLinkLabel,
+} from "./email-template";
 
 describe("branded customer email", () => {
   it("renders secure quote links as branded buttons without exposing the token", () => {
@@ -29,6 +32,34 @@ describe("branded customer email", () => {
       '>https://www.example.com/informasjon</a>',
     );
     expect(html).not.toContain("Åpne ditt sikre tilbud");
+  });
+
+  it("uses a customer-portal label for the final contract email", () => {
+    const html = buildBrandedEmailHtml({
+      subject: "Endelig signert kontrakt K-10-V1",
+      text: "Administrer avtalen via din sikre kundelenke:\nhttps://www.takfornyelse.as/tilbud/secure-token",
+      secureLinkLabel: secureCustomerLinkLabel("contract"),
+    });
+
+    expect(html).toContain(">Åpne din sikre kundeside</a>");
+    expect(html).not.toContain(">Åpne ditt sikre tilbud</a>");
+  });
+
+  it("uses distinct labels for reminders and change agreements", () => {
+    expect(secureCustomerLinkLabel("quote")).toBe(
+      "Åpne ditt sikre tilbud",
+    );
+    expect(secureCustomerLinkLabel("reminder")).toBe("Åpne tilbudet");
+    expect(secureCustomerLinkLabel("change_agreement")).toBe(
+      "Åpne endringsavtalen",
+    );
+
+    const html = buildBrandedEmailHtml({
+      subject: "Endringsavtale E-10-V1",
+      text: "Kontroller endringen:\nhttps://www.takfornyelse.as/endring/secure-token",
+      secureLinkLabel: secureCustomerLinkLabel("change_agreement"),
+    });
+    expect(html).toContain(">Åpne endringsavtalen</a>");
   });
 
   it("escapes customer-controlled markup", () => {

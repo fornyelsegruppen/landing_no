@@ -5,7 +5,10 @@ import { sanitizeJobError } from "@/lib/jobs/job-policy";
 import { generateLeadReplyDraft } from "@/lib/leads/lead-ai";
 import { assertMessageCanDeliver } from "./message-policy";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
-import { buildBrandedEmailHtml } from "./email-template";
+import {
+  buildBrandedEmailHtml,
+  secureCustomerLinkLabel,
+} from "./email-template";
 import { updateCaseState } from "@/lib/cases/case-command";
 import { caseReplyAddress } from "./case-reply";
 import { enqueueQuoteFollowUps } from "@/lib/quotes/follow-up-schedule";
@@ -349,7 +352,13 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       to: lead.email,
       subject: message.subject,
       text: message.bodyText,
-      html: message.bodyHtml || buildBrandedEmailHtml({ subject: message.subject, text: message.bodyText }),
+      html:
+        message.bodyHtml ||
+        buildBrandedEmailHtml({
+          subject: message.subject,
+          text: message.bodyText,
+          secureLinkLabel: secureCustomerLinkLabel(message.category),
+        }),
       replyTo: (featureReadiness("communicationRoutingV2").ready ? caseReplyAddress(lead.id) : null) || process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
       idempotencyKey: message.idempotencyKey,
       correlationId,

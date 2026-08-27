@@ -4,6 +4,7 @@ type BrandedEmailInput = {
   subject: string;
   text: string;
   preheader?: string;
+  secureLinkLabel?: string;
 };
 
 function escapeHtml(value: string) {
@@ -15,7 +16,23 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-function secureQuoteButton(url: string) {
+export function secureCustomerLinkLabel(category: string) {
+  switch (category) {
+    case "contract":
+      return "Åpne din sikre kundeside";
+    case "reminder":
+      return "Åpne tilbudet";
+    case "change_agreement":
+    case "change_confirmation":
+      return "Åpne endringsavtalen";
+    case "quote":
+      return "Åpne ditt sikre tilbud";
+    default:
+      return undefined;
+  }
+}
+
+function secureActionButton(url: string, label?: string) {
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
@@ -24,38 +41,45 @@ function secureQuoteButton(url: string) {
       hostname === "www.takfornyelse.as" ||
       hostname.endsWith(".vercel.app");
 
+    const isQuoteLink = parsed.pathname.startsWith("/tilbud/");
+    const isChangeAgreementLink = parsed.pathname.startsWith("/endring/");
     if (
       parsed.protocol !== "https:" ||
       !isTakfornyelseHost ||
-      !parsed.pathname.startsWith("/tilbud/")
+      (!isQuoteLink && !isChangeAgreementLink)
     ) {
       return null;
     }
 
-    return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:8px 0 4px;background:#f0a914;color:#101319;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 20px;border-radius:10px">Åpne ditt sikre tilbud</a>`;
+    const buttonLabel =
+      label ||
+      (isChangeAgreementLink
+        ? "Åpne endringsavtalen"
+        : "Åpne ditt sikre tilbud");
+    return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:8px 0 4px;background:#f0a914;color:#101319;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 20px;border-radius:10px">${escapeHtml(buttonLabel)}</a>`;
   } catch {
     return null;
   }
 }
 
-function linkedLine(line: string) {
+function linkedLine(line: string, secureLinkLabel?: string) {
   const parts = line.split(/(https:\/\/[^\s<]+)/g);
   return parts
     .map((part) => {
       if (!part.startsWith("https://")) return escapeHtml(part);
       return (
-        secureQuoteButton(part) ||
+        secureActionButton(part, secureLinkLabel) ||
         `<a href="${escapeHtml(part)}" style="color:#d68b00;font-weight:700;text-decoration:underline;word-break:break-all">${escapeHtml(part)}</a>`
       );
     })
     .join("");
 }
 
-function textToHtml(text: string) {
+function textToHtml(text: string, secureLinkLabel?: string) {
   return text
     .trim()
     .split(/\n{2,}/)
-    .map((paragraph) => `<p style="margin:0 0 18px;line-height:1.65;color:#20242c">${paragraph.split(/\r?\n/).map(linkedLine).join("<br>")}</p>`)
+    .map((paragraph) => `<p style="margin:0 0 18px;line-height:1.65;color:#20242c">${paragraph.split(/\r?\n/).map((line) => linkedLine(line, secureLinkLabel)).join("<br>")}</p>`)
     .join("");
 }
 
@@ -83,7 +107,7 @@ export function buildBrandedEmailHtml(input: BrandedEmailInput) {
           </td></tr>
           <tr><td style="padding:34px 30px 18px">
             <h1 style="margin:0 0 22px;font-size:26px;line-height:1.25;color:#101319">${subject}</h1>
-            ${textToHtml(input.text)}
+            ${textToHtml(input.text, input.secureLinkLabel)}
           </td></tr>
           <tr><td style="padding:22px 30px;background:#10141c;color:#d8dde6;font-size:13px;line-height:1.6">
             <strong style="color:#ffffff">Takfornyelse – en del av ${escapeHtml(siteConfig.parentOrg)}</strong><br>
