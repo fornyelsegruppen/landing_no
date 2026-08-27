@@ -2,7 +2,7 @@
 
 Data: 2026-08-26  
 Vykdymo aplinka iki cutover: `https://takfornyelse-staging.vercel.app`  
-Pradinė būsena: **Production NO-GO**  
+Pradinė būsena: **Kontroliuojamas Production pilotas aktyvus; pilna automatika NO-GO**
 Šiandienos tikslas: **GO kontroliuojamam produkciniam pilotui**, ne neprižiūrimai pilnai automatikai.
 
 ## 1. Ką šiandien vadiname GO
@@ -233,12 +233,12 @@ Visi scenarijai atliekami staging aplinkoje. Naudojami sintetiniai duomenys ir k
 | Gate | Rezultatas | Įrodymas | Patvirtino | Laikas |
 |---|---|---|---|---|
 | P0 Apimtis ir atsakomybės | PASS | Brønnøysund API: rekvizitai, MVA ir Foretaksregisteret patikrinti; savininkas patvirtino atsakomybes, Fiken ir klientų kontaktus | Įmonės savininkas | 2026-08-26 |
-| P1 Dokumentai ir teisinė kontrolė | BLOCKED | Aktyvus staging šablonas `STAGING-TEST-V1` yra aiškiai neįpareigojantis ir naudoja `example.com`; paruoštas, bet dar neaktyvuotas `PRODUCTION-PILOT-V1` kandidatas: `docs/legal/production-pilot-legal-package-v1.md` |  | 2026-08-26 |
-| P2 Kainodara ir matavimas | PENDING |  |  |  |
-| P3 Rankinis UAT | PENDING |  |  |  |
-| P4 Infrastruktūra / backup / sauga | PENDING |  |  |  |
-| P5 Cutover smoke | PENDING |  |  |  |
-| Produkto savininko sprendimas | PENDING |  |  |  |
+| P1 Dokumentai ir teisinė kontrolė | OWNER-APPROVED PILOT | Aktyvi `PRODUCTION-PILOT-V1`; išorinė teisininko peržiūra savininko sprendimu neatliekama; tai nėra nepriklausoma teisinė išvada | Įmonės savininkas | 2026-08-27 |
+| P2 Kainodara ir matavimas | PASS KONTROLIUOJAMAM PILOTUI | Patvirtintos kainos ir matavimo taisyklės; Gemini nekeičia deterministinių skaičių | Įmonės savininkas ir techninė patikra | 2026-08-27 |
+| P3 Rankinis UAT | IN_PROGRESS | Pagrindiniai Staging ir Production keliai įrodyti; likę scenarijai registruoti [PROD-8 faktinės būsenos audite](./prod8-current-state-audit-2026-08-28.md) | Savininkas ir techninė patikra | 2026-08-28 |
+| P4 Infrastruktūra / backup / sauga | PASS KONTROLIUOJAMAM PILOTUI | Atskiros DB/Blob, restore repeticija, rollback, Turnstile ir Upstash įrodyti; 8.4 cron dar neaktyvuojamas | Savininkas ir techninė patikra | 2026-08-28 |
+| P5 Cutover smoke | PASS KONTROLIUOJAMAM PILOTUI | Vieša svetainė, forma, admin, laiškas ir pirmos sintetinės bylos patikrintos | Savininkas ir techninė patikra | 2026-08-27 |
+| Produkto savininko sprendimas | GO_CONTROLLED_PRODUCTION_PILOT | `GO_FULL_AUTOMATION` lieka nepatvirtintas iki realių bylų ir fizinių matavimų piloto | Įmonės savininkas | 2026-08-27 |
 
 ## 6. Oficialūs kontrolės šaltiniai
 

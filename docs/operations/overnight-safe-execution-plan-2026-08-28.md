@@ -1,7 +1,7 @@
 # Takfornyelse — saugus naktinis vykdymo planas
 
 Data: 2026-08-28
-Būsena: **VYKDOMA — O-0 incidentas taisomas pagal savininko išplėstą naktinį įgaliojimą**
+Būsena: **UŽBAIGTA TIEK, KIEK SAUGIAI ĮMANOMA — O-0 laukia vieno savininko Preview UAT; visos nepriklausomos fazės užbaigtos**
 Apimtis: Production būklės skaitymo auditas, lokalaus kodo ir testų patikra, PROD-8.2–8.4 spragų registras ir rytojaus savininko UAT paruošimas.
 
 ## 1. Tikslas
@@ -226,14 +226,14 @@ Jeigu randamas neatitikimas: `STOP`; nebandyti taisyti Production duomenų be sa
 
 | Fazė | Būsena | Įrodymas / rezultatas | Pastaba |
 |---|---|---|---|
-| O-0 Production freeze | **TAISOMA — LOCAL PASS** | Aktyvus deployment `dpl_CvS7U3tgY16XmLss8aAciiKtZzK5`, rollback kandidatas `dpl_FQW24KoJryQ3iAw1gRd3qrWWQ4bi`, ankstesnis CI run `33116393482` PASS, vieši URL 200, backup įrodymas užfiksuotas; `mark_reviewed` pataisa turi 13/13 tikslinius ir 581/581 unit PASS | Liko Preview, naujas Linux CI ir kontroliuojamas Production patikrinimas. |
-| O-1 Planų sutikrinimas | PENDING |  | Pradedama tik užbaigus O-0 PASS. |
-| O-2 Rankinio kontakto auditas | PENDING |  |  |
-| O-3 Bylos #10 read-only auditas | PENDING |  | O-0 metu atliktas tik ribotas diagnostinis skaitymas. |
-| O-4 Savininko UAT paketas | PENDING |  |  |
-| O-5 PROD-8.4 preflight | PENDING |  |  |
-| O-6 Techninė kokybės patikra | PENDING |  |  |
-| O-7 Rytinis perdavimas | PENDING | [Naktinio vykdymo ataskaita](./overnight-safe-execution-report-2026-08-28.md) | Ataskaita bus atnaujinama tęsiant darbus. |
+| O-0 Production freeze | **BLOCKED / GRĮŽTI RYTE** | Aktyvus deployment `dpl_CvS7U3tgY16XmLss8aAciiKtZzK5`, rollback kandidatas `dpl_FQW24KoJryQ3iAw1gRd3qrWWQ4bi`; pataisa `c2989a1`; 13/13 tikslinių ir 581/581 unit PASS; Linux CI `33120965793` PASS; Preview `dpl_2mBbVwymveu5Jjgw5qc39X7U3dPj` READY | Preview administratoriaus sesija pasibaigusi. Ryte reikia prisijungus atidaryti vieną neperžiūrėtą Preview bylą ir patvirtinti vieną `case.mark_reviewed`. Iki tol Production hotfix nedaromas. |
+| O-1 Planų sutikrinimas | **PASS** | [Faktinės PROD-8 būsenos auditas](./prod8-current-state-audit-2026-08-28.md) | PROD-8.2/8.3 palikti `VERIFYING`, 8.4 `PRECHECK`; žmogaus UAT nepervertintas. |
+| O-2 Rankinio kontakto auditas | **PASS** | [Saugumo auditas](./manual-contact-recovery-security-audit-2026-08-28.md): 26/26 tikslinių testų, TypeScript ir tikslinis ESLint PASS | Autentifikuotas Preview E2E liko savininko UAT O-0 fazėje. |
+| O-3 Bylos #10 read-only auditas | **PASS VIENTISUMUI / BLOCKED OPERACINIAM UŽDARYMUI** | [PROD-8.2 bylos vientisumo auditas](./prod8-2-production-case-integrity-audit-2026-08-28.md) | Komercinė grandinė, du parašai ir priskirtas suplanuotas darbas nuoseklūs. Vienas užbaigto laiško delivery job tebėra aktyvus; ryte administratorius turi jį atšaukti be persiuntimo ir pakartoti read-only auditą. Production įrašai naktį nepakeisti. |
+| O-4 Savininko UAT paketas | **PASS** | [Trumpas savininko UAT checklist](./prod8-owner-uat-checklist-2026-08-28.md) | Paruošti konkretūs URL, mygtukų scenarijai, tikėtini rezultatai ir STOP sąlygos; pats žmogaus UAT sąmoningai dar nėra pažymėtas PASS. |
+| O-5 PROD-8.4 preflight | **PASS / OWNER ACTION REQUIRED** | [PROD-8.4 preflight](./prod8-4-preflight-2026-08-28.md): 37/37 tikslinių testų PASS | Trūksta Production `CRON_SECRET` ir `PEXELS_API_KEY`; abu flagai turi likti išjungti iki rytinio dependency + UAT etapo. |
+| O-6 Techninė kokybės patikra | **PASS SU PLATFORMOS APRIBOJIMU** | 175 testų failai / 600 testų, TypeScript, visas ESLint ir `git diff --check` PASS. Lokalūs migracijų testai Windows ARM aplinkoje nebaigti dėl žinomo neprivalomo `libsql` ARM modulio apribojimo; po push privalomas žalias Linux CI. | Nė vienas raudonas rezultatas nenutylėtas. Kodo commit `51ca68f` paliktas lokaliai, be push ir deploy. |
+| O-7 Rytinis perdavimas | **PASS** | [Naktinio vykdymo ataskaita](./overnight-safe-execution-report-2026-08-28.md) | Parengta tiksli savininko veiksmų eilė, UAT nuorodos, blokavimo priežastys ir saugus push/deploy sprendimas. |
 
 ## 7. Geresnis vykdymo modelis
 

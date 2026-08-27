@@ -1,7 +1,7 @@
 # Takfornyelse — PROD-8 kontroliuojamo funkcijų įjungimo planas
 
 Data: 2026-08-27  
-Būsena: **PROD-8.1 PASS — PROD-8.2 nepradėtas**
+Būsena: **PROD-8.1 PASS — PROD-8.2 ir PROD-8.3 VERIFYING — PROD-8.4 PRECHECK**
 Apimtis: Production `takfornyelse.as`, administratoriaus `/admin-v2`, darbuotojo `/user`, saugios kliento nuorodos ir automatiniai operaciniai procesai.
 
 ## 1. Tikslas ir sprendimas
@@ -329,9 +329,9 @@ Po STOP:
 | -------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------- |
 | PROD-8.0 Preflight                     | PASS    | Production `dpl_CWjdo63P3zdBmvFymZ3RwDnkmPXu`; Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`; commit `6007e79` | DB kopija, rollback, Gemini ir limitai, 584 testai, Preview/Production smoke, admin juosta, 0×5xx, 13/13 flagų false | Savininkas ir techninė patikra | 2026-08-27 12:59 Europe/Oslo |
 | PROD-8.1 Vidinė AI ir matavimo banga   | PASS    | Production `dpl_8ff7pKTcjvbJ7hzkvG7cK87JvFYs`; rollback `dpl_6agTKhwKULtEFvoPQJh3Zd5CSRAD`; commit `f80a8d9` | Byla `#9`, 1× receipt sent, 1× AI draft cancelled archyvuojant, `TM-9-V1`–`V4`, 102,2 m² manual approval, 0 komercinių dokumentų, 2× completed jobs, 1× `lead.archive`, 594 testai PASS | Savininkas ir techninė patikra | 2026-08-27 14:29 Europe/Oslo |
-| PROD-8.2 Kliento komercinis kelias     | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
-| PROD-8.3 Darbo ir darbuotojo banga     | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
-| PROD-8.4 Priminimų ir blogo automatika | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
+| PROD-8.2 Kliento komercinis kelias     | VERIFYING | Production byla `#10`; [faktinės būsenos auditas](./prod8-current-state-audit-2026-08-28.md) | Pagrindinis pasiūlymo ir dviejų parašų kelias įrodytas; liko klausimo, atmetimo, nutraukimo, gyvo neigiamo tokeno ir `mark_reviewed` UAT | Savininkas ir techninė patikra | 2026-08-28 |
+| PROD-8.3 Darbo ir darbuotojo banga     | VERIFYING | Production byla `#10`; [faktinės būsenos auditas](./prod8-current-state-audit-2026-08-28.md) | Darbo sukūrimas, paskyrimas ir baziniai laiškai įrodyti; pilna darbuotojo būsenų, ETA, tolerancijos ir užbaigimo eiga dar nebaigta | Savininkas ir techninė patikra | 2026-08-28 |
+| PROD-8.4 Priminimų ir blogo automatika | PRECHECK | [Faktinės būsenos auditas](./prod8-current-state-audit-2026-08-28.md) | Turnstile, Upstash, Gemini ir Resend paruošti; Production `CRON_SECRET`, `PEXELS_API_KEY` ir kontroliuojamas UAT dar neuždaryti | Techninė patikra | 2026-08-28 |
 | PROD-8.5 Realių bylų pilotas           | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
 
 ## 12. Galutinė PROD-8 užbaigimo sąlyga
