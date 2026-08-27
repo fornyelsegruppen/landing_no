@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   createWorkOrder: vi.fn(),
+  dispatchCustomer: vi.fn(),
+  notifyWorker: vi.fn(),
+  syncCommunications: vi.fn(),
   findByID: vi.fn(),
   recordAudit: vi.fn(),
 }));
@@ -10,6 +13,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/payload", () => ({ getPayload: vi.fn(async () => ({ auth: mocks.auth, findByID: mocks.findByID })) }));
 vi.mock("@/payload/access/roles", () => ({ userIsAdmin: vi.fn(() => true) }));
 vi.mock("@/lib/work-orders/create", () => ({ createWorkOrderFromContract: mocks.createWorkOrder }));
+vi.mock("@/lib/work-orders/communications", () => ({
+  dispatchAdminApprovedScheduleCommunicationNow: mocks.dispatchCustomer,
+  notifyAssignedWorkerNow: mocks.notifyWorker,
+  syncWorkOrderCommunicationJobs: mocks.syncCommunications,
+}));
 vi.mock("@/lib/audit/payload-audit-writer", () => ({ createPayloadAuditWriter: vi.fn(() => vi.fn()) }));
 vi.mock("@/lib/audit/audit-event", () => ({ recordAuditEvent: mocks.recordAudit }));
 vi.mock("@/lib/admin-v2/commercial-action-guard", () => ({
@@ -25,7 +33,10 @@ describe("admin work-order creation", () => {
     mocks.findByID.mockReset().mockImplementation(async ({ collection }: { collection: string }) => collection === "contracts"
       ? { id: 7, quote: 4 }
       : { id: 4, lead: 1 });
-    mocks.createWorkOrder.mockReset().mockResolvedValue({ created: true, workOrder: { id: 41 } });
+    mocks.createWorkOrder.mockReset().mockResolvedValue({ created: true, workOrder: { id: 41, status: "scheduled" } });
+    mocks.dispatchCustomer.mockReset().mockResolvedValue({ delivered: true, queued: false });
+    mocks.notifyWorker.mockReset().mockResolvedValue({ delivered: true, queued: false });
+    mocks.syncCommunications.mockReset().mockResolvedValue({ created: 0, cancelled: 0, skipped: true });
     mocks.recordAudit.mockReset().mockResolvedValue(undefined);
   });
 
@@ -42,6 +53,13 @@ describe("admin work-order creation", () => {
       contractId: 7,
       scheduledAt: "2026-08-25T06:30:00.000Z",
     }));
+    expect(mocks.dispatchCustomer).toHaveBeenCalledOnce();
+    expect(mocks.notifyWorker).toHaveBeenCalledOnce();
+    await expect(response.json()).resolves.toMatchObject({
+      notification: "sent",
+      customerNotification: "sent",
+      workerNotification: "sent",
+    });
   });
 
   it("does not accept a schedule without an employee", async () => {

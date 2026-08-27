@@ -7,13 +7,13 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { userIsAdmin } from "@/payload/access/roles";
 import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
-import { dispatchWorkOrderCommunicationNow, dispatchWorkOrderRescheduleNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
+import { dispatchAdminApprovedRescheduleCommunicationNow, dispatchAdminApprovedScheduleCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { captureException } from "@/lib/monitoring";
 import { assertAssignableWorker } from "@/lib/work-orders/create";
 import { appendTimeline } from "@/lib/work-orders/access";
 
 const schema = z.object({
-  action: z.enum(["save", "cancel"]).default("save"),
+  action: z.enum(["save", "cancel", "notify"]).default("save"),
   adminNote: z.string().trim().max(1000).optional(),
   arrivalWindow: z.string().trim().max(120).optional(),
   assignedWorkerId: z.number().int().positive().optional(),
@@ -42,6 +42,42 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     const current = await payload.findByID({ collection: "work-orders", id: Number(id), depth: 0, overrideAccess: true });
+    if (parsed.data.action === "notify") {
+      if (current.status !== "scheduled" || !relationId(current.assignedWorker) || !current.scheduledAt || !current.arrivalWindow) {
+        return NextResponse.json({ error: "A complete scheduled assignment is required before notifications can be sent" }, { status: 409 });
+      }
+      let customerNotification: "sent" | "queued" | "skipped" = "skipped";
+      let workerNotification: "sent" | "queued" | "skipped" = "skipped";
+      try {
+        const result = await dispatchAdminApprovedScheduleCommunicationNow(payload, current, correlationIdFromHeaders(request.headers));
+        customerNotification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
+      } catch (error) {
+        customerNotification = "queued";
+        captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "manual-customer-assignment-notification", workOrderId: current.id });
+      }
+      try {
+        const result = await notifyAssignedWorkerNow(payload, current, correlationIdFromHeaders(request.headers));
+        workerNotification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
+      } catch (error) {
+        workerNotification = "queued";
+        captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "manual-worker-assignment-notification", workOrderId: current.id });
+      }
+      await recordAuditEvent(createPayloadAuditWriter(payload), {
+        actorId: user.id,
+        action: "work-order.assignment-notifications-requested",
+        entityType: "work-order",
+        entityId: current.id,
+        correlationId: correlationIdFromHeaders(request.headers),
+        changedFields: [],
+        after: { customerNotification, workerNotification },
+      });
+      const notification = customerNotification === "sent" && workerNotification === "sent"
+        ? "sent"
+        : customerNotification === "queued" || workerNotification === "queued"
+          ? "queued"
+          : "skipped";
+      return NextResponse.json({ workOrderId: current.id, status: current.status, notification, customerNotification, workerNotification });
+    }
     if (!["unassigned", "assigned", "scheduled"].includes(current.status) && parsed.data.action !== "cancel") {
       return NextResponse.json({ error: "Work that has started can no longer be reassigned here" }, { status: 409 });
     }
@@ -108,21 +144,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       before: { assignedWorker: relationId(current.assignedWorker), scheduledAt: current.scheduledAt, arrivalWindow: current.arrivalWindow, status: current.status },
       after: { assignedWorker: relationId(updated.assignedWorker), scheduledAt: updated.scheduledAt, arrivalWindow: updated.arrivalWindow, status: updated.status },
     });
-    let notification: "sent" | "queued" | "skipped" = "skipped";
+    let customerNotification: "sent" | "queued" | "skipped" = "skipped";
+    let workerNotification: "sent" | "queued" | "skipped" = "skipped";
     if (updated.status === "scheduled") {
       try {
         await syncWorkOrderCommunicationJobs(payload, updated, correlationIdFromHeaders(request.headers));
-        const result = planningChanged && current.status !== "unassigned"
-          ? await dispatchWorkOrderRescheduleNow(payload, updated, current, parsed.data.planningReason || "Planen måtte oppdateres", correlationIdFromHeaders(request.headers))
-          : await dispatchWorkOrderCommunicationNow(payload, updated, "schedule_confirmation", correlationIdFromHeaders(request.headers));
-        notification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
-        if (planningChanged) await notifyAssignedWorkerNow(payload, updated, correlationIdFromHeaders(request.headers));
       } catch (error) {
-        notification = "queued";
-        captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "schedule-notification", workOrderId: current.id });
+        captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "schedule-reminders", workOrderId: current.id });
+      }
+      try {
+        const result = planningChanged && current.status !== "unassigned"
+          ? await dispatchAdminApprovedRescheduleCommunicationNow(payload, updated, current, parsed.data.planningReason || "Planen måtte oppdateres", correlationIdFromHeaders(request.headers))
+          : await dispatchAdminApprovedScheduleCommunicationNow(payload, updated, correlationIdFromHeaders(request.headers));
+        customerNotification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
+      } catch (error) {
+        customerNotification = "queued";
+        captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "customer-schedule-notification", workOrderId: current.id });
+      }
+      if (planningChanged) {
+        try {
+          const result = await notifyAssignedWorkerNow(payload, updated, correlationIdFromHeaders(request.headers));
+          workerNotification = result.delivered ? "sent" : result.queued ? "queued" : "skipped";
+        } catch (error) {
+          workerNotification = "queued";
+          captureException(error, { route: "PATCH /api/admin/work-orders/[id]", operation: "worker-assignment-notification", workOrderId: current.id });
+        }
       }
     }
-    return NextResponse.json({ workOrderId: updated.id, status: updated.status, notification });
+    const notification = customerNotification === "sent" && (!planningChanged || workerNotification === "sent")
+      ? "sent"
+      : customerNotification === "queued" || workerNotification === "queued"
+        ? "queued"
+        : "skipped";
+    return NextResponse.json({ workOrderId: updated.id, status: updated.status, notification, customerNotification, workerNotification });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Work-order update failed" }, { status: 409 });
   }

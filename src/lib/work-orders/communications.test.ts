@@ -1,6 +1,6 @@
 import type { Payload } from "payload";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ChannelUnavailableError, CommunicationCancelledError, enqueueCompletionCommunication, processWorkOrderCommunicationJob, syncWorkOrderCommunicationJobs, workOrderScheduleVersion } from "./communications";
+import { ChannelUnavailableError, CommunicationCancelledError, dispatchAdminApprovedScheduleCommunicationNow, enqueueCompletionCommunication, notifyAssignedWorkerNow, processWorkOrderCommunicationJob, syncWorkOrderCommunicationJobs, workOrderScheduleVersion } from "./communications";
 import { dispatchCompletionCommunicationNow } from "./communications";
 import { LogEmailProvider } from "@/lib/providers/safe-providers";
 
@@ -83,6 +83,58 @@ describe("work-order communications", () => {
 
     expect(result).toMatchObject({ skipped: true, created: 0 });
     expect(rows.jobs).toHaveLength(0);
+  });
+
+  it("sends an administrator-approved customer assignment while automatic reminders stay paused", async () => {
+    process.env.VERCEL_ENV = "production";
+    const order = { id: 17, reference: "A-K-17-V1", lead: 4, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T06:00:00Z", arrivalWindow: "08:00–10:00", afterPhotos: [] };
+    const { payload, rows } = fakePayload({
+      order,
+      lead: { id: 4, name: "Ola", email: "ola@example.no", preferredChannel: "email", status: "converted" },
+      worker: { id: 5, displayName: "Kari Nordmann", email: "kari@example.no", phone: "+47 900 00 000", role: "worker", active: true },
+    });
+    const provider = new LogEmailProvider();
+
+    const result = await dispatchAdminApprovedScheduleCommunicationNow(
+      payload,
+      order,
+      "correlation-admin-approved",
+      provider,
+    );
+
+    expect(result).toMatchObject({ delivered: true, skipped: false });
+    expect(provider.deliveries).toHaveLength(1);
+    expect(rows.messages[0]).toMatchObject({
+      category: "schedule_confirmation",
+      status: "sent",
+      aiAnalysis: expect.objectContaining({ adminApprovedTransactional: true }),
+    });
+  });
+
+  it("sends and records an employee assignment even while automatic reminders are paused", async () => {
+    process.env.VERCEL_ENV = "production";
+    const order = { id: 18, reference: "A-K-18-V1", assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T06:00:00Z", arrivalWindow: "08:00–10:00" };
+    const { payload, rows } = fakePayload({
+      order,
+      worker: { id: 5, displayName: "Kari Nordmann", email: "kari@example.no", phone: "+47 900 00 000", role: "worker", active: true },
+    });
+    const provider = new LogEmailProvider();
+
+    const result = await notifyAssignedWorkerNow(
+      payload,
+      order,
+      "correlation-worker-assignment",
+      provider,
+    );
+
+    expect(result).toMatchObject({ delivered: true, queued: false });
+    expect(provider.deliveries).toHaveLength(1);
+    expect(provider.deliveries[0]).toMatchObject({ template: "worker-assignment" });
+    expect(rows.jobs).toHaveLength(1);
+    expect(rows.jobs[0]).toMatchObject({
+      type: "worker.assignment.notification",
+      status: "completed",
+    });
   });
 
   it("creates each reminder once and cancels the old schedule on reschedule", async () => {

@@ -62,6 +62,18 @@ describe("branded customer email", () => {
     expect(html).toContain(">Åpne endringsavtalen</a>");
   });
 
+  it("renders an authenticated employee-portal link as a clear branded button", () => {
+    const html = buildBrandedEmailHtml({
+      subject: "Oppdrag A-K-18-V1",
+      text: "Åpne oppdraget:\nhttps://www.takfornyelse.as/user/arbeid/18",
+      secureLinkLabel: "Åpne oppdraget i medarbeiderportalen",
+    });
+
+    expect(html).toContain('href="https://www.takfornyelse.as/user/arbeid/18"');
+    expect(html).toContain(">Åpne oppdraget i medarbeiderportalen</a>");
+    expect(html).not.toContain(">https://www.takfornyelse.as/user/arbeid/18</a>");
+  });
+
   it("escapes customer-controlled markup", () => {
     const html = buildBrandedEmailHtml({ subject: "<script>", text: "Hei <img src=x>" });
     expect(html).not.toContain("<script>");

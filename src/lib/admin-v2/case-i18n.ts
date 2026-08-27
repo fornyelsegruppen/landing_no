@@ -122,15 +122,22 @@ const copy = {
     arrivalTo: "Ankomst til",
     arrivalEndAfterStart: "Sluttiden må være senere enn starttiden.",
     completePlanningRequired: "Velg ansatt, dato og hele ankomstintervallet.",
-    planningSavedAndNotified: "Tildelingen er lagret, og kunden er varslet.",
+    planningSavedAndNotified: "Tildelingen er lagret. Kunden og medarbeideren er varslet.",
     planningSavedNotificationQueued:
-      "Tildelingen er lagret. Kundevarslingen ligger trygt i utsendingskøen.",
+      "Tildelingen er lagret. Ett eller begge varslene ligger trygt i kø for nytt forsøk.",
     workerPhoneFallback:
       "Den ansatte mangler telefonnummer. Kunden får Takfornyelses hovednummer som kontakt.",
     adminNote: "Intern merknad",
     adminNoteHelp: "Vises ikke til kunden.",
     createAndPlan: "Opprett arbeidsordre",
     savePlanning: "Lagre tildeling og tid",
+    resendAssignmentNotifications: "Send eller prøv tildelingsvarsler på nytt",
+    resendAssignmentNotificationsConfirm:
+      "Send tildelingsinformasjonen til kunden og medarbeideren nå?",
+    assignmentNotificationsSent:
+      "Tildelingsinformasjonen er sendt til kunden og medarbeideren.",
+    assignmentNotificationsQueued:
+      "Ett eller begge varslene venter trygt på et nytt leveringsforsøk.",
     cancelWork: "Avbryt arbeidsordren",
     cancelWorkConfirm: "Er du sikker på at arbeidsordren skal avbrytes?",
     employeeRequiredForDate: "Velg en ansatt før du angir dato.",
@@ -366,15 +373,22 @@ const copy = {
     arrivalEndAfterStart: "Atvykimo pabaiga turi būti vėliau už pradžią.",
     completePlanningRequired:
       "Pasirinkite darbuotoją, datą ir visą atvykimo intervalą.",
-    planningSavedAndNotified: "Paskyrimas išsaugotas, klientas informuotas.",
+    planningSavedAndNotified: "Paskyrimas išsaugotas. Klientas ir darbuotojas informuoti.",
     planningSavedNotificationQueued:
-      "Paskyrimas išsaugotas. Pranešimas klientui saugiai laukia siuntimo eilėje.",
+      "Paskyrimas išsaugotas. Vienas arba abu laiškai saugiai laukia pakartotinio siuntimo eilėje.",
     workerPhoneFallback:
       "Darbuotojo telefonas neįrašytas. Klientui bus nurodytas pagrindinis Takfornyelse numeris.",
     adminNote: "Vidinė pastaba",
     adminNoteHelp: "Klientui nerodoma.",
     createAndPlan: "Sukurti darbo užsakymą",
     savePlanning: "Išsaugoti darbuotoją ir laiką",
+    resendAssignmentNotifications: "Siųsti arba pakartoti paskyrimo laiškus",
+    resendAssignmentNotificationsConfirm:
+      "Ar dabar siųsti paskyrimo informaciją klientui ir darbuotojui?",
+    assignmentNotificationsSent:
+      "Paskyrimo informacija išsiųsta klientui ir darbuotojui.",
+    assignmentNotificationsQueued:
+      "Vienas arba abu laiškai saugiai laukia pakartotinio siuntimo.",
     cancelWork: "Atšaukti darbo užsakymą",
     cancelWorkConfirm: "Ar tikrai norite atšaukti darbo užsakymą?",
     employeeRequiredForDate: "Prieš nustatydami datą pasirinkite darbuotoją.",
@@ -611,15 +625,22 @@ const copy = {
     completePlanningRequired:
       "Choose an employee, date and the full arrival window.",
     planningSavedAndNotified:
-      "The assignment was saved and the customer was notified.",
+      "The assignment was saved. The customer and employee were notified.",
     planningSavedNotificationQueued:
-      "The assignment was saved. The customer notification is safely queued.",
+      "The assignment was saved. One or both notifications are safely queued for retry.",
     workerPhoneFallback:
       "The employee has no phone number. The customer will receive Takfornyelse's main number.",
     adminNote: "Internal note",
     adminNoteHelp: "Not shown to the customer.",
     createAndPlan: "Create work order",
     savePlanning: "Save assignment and schedule",
+    resendAssignmentNotifications: "Send or retry assignment emails",
+    resendAssignmentNotificationsConfirm:
+      "Send the assignment details to the customer and employee now?",
+    assignmentNotificationsSent:
+      "The assignment details were sent to the customer and employee.",
+    assignmentNotificationsQueued:
+      "One or both notifications are safely queued for another delivery attempt.",
     cancelWork: "Cancel work order",
     cancelWorkConfirm: "Are you sure you want to cancel this work order?",
     employeeRequiredForDate: "Choose an employee before setting a date.",

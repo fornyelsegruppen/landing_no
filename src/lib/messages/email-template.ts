@@ -43,10 +43,11 @@ function secureActionButton(url: string, label?: string) {
 
     const isQuoteLink = parsed.pathname.startsWith("/tilbud/");
     const isChangeAgreementLink = parsed.pathname.startsWith("/endring/");
+    const isWorkerPortalLink = parsed.pathname.startsWith("/user/");
     if (
       parsed.protocol !== "https:" ||
       !isTakfornyelseHost ||
-      (!isQuoteLink && !isChangeAgreementLink)
+      (!isQuoteLink && !isChangeAgreementLink && !isWorkerPortalLink)
     ) {
       return null;
     }
@@ -55,7 +56,9 @@ function secureActionButton(url: string, label?: string) {
       label ||
       (isChangeAgreementLink
         ? "Åpne endringsavtalen"
-        : "Åpne ditt sikre tilbud");
+        : isWorkerPortalLink
+          ? "Åpne oppdraget i medarbeiderportalen"
+          : "Åpne ditt sikre tilbud");
     return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:8px 0 4px;background:#f0a914;color:#101319;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 20px;border-radius:10px">${escapeHtml(buttonLabel)}</a>`;
   } catch {
     return null;

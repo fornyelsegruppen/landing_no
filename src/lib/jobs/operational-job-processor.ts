@@ -20,6 +20,7 @@ import { createEmailProvider } from "@/lib/providers/email-provider";
 import {
   ChannelUnavailableError,
   CommunicationCancelledError,
+  processWorkerAssignmentNotificationJob,
   processWorkOrderCommunicationJob,
 } from "@/lib/work-orders/communications";
 import { nextRetryDelayMs, sanitizeJobError } from "./job-policy";
@@ -67,11 +68,13 @@ async function automaticCommunicationJobIsPaused(
   job: { type?: string | null; payload?: unknown },
 ) {
   if (!automaticCommunicationIsPaused()) return false;
-  if (
-    ["work-order.communication", "quote.follow-up"].includes(job.type || "")
-  ) {
-    return true;
+  if (job.type === "work-order.communication") {
+    const data = job.payload && typeof job.payload === "object"
+      ? job.payload as Record<string, unknown>
+      : {};
+    return data.adminApprovedTransactional !== true;
   }
+  if (job.type === "quote.follow-up") return true;
   if (job.type !== "message.delivery") return false;
   const messageId = numericPayloadId(job.payload, "messageId");
   if (!messageId) return false;
@@ -88,7 +91,10 @@ async function automaticCommunicationJobIsPaused(
     message.aiAnalysis && typeof message.aiAnalysis === "object"
       ? (message.aiAnalysis as Record<string, unknown>)
       : {};
-  return Boolean(analysis.workOrderId || analysis.reminder);
+  return Boolean(
+    (analysis.workOrderId || analysis.reminder) &&
+    analysis.adminApprovedTransactional !== true,
+  );
 }
 
 async function rescueStaleJobs(payload: Payload, now: Date) {
@@ -206,6 +212,7 @@ export async function processOperationalJobs(
           "lead.ai.draft",
           "customer.reply.draft",
           "work-order.communication",
+          "worker.assignment.notification",
           "quote.follow-up",
         ],
       },
@@ -342,6 +349,21 @@ export async function processOperationalJobs(
           job.correlationId,
           now,
         );
+      } else if (job.type === "worker.assignment.notification") {
+        const provider = createEmailProvider();
+        if (provider.health().status !== "ready")
+          throw new Error("Email provider requires configuration");
+        const delivery = await processWorkerAssignmentNotificationJob(
+          payload,
+          job.payload,
+          job.correlationId,
+          provider,
+        );
+        jobResult = {
+          processed: true,
+          provider: delivery.provider,
+          providerMessageId: delivery.providerMessageId,
+        };
       } else {
         jobResult = await processQuoteFollowUpJob(
           payload,

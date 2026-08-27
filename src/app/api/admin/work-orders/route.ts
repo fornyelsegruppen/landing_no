@@ -8,7 +8,7 @@ import { norwayLocalDateTimeToIso } from "@/lib/norway-time";
 import { createWorkOrderFromContract } from "@/lib/work-orders/create";
 import { userIsAdmin } from "@/payload/access/roles";
 import { validateArrivalWindowForSchedule } from "@/lib/work-orders/scheduling";
-import { dispatchWorkOrderCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
+import { dispatchAdminApprovedScheduleCommunicationNow, notifyAssignedWorkerNow, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { captureException } from "@/lib/monitoring";
 import { assertExpectedDocumentHash, assertWorkOrderContractTarget } from "@/lib/admin-v2/commercial-action-guard";
 
@@ -64,19 +64,35 @@ export async function POST(request: Request) {
       correlationId: correlationIdFromHeaders(request.headers),
       changedFields: result.created ? ["contract", "quote", "lead", "assignedWorker", "scheduledAt", "arrivalWindow", "adminNote", "status"] : [],
     });
-    let notification: "sent" | "queued" | "skipped" = "skipped";
+    let customerNotification: "sent" | "queued" | "skipped" = "skipped";
+    let workerNotification: "sent" | "queued" | "skipped" = "skipped";
     if (result.workOrder.status === "scheduled") {
       try {
         await syncWorkOrderCommunicationJobs(payload, result.workOrder, correlationIdFromHeaders(request.headers));
-        const dispatched = await dispatchWorkOrderCommunicationNow(payload, result.workOrder, "schedule_confirmation", correlationIdFromHeaders(request.headers));
-        notification = dispatched.delivered ? "sent" : dispatched.queued ? "queued" : "skipped";
-        await notifyAssignedWorkerNow(payload, result.workOrder, correlationIdFromHeaders(request.headers));
       } catch (error) {
-        notification = "queued";
-        captureException(error, { route: "POST /api/admin/work-orders", operation: "schedule-notification", workOrderId: result.workOrder.id });
+        captureException(error, { route: "POST /api/admin/work-orders", operation: "schedule-reminders", workOrderId: result.workOrder.id });
+      }
+      try {
+        const dispatched = await dispatchAdminApprovedScheduleCommunicationNow(payload, result.workOrder, correlationIdFromHeaders(request.headers));
+        customerNotification = dispatched.delivered ? "sent" : dispatched.queued ? "queued" : "skipped";
+      } catch (error) {
+        customerNotification = "queued";
+        captureException(error, { route: "POST /api/admin/work-orders", operation: "customer-schedule-notification", workOrderId: result.workOrder.id });
+      }
+      try {
+        const dispatched = await notifyAssignedWorkerNow(payload, result.workOrder, correlationIdFromHeaders(request.headers));
+        workerNotification = dispatched.delivered ? "sent" : dispatched.queued ? "queued" : "skipped";
+      } catch (error) {
+        workerNotification = "queued";
+        captureException(error, { route: "POST /api/admin/work-orders", operation: "worker-assignment-notification", workOrderId: result.workOrder.id });
       }
     }
-    return NextResponse.json({ workOrderId: result.workOrder.id, created: result.created, notification }, { status: result.created ? 201 : 200 });
+    const notification = customerNotification === "sent" && workerNotification === "sent"
+      ? "sent"
+      : customerNotification === "queued" || workerNotification === "queued"
+        ? "queued"
+        : "skipped";
+    return NextResponse.json({ workOrderId: result.workOrder.id, created: result.created, notification, customerNotification, workerNotification }, { status: result.created ? 201 : 200 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Work-order creation failed" }, { status: 409 });
   }

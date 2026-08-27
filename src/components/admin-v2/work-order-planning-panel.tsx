@@ -188,6 +188,48 @@ export function WorkOrderPlanningPanel(props: {
     }
   }
 
+  async function notify() {
+    if (
+      !props.workOrderId ||
+      busy ||
+      !window.confirm(copy.resendAssignmentNotificationsConfirm)
+    )
+      return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const response = await fetch(
+        `/api/admin/work-orders/${props.workOrderId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "notify" }),
+        },
+      );
+      const result = (await response
+        .json()
+        .catch(() => ({}))) as AdminActionResponse;
+      const nextFeedback = interpretAdminActionResult({
+        fallbackError: copy.actionFailed,
+        ok: response.ok,
+        queuedMessage: copy.assignmentNotificationsQueued,
+        result,
+        staleMessage: copy.staleAction,
+        successMessage: copy.assignmentNotificationsSent,
+      });
+      setFeedback(nextFeedback);
+      if (nextFeedback.refresh) router.refresh();
+    } catch (error) {
+      setFeedback({
+        kind: "error",
+        message: error instanceof Error ? error.message : copy.actionFailed,
+        refresh: false,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div
       className="border-accent/30 bg-accent/5 mt-5 rounded-2xl border p-4"
@@ -396,6 +438,16 @@ export function WorkOrderPlanningPanel(props: {
             type="button"
           >
             {copy.cancelWork}
+          </button>
+        ) : null}
+        {!creating && props.status === "scheduled" ? (
+          <button
+            className="border-accent/40 text-accent hover:bg-accent/10 min-h-12 rounded-xl border px-5 font-bold disabled:opacity-60"
+            disabled={busy}
+            onClick={() => void notify()}
+            type="button"
+          >
+            {copy.resendAssignmentNotifications}
           </button>
         ) : null}
       </div>

@@ -2,10 +2,12 @@ export type AdminActionResponse = {
   code?: string;
   configurationRequired?: boolean;
   currentReference?: string;
+  customerNotification?: "sent" | "queued" | "skipped";
   error?: string;
   notification?: "sent" | "queued" | "skipped";
   queued?: boolean;
   sent?: boolean;
+  workerNotification?: "sent" | "queued" | "skipped";
 };
 
 export type AdminActionFeedback = {
