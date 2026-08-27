@@ -1,7 +1,7 @@
 # Takfornyelse — PROD-8 kontroliuojamo funkcijų įjungimo planas
 
 Data: 2026-08-27  
-Būsena: **PROD-8.0 PASS — PROD-8.1 funkcijos dar neįjungtos**
+Būsena: **PROD-8.1 PASS — PROD-8.2 nepradėtas**
 Apimtis: Production `takfornyelse.as`, administratoriaus `/admin-v2`, darbuotojo `/user`, saugios kliento nuorodos ir automatiniai operaciniai procesai.
 
 ## 1. Tikslas ir sprendimas
@@ -150,6 +150,20 @@ Užbaigta per safety-only Production deploy:
 ### Rollback
 
 Išjungti penkis šios bangos flagus, redeployinti paskutinę stabilią konfigūraciją ir sustabdyti tik `lead.ai.draft` tipo laukiančius darbus. Esami juodraščiai ir auditas išsaugomi.
+
+### Vykdymo įrašas — 2026-08-27
+
+**Dabartinė būsena: `PASS`.** PROD-8.1 užbaigtas; PROD-8.2 flagai neįjungti ir komercinis kelias nepradėtas.
+
+- Aktyvus Production deployment: `dpl_8ff7pKTcjvbJ7hzkvG7cK87JvFYs` (`Ready`), commit `f80a8d9`; momentinis rollback deployment `dpl_6agTKhwKULtEFvoPQJh3Zd5CSRAD`.
+- Įjungti tik penki šios bangos flagai: `FEATURE_CASE_STATE_ENGINE_V2`, `FEATURE_ADMIN_EXCEPTION_FLOWS_V2`, `FEATURE_AI_DRAFTS`, `FEATURE_ROOF_MEASUREMENT` ir `FEATURE_MEASUREMENT_EVIDENCE_V2`. Aštuoni vėlesnių bangų flagai liko `false`.
+- Kontroliuojama sintetinė Production byla `#9`; naudotas tik savininko kontroliuojamas adresas ir el. paštas, be tikro kliento.
+- Sukurtas vienas `receipt` ir išsiųstas vieną kartą. Sukurtas vienas norvegiškas `ai_reply` juodraštis; jis klientui nebuvo išsiųstas ir archyvuojant tapo `cancelled`.
+- Matavimo istorija nekintama: `TM-9-V1` automatinė schema su privačiu įrodymu; `TM-9-V2` ir `TM-9-V3` administratoriaus pasirinkto pagrindinio pastato `way/132540663` versijos su atskirais privačiais įrodymais; `TM-9-V4` — administratoriaus rankinis `manual_no_visual` plotas 102,2 m² su privalomu šaltiniu ir priežastimi, būsena `approved`.
+- Patvirtinta, kad nėra nė vieno kainos skaičiavimo, pasiūlymo, sutarties, darbo užsakymo ar pakeitimo susitarimo. Abu susiję operaciniai jobai (`message.delivery`, `lead.ai.draft`) yra `completed`; dublikatų nėra, abiejų žinučių idempotency raktai unikalūs.
+- Pirmas administratoriaus matavimo veiksmas atskleidė kainodaros priklausomybės izoliavimo klaidą ir vieną paaiškintą `POST /api/admin/leads/9` 500. Vykdymas buvo sustabdytas; pataisa `f80a8d9` izoliuoja matavimo pilotą nuo išjungtos kainodaros. Po pataisos pastato pasirinkimo `POST /api/admin/measurements` grąžino 201, matavimas patvirtintas, o naujų funkcinių 5xx nenustatyta.
+- Kokybės įrodymas prieš bangą ir pataisai: TypeScript, ESLint, 185 testų failai ir 594 testai PASS; Vercel Production build `Ready`. Windows ARM64 lokalaus build apribojimas susijęs tik su neegzistuojančiu pasirinktiniu `@libsql/win32-arm64-msvc` paketu ir neveikia Vercel/PostgreSQL Production.
+- Byla `#9` archyvuota kaip `other`, būsena `closed`, kitas veiksmas išvalytas. Yra tiksliai vienas nekintamas `lead.archive` audito įrašas; byla neperkelta į šiukšlinę ir neištrinta.
 
 ## 6. PROD-8.2 — kontroliuojamas kliento komercinis kelias
 
@@ -314,7 +328,7 @@ Po STOP:
 | Etapas                                 | Būsena  | Deployment / commit                                                                                         | Įrodymai                                                                                                             | Patvirtino                     | Laikas                       |
 | -------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------- |
 | PROD-8.0 Preflight                     | PASS    | Production `dpl_CWjdo63P3zdBmvFymZ3RwDnkmPXu`; Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`; commit `6007e79` | DB kopija, rollback, Gemini ir limitai, 584 testai, Preview/Production smoke, admin juosta, 0×5xx, 13/13 flagų false | Savininkas ir techninė patikra | 2026-08-27 12:59 Europe/Oslo |
-| PROD-8.1 Vidinė AI ir matavimo banga   | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
+| PROD-8.1 Vidinė AI ir matavimo banga   | PASS    | Production `dpl_8ff7pKTcjvbJ7hzkvG7cK87JvFYs`; rollback `dpl_6agTKhwKULtEFvoPQJh3Zd5CSRAD`; commit `f80a8d9` | Byla `#9`, 1× receipt sent, 1× AI draft cancelled archyvuojant, `TM-9-V1`–`V4`, 102,2 m² manual approval, 0 komercinių dokumentų, 2× completed jobs, 1× `lead.archive`, 594 testai PASS | Savininkas ir techninė patikra | 2026-08-27 14:29 Europe/Oslo |
 | PROD-8.2 Kliento komercinis kelias     | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
 | PROD-8.3 Darbo ir darbuotojo banga     | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
 | PROD-8.4 Priminimų ir blogo automatika | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
