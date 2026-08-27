@@ -90,7 +90,7 @@ test("project gallery presents photos in a clear chronological order", async ({
 
   const washingProject = page
     .getByRole("article")
-    .filter({ hasText: "Takvask – før, under og etter" });
+    .filter({ hasText: "Prosjekt 1 / 3" });
 
   await expect(washingProject.getByRole("heading", { level: 4 })).toHaveText([
     "Før- og ettereksempler",
