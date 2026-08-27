@@ -16,6 +16,7 @@ import { approveAndSendPreparedLeadPackage, prepareAutomaticLeadPackage } from "
 import { CaseCommandConflictError, updateCaseState } from "@/lib/cases/case-command";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
 import { customerReplyContextFromAnalysis } from "@/lib/messages/customer-reply";
+import { markLeadReviewed } from "@/lib/admin-v2/mark-lead-reviewed";
 
 export const maxDuration = 60;
 
@@ -99,6 +100,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }, { status: 409 });
     }
     let result: Record<string, unknown> = {};
+    let recordGenericAudit = true;
 
     if (parsed.data.action === "generate_reply") {
       assertFeatureReady("aiDrafts");
@@ -259,17 +261,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const updatedLead = "lead" in updated ? updated.lead : updated;
       result = { updated: true, lead: { id: updatedLead.id, address: updatedLead.address, postal: updatedLead.postal, city: updatedLead.city, inquiryType: updatedLead.inquiryType } };
     } else if (parsed.data.action === "mark_reviewed") {
-      const reviewedAt = lead.adminReviewedAt || new Date().toISOString();
-      if (!lead.adminReviewedAt) {
-        await payload.update({
-          collection: "leads",
-          id: leadId,
-          depth: 0,
-          overrideAccess: true,
-          data: { adminReviewedAt: reviewedAt, adminReviewedBy: user.id },
-        });
-      }
-      result = { reviewedAt };
+      result = await markLeadReviewed(payload, {
+        actorId: Number(user.id),
+        lead,
+        leadId,
+      });
+      recordGenericAudit = false;
     } else if (parsed.data.action === "start_measurement") {
       await updateCaseState(payload, { leadId, actorId: user.id, command: "start_measurement", idempotencyKey: `${correlationId}:start-measurement`, patch: { status: "measuring", nextActionOwner: "administrator", nextAction: "Start kontrollert takmåling.", nextActionAt: new Date().toISOString() } });
       result = { status: "measuring" };
@@ -278,7 +275,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       result = { status: "closed" };
     }
 
-    await recordAuditEvent(createPayloadAuditWriter(payload), {
+    if (recordGenericAudit) await recordAuditEvent(createPayloadAuditWriter(payload), {
       actorId: user.id,
       action: `lead.${parsed.data.action}`,
       entityType: "lead",
