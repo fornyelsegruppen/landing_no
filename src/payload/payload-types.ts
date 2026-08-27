@@ -669,7 +669,7 @@ export interface Lead {
   name: string;
   email?: string | null;
   /**
-   * Address supplied by the customer through a secure manual-contact recovery link.
+   * Adresse kunden har oppgitt via en sikker kontaktlenke. Nye meldinger bruker denne adressen uten å endre signerte dokumenter.
    */
   communicationEmail?: string | null;
   communicationEmailUpdatedAt?: string | null;
