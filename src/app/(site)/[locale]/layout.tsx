@@ -6,7 +6,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
-import { siteConfig } from "@/lib/site";
+import { isSiteLocale, siteConfig } from "@/lib/site";
 import { getSiteContent } from "@/lib/cms-content";
 import { localizeCopy } from "@/lib/page-copy";
 import { optimizeRemoteImageUrl } from "@/lib/images";
@@ -43,8 +43,9 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  if (!isSiteLocale(locale)) notFound();
   const content = await getSiteContent();
-  const meta = localizeCopy(content.copy, locale as "no" | "en").meta;
+  const meta = localizeCopy(content.copy, locale).meta;
   const ogImage = optimizeRemoteImageUrl(content.settings.images.hero.url, {
     width: 1200,
     quality: 70,
@@ -101,7 +102,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function LocaleLayout({ children, params }: Props) {
   const { locale } = await params;
 
-  if (!routing.locales.includes(locale as "no" | "en")) {
+  if (!isSiteLocale(locale)) {
     notFound();
   }
 

@@ -1,5 +1,6 @@
 import dynamic from "next/dynamic";
 import { setRequestLocale } from "next-intl/server";
+import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/sections/hero";
 import { PackageOfferSection } from "@/components/sections/package-offer";
 import { ServicesSection } from "@/components/sections/services";
@@ -14,7 +15,7 @@ import { routing } from "@/i18n/routing";
 import { getSiteContent } from "@/lib/cms-content";
 import { getLatestPublishedPosts } from "@/lib/cms-pages";
 import { buildLatestGuideCards } from "@/lib/blog/latest-guides";
-import type { Locale } from "@/lib/site";
+import { isSiteLocale } from "@/lib/site";
 
 /** Defer heavier below-fold client JS so initial load ships less unused code. */
 const CalculatorSection = dynamic(() =>
@@ -45,8 +46,9 @@ export function generateStaticParams() {
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
+  if (!isSiteLocale(locale)) notFound();
   setRequestLocale(locale);
-  const loc = locale as Locale;
+  const loc = locale;
   const [content, latestPosts] = await Promise.all([
     getSiteContent(),
     getLatestPublishedPosts(loc, 3),

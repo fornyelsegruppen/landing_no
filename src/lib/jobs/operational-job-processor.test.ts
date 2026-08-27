@@ -4,7 +4,7 @@ import { processOperationalJobs } from "./operational-job-processor";
 
 type Row = Record<string, unknown> & { id: number };
 
-function repository() {
+function repository(overrides: { message?: Record<string, unknown>; job?: Record<string, unknown> } = {}) {
   const lead: Row = { id: 1, email: "kunde@example.test", status: "new" };
   const message: Row = {
     id: 2,
@@ -29,6 +29,8 @@ function repository() {
     correlationId: "correlation-123",
     payload: { messageId: 2 },
   };
+  Object.assign(message, overrides.message);
+  Object.assign(job, overrides.job);
   const collections: Record<string, Row[]> = { leads: [lead], messages: [message], "operational-jobs": [job] };
   const payload = {
     async find({ collection, where }: { collection: string; where?: unknown }) {
@@ -102,5 +104,26 @@ describe("operational job processor", () => {
     expect(state.job).toMatchObject({ status: "attention", lastErrorCode: "Error" });
     expect(state.message.status).toBe("attention");
     expect(JSON.stringify(state.job)).not.toContain("kunde@example.test");
+  });
+
+  it("leaves automatic operational delivery pending while the Production pause is active", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.RESEND_API_KEY = "configured-for-test";
+    const state = repository({
+      message: {
+        category: "reminder",
+        aiAnalysis: { workOrderId: 7, communicationKind: "on_way" },
+      },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({ paused: [3], completed: [], attention: [] });
+    expect(state.job).toMatchObject({ status: "pending", attempts: 0 });
+    expect(state.message).toMatchObject({ status: "queued" });
   });
 });

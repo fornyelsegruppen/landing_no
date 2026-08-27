@@ -4,6 +4,7 @@ import { prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
 import { createCustomerReplyDraft, createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
 import { customerReplyPurposes, type CustomerReplyPurpose } from "@/lib/messages/customer-reply";
 import { featureReadiness } from "@/lib/platform/features";
+import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { ChannelUnavailableError, CommunicationCancelledError, processWorkOrderCommunicationJob } from "@/lib/work-orders/communications";
@@ -31,6 +32,30 @@ function customerReplyPurpose(value: unknown): CustomerReplyPurpose | null {
   return typeof purpose === "string" && (customerReplyPurposes as readonly string[]).includes(purpose)
     ? purpose as CustomerReplyPurpose
     : null;
+}
+
+async function automaticCommunicationJobIsPaused(
+  payload: Payload,
+  job: { type?: string | null; payload?: unknown },
+) {
+  if (!automaticCommunicationIsPaused()) return false;
+  if (["work-order.communication", "quote.follow-up"].includes(job.type || "")) {
+    return true;
+  }
+  if (job.type !== "message.delivery") return false;
+  const messageId = numericPayloadId(job.payload, "messageId");
+  if (!messageId) return false;
+  const message = await payload.findByID({
+    collection: "messages",
+    id: messageId,
+    depth: 0,
+    overrideAccess: true,
+  }).catch(() => null);
+  if (!message) return false;
+  const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
+    ? message.aiAnalysis as Record<string, unknown>
+    : {};
+  return Boolean(analysis.workOrderId || analysis.reminder);
 }
 
 async function rescueStaleJobs(payload: Payload, now: Date) {
@@ -131,8 +156,13 @@ export async function processOperationalJobs(payload: Payload, options: Processo
   const attention: number[] = [];
   const retried: number[] = [];
   const cancelled: number[] = [];
+  const paused: number[] = [];
 
   for (const job of jobs.docs) {
+    if (await automaticCommunicationJobIsPaused(payload, job)) {
+      paused.push(job.id);
+      continue;
+    }
     const attempts = (job.attempts || 0) + 1;
     await payload.update({
       collection: "operational-jobs",
@@ -244,5 +274,5 @@ export async function processOperationalJobs(payload: Payload, options: Processo
   }
 
   const overdue = await overduePendingJobIds(payload, now);
-  return { completed, attention, retried, cancelled, rescued, overdue };
+  return { completed, attention, retried, cancelled, paused, rescued, overdue };
 }

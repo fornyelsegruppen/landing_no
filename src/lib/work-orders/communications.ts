@@ -3,6 +3,7 @@ import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { sanitizeJobError } from "@/lib/jobs/job-policy";
 import { deliverMessage, enqueueMessageJob } from "@/lib/messages/message-engine";
 import { featureReadiness } from "@/lib/platform/features";
+import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import type { EmailProvider } from "@/lib/providers/contracts";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { buildBrandedEmailHtml } from "@/lib/messages/email-template";
@@ -77,7 +78,7 @@ async function createJob(payload: Payload, input: JobPayload, availableAt: Date,
 }
 
 export async function syncWorkOrderCommunicationJobs(payload: Payload, order: CommunicationOrder, correlationId: string, now = new Date()) {
-  if (!featureReadiness("automatedReminders").ready) return { created: 0, cancelled: 0, skipped: true as const };
+  if (automaticCommunicationIsPaused() || !featureReadiness("automatedReminders").ready) return { created: 0, cancelled: 0, skipped: true as const };
   const scheduleVersion = workOrderScheduleVersion(order);
   const pending = await pendingCommunicationJobs(payload, order.id);
   let cancelled = 0;
@@ -108,7 +109,7 @@ export async function enqueueWorkOrderStatusCommunication(
   correlationId: string,
   now = new Date(),
 ) {
-  if (!featureReadiness("automatedReminders").ready) return { skipped: true as const };
+  if (automaticCommunicationIsPaused() || !featureReadiness("automatedReminders").ready) return { skipped: true as const };
   if (!communicationIsCurrent({ workOrderId: order.id, kind, scheduleVersion: workOrderScheduleVersion(order) }, order)) {
     throw new CommunicationCancelledError("Work status no longer matches the customer notification");
   }
@@ -116,7 +117,7 @@ export async function enqueueWorkOrderStatusCommunication(
 }
 
 export async function enqueueCompletionCommunication(payload: Payload, order: { id: number; status: string; documentationSubmittedAt?: string | null }, correlationId: string, now = new Date()) {
-  if (!featureReadiness("automatedReminders").ready) return { skipped: true as const };
+  if (automaticCommunicationIsPaused() || !featureReadiness("automatedReminders").ready) return { skipped: true as const };
   if (order.status !== "documented" || !order.documentationSubmittedAt) throw new CommunicationCancelledError("Completion communication requires documented work");
   return { skipped: false as const, job: await createJob(payload, { workOrderId: order.id, kind: "completion", scheduleVersion: `documented:${order.documentationSubmittedAt}` }, now, correlationId) };
 }
@@ -141,7 +142,7 @@ export async function dispatchWorkOrderCommunicationNow(
   correlationId: string,
   provider: EmailProvider = createEmailProvider(),
 ) {
-  if (!featureReadiness("automatedReminders").ready) {
+  if (automaticCommunicationIsPaused() || !featureReadiness("automatedReminders").ready) {
     return { skipped: true as const, delivered: false as const, queued: false as const };
   }
   const queued = kind === "completion"
@@ -246,6 +247,9 @@ export async function dispatchWorkOrderRescheduleNow(
   correlationId: string,
   provider: EmailProvider = createEmailProvider(),
 ) {
+  if (automaticCommunicationIsPaused()) {
+    return { skipped: true as const, delivered: false as const, queued: false as const };
+  }
   if (!planningReason.trim()) throw new TypeError("A rescheduling reason is required");
   if (!order.scheduledAt || order.status !== "scheduled") throw new CommunicationCancelledError("A new complete schedule is required");
   const input: JobPayload = {
@@ -281,6 +285,7 @@ export async function notifyAssignedWorkerNow(
   correlationId: string,
   provider: EmailProvider = createEmailProvider(),
 ) {
+  if (automaticCommunicationIsPaused()) return { skipped: true as const };
   const workerId = relationId(order.assignedWorker);
   if (!workerId || !order.scheduledAt || !order.arrivalWindow) throw new TypeError("Complete assignment is required before notifying the employee");
   const worker = await payload.findByID({ collection: "users", id: workerId, depth: 0, overrideAccess: true });

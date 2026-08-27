@@ -4,6 +4,7 @@ import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
 import { deliverMessage } from "@/lib/messages/message-engine";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { siteConfig } from "@/lib/site";
+import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import { issueQuoteAccessToken, revokeQuoteAccessTokens } from "./customer-access";
 import type { QuoteFollowUpPayload } from "./follow-up-schedule";
 
@@ -15,6 +16,7 @@ function parse(value: unknown): QuoteFollowUpPayload | null {
 }
 
 export async function processQuoteFollowUpJob(payload: Payload, raw: unknown, correlationId: string, now = new Date()) {
+  if (automaticCommunicationIsPaused()) return { skipped: true, reason: "automation-paused" };
   const input = parse(raw);
   if (!input) throw new TypeError("Quote follow-up job is invalid");
   const quote = await payload.findByID({ collection: "quotes", id: input.quoteId, depth: 0, overrideAccess: true });

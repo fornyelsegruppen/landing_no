@@ -7,6 +7,26 @@ describe("quote follow-up", () => {
     delete process.env.FEATURE_COMMUNICATION_ROUTING_V2;
     delete process.env.RESEND_API_KEY;
     delete process.env.CRON_SECRET;
+    delete process.env.VERCEL_ENV;
+    delete process.env.AUTOMATION_EMERGENCY_PAUSE;
+  });
+
+  it("keeps automatic follow-ups paused by default in Production", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.FEATURE_COMMUNICATION_ROUTING_V2 = "true";
+    process.env.RESEND_API_KEY = "test";
+    process.env.CRON_SECRET = "test";
+    const payload = { find: vi.fn(), create: vi.fn() };
+
+    const result = await enqueueQuoteFollowUps(
+      payload as never,
+      { quoteId: 4, leadId: 2, validUntil: "2026-09-10T10:00:00.000Z" },
+      "corr",
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+
+    expect(result).toMatchObject({ skipped: true, created: 0 });
+    expect(payload.create).not.toHaveBeenCalled();
   });
 
   it("creates at most two reminders and one expiry job idempotently", async () => {

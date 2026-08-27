@@ -35,3 +35,7 @@ export const siteConfig = {
 };
 
 export type Locale = (typeof siteConfig.locales)[number];
+
+export function isSiteLocale(value: string): value is Locale {
+  return siteConfig.locales.includes(value as Locale);
+}

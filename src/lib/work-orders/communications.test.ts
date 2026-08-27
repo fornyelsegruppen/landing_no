@@ -67,6 +67,22 @@ describe("work-order communications", () => {
     delete process.env.FEATURE_AUTOMATED_REMINDERS;
     delete process.env.RESEND_API_KEY;
     delete process.env.CRON_SECRET;
+    delete process.env.VERCEL_ENV;
+    delete process.env.AUTOMATION_EMERGENCY_PAUSE;
+  });
+
+  it("does not create automatic communication jobs while the Production pause is active", async () => {
+    process.env.VERCEL_ENV = "production";
+    const { payload, rows } = fakePayload();
+    const result = await syncWorkOrderCommunicationJobs(
+      payload,
+      { id: 7, status: "scheduled", scheduledAt: "2026-08-27T10:00:00Z" },
+      "correlation-paused",
+      new Date("2026-08-23T08:00:00Z"),
+    );
+
+    expect(result).toMatchObject({ skipped: true, created: 0 });
+    expect(rows.jobs).toHaveLength(0);
   });
 
   it("creates each reminder once and cancels the old schedule on reschedule", async () => {
@@ -135,7 +151,12 @@ describe("work-order communications", () => {
   it("requires attention instead of silently changing an SMS preference", async () => {
     const order = { id: 9, lead: 4, contract: 3, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T10:00:00Z", arrivalWindow: "12:00–14:00", afterPhotos: [] };
     const { payload } = fakePayload({ order, lead: { id: 4, name: "Kunde", email: "kunde@example.no", preferredChannel: "sms" } });
-    await expect(processWorkOrderCommunicationJob(payload, { workOrderId: 9, kind: "reminder_48h", scheduleVersion: workOrderScheduleVersion(order) }, "correlation-1")).rejects.toBeInstanceOf(ChannelUnavailableError);
+    await expect(processWorkOrderCommunicationJob(
+      payload,
+      { workOrderId: 9, kind: "reminder_48h", scheduleVersion: workOrderScheduleVersion(order) },
+      "correlation-1",
+      new Date("2026-08-25T10:00:00Z"),
+    )).rejects.toBeInstanceOf(ChannelUnavailableError);
   });
 
   it("includes the assigned worker, phone and selected arrival interval", async () => {
