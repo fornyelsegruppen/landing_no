@@ -6,10 +6,11 @@ Systemets `/api/admin/platform-health` og adminoversikt beregner dette registere
 
 | Miljønøkkel | Bevis | Status |
 |---|---|---|
-| `STAGING_QA_REFERENCE` | Signert staging-QA | Ikke utført |
-| `RESTORE_TEST_REFERENCE` | Bestått restore-øvelse | Ikke utført |
-| `LEAD_INBOX_PILOT_REFERENCE` | Rapport fra 20–30 pilotleads | Ikke utført |
-| `PRODUCTION_OWNER_APPROVAL_REFERENCE` | Eksplisitt produkteiergodkjenning | Ikke utført |
+| `STAGING_QA_REFERENCE` | Staging-QA: Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`, commit `6007e79`, 584 tester og route-smoke | Bestått; må registreres i Production env |
+| `RESTORE_TEST_REFERENCE` | Tidligere restore-øvelse `br-curly-bar-asjsrltd`; fersk lesekontroll `br-damp-unit-as3pdkgr` | Bestått; må registreres i Production env |
+| `PRODUCTION_OWNER_APPROVAL_REFERENCE` | Eier godkjente PROD-8-planen og oppstart 2026-08-27 | Godkjent; må registreres i Production env |
+
+`LEAD_INBOX_PILOT_REFERENCE` er ikke et felles krav for kontrollerte PROD-8-bølger. Det settes først etter rapporten fra 20–30 reelle pilotleads og kreves for overgang fra `controlled_pilot` til `full_automation`.
 
 ## Feature-spesifikke bevis
 
@@ -29,4 +30,4 @@ Systemets `/api/admin/platform-health` og adminoversikt beregner dette registere
 | `FEATURE_CUSTOMER_LIFECYCLE_V2` | `CUSTOMER_LIFECYCLE_QA_REFERENCE` | Avslått |
 | `FEATURE_SECURITY_HARDENING_V2` | `SECURITY_HARDENING_QA_REFERENCE` | Avslått |
 
-En rad får bare `go` når flagget er eksplisitt aktivert, alle tekniske integrasjoner er klare og alle felles og feature-spesifikke referanser finnes. Et avslått flagg rapporteres `disabled`, ikke `go`.
+En rad får bare `go` når flagget er eksplisitt aktivert, alle tekniske integrasjoner er klare og alle felles og feature-spesifikke referanser finnes. Et avslått flagg rapporteres `disabled`, ikke `go`. Manglende `LEAD_INBOX_PILOT_REFERENCE` blokkerer ikke en kontrollert bølge, men blokkerer `full_automation`.

@@ -1,7 +1,7 @@
 # Takfornyelse — PROD-8 kontroliuojamo funkcijų įjungimo planas
 
 Data: 2026-08-27  
-Būsena: **PARUOŠTA VYKDYTI — funkcijos dar neįjungtos**  
+Būsena: **PROD-8.0 PRECHECK — funkcijos dar neįjungtos**
 Apimtis: Production `takfornyelse.as`, administratoriaus `/admin-v2`, darbuotojo `/user`, saugios kliento nuorodos ir automatiniai operaciniai procesai.
 
 ## 1. Tikslas ir sprendimas
@@ -81,6 +81,33 @@ Kiekvieno etapo užbaigimo įrašas privalo turėti:
 - backup arba rollback nepatikrinamas;
 - aptinkamas nepaaiškintas 5xx, duomenų neatitikimas arba Production/Preview paslapties sumaišymas;
 - negalima saugiai nustatyti flagų ar priklausomybių būsenos.
+
+### Vykdymo įrašas — 2026-08-27
+
+**Dabartinė būsena: `PRECHECK`.** PROD-8.1 nepradedamas, kol visi likę punktai neturi įrodymo.
+
+Patvirtinta:
+
+- aktyvus Production deployment: `dpl_DU2EPy99v6px53cQQfAqTYq3afHj` (`Ready`), domenai `takfornyelse.as` ir `www.takfornyelse.as`;
+- patikrintas ankstesnis `Ready` rollback deployment: `dpl_DjHgvHsNKUSmNLGU6fvSRyomX8cS`;
+- šviežia Production DB kopija: `br-damp-unit-as3pdkgr`; kopija pasiekiama tik skaitymui, įrašų skaičiai sutikrinti;
+- visi 13 Production `FEATURE_*` flagų yra `false`;
+- aktyvių sintetinių bylų nėra; PROD-7 byla `#8` archyvuota;
+- Production bazinė eilė: vienas užbaigtas operacinis darbas, viena išsiųsta žinutė, įstrigusių darbų nenustatyta;
+- `/meta.json` 500 priežastis pašalinta commitais `8098739` ir `6007e79`;
+- 184 testų failai ir 584 testai PASS; TypeScript bei ESLint PASS;
+- galutinis Phase 0 Preview deployment `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ` yra `Ready`, turi piloto režimo konfigūraciją ir priskirtas `takfornyelse-staging.vercel.app`;
+- Preview smoke: `/no`, `/en`, `/no/blogg`, `/robots.txt`, `/sitemap.xml` = 200; `/admin-v2` ir `/user` = saugus login redirect; `/meta.json` = 404; 5xx = 0;
+- centrinis automatinių operacinių siuntimų pristabdymas įdiegtas ir padengtas testais;
+- administratoriaus kontroliuojamo piloto juosta įdiegta ir turi render testą LT kalba.
+
+Dar būtina prieš `PASS`:
+
+- Production aplinkoje saugiai pridėti `GEMINI_API_KEY`, `GEMINI_MODEL`, dienos ir mėnesio limitus;
+- pridėti Production `PLATFORM_OPERATING_MODE=controlled_pilot`, `PLATFORM_ACTIVE_WAVE=PROD-8.0` ir `AUTOMATION_EMERGENCY_PAUSE=true`;
+- pridėti tikrus `STAGING_QA_REFERENCE`, `RESTORE_TEST_REFERENCE` ir `PRODUCTION_OWNER_APPROVAL_REFERENCE` identifikatorius;
+- prisijungusio administratoriaus naršyklėje patvirtinti piloto juostos tekstą ir mobilų vaizdą;
+- gavus atskirą savininko patvirtinimą, Production įdiegti tik PROD-8.0 saugos pataisymus ir pakartoti bazinį smoke bei 5xx patikrą.
 
 ## 5. PROD-8.1 — vidinė bylų, AI ir matavimo banga
 
@@ -281,7 +308,7 @@ Po STOP:
 
 | Etapas | Būsena | Deployment / commit | Įrodymai | Patvirtino | Laikas |
 |---|---|---|---|---|---|
-| PROD-8.0 Preflight | PENDING |  |  |  |  |
+| PROD-8.0 Preflight | PRECHECK | Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ` / `6007e79` | DB kopija, 584 testai, smoke, 0×5xx; likę Production Gemini/env ir prisijungusio admin QA | Savininko plano vykdymas patvirtintas | 2026-08-27 12:27 Europe/Oslo |
 | PROD-8.1 Vidinė AI ir matavimo banga | PENDING |  |  |  |  |
 | PROD-8.2 Kliento komercinis kelias | PENDING |  |  |  |  |
 | PROD-8.3 Darbo ir darbuotojo banga | PENDING |  |  |  |  |
