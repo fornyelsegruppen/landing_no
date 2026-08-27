@@ -75,4 +75,33 @@ describe("PROD-7 lead inquiry type compatibility migration", () => {
     `);
     expect(labels.rows).toEqual([{ enumlabel: "takvask_impregnering" }]);
   }, 30_000);
+
+  it("uses the enum actually attached to the inquiry column", async () => {
+    await database.exec(`
+      DROP TABLE leads;
+      DROP TYPE enum_leads_type;
+      CREATE TYPE enum_leads_inquiry_type AS ENUM('takvask', 'usikker');
+      CREATE TABLE leads (
+        id serial PRIMARY KEY,
+        inquiry_type enum_leads_inquiry_type NOT NULL
+      );
+    `);
+
+    await database.exec(upSql());
+    await database.exec(
+      "INSERT INTO leads (inquiry_type) VALUES ('takvask_impregnering')",
+    );
+
+    const result = await database.query<{ inquiry_type: string }>(
+      "SELECT inquiry_type::text AS inquiry_type FROM leads",
+    );
+    expect(result.rows).toEqual([
+      { inquiry_type: "takvask_impregnering" },
+    ]);
+  }, 30_000);
+
+  it("is a safe no-op before the leads schema exists", async () => {
+    await database.exec("DROP TABLE leads; DROP TYPE enum_leads_type");
+    await expect(database.exec(upSql())).resolves.toBeDefined();
+  }, 30_000);
 });
