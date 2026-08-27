@@ -34,12 +34,23 @@ describe("platform operating mode", () => {
     expect(status.disabledFeatures).toHaveLength(12);
   });
 
-  it("allows full mode only after the real pilot reference is recorded", () => {
+  it("allows full mode only after lead and physical roof pilot evidence is recorded", () => {
     expect(
       buildOperatingMode({
         PLATFORM_OPERATING_MODE: "full_automation",
         LEAD_INBOX_PILOT_REFERENCE: "pilot-report-30",
+        ROOF_VALIDATION_REFERENCE: "physical-roof-comparison-3",
       }).mode,
     ).toBe("full_automation");
+  });
+
+  it("keeps full mode closed when only technical roof QA exists", () => {
+    expect(
+      buildOperatingMode({
+        PLATFORM_OPERATING_MODE: "full_automation",
+        LEAD_INBOX_PILOT_REFERENCE: "pilot-report-30",
+        ROOF_TECHNICAL_QA_REFERENCE: "staging-roof-qa",
+      }).mode,
+    ).toBe("controlled_pilot");
   });
 });

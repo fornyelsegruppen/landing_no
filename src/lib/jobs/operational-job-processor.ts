@@ -1,13 +1,27 @@
 import type { Payload, Where } from "payload";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
-import { prepareAutomaticLeadPackage } from "@/lib/leads/automatic-package";
-import { createCustomerReplyDraft, createLeadAiReply, deliverMessage } from "@/lib/messages/message-engine";
-import { customerReplyPurposes, type CustomerReplyPurpose } from "@/lib/messages/customer-reply";
+import {
+  prepareAutomaticLeadMeasurement,
+  prepareAutomaticLeadPackage,
+} from "@/lib/leads/automatic-package";
+import {
+  createCustomerReplyDraft,
+  createLeadAiReply,
+  deliverMessage,
+} from "@/lib/messages/message-engine";
+import {
+  customerReplyPurposes,
+  type CustomerReplyPurpose,
+} from "@/lib/messages/customer-reply";
 import { featureReadiness } from "@/lib/platform/features";
 import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { createEmailProvider } from "@/lib/providers/email-provider";
-import { ChannelUnavailableError, CommunicationCancelledError, processWorkOrderCommunicationJob } from "@/lib/work-orders/communications";
+import {
+  ChannelUnavailableError,
+  CommunicationCancelledError,
+  processWorkOrderCommunicationJob,
+} from "@/lib/work-orders/communications";
 import { nextRetryDelayMs, sanitizeJobError } from "./job-policy";
 import { processQuoteFollowUpJob } from "@/lib/quotes/follow-up";
 import { updateCaseState } from "@/lib/cases/case-command";
@@ -20,7 +34,20 @@ type ProcessorOptions = {
   rescueStale?: boolean;
 };
 
-function numericPayloadId(value: unknown, key: "messageId" | "leadId" | "sourceMessageId") {
+export function automaticPreparationScope(
+  measurementReady: boolean,
+  quotesReady: boolean,
+) {
+  if (!measurementReady) return "none" as const;
+  return quotesReady
+    ? ("commercial-package" as const)
+    : ("measurement-only" as const);
+}
+
+function numericPayloadId(
+  value: unknown,
+  key: "messageId" | "leadId" | "sourceMessageId",
+) {
   if (!value || typeof value !== "object") return null;
   const id = (value as Record<string, unknown>)[key];
   return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
@@ -29,8 +56,9 @@ function numericPayloadId(value: unknown, key: "messageId" | "leadId" | "sourceM
 function customerReplyPurpose(value: unknown): CustomerReplyPurpose | null {
   if (!value || typeof value !== "object") return null;
   const purpose = (value as Record<string, unknown>).purpose;
-  return typeof purpose === "string" && (customerReplyPurposes as readonly string[]).includes(purpose)
-    ? purpose as CustomerReplyPurpose
+  return typeof purpose === "string" &&
+    (customerReplyPurposes as readonly string[]).includes(purpose)
+    ? (purpose as CustomerReplyPurpose)
     : null;
 }
 
@@ -39,22 +67,27 @@ async function automaticCommunicationJobIsPaused(
   job: { type?: string | null; payload?: unknown },
 ) {
   if (!automaticCommunicationIsPaused()) return false;
-  if (["work-order.communication", "quote.follow-up"].includes(job.type || "")) {
+  if (
+    ["work-order.communication", "quote.follow-up"].includes(job.type || "")
+  ) {
     return true;
   }
   if (job.type !== "message.delivery") return false;
   const messageId = numericPayloadId(job.payload, "messageId");
   if (!messageId) return false;
-  const message = await payload.findByID({
-    collection: "messages",
-    id: messageId,
-    depth: 0,
-    overrideAccess: true,
-  }).catch(() => null);
+  const message = await payload
+    .findByID({
+      collection: "messages",
+      id: messageId,
+      depth: 0,
+      overrideAccess: true,
+    })
+    .catch(() => null);
   if (!message) return false;
-  const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
-    ? message.aiAnalysis as Record<string, unknown>
-    : {};
+  const analysis =
+    message.aiAnalysis && typeof message.aiAnalysis === "object"
+      ? (message.aiAnalysis as Record<string, unknown>)
+      : {};
   return Boolean(analysis.workOrderId || analysis.reminder);
 }
 
@@ -104,24 +137,49 @@ async function overduePendingJobIds(payload: Payload, now: Date) {
     },
   });
   return result.docs
-    .filter((job) => ["pending", "retry"].includes(job.status) && new Date(job.availableAt).getTime() <= new Date(overdueBefore).getTime())
+    .filter(
+      (job) =>
+        ["pending", "retry"].includes(job.status) &&
+        new Date(job.availableAt).getTime() <=
+          new Date(overdueBefore).getTime(),
+    )
     .map((job) => job.id);
 }
 
-async function markMessageContactAttention(payload: Payload, messageId: number, reason: string, now: Date) {
-  const message = await payload.findByID({ collection: "messages", id: messageId, depth: 0, overrideAccess: true });
-  const leadId = typeof message.lead === "number"
-    ? message.lead
-    : message.lead && typeof message.lead === "object" && "id" in message.lead
-      ? Number(message.lead.id)
-      : null;
+async function markMessageContactAttention(
+  payload: Payload,
+  messageId: number,
+  reason: string,
+  now: Date,
+) {
+  const message = await payload.findByID({
+    collection: "messages",
+    id: messageId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const leadId =
+    typeof message.lead === "number"
+      ? message.lead
+      : message.lead && typeof message.lead === "object" && "id" in message.lead
+        ? Number(message.lead.id)
+        : null;
   if (!leadId || !Number.isSafeInteger(leadId)) return;
-  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
-  const hasPhone = typeof lead.phone === "string" && lead.phone.trim().length >= 8;
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  const hasPhone =
+    typeof lead.phone === "string" && lead.phone.trim().length >= 8;
   await updateCaseState(payload, {
     leadId,
     command: "message_delivery_attention",
-    idempotencyKey: makeIdempotencyKey("message.delivery-attention", { messageId, reason }),
+    idempotencyKey: makeIdempotencyKey("message.delivery-attention", {
+      messageId,
+      reason,
+    }),
     patch: {
       nextActionOwner: "administrator",
       nextActionAt: now.toISOString(),
@@ -133,11 +191,25 @@ async function markMessageContactAttention(payload: Payload, messageId: number, 
   });
 }
 
-export async function processOperationalJobs(payload: Payload, options: ProcessorOptions = {}) {
+export async function processOperationalJobs(
+  payload: Payload,
+  options: ProcessorOptions = {},
+) {
   const now = options.now || new Date();
-  const rescued = options.rescueStale === false ? [] : await rescueStaleJobs(payload, now);
+  const rescued =
+    options.rescueStale === false ? [] : await rescueStaleJobs(payload, now);
   const filters: Where[] = [
-    { type: { in: ["message.delivery", "lead.ai.draft", "customer.reply.draft", "work-order.communication", "quote.follow-up"] } },
+    {
+      type: {
+        in: [
+          "message.delivery",
+          "lead.ai.draft",
+          "customer.reply.draft",
+          "work-order.communication",
+          "quote.follow-up",
+        ],
+      },
+    },
     { status: { in: ["pending", "retry"] } },
     { availableAt: { less_than_equal: now.toISOString() } },
   ];
@@ -174,60 +246,116 @@ export async function processOperationalJobs(payload: Payload, options: Processo
       let jobResult: Record<string, unknown> = { processed: true };
       if (job.type === "message.delivery") {
         const messageId = numericPayloadId(job.payload, "messageId");
-        if (!messageId) throw new TypeError("Delivery job has no message reference");
+        if (!messageId)
+          throw new TypeError("Delivery job has no message reference");
         const provider = createEmailProvider();
-        if (provider.health().status !== "ready") throw new Error("Email provider requires configuration");
+        if (provider.health().status !== "ready")
+          throw new Error("Email provider requires configuration");
         await deliverMessage(payload, provider, messageId, job.correlationId);
       } else if (job.type === "customer.reply.draft") {
         const leadId = numericPayloadId(job.payload, "leadId");
-        const sourceMessageId = numericPayloadId(job.payload, "sourceMessageId");
+        const sourceMessageId = numericPayloadId(
+          job.payload,
+          "sourceMessageId",
+        );
         const purpose = customerReplyPurpose(job.payload);
-        if (!leadId || !sourceMessageId || !purpose) throw new TypeError("Customer reply job has incomplete references");
-        if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
+        if (!leadId || !sourceMessageId || !purpose)
+          throw new TypeError("Customer reply job has incomplete references");
+        if (!featureReadiness("aiDrafts").ready)
+          throw new Error("AI drafts require configuration");
         await assertPayloadAiUsageAvailable(payload);
-        await createCustomerReplyDraft(payload, new GeminiAiProvider(), { correlationId: job.correlationId, leadId, purpose, sourceMessageId });
+        await createCustomerReplyDraft(payload, new GeminiAiProvider(), {
+          correlationId: job.correlationId,
+          leadId,
+          purpose,
+          sourceMessageId,
+        });
       } else if (job.type === "lead.ai.draft") {
         const leadId = numericPayloadId(job.payload, "leadId");
         if (!leadId) throw new TypeError("AI job has no lead reference");
-        const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+        const lead = await payload.findByID({
+          collection: "leads",
+          id: leadId,
+          depth: 0,
+          overrideAccess: true,
+        });
         if (lead.status === "converted" || lead.status === "closed") {
           await payload.update({
             collection: "operational-jobs",
             id: job.id,
             overrideAccess: true,
-            data: { status: "cancelled", completedAt: new Date().toISOString(), result: { processed: false, reason: "lead-terminal-state" } },
+            data: {
+              status: "cancelled",
+              completedAt: new Date().toISOString(),
+              result: { processed: false, reason: "lead-terminal-state" },
+            },
           });
           cancelled.push(job.id);
           continue;
         }
-        if (!featureReadiness("aiDrafts").ready) throw new Error("AI drafts require configuration");
+        if (!featureReadiness("aiDrafts").ready)
+          throw new Error("AI drafts require configuration");
         await assertPayloadAiUsageAvailable(payload);
-        await createLeadAiReply(payload, new GeminiAiProvider(), leadId, job.correlationId);
-        const measurementReady = featureReadiness("roofMeasurement").ready;
+        await createLeadAiReply(
+          payload,
+          new GeminiAiProvider(),
+          leadId,
+          job.correlationId,
+        );
+        const measurementReady =
+          featureReadiness("roofMeasurement").ready &&
+          featureReadiness("measurementEvidenceV2").ready;
         const quotesReady = featureReadiness("customerQuotes").ready;
-        if (measurementReady && quotesReady) {
-          const preparedPackage = await prepareAutomaticLeadPackage(payload, leadId);
-          jobResult = { processed: true, package: preparedPackage };
+        const preparationScope = automaticPreparationScope(
+          measurementReady,
+          quotesReady,
+        );
+        if (preparationScope !== "none") {
+          const preparedPackage =
+            preparationScope === "commercial-package"
+              ? await prepareAutomaticLeadPackage(payload, leadId)
+              : await prepareAutomaticLeadMeasurement(payload, leadId);
+          jobResult = {
+            processed: true,
+            package: preparedPackage,
+            scope: preparationScope,
+          };
         } else {
           jobResult = {
             processed: true,
             package: {
               status: "skipped",
-              reason: "roof-measurement-or-customer-quotes-not-ready",
+              reason: "roof-measurement-not-ready",
             },
           };
         }
       } else if (job.type === "work-order.communication") {
-        await processWorkOrderCommunicationJob(payload, job.payload, job.correlationId, now);
+        await processWorkOrderCommunicationJob(
+          payload,
+          job.payload,
+          job.correlationId,
+          now,
+        );
       } else {
-        jobResult = await processQuoteFollowUpJob(payload, job.payload, job.correlationId, now);
+        jobResult = await processQuoteFollowUpJob(
+          payload,
+          job.payload,
+          job.correlationId,
+          now,
+        );
       }
 
       await payload.update({
         collection: "operational-jobs",
         id: job.id,
         overrideAccess: true,
-        data: { status: "completed", completedAt: new Date().toISOString(), result: jobResult, lastErrorCode: null, lastErrorMessage: null },
+        data: {
+          status: "completed",
+          completedAt: new Date().toISOString(),
+          result: jobResult,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        },
       });
       completed.push(job.id);
     } catch (error) {
@@ -236,22 +364,32 @@ export async function processOperationalJobs(payload: Payload, options: Processo
           collection: "operational-jobs",
           id: job.id,
           overrideAccess: true,
-          data: { status: "cancelled", completedAt: new Date().toISOString(), lastErrorCode: "STATE_CHANGED", lastErrorMessage: error.message },
+          data: {
+            status: "cancelled",
+            completedAt: new Date().toISOString(),
+            lastErrorCode: "STATE_CHANGED",
+            lastErrorMessage: error.message,
+          },
         });
         cancelled.push(job.id);
         continue;
       }
       const sanitized = sanitizeJobError(error);
-      const exhausted = error instanceof ChannelUnavailableError
-        || attempts >= (job.maxAttempts || 3)
-        || /requires configuration|daily request limit/i.test(error instanceof Error ? error.message : "");
+      const exhausted =
+        error instanceof ChannelUnavailableError ||
+        attempts >= (job.maxAttempts || 3) ||
+        /requires configuration|daily request limit/i.test(
+          error instanceof Error ? error.message : "",
+        );
       await payload.update({
         collection: "operational-jobs",
         id: job.id,
         overrideAccess: true,
         data: {
           status: exhausted ? "attention" : "retry",
-          availableAt: new Date(now.getTime() + nextRetryDelayMs(attempts)).toISOString(),
+          availableAt: new Date(
+            now.getTime() + nextRetryDelayMs(attempts),
+          ).toISOString(),
           lastErrorCode: sanitized.code,
           lastErrorMessage: sanitized.message,
         },
@@ -263,9 +401,18 @@ export async function processOperationalJobs(payload: Payload, options: Processo
             collection: "messages",
             id: messageId,
             overrideAccess: true,
-            data: { status: "attention", failureCode: sanitized.code, failureMessage: sanitized.message },
+            data: {
+              status: "attention",
+              failureCode: sanitized.code,
+              failureMessage: sanitized.message,
+            },
           });
-          await markMessageContactAttention(payload, messageId, sanitized.code, now);
+          await markMessageContactAttention(
+            payload,
+            messageId,
+            sanitized.code,
+            now,
+          );
         }
       }
       if (exhausted) attention.push(job.id);

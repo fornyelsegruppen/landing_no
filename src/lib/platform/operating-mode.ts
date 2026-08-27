@@ -29,7 +29,8 @@ export function buildOperatingMode(environment: Environment = process.env) {
   const disabledFeatures = featureFlagNames.filter((name) => !flags[name]);
   const requestedMode = environment.PLATFORM_OPERATING_MODE?.trim();
   const realPilotCompleted = Boolean(
-    environment.LEAD_INBOX_PILOT_REFERENCE?.trim(),
+    environment.LEAD_INBOX_PILOT_REFERENCE?.trim() &&
+    environment.ROOF_VALIDATION_REFERENCE?.trim(),
   );
   const mode: PlatformOperatingMode =
     requestedMode === "full_automation" && realPilotCompleted
@@ -41,7 +42,6 @@ export function buildOperatingMode(environment: Environment = process.env) {
     activeWave: environment.PLATFORM_ACTIVE_WAVE?.trim() || "PROD-8.0",
     enabledFeatures: enabledFeatures as FeatureFlagName[],
     disabledFeatures: disabledFeatures as FeatureFlagName[],
-    automaticCommunicationPaused:
-      automaticCommunicationIsPaused(environment),
+    automaticCommunicationPaused: automaticCommunicationIsPaused(environment),
   };
 }

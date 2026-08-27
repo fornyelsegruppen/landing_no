@@ -50,7 +50,19 @@ export function readFeatureFlags(
 }
 
 export type IntegrationName =
-  "ai" | "email" | "sms" | "maps" | "buildingFootprints" | "imagery" | "signature" | "legal" | "searchData" | "jobs" | "rateLimit" | "botProtection" | "privateStorage";
+  | "ai"
+  | "email"
+  | "sms"
+  | "maps"
+  | "buildingFootprints"
+  | "imagery"
+  | "signature"
+  | "legal"
+  | "searchData"
+  | "jobs"
+  | "rateLimit"
+  | "botProtection"
+  | "privateStorage";
 
 export type IntegrationReadiness =
   "ready" | "configuration_required" | "disabled";
@@ -74,9 +86,11 @@ export function readIntegrationStatus(
   environment: Environment = process.env,
 ): Record<IntegrationName, IntegrationStatus> {
   const aiReady = configured(environment, "GEMINI_API_KEY");
-  const previewEmailLog = environment.VERCEL_ENV === "preview"
-    && parseBooleanFlag(environment.ALLOW_PREVIEW_EMAIL_LOG);
-  const emailReady = configured(environment, "RESEND_API_KEY") || previewEmailLog;
+  const previewEmailLog =
+    environment.VERCEL_ENV === "preview" &&
+    parseBooleanFlag(environment.ALLOW_PREVIEW_EMAIL_LOG);
+  const emailReady =
+    configured(environment, "RESEND_API_KEY") || previewEmailLog;
   const smsProvider = environment.SMS_PROVIDER?.trim() || "disabled";
   const smsReady =
     smsProvider !== "disabled" && configured(environment, "SMS_API_KEY");
@@ -128,11 +142,19 @@ export function readIntegrationStatus(
     },
     imagery: {
       name: "imagery",
-      readiness: configured(environment, "NORGE_I_BILDER_TOKEN") && configured(environment, "MAP_TERMS_ACCEPTED_AT") ? "ready" : "configuration_required",
+      readiness:
+        configured(environment, "NORGE_I_BILDER_TOKEN") &&
+        configured(environment, "MAP_TERMS_ACCEPTED_AT")
+          ? "ready"
+          : "configuration_required",
       provider: "norge-i-bilder",
       missing: [
-        ...(!configured(environment, "NORGE_I_BILDER_TOKEN") ? ["NORGE_I_BILDER_TOKEN"] : []),
-        ...(!configured(environment, "MAP_TERMS_ACCEPTED_AT") ? ["MAP_TERMS_ACCEPTED_AT"] : []),
+        ...(!configured(environment, "NORGE_I_BILDER_TOKEN")
+          ? ["NORGE_I_BILDER_TOKEN"]
+          : []),
+        ...(!configured(environment, "MAP_TERMS_ACCEPTED_AT")
+          ? ["MAP_TERMS_ACCEPTED_AT"]
+          : []),
       ],
     },
     signature: {
@@ -145,9 +167,13 @@ export function readIntegrationStatus(
     },
     legal: {
       name: "legal",
-      readiness: configured(environment, "LEGAL_REVIEW_REFERENCE") ? "ready" : "configuration_required",
+      readiness: configured(environment, "LEGAL_REVIEW_REFERENCE")
+        ? "ready"
+        : "configuration_required",
       provider: "approved-contract-terms",
-      missing: configured(environment, "LEGAL_REVIEW_REFERENCE") ? [] : ["LEGAL_REVIEW_REFERENCE"],
+      missing: configured(environment, "LEGAL_REVIEW_REFERENCE")
+        ? []
+        : ["LEGAL_REVIEW_REFERENCE"],
     },
     searchData: {
       name: "searchData",
@@ -165,27 +191,59 @@ export function readIntegrationStatus(
     },
     rateLimit: {
       name: "rateLimit",
-      readiness: configuredAny(environment, ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]) && configuredAny(environment, ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"]) ? "ready" : "configuration_required",
+      readiness:
+        configuredAny(environment, [
+          "UPSTASH_REDIS_REST_URL",
+          "KV_REST_API_URL",
+        ]) &&
+        configuredAny(environment, [
+          "UPSTASH_REDIS_REST_TOKEN",
+          "KV_REST_API_TOKEN",
+        ])
+          ? "ready"
+          : "configuration_required",
       provider: "upstash-redis",
       missing: [
-        ...(!configuredAny(environment, ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]) ? ["UPSTASH_REDIS_REST_URL or KV_REST_API_URL"] : []),
-        ...(!configuredAny(environment, ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"]) ? ["UPSTASH_REDIS_REST_TOKEN or KV_REST_API_TOKEN"] : []),
+        ...(!configuredAny(environment, [
+          "UPSTASH_REDIS_REST_URL",
+          "KV_REST_API_URL",
+        ])
+          ? ["UPSTASH_REDIS_REST_URL or KV_REST_API_URL"]
+          : []),
+        ...(!configuredAny(environment, [
+          "UPSTASH_REDIS_REST_TOKEN",
+          "KV_REST_API_TOKEN",
+        ])
+          ? ["UPSTASH_REDIS_REST_TOKEN or KV_REST_API_TOKEN"]
+          : []),
       ],
     },
     botProtection: {
       name: "botProtection",
-      readiness: configured(environment, "TURNSTILE_SECRET_KEY") && configured(environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY") ? "ready" : "configuration_required",
+      readiness:
+        configured(environment, "TURNSTILE_SECRET_KEY") &&
+        configured(environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY")
+          ? "ready"
+          : "configuration_required",
       provider: "cloudflare-turnstile",
       missing: [
-        ...(!configured(environment, "TURNSTILE_SECRET_KEY") ? ["TURNSTILE_SECRET_KEY"] : []),
-        ...(!configured(environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY") ? ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"] : []),
+        ...(!configured(environment, "TURNSTILE_SECRET_KEY")
+          ? ["TURNSTILE_SECRET_KEY"]
+          : []),
+        ...(!configured(environment, "NEXT_PUBLIC_TURNSTILE_SITE_KEY")
+          ? ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]
+          : []),
       ],
     },
     privateStorage: {
       name: "privateStorage",
-      readiness: configured(environment, "BLOB_READ_WRITE_TOKEN") ? "ready" : "configuration_required",
+      readiness: configured(environment, "BLOB_READ_WRITE_TOKEN")
+        ? "ready"
+        : "configuration_required",
       provider: "vercel-blob-private",
-      missing: configured(environment, "BLOB_READ_WRITE_TOKEN") ? [] : ["BLOB_READ_WRITE_TOKEN"],
+      missing: configured(environment, "BLOB_READ_WRITE_TOKEN")
+        ? []
+        : ["BLOB_READ_WRITE_TOKEN"],
     },
   };
 }
@@ -199,11 +257,16 @@ const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   automatedReminders: ["email", "jobs"],
   seoScheduler: ["ai", "jobs"],
   caseStateEngineV2: [],
-  measurementEvidenceV2: ["maps", "buildingFootprints"],
+  measurementEvidenceV2: ["maps", "buildingFootprints", "privateStorage"],
   adminExceptionFlowsV2: [],
   communicationRoutingV2: ["email", "jobs"],
   customerLifecycleV2: ["email", "legal"],
-  securityHardeningV2: ["signature", "rateLimit", "botProtection", "privateStorage"],
+  securityHardeningV2: [
+    "signature",
+    "rateLimit",
+    "botProtection",
+    "privateStorage",
+  ],
 };
 
 export function featureReadiness(

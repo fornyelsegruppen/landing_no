@@ -33,6 +33,7 @@ const completeEnvironment = {
   LEAD_INBOX_PILOT_REFERENCE: "PILOT-1",
   PRODUCTION_OWNER_APPROVAL_REFERENCE: "OWNER-1",
   AI_CONTENT_PILOT_REFERENCE: "AI-1",
+  ROOF_TECHNICAL_QA_REFERENCE: "ROOF-TECH-1",
   ROOF_VALIDATION_REFERENCE: "ROOF-1",
   PRICING_APPROVAL_REFERENCE: "PRICE-1",
   QUOTE_JOURNEY_QA_REFERENCE: "QUOTE-1",
@@ -63,17 +64,42 @@ describe("production release gate", () => {
   });
 
   it("does not require real-pilot evidence to run a controlled feature wave", () => {
-    const environment = { ...completeEnvironment, LEAD_INBOX_PILOT_REFERENCE: "" };
+    const environment = {
+      ...completeEnvironment,
+      LEAD_INBOX_PILOT_REFERENCE: "",
+    };
     const gate = buildReleaseGate(environment);
 
     expect(gate.productionReady).toBe(true);
     expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 0 });
   });
 
-  it("blocks an enabled feature when staging evidence is missing without exposing values", () => {
-    const environment = { ...completeEnvironment, WORKER_MOBILE_QA_REFERENCE: "" };
+  it("permits technical roof QA in a controlled wave while keeping pricing evidence on quotes", () => {
+    const environment = {
+      ...completeEnvironment,
+      FEATURE_CUSTOMER_QUOTES: "false",
+      ROOF_VALIDATION_REFERENCE: "",
+      PRICING_APPROVAL_REFERENCE: "",
+    };
     const gate = buildReleaseGate(environment);
-    expect(gate.features.workerPortal).toMatchObject({ status: "no_go", missingEvidence: ["WORKER_MOBILE_QA_REFERENCE"] });
+
+    expect(gate.features.roofMeasurement).toMatchObject({
+      status: "go",
+      missingEvidence: [],
+    });
+    expect(gate.features.customerQuotes.status).toBe("disabled");
+  });
+
+  it("blocks an enabled feature when staging evidence is missing without exposing values", () => {
+    const environment = {
+      ...completeEnvironment,
+      WORKER_MOBILE_QA_REFERENCE: "",
+    };
+    const gate = buildReleaseGate(environment);
+    expect(gate.features.workerPortal).toMatchObject({
+      status: "no_go",
+      missingEvidence: ["WORKER_MOBILE_QA_REFERENCE"],
+    });
     const serialized = JSON.stringify(gate);
     expect(serialized).not.toContain("secret-gemini");
     expect(serialized).not.toContain("secret-resend");

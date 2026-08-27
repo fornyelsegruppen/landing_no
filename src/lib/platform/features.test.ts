@@ -67,15 +67,21 @@ describe("platform feature configuration", () => {
   });
 
   it("enables reviewed footprint measurement without licensed imagery", () => {
-    expect(featureReadiness("roofMeasurement", { FEATURE_ROOF_MEASUREMENT: "true" })).toEqual({
+    expect(
+      featureReadiness("roofMeasurement", { FEATURE_ROOF_MEASUREMENT: "true" }),
+    ).toEqual({
       enabled: true,
       ready: true,
       unavailable: [],
     });
-    expect(() => assertFeatureReady("roofMeasurement", {
-      FEATURE_ROOF_MEASUREMENT: "true",
-    })).not.toThrow();
-    expect(readIntegrationStatus({}).imagery.readiness).toBe("configuration_required");
+    expect(() =>
+      assertFeatureReady("roofMeasurement", {
+        FEATURE_ROOF_MEASUREMENT: "true",
+      }),
+    ).not.toThrow();
+    expect(readIntegrationStatus({}).imagery.readiness).toBe(
+      "configuration_required",
+    );
   });
 
   it("distinguishes disabled from missing configuration", () => {
@@ -90,11 +96,15 @@ describe("platform feature configuration", () => {
       RESEND_API_KEY: "configured",
       LEGAL_REVIEW_REFERENCE: "lawyer-review-2026-08",
     };
-    expect(() => assertFeatureReady("customerQuotes", quoteEnvironment)).not.toThrow();
-    expect(featureReadiness("contractSigning", {
-      ...quoteEnvironment,
-      FEATURE_CONTRACT_SIGNING: "true",
-    })).toMatchObject({
+    expect(() =>
+      assertFeatureReady("customerQuotes", quoteEnvironment),
+    ).not.toThrow();
+    expect(
+      featureReadiness("contractSigning", {
+        ...quoteEnvironment,
+        FEATURE_CONTRACT_SIGNING: "true",
+      }),
+    ).toMatchObject({
       enabled: true,
       ready: false,
       unavailable: ["signature"],
@@ -108,9 +118,16 @@ describe("platform feature configuration", () => {
       FEATURE_CUSTOMER_QUOTES: "true",
       LEGAL_REVIEW_REFERENCE: "staging-test",
     };
-    expect(readIntegrationStatus(preview).email).toMatchObject({ readiness: "ready", provider: "log", missing: [] });
+    expect(readIntegrationStatus(preview).email).toMatchObject({
+      readiness: "ready",
+      provider: "log",
+      missing: [],
+    });
     expect(() => assertFeatureReady("customerQuotes", preview)).not.toThrow();
-    expect(readIntegrationStatus({ ...preview, VERCEL_ENV: "production" }).email.readiness).toBe("configuration_required");
+    expect(
+      readIntegrationStatus({ ...preview, VERCEL_ENV: "production" }).email
+        .readiness,
+    ).toBe("configuration_required");
   });
 
   it("keeps every remediation capability independently reversible", () => {
@@ -127,28 +144,52 @@ describe("platform feature configuration", () => {
     expect(flags.securityHardeningV2).toBe(false);
   });
 
+  it("requires private storage before immutable measurement evidence is ready", () => {
+    expect(
+      featureReadiness("measurementEvidenceV2", {
+        FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
+      }),
+    ).toEqual({
+      enabled: true,
+      ready: false,
+      unavailable: ["privateStorage"],
+    });
+    expect(
+      featureReadiness("measurementEvidenceV2", {
+        FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
+        BLOB_READ_WRITE_TOKEN: "configured",
+      }),
+    ).toMatchObject({ ready: true, unavailable: [] });
+  });
+
   it("requires distributed abuse controls and private storage before security rollout", () => {
-    expect(featureReadiness("securityHardeningV2", {
-      FEATURE_SECURITY_HARDENING_V2: "true",
-      PAYLOAD_SECRET: "configured",
-    })).toEqual({
+    expect(
+      featureReadiness("securityHardeningV2", {
+        FEATURE_SECURITY_HARDENING_V2: "true",
+        PAYLOAD_SECRET: "configured",
+      }),
+    ).toEqual({
       enabled: true,
       ready: false,
       unavailable: ["rateLimit", "botProtection", "privateStorage"],
     });
 
-    expect(() => assertFeatureReady("securityHardeningV2", {
-      FEATURE_SECURITY_HARDENING_V2: "true",
-      PAYLOAD_SECRET: "configured",
-      UPSTASH_REDIS_REST_URL: "configured",
-      UPSTASH_REDIS_REST_TOKEN: "configured",
-      TURNSTILE_SECRET_KEY: "configured",
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: "configured",
-      BLOB_READ_WRITE_TOKEN: "configured",
-    })).not.toThrow();
-    expect(readIntegrationStatus({
-      KV_REST_API_URL: "configured",
-      KV_REST_API_TOKEN: "configured",
-    }).rateLimit).toMatchObject({ readiness: "ready", missing: [] });
+    expect(() =>
+      assertFeatureReady("securityHardeningV2", {
+        FEATURE_SECURITY_HARDENING_V2: "true",
+        PAYLOAD_SECRET: "configured",
+        UPSTASH_REDIS_REST_URL: "configured",
+        UPSTASH_REDIS_REST_TOKEN: "configured",
+        TURNSTILE_SECRET_KEY: "configured",
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: "configured",
+        BLOB_READ_WRITE_TOKEN: "configured",
+      }),
+    ).not.toThrow();
+    expect(
+      readIntegrationStatus({
+        KV_REST_API_URL: "configured",
+        KV_REST_API_TOKEN: "configured",
+      }).rateLimit,
+    ).toMatchObject({ readiness: "ready", missing: [] });
   });
 });

@@ -16,9 +16,12 @@ const commonEvidence = [
 
 const featureEvidence: Record<FeatureFlagName, readonly string[]> = {
   aiDrafts: ["AI_CONTENT_PILOT_REFERENCE"],
-  roofMeasurement: ["ROOF_VALIDATION_REFERENCE", "PRICING_APPROVAL_REFERENCE"],
+  roofMeasurement: ["ROOF_TECHNICAL_QA_REFERENCE"],
   customerQuotes: ["PRICING_APPROVAL_REFERENCE", "QUOTE_JOURNEY_QA_REFERENCE"],
-  contractSigning: ["SIGNATURE_APPROVAL_REFERENCE", "CONTRACT_JOURNEY_QA_REFERENCE"],
+  contractSigning: [
+    "SIGNATURE_APPROVAL_REFERENCE",
+    "CONTRACT_JOURNEY_QA_REFERENCE",
+  ],
   workerPortal: ["WORKER_MOBILE_QA_REFERENCE"],
   automatedReminders: ["COMMUNICATION_APPROVAL_REFERENCE"],
   seoScheduler: ["SEO_PILOT_REFERENCE"],
@@ -67,21 +70,28 @@ export function buildReleaseGate(environment: Environment = process.env) {
     {
       status: ReleaseGateStatus;
       flag: string;
-      unavailableIntegrations: ReturnType<typeof featureReadiness>["unavailable"];
+      unavailableIntegrations: ReturnType<
+        typeof featureReadiness
+      >["unavailable"];
       missingEvidence: string[];
     }
   >;
 
   const decisions = Object.values(features);
-  const enabled = decisions.filter((decision) => decision.status !== "disabled");
+  const enabled = decisions.filter(
+    (decision) => decision.status !== "disabled",
+  );
 
   return {
     generatedAt: new Date().toISOString(),
-    productionReady: enabled.length > 0 && enabled.every((decision) => decision.status === "go"),
+    productionReady:
+      enabled.length > 0 &&
+      enabled.every((decision) => decision.status === "go"),
     counts: {
       go: decisions.filter((decision) => decision.status === "go").length,
       noGo: decisions.filter((decision) => decision.status === "no_go").length,
-      disabled: decisions.filter((decision) => decision.status === "disabled").length,
+      disabled: decisions.filter((decision) => decision.status === "disabled")
+        .length,
     },
     features,
   };

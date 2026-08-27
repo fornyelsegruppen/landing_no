@@ -27,15 +27,15 @@ PROD-8 tikslas — sklandžiai įjungti visą jau Staging aplinkoje patikrintą 
 
 ## 3. Būsenos ir užbaigimo protokolas
 
-| Būsena | Reikšmė |
-|---|---|
-| `PENDING` | Etapas nepradėtas |
-| `PRECHECK` | Tikrinamos priklausomybės, niekas nejungiama |
-| `DEPLOYED` | Konfigūracija įjungta ir deployment yra `Ready`, bet funkcinis testas dar nebaigtas |
-| `VERIFYING` | Vyksta vienas kontroliuojamas testas ir įrodymų rinkimas |
-| `PASS` | Įvykdyti visi etapo kriterijai, nėra atviro P0/P1, galima pereiti toliau |
-| `STOP` | Aptiktas stabdantis neatitikimas; kitas etapas draudžiamas |
-| `ROLLED_BACK` | Bangos flagai grąžinti į saugią būseną ir patvirtintas stabilumas |
+| Būsena        | Reikšmė                                                                             |
+| ------------- | ----------------------------------------------------------------------------------- |
+| `PENDING`     | Etapas nepradėtas                                                                   |
+| `PRECHECK`    | Tikrinamos priklausomybės, niekas nejungiama                                        |
+| `DEPLOYED`    | Konfigūracija įjungta ir deployment yra `Ready`, bet funkcinis testas dar nebaigtas |
+| `VERIFYING`   | Vyksta vienas kontroliuojamas testas ir įrodymų rinkimas                            |
+| `PASS`        | Įvykdyti visi etapo kriterijai, nėra atviro P0/P1, galima pereiti toliau            |
+| `STOP`        | Aptiktas stabdantis neatitikimas; kitas etapas draudžiamas                          |
+| `ROLLED_BACK` | Bangos flagai grąžinti į saugią būseną ir patvirtintas stabilumas                   |
 
 Kiekvieno etapo užbaigimo įrašas privalo turėti:
 
@@ -123,6 +123,8 @@ Užbaigta per safety-only Production deploy:
 - `FEATURE_MEASUREMENT_EVIDENCE_V2=true`
 
 **Priklausomybės:** Gemini raktas, modelis ir limitai; Kartverket ir OSM pasiekiamumas; privatus Blob; patvirtintas savininko kontroliuojamas testinis adresas.
+
+**Saugos patikslinimas prieš įjungimą:** šioje bangoje automatinis job gali sukurti tik AI juodraštį, stogo matavimą ir privatų matavimo įrodymą. Kainos taisyklė, kainos skaičiavimas, pasiūlymas ir sutartis nėra skaitomi ar kuriami, kol `FEATURE_CUSTOMER_QUOTES=false`. Kontroliuojamam matavimo pilotui pakanka `ROOF_TECHNICAL_QA_REFERENCE`; `ROOF_VALIDATION_REFERENCE` rezervuotas trims fiziniams palyginimams ir kartu su realių užklausų piloto įrodymu privalomas prieš `full_automation`.
 
 ### Veiksmai
 
@@ -309,14 +311,14 @@ Po STOP:
 
 ## 11. Vykdymo registras
 
-| Etapas | Būsena | Deployment / commit | Įrodymai | Patvirtino | Laikas |
-|---|---|---|---|---|---|
-| PROD-8.0 Preflight | PASS | Production `dpl_CWjdo63P3zdBmvFymZ3RwDnkmPXu`; Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`; commit `6007e79` | DB kopija, rollback, Gemini ir limitai, 584 testai, Preview/Production smoke, admin juosta, 0×5xx, 13/13 flagų false | Savininkas ir techninė patikra | 2026-08-27 12:59 Europe/Oslo |
-| PROD-8.1 Vidinė AI ir matavimo banga | PENDING |  |  |  |  |
-| PROD-8.2 Kliento komercinis kelias | PENDING |  |  |  |  |
-| PROD-8.3 Darbo ir darbuotojo banga | PENDING |  |  |  |  |
-| PROD-8.4 Priminimų ir blogo automatika | PENDING |  |  |  |  |
-| PROD-8.5 Realių bylų pilotas | PENDING |  |  |  |  |
+| Etapas                                 | Būsena  | Deployment / commit                                                                                         | Įrodymai                                                                                                             | Patvirtino                     | Laikas                       |
+| -------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------- |
+| PROD-8.0 Preflight                     | PASS    | Production `dpl_CWjdo63P3zdBmvFymZ3RwDnkmPXu`; Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`; commit `6007e79` | DB kopija, rollback, Gemini ir limitai, 584 testai, Preview/Production smoke, admin juosta, 0×5xx, 13/13 flagų false | Savininkas ir techninė patikra | 2026-08-27 12:59 Europe/Oslo |
+| PROD-8.1 Vidinė AI ir matavimo banga   | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
+| PROD-8.2 Kliento komercinis kelias     | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
+| PROD-8.3 Darbo ir darbuotojo banga     | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
+| PROD-8.4 Priminimų ir blogo automatika | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
+| PROD-8.5 Realių bylų pilotas           | PENDING |                                                                                                             |                                                                                                                      |                                |                              |
 
 ## 12. Galutinė PROD-8 užbaigimo sąlyga
 
