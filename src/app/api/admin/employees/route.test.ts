@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { employeeInputSchema } from "@/lib/employees/employee-input";
+import {
+  employeeInputSchema,
+  employeeUpdateSchema,
+} from "@/lib/employees/employee-input";
 
 const validEmployee = {
   displayName: "Kari Nordmann",
@@ -18,5 +21,23 @@ describe("employee input", () => {
     expect(
       employeeInputSchema.safeParse({ ...validEmployee, phone: "123" }).success,
     ).toBe(false);
+  });
+
+  it("accepts an existing employee profile update without a password change", () => {
+    expect(
+      employeeUpdateSchema.safeParse({
+        displayName: "Kari Nordmann",
+        email: "KARI@EXAMPLE.NO",
+        phone: "+47 900 00 000",
+        interfaceLanguage: "lt",
+        password: "",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an existing employee profile with an unusable phone number", () => {
+    expect(employeeUpdateSchema.safeParse({ phone: "123" }).success).toBe(
+      false,
+    );
   });
 });
