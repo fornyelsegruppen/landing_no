@@ -87,6 +87,7 @@ describe("work-order communications", () => {
 
   it("sends an administrator-approved customer assignment while automatic reminders stay paused", async () => {
     process.env.VERCEL_ENV = "production";
+    delete process.env.FEATURE_AUTOMATED_REMINDERS;
     const order = { id: 17, reference: "A-K-17-V1", lead: 4, assignedWorker: 5, status: "scheduled", scheduledAt: "2026-08-27T06:00:00Z", arrivalWindow: "08:00–10:00", afterPhotos: [] };
     const { payload, rows } = fakePayload({
       order,

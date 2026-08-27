@@ -164,8 +164,9 @@ export async function dispatchWorkOrderCommunicationNow(
   options: ImmediateDispatchOptions = {},
 ) {
   if (
-    (!options.allowDuringAutomationPause && automaticCommunicationIsPaused()) ||
-    !featureReadiness("automatedReminders").ready
+    !options.allowDuringAutomationPause &&
+    (automaticCommunicationIsPaused() ||
+      !featureReadiness("automatedReminders").ready)
   ) {
     return { skipped: true as const, delivered: false as const, queued: false as const };
   }
