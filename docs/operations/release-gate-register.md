@@ -6,9 +6,9 @@ Systemets `/api/admin/platform-health` og adminoversikt beregner dette registere
 
 | Miljønøkkel | Bevis | Status |
 |---|---|---|
-| `STAGING_QA_REFERENCE` | Staging-QA: Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`, commit `6007e79`, 584 tester og route-smoke | Bestått; må registreres i Production env |
-| `RESTORE_TEST_REFERENCE` | Tidligere restore-øvelse `br-curly-bar-asjsrltd`; fersk lesekontroll `br-damp-unit-as3pdkgr` | Bestått; må registreres i Production env |
-| `PRODUCTION_OWNER_APPROVAL_REFERENCE` | Eier godkjente PROD-8-planen og oppstart 2026-08-27 | Godkjent; må registreres i Production env |
+| `STAGING_QA_REFERENCE` | Staging-QA: Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`, commit `6007e79`, 584 tester og route-smoke | Bestått og registrert i Production env |
+| `RESTORE_TEST_REFERENCE` | Tidligere restore-øvelse `br-curly-bar-asjsrltd`; fersk lesekontroll `br-damp-unit-as3pdkgr` | Bestått og registrert i Production env |
+| `PRODUCTION_OWNER_APPROVAL_REFERENCE` | Eier godkjente PROD-8-planen, preflight-konfigurasjonen og safety-only deployment 2026-08-27 | Godkjent og registrert i Production env |
 
 `LEAD_INBOX_PILOT_REFERENCE` er ikke et felles krav for kontrollerte PROD-8-bølger. Det settes først etter rapporten fra 20–30 reelle pilotleads og kreves for overgang fra `controlled_pilot` til `full_automation`.
 

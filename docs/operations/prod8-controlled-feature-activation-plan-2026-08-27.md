@@ -1,7 +1,7 @@
 # Takfornyelse — PROD-8 kontroliuojamo funkcijų įjungimo planas
 
 Data: 2026-08-27  
-Būsena: **PROD-8.0 PRECHECK — funkcijos dar neįjungtos**
+Būsena: **PROD-8.0 PASS — PROD-8.1 funkcijos dar neįjungtos**
 Apimtis: Production `takfornyelse.as`, administratoriaus `/admin-v2`, darbuotojo `/user`, saugios kliento nuorodos ir automatiniai operaciniai procesai.
 
 ## 1. Tikslas ir sprendimas
@@ -84,12 +84,12 @@ Kiekvieno etapo užbaigimo įrašas privalo turėti:
 
 ### Vykdymo įrašas — 2026-08-27
 
-**Dabartinė būsena: `PRECHECK`.** PROD-8.1 nepradedamas, kol visi likę punktai neturi įrodymo.
+**Dabartinė būsena: `PASS`.** PROD-8.0 užbaigtas; PROD-8.1 nepradėtas ir visi jo flagai tebėra išjungti.
 
 Patvirtinta:
 
-- aktyvus Production deployment: `dpl_DU2EPy99v6px53cQQfAqTYq3afHj` (`Ready`), domenai `takfornyelse.as` ir `www.takfornyelse.as`;
-- patikrintas ankstesnis `Ready` rollback deployment: `dpl_DjHgvHsNKUSmNLGU6fvSRyomX8cS`;
+- aktyvus safety-only Production deployment: `dpl_CWjdo63P3zdBmvFymZ3RwDnkmPXu` (`Ready`), domenai `takfornyelse.as`, `www.takfornyelse.as` ir `landing-no.vercel.app`;
+- momentinis rollback deployment: `dpl_DU2EPy99v6px53cQQfAqTYq3afHj` (`Ready`); numatytas veiksmas `vercel rollback dpl_DU2EPy99v6px53cQQfAqTYq3afHj --yes`;
 - šviežia Production DB kopija: `br-damp-unit-as3pdkgr`; kopija pasiekiama tik skaitymui, įrašų skaičiai sutikrinti;
 - visi 13 Production `FEATURE_*` flagų yra `false`;
 - aktyvių sintetinių bylų nėra; PROD-7 byla `#8` archyvuota;
@@ -101,13 +101,16 @@ Patvirtinta:
 - centrinis automatinių operacinių siuntimų pristabdymas įdiegtas ir padengtas testais;
 - administratoriaus kontroliuojamo piloto juosta įdiegta ir turi render testą LT kalba.
 
-Dar būtina prieš `PASS`:
+Užbaigta per safety-only Production deploy:
 
-- Production aplinkoje saugiai pridėti `GEMINI_API_KEY`, `GEMINI_MODEL`, dienos ir mėnesio limitus;
-- pridėti Production `PLATFORM_OPERATING_MODE=controlled_pilot`, `PLATFORM_ACTIVE_WAVE=PROD-8.0` ir `AUTOMATION_EMERGENCY_PAUSE=true`;
-- pridėti tikrus `STAGING_QA_REFERENCE`, `RESTORE_TEST_REFERENCE` ir `PRODUCTION_OWNER_APPROVAL_REFERENCE` identifikatorius;
-- prisijungusio administratoriaus naršyklėje patvirtinti piloto juostos tekstą ir mobilų vaizdą;
-- gavus atskirą savininko patvirtinimą, Production įdiegti tik PROD-8.0 saugos pataisymus ir pakartoti bazinį smoke bei 5xx patikrą.
+- Production `GEMINI_API_KEY` egzistavimas patvirtintas neatskleidžiant reikšmės; modelis `gemini-3.5-flash-lite`, limitai 10 per dieną ir 100 per mėnesį;
+- Production veikia `controlled_pilot`, aktyvi banga `PROD-8.0`, `AUTOMATION_EMERGENCY_PAUSE=true`;
+- Production įrašyti tikri `STAGING_QA_REFERENCE`, `RESTORE_TEST_REFERENCE` ir `PRODUCTION_OWNER_APPROVAL_REFERENCE` identifikatoriai;
+- po deploy visi 13 `FEATURE_*` flagų pakartotinai patvirtinti kaip `false`;
+- Production smoke: `/no`, `/en`, `/no/blogg`, `/robots.txt`, `/sitemap.xml` = 200; apex = 308 į `www`; `/admin-v2` ir `/user` = saugus login redirect; `/meta.json` = 404;
+- prisijungusio administratoriaus naršyklėje juosta rodo `PROD-8.0`, 0 aktyvių ir 13 išjungtų funkcijų bei pristabdytus automatinius siuntimus; Staging patikrintas ir 390×844 telefono vaizdas;
+- po deploy Vercel 5xx patikros iškart ir po daugiau nei 5 minučių: 0;
+- Production administratoriaus eilėse nėra naujų, aktyvių, įstrigusių ar dėmesio reikalaujančių bylų/darbų.
 
 ## 5. PROD-8.1 — vidinė bylų, AI ir matavimo banga
 
@@ -308,7 +311,7 @@ Po STOP:
 
 | Etapas | Būsena | Deployment / commit | Įrodymai | Patvirtino | Laikas |
 |---|---|---|---|---|---|
-| PROD-8.0 Preflight | PRECHECK | Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ` / `6007e79` | DB kopija, 584 testai, smoke, 0×5xx; likę Production Gemini/env ir prisijungusio admin QA | Savininko plano vykdymas patvirtintas | 2026-08-27 12:27 Europe/Oslo |
+| PROD-8.0 Preflight | PASS | Production `dpl_CWjdo63P3zdBmvFymZ3RwDnkmPXu`; Preview `dpl_Ep3DEjGjPyWiAxqDuYCWpFLCwoXQ`; commit `6007e79` | DB kopija, rollback, Gemini ir limitai, 584 testai, Preview/Production smoke, admin juosta, 0×5xx, 13/13 flagų false | Savininkas ir techninė patikra | 2026-08-27 12:59 Europe/Oslo |
 | PROD-8.1 Vidinė AI ir matavimo banga | PENDING |  |  |  |  |
 | PROD-8.2 Kliento komercinis kelias | PENDING |  |  |  |  |
 | PROD-8.3 Darbo ir darbuotojo banga | PENDING |  |  |  |  |
