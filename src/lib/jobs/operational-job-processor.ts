@@ -279,7 +279,8 @@ export async function processOperationalJobs(
           depth: 0,
           overrideAccess: true,
         });
-        if (lead.status === "converted" || lead.status === "closed") {
+        if (!["new", "draft_ready"].includes(lead.status || "")) {
+          const terminal = lead.status === "converted" || lead.status === "closed";
           await payload.update({
             collection: "operational-jobs",
             id: job.id,
@@ -287,7 +288,12 @@ export async function processOperationalJobs(
             data: {
               status: "cancelled",
               completedAt: new Date().toISOString(),
-              result: { processed: false, reason: "lead-terminal-state" },
+              result: {
+                processed: false,
+                reason: terminal
+                  ? "lead-terminal-state"
+                  : "lead-intake-finished",
+              },
             },
           });
           cancelled.push(job.id);

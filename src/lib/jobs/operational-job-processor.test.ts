@@ -9,6 +9,7 @@ type Row = Record<string, unknown> & { id: number };
 
 function repository(
   overrides: {
+    lead?: Record<string, unknown>;
     message?: Record<string, unknown>;
     job?: Record<string, unknown>;
   } = {},
@@ -37,6 +38,7 @@ function repository(
     correlationId: "correlation-123",
     payload: { messageId: 2 },
   };
+  Object.assign(lead, overrides.lead);
   Object.assign(message, overrides.message);
   Object.assign(job, overrides.job);
   const collections: Record<string, Row[]> = {
@@ -172,5 +174,28 @@ describe("operational job processor", () => {
     expect(result).toMatchObject({ paused: [3], completed: [], attention: [] });
     expect(state.job).toMatchObject({ status: "pending", attempts: 0 });
     expect(state.message).toMatchObject({ status: "queued" });
+  });
+
+  it("cancels a stale intake AI retry after the commercial journey has started", async () => {
+    const state = repository({
+      lead: { status: "quoted" },
+      job: {
+        type: "lead.ai.draft",
+        status: "retry",
+        payload: { leadId: 1 },
+      },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({ cancelled: [3], completed: [] });
+    expect(state.job).toMatchObject({
+      status: "cancelled",
+      result: { processed: false, reason: "lead-intake-finished" },
+    });
   });
 });
