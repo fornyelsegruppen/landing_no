@@ -24,7 +24,8 @@ const copy = {
     quoteVersions: "Tilbudskjede",
     contractVersions: "Kontraktskjede",
     combinedDocument: "Åpne samlet tilbud og kontrakt",
-    contractIncludedInCombinedDocument: "Kontraktsutkastet er inkludert i det samlede dokumentet {reference} ovenfor.",
+    contractIncludedInCombinedDocument:
+      "Kontraktsutkastet er inkludert i det samlede dokumentet {reference} ovenfor.",
     working: "Under behandling",
     effective: "Gjeldende",
     historical: "Historisk",
@@ -57,12 +58,16 @@ const copy = {
     area: "Estimert takareal",
     automaticArea: "Automatisk estimat",
     manualArea: "Kontrollert takareal (m²)",
-    manualAreaHelp: "Skriv inn arealet bare når du har kontrollert målingen. Pris, maksimalpris, tilbud og kontraktsutkast opprettes da på nytt.",
+    manualAreaHelp:
+      "Skriv inn arealet bare når du har kontrollert målingen. Pris, maksimalpris, tilbud og kontraktsutkast opprettes da på nytt.",
     overrideReason: "Grunnlag for overstyringen",
-    overrideReasonPlaceholder: "For eksempel kontrollert mot tegning eller manuell oppmåling",
+    overrideReasonPlaceholder:
+      "For eksempel kontrollert mot tegning eller manuell oppmåling",
     recalculatePackage: "Lagre areal og beregn pakken på nytt",
-    recalculateConfirm: "Dette oppretter nye versjoner av måling, pris, tilbud og kontraktsutkast. Fortsette?",
-    manualOverrideSaved: "Kontrollert areal er lagret, og hele tilbudspakken er beregnet på nytt.",
+    recalculateConfirm:
+      "Dette oppretter nye versjoner av måling, pris, tilbud og kontraktsutkast. Fortsette?",
+    manualOverrideSaved:
+      "Kontrollert areal er lagret, og hele tilbudspakken er beregnet på nytt.",
     manualOverrideBadge: "Manuelt kontrollert",
     reviewAndSend: "Kontroller og send tilbudspakken",
     confidence: "Sikkerhet",
@@ -79,25 +84,36 @@ const copy = {
     fixedDiscount: "Fast beløp eks. mva. (kr)",
     discountValue: "Rabattverdi",
     commercialReason: "Begrunnelse for endringen",
-    commercialReasonPlaceholder: "For eksempel avtalt sesongrabatt eller dokumentert objekttilpasning",
+    commercialReasonPlaceholder:
+      "For eksempel avtalt sesongrabatt eller dokumentert objekttilpasning",
     recommendedOption: "Anbefalt tillegg som eget alternativ",
     originalOption: "Opprinnelig forespørsel",
     noRecommendedOption: "Ikke legg til et alternativ",
-    recommendationHelp: "Kunden mottar begge alternativer og kan bare signere ett. AI kan foreslå, men administrator godkjenner.",
-    recommendationCopy: "Vi anbefaler impregnering etter vask når takets tilstand er egnet, fordi behandlingen kan redusere fuktopptak og forlenge effekten av rengjøringen. Kunden ser prisen tydelig før valg.",
+    recommendationHelp:
+      "Kunden mottar begge alternativer og kan bare signere ett. AI kan foreslå, men administrator godkjenner.",
+    recommendationCopy:
+      "Vi anbefaler impregnering etter vask når takets tilstand er egnet, fordi behandlingen kan redusere fuktopptak og forlenge effekten av rengjøringen. Kunden ser prisen tydelig før valg.",
     suggestedRecommendation: "Systemforslag",
-    recommendationNotIncluded: "Dette er bare et forslag og er ikke med i kundepakken før du velger alternativet og oppretter en ny kontrollert tilbudsversjon.",
-    unsavedCommercialChanges: "Du har valg eller prisendringer som ikke er brukt ennå. Opprett først en ny kontrollert tilbudsversjon før du godkjenner og sender pakken.",
+    recommendationNotIncluded:
+      "Dette er bare et forslag og er ikke med i kundepakken før du velger alternativet og oppretter en ny kontrollert tilbudsversjon.",
+    unsavedCommercialChanges:
+      "Du har valg eller prisendringer som ikke er brukt ennå. Opprett først en ny kontrollert tilbudsversjon før du godkjenner og sender pakken.",
     rebuildCommercialPackage: "Opprett ny kontrollert tilbudsversjon",
     previewQuotePdf: "Kontroller tilbud og kontrakt som PDF",
-    commercialConfirm: "Dette erstatter åpne utkast med en ny, auditert pris- og dokumentversjon. Fortsette?",
-    discountSafety: "Rabatt over 20 % eller enhetspris utenfor 80–200 % av godkjent prisliste blokkeres.",
+    commercialConfirm:
+      "Dette erstatter åpne utkast med en ny, auditert pris- og dokumentversjon. Fortsette?",
+    discountSafety:
+      "Rabatt over 20 % eller enhetspris utenfor 80–200 % av godkjent prisliste blokkeres.",
     validUntil: "Gyldig til",
     scheduled: "Planlagt",
     employee: "Ansatt på oppdraget",
     workPlanning: "Tildeling og planlegging",
     chooseEmployee: "Velg ansatt",
     noEmployee: "Ikke tildelt ennå",
+    addEmployee: "Legg til ny ansatt",
+    noAssignableEmployees: "Ingen ansatte kan tildeles ennå.",
+    incompleteEmployees:
+      "Aktive medarbeiderkontoer som mangler navn eller gyldig telefonnummer og derfor ikke kan tildeles:",
     norwayTime: "Dato og tid i Norge",
     workDate: "Arbeidsdato i Norge",
     arrivalWindow: "Avtalt ankomstvindu",
@@ -107,8 +123,10 @@ const copy = {
     arrivalEndAfterStart: "Sluttiden må være senere enn starttiden.",
     completePlanningRequired: "Velg ansatt, dato og hele ankomstintervallet.",
     planningSavedAndNotified: "Tildelingen er lagret, og kunden er varslet.",
-    planningSavedNotificationQueued: "Tildelingen er lagret. Kundevarslingen ligger trygt i utsendingskøen.",
-    workerPhoneFallback: "Den ansatte mangler telefonnummer. Kunden får Takfornyelses hovednummer som kontakt.",
+    planningSavedNotificationQueued:
+      "Tildelingen er lagret. Kundevarslingen ligger trygt i utsendingskøen.",
+    workerPhoneFallback:
+      "Den ansatte mangler telefonnummer. Kunden får Takfornyelses hovednummer som kontakt.",
     adminNote: "Intern merknad",
     adminNoteHelp: "Vises ikke til kunden.",
     createAndPlan: "Opprett arbeidsordre",
@@ -119,13 +137,18 @@ const copy = {
     close: "Lukk saken",
     closeConfirm: "Er du sikker på at saken skal lukkes?",
     actionDone: "Handlingen er fullført.",
-    actionSavedQueued: "Handlingen er lagret. Kundemeldingen ligger trygt i utsendingskøen.",
-    staleAction: "Saken eller dokumentet ble endret i en annen fane. Siden oppdateres til gjeldende versjon.",
-    networkTimeout: "Serveren brukte for lang tid. Oppdater saken og kontroller status før du prøver igjen.",
+    actionSavedQueued:
+      "Handlingen er lagret. Kundemeldingen ligger trygt i utsendingskøen.",
+    staleAction:
+      "Saken eller dokumentet ble endret i en annen fane. Siden oppdateres til gjeldende versjon.",
+    networkTimeout:
+      "Serveren brukte for lang tid. Oppdater saken og kontroller status før du prøver igjen.",
     actionFailed: "Handlingen kunne ikke fullføres.",
     processing: "Behandler …",
-    confirmEconomicAction: "Bekreft at du har kontrollert grunnlaget og vil utføre denne økonomiske handlingen.",
-    confirmClosureSend: "Dette er siste utsending til kunden om avslutningen. Bekreft at teksten er kontrollert og skal sendes nå.",
+    confirmEconomicAction:
+      "Bekreft at du har kontrollert grunnlaget og vil utføre denne økonomiske handlingen.",
+    confirmClosureSend:
+      "Dette er siste utsending til kunden om avslutningen. Bekreft at teksten er kontrollert og skal sendes nå.",
     noMessages: "Ingen kundemeldinger ennå.",
     noDocuments: "Ingen varige dokumenter registrert ennå.",
     customerSignedAt: "Kunden signerte",
@@ -136,7 +159,8 @@ const copy = {
     signatureRequired: "Skriv fullt navn og tegn signaturen.",
     signContract: "Signer kontrakten",
     completionReview: "Administrativ sluttkontroll",
-    completionReviewHelp: "Kontroller dokumentasjon og endelig pris før kunden varsles.",
+    completionReviewHelp:
+      "Kontroller dokumentasjon og endelig pris før kunden varsles.",
     beforePhotos: "Før-bilder",
     afterPhotos: "Etterbilder",
     finalArea: "Kontrollmålt areal",
@@ -146,13 +170,19 @@ const copy = {
     invoiceDueDays: "Foreslått betalingsfrist (dager)",
     warrantyMonths: "Garantiperiode (måneder)",
     warrantyScope: "Bekreftet garantiomfang",
-    confirmDocumentation: "Jeg har kontrollert før-/etterbilder, ferdigmelding og utført arbeid.",
-    confirmFinalPrice: "Jeg har kontrollert at sluttbeløpet følger signert kontrakt eller akseptert endringsavtale.",
-    invoiceDraftNotice: "Systemet oppretter et internt fakturautkast, ikke en bokført faktura. Utsendelse krever godkjent regnskapsprosess.",
-    completionCertificateNotice: "Systemet oppretter en arbeids- og ferdigbekreftelse, ikke en automatisk kommersiell garanti. Lovfestede reklamasjonsrettigheter gjelder fortsatt.",
+    confirmDocumentation:
+      "Jeg har kontrollert før-/etterbilder, ferdigmelding og utført arbeid.",
+    confirmFinalPrice:
+      "Jeg har kontrollert at sluttbeløpet følger signert kontrakt eller akseptert endringsavtale.",
+    invoiceDraftNotice:
+      "Systemet oppretter et internt fakturautkast, ikke en bokført faktura. Utsendelse krever godkjent regnskapsprosess.",
+    completionCertificateNotice:
+      "Systemet oppretter en arbeids- og ferdigbekreftelse, ikke en automatisk kommersiell garanti. Lovfestede reklamasjonsrettigheter gjelder fortsatt.",
     completeReview: "Godkjenn sluttkontroll og opprett dokumenter",
-    completionConfirm: "Bekreft sluttkontroll, garanti og opprettelse av fakturautkast. Kunden varsles etter godkjenning.",
-    completionDone: "Sluttkontrollen er godkjent. Fakturautkast og garantidokument er opprettet.",
+    completionConfirm:
+      "Bekreft sluttkontroll, garanti og opprettelse av fakturautkast. Kunden varsles etter godkjenning.",
+    completionDone:
+      "Sluttkontrollen er godkjent. Fakturautkast og garantidokument er opprettet.",
     lifecycle: "Arkiv og papirkurv",
     lifecycleActive: "Aktiv sak",
     lifecycleArchived: "Arkivert sak",
@@ -169,7 +199,15 @@ const copy = {
     lifecycleConfirm: "Denne handlingen endrer sakens arkivstatus. Fortsette?",
     purgeConfirm: "Permanent sletting kan ikke angres. Fortsette?",
     lifecycleSaved: "Arkivstatusen er oppdatert.",
-    archiveClasses: { completed: "Fullført", declined: "Kunden avslo", lost: "Tapt", invalid: "Ugyldig", spam: "Spam", duplicate: "Duplikat", other: "Annet" },
+    archiveClasses: {
+      completed: "Fullført",
+      declined: "Kunden avslo",
+      lost: "Tapt",
+      invalid: "Ugyldig",
+      spam: "Spam",
+      duplicate: "Duplikat",
+      other: "Annet",
+    },
     invoiceDraft: "Fakturautkast",
     warranty: "Garanti",
     warrantyUntil: "Gyldig til",
@@ -228,7 +266,8 @@ const copy = {
     quoteVersions: "Pasiūlymų grandinė",
     contractVersions: "Sutarčių grandinė",
     combinedDocument: "Atidaryti bendrą pasiūlymą ir sutartį",
-    contractIncludedInCombinedDocument: "Sutarties juodraštis įtrauktas į aukščiau esantį bendrą dokumentą {reference}.",
+    contractIncludedInCombinedDocument:
+      "Sutarties juodraštis įtrauktas į aukščiau esantį bendrą dokumentą {reference}.",
     working: "Vykdoma",
     effective: "Galiojanti",
     historical: "Istorinė",
@@ -261,12 +300,16 @@ const copy = {
     area: "Numatomas stogo plotas",
     automaticArea: "Automatinis įvertinimas",
     manualArea: "Patikrintas stogo plotas (m²)",
-    manualAreaHelp: "Plotą įrašykite tik jį patikrinę. Pagal naują plotą bus iš naujo parengta kaina, didžiausia kaina, pasiūlymas ir sutarties juodraštis.",
+    manualAreaHelp:
+      "Plotą įrašykite tik jį patikrinę. Pagal naują plotą bus iš naujo parengta kaina, didžiausia kaina, pasiūlymas ir sutarties juodraštis.",
     overrideReason: "Ploto pakeitimo pagrindas",
-    overrideReasonPlaceholder: "Pavyzdžiui, patikrinta pagal brėžinį arba išmatuota rankiniu būdu",
+    overrideReasonPlaceholder:
+      "Pavyzdžiui, patikrinta pagal brėžinį arba išmatuota rankiniu būdu",
     recalculatePackage: "Išsaugoti plotą ir perskaičiuoti paketą",
-    recalculateConfirm: "Bus sukurtos naujos matavimo, kainos, pasiūlymo ir sutarties juodraščio versijos. Tęsti?",
-    manualOverrideSaved: "Patikrintas plotas išsaugotas, o visas pasiūlymo paketas perskaičiuotas.",
+    recalculateConfirm:
+      "Bus sukurtos naujos matavimo, kainos, pasiūlymo ir sutarties juodraščio versijos. Tęsti?",
+    manualOverrideSaved:
+      "Patikrintas plotas išsaugotas, o visas pasiūlymo paketas perskaičiuotas.",
     manualOverrideBadge: "Patikrinta rankiniu būdu",
     reviewAndSend: "Patikrinti ir išsiųsti pasiūlymo paketą",
     confidence: "Patikimumas",
@@ -283,25 +326,37 @@ const copy = {
     fixedDiscount: "Fiksuota suma be PVM (kr)",
     discountValue: "Nuolaidos dydis",
     commercialReason: "Pakeitimo pagrindimas",
-    commercialReasonPlaceholder: "Pavyzdžiui, sutarta sezoninė nuolaida arba dokumentuotas objekto pritaikymas",
-    recommendedOption: "Rekomenduojama papildoma paslauga kaip atskiras variantas",
+    commercialReasonPlaceholder:
+      "Pavyzdžiui, sutarta sezoninė nuolaida arba dokumentuotas objekto pritaikymas",
+    recommendedOption:
+      "Rekomenduojama papildoma paslauga kaip atskiras variantas",
     originalOption: "Pradinė kliento užklausa",
     noRecommendedOption: "Papildomo varianto neteikti",
-    recommendationHelp: "Klientas gauna abu variantus ir gali pasirašyti tik vieną. DI gali pasiūlyti, tačiau patvirtina administratorius.",
-    recommendationCopy: "Po plovimo rekomenduojame impregnavimą, kai stogo būklė tam tinkama, nes apdorojimas gali sumažinti drėgmės įsigėrimą ir prailginti valymo efektą. Prieš pasirinkdamas klientas aiškiai mato kainą.",
+    recommendationHelp:
+      "Klientas gauna abu variantus ir gali pasirašyti tik vieną. DI gali pasiūlyti, tačiau patvirtina administratorius.",
+    recommendationCopy:
+      "Po plovimo rekomenduojame impregnavimą, kai stogo būklė tam tinkama, nes apdorojimas gali sumažinti drėgmės įsigėrimą ir prailginti valymo efektą. Prieš pasirinkdamas klientas aiškiai mato kainą.",
     suggestedRecommendation: "Sistemos pasiūlymas",
-    recommendationNotIncluded: "Tai tik rekomendacija. Ji nebus įtraukta į kliento paketą, kol nepasirinksite varianto ir nesukursite naujos patikrintos pasiūlymo versijos.",
-    unsavedCommercialChanges: "Yra dar nepritaikytų pasirinkimų arba kainos pakeitimų. Prieš patvirtindami ir siųsdami paketą pirmiausia sukurkite naują patikrintą pasiūlymo versiją.",
+    recommendationNotIncluded:
+      "Tai tik rekomendacija. Ji nebus įtraukta į kliento paketą, kol nepasirinksite varianto ir nesukursite naujos patikrintos pasiūlymo versijos.",
+    unsavedCommercialChanges:
+      "Yra dar nepritaikytų pasirinkimų arba kainos pakeitimų. Prieš patvirtindami ir siųsdami paketą pirmiausia sukurkite naują patikrintą pasiūlymo versiją.",
     rebuildCommercialPackage: "Sukurti naują patikrintą pasiūlymo versiją",
     previewQuotePdf: "Peržiūrėti pasiūlymo ir sutarties PDF",
-    commercialConfirm: "Atviri juodraščiai bus pakeisti nauja audituojama kainos ir dokumentų versija. Tęsti?",
-    discountSafety: "Didesnė nei 20 % nuolaida arba vieneto kaina už 80–200 % patvirtinto kainyno ribų blokuojama.",
+    commercialConfirm:
+      "Atviri juodraščiai bus pakeisti nauja audituojama kainos ir dokumentų versija. Tęsti?",
+    discountSafety:
+      "Didesnė nei 20 % nuolaida arba vieneto kaina už 80–200 % patvirtinto kainyno ribų blokuojama.",
     validUntil: "Galioja iki",
     scheduled: "Suplanuota",
     employee: "Darbui priskirtas darbuotojas",
     workPlanning: "Paskyrimas ir planavimas",
     chooseEmployee: "Pasirinkti darbuotoją",
     noEmployee: "Dar nepriskirta",
+    addEmployee: "Pridėti naują darbuotoją",
+    noAssignableEmployees: "Dar nėra darbuotojų, kuriuos galima priskirti.",
+    incompleteEmployees:
+      "Aktyvios darbuotojų paskyros, kurioms trūksta vardo arba tinkamo telefono numerio ir kurių negalima priskirti:",
     norwayTime: "Data ir laikas Norvegijoje",
     workDate: "Darbo data Norvegijoje",
     arrivalWindow: "Sutartas atvykimo intervalas",
@@ -309,10 +364,13 @@ const copy = {
     arrivalFrom: "Atvykimas nuo",
     arrivalTo: "Atvykimas iki",
     arrivalEndAfterStart: "Atvykimo pabaiga turi būti vėliau už pradžią.",
-    completePlanningRequired: "Pasirinkite darbuotoją, datą ir visą atvykimo intervalą.",
+    completePlanningRequired:
+      "Pasirinkite darbuotoją, datą ir visą atvykimo intervalą.",
     planningSavedAndNotified: "Paskyrimas išsaugotas, klientas informuotas.",
-    planningSavedNotificationQueued: "Paskyrimas išsaugotas. Pranešimas klientui saugiai laukia siuntimo eilėje.",
-    workerPhoneFallback: "Darbuotojo telefonas neįrašytas. Klientui bus nurodytas pagrindinis Takfornyelse numeris.",
+    planningSavedNotificationQueued:
+      "Paskyrimas išsaugotas. Pranešimas klientui saugiai laukia siuntimo eilėje.",
+    workerPhoneFallback:
+      "Darbuotojo telefonas neįrašytas. Klientui bus nurodytas pagrindinis Takfornyelse numeris.",
     adminNote: "Vidinė pastaba",
     adminNoteHelp: "Klientui nerodoma.",
     createAndPlan: "Sukurti darbo užsakymą",
@@ -323,13 +381,18 @@ const copy = {
     close: "Uždaryti bylą",
     closeConfirm: "Ar tikrai norite uždaryti šią bylą?",
     actionDone: "Veiksmas atliktas.",
-    actionSavedQueued: "Veiksmas išsaugotas. Pranešimas klientui saugiai laukia siuntimo eilėje.",
-    staleAction: "Byla arba dokumentas pakeistas kitame lange. Puslapis atnaujinamas į galiojančią versiją.",
-    networkTimeout: "Serveris neatsakė laiku. Prieš bandydami dar kartą atnaujinkite bylą ir patikrinkite būseną.",
+    actionSavedQueued:
+      "Veiksmas išsaugotas. Pranešimas klientui saugiai laukia siuntimo eilėje.",
+    staleAction:
+      "Byla arba dokumentas pakeistas kitame lange. Puslapis atnaujinamas į galiojančią versiją.",
+    networkTimeout:
+      "Serveris neatsakė laiku. Prieš bandydami dar kartą atnaujinkite bylą ir patikrinkite būseną.",
     actionFailed: "Veiksmo atlikti nepavyko.",
     processing: "Vykdoma …",
-    confirmEconomicAction: "Patvirtinkite, kad patikrinote duomenis ir norite atlikti šį finansinį veiksmą.",
-    confirmClosureSend: "Tai paskutinis sutarties užbaigimo pranešimas klientui. Patvirtinkite, kad tekstas patikrintas ir turi būti išsiųstas dabar.",
+    confirmEconomicAction:
+      "Patvirtinkite, kad patikrinote duomenis ir norite atlikti šį finansinį veiksmą.",
+    confirmClosureSend:
+      "Tai paskutinis sutarties užbaigimo pranešimas klientui. Patvirtinkite, kad tekstas patikrintas ir turi būti išsiųstas dabar.",
     noMessages: "Žinučių klientui dar nėra.",
     noDocuments: "Nuolatinių dokumentų dar nėra.",
     customerSignedAt: "Klientas pasirašė",
@@ -340,7 +403,8 @@ const copy = {
     signatureRequired: "Įrašykite vardą, pavardę ir nupieškite parašą.",
     signContract: "Pasirašyti sutartį",
     completionReview: "Administratoriaus galutinė patikra",
-    completionReviewHelp: "Prieš informuojant klientą patikrinkite dokumentus ir galutinę kainą.",
+    completionReviewHelp:
+      "Prieš informuojant klientą patikrinkite dokumentus ir galutinę kainą.",
     beforePhotos: "Nuotraukos prieš",
     afterPhotos: "Nuotraukos po",
     finalArea: "Patikrintas plotas",
@@ -350,13 +414,19 @@ const copy = {
     invoiceDueDays: "Siūlomas apmokėjimo terminas (dienomis)",
     warrantyMonths: "Garantijos laikotarpis (mėnesiais)",
     warrantyScope: "Patvirtinta garantijos apimtis",
-    confirmDocumentation: "Patikrinau nuotraukas prieš ir po, darbuotojo pastabą bei atliktus darbus.",
-    confirmFinalPrice: "Patikrinau, kad galutinė suma atitinka pasirašytą sutartį arba patvirtintą pakeitimų susitarimą.",
-    invoiceDraftNotice: "Sistema sukuria vidinį sąskaitos juodraštį, o ne apskaitoje registruotą sąskaitą. Siuntimui būtinas patvirtintas apskaitos procesas.",
-    completionCertificateNotice: "Sistema sukuria darbų ir užbaigimo patvirtinimą, o ne automatinę komercinę garantiją. Įstatyminės reklamacijos teisės lieka galioti.",
+    confirmDocumentation:
+      "Patikrinau nuotraukas prieš ir po, darbuotojo pastabą bei atliktus darbus.",
+    confirmFinalPrice:
+      "Patikrinau, kad galutinė suma atitinka pasirašytą sutartį arba patvirtintą pakeitimų susitarimą.",
+    invoiceDraftNotice:
+      "Sistema sukuria vidinį sąskaitos juodraštį, o ne apskaitoje registruotą sąskaitą. Siuntimui būtinas patvirtintas apskaitos procesas.",
+    completionCertificateNotice:
+      "Sistema sukuria darbų ir užbaigimo patvirtinimą, o ne automatinę komercinę garantiją. Įstatyminės reklamacijos teisės lieka galioti.",
     completeReview: "Patvirtinti darbą ir sukurti dokumentus",
-    completionConfirm: "Patvirtinkite galutinę patikrą, garantiją ir sąskaitos juodraščio sukūrimą. Po patvirtinimo klientas bus informuotas.",
-    completionDone: "Galutinė patikra patvirtinta. Sąskaitos juodraštis ir garantijos dokumentas sukurti.",
+    completionConfirm:
+      "Patvirtinkite galutinę patikrą, garantiją ir sąskaitos juodraščio sukūrimą. Po patvirtinimo klientas bus informuotas.",
+    completionDone:
+      "Galutinė patikra patvirtinta. Sąskaitos juodraštis ir garantijos dokumentas sukurti.",
     lifecycle: "Archyvas ir šiukšlinė",
     lifecycleActive: "Aktyvi byla",
     lifecycleArchived: "Archyvuota byla",
@@ -373,7 +443,15 @@ const copy = {
     lifecycleConfirm: "Šis veiksmas pakeis bylos archyvo būseną. Tęsti?",
     purgeConfirm: "Galutinio trynimo atšaukti negalima. Tęsti?",
     lifecycleSaved: "Bylos archyvo būsena atnaujinta.",
-    archiveClasses: { completed: "Užbaigta", declined: "Klientas atsisakė", lost: "Prarasta", invalid: "Klaidinga", spam: "Šlamštas", duplicate: "Dublikatas", other: "Kita" },
+    archiveClasses: {
+      completed: "Užbaigta",
+      declined: "Klientas atsisakė",
+      lost: "Prarasta",
+      invalid: "Klaidinga",
+      spam: "Šlamštas",
+      duplicate: "Dublikatas",
+      other: "Kita",
+    },
     invoiceDraft: "Sąskaitos juodraštis",
     warranty: "Garantija",
     warrantyUntil: "Galioja iki",
@@ -432,7 +510,8 @@ const copy = {
     quoteVersions: "Quote chain",
     contractVersions: "Contract chain",
     combinedDocument: "Open combined quote and contract",
-    contractIncludedInCombinedDocument: "The contract draft is included in the combined document {reference} above.",
+    contractIncludedInCombinedDocument:
+      "The contract draft is included in the combined document {reference} above.",
     working: "Working",
     effective: "Effective",
     historical: "Historical",
@@ -465,12 +544,16 @@ const copy = {
     area: "Estimated roof area",
     automaticArea: "Automatic estimate",
     manualArea: "Verified roof area (m²)",
-    manualAreaHelp: "Enter an area only after checking it. The price, maximum price, quote and contract draft will be recreated from the verified area.",
+    manualAreaHelp:
+      "Enter an area only after checking it. The price, maximum price, quote and contract draft will be recreated from the verified area.",
     overrideReason: "Reason for the override",
-    overrideReasonPlaceholder: "For example, checked against drawings or measured manually",
+    overrideReasonPlaceholder:
+      "For example, checked against drawings or measured manually",
     recalculatePackage: "Save area and recalculate package",
-    recalculateConfirm: "New versions of the measurement, price, quote and contract draft will be created. Continue?",
-    manualOverrideSaved: "The verified area was saved and the complete quote package was recalculated.",
+    recalculateConfirm:
+      "New versions of the measurement, price, quote and contract draft will be created. Continue?",
+    manualOverrideSaved:
+      "The verified area was saved and the complete quote package was recalculated.",
     manualOverrideBadge: "Manually verified",
     reviewAndSend: "Review and send quote package",
     confidence: "Confidence",
@@ -487,36 +570,52 @@ const copy = {
     fixedDiscount: "Fixed amount excl. VAT (kr)",
     discountValue: "Discount value",
     commercialReason: "Reason for the adjustment",
-    commercialReasonPlaceholder: "For example an agreed seasonal discount or a documented property adjustment",
+    commercialReasonPlaceholder:
+      "For example an agreed seasonal discount or a documented property adjustment",
     recommendedOption: "Recommended add-on as a separate option",
     originalOption: "Original customer request",
     noRecommendedOption: "Do not add an option",
-    recommendationHelp: "The customer receives both options and can sign only one. AI may suggest; the administrator approves.",
-    recommendationCopy: "We recommend impregnation after washing when the roof condition is suitable, because treatment can reduce moisture absorption and prolong the cleaning effect. The customer sees the price clearly before choosing.",
+    recommendationHelp:
+      "The customer receives both options and can sign only one. AI may suggest; the administrator approves.",
+    recommendationCopy:
+      "We recommend impregnation after washing when the roof condition is suitable, because treatment can reduce moisture absorption and prolong the cleaning effect. The customer sees the price clearly before choosing.",
     suggestedRecommendation: "System suggestion",
-    recommendationNotIncluded: "This is only a suggestion and is not included in the customer package until you select it and create a new verified quote version.",
-    unsavedCommercialChanges: "You have selections or price changes that have not been applied. Create a new verified quote version before approving and sending the package.",
+    recommendationNotIncluded:
+      "This is only a suggestion and is not included in the customer package until you select it and create a new verified quote version.",
+    unsavedCommercialChanges:
+      "You have selections or price changes that have not been applied. Create a new verified quote version before approving and sending the package.",
     rebuildCommercialPackage: "Create a new verified quote version",
     previewQuotePdf: "Review quote and contract PDF",
-    commercialConfirm: "This replaces open drafts with a new audited price and document version. Continue?",
-    discountSafety: "Discounts above 20% or unit prices outside 80–200% of the approved price list are blocked.",
+    commercialConfirm:
+      "This replaces open drafts with a new audited price and document version. Continue?",
+    discountSafety:
+      "Discounts above 20% or unit prices outside 80–200% of the approved price list are blocked.",
     validUntil: "Valid until",
     scheduled: "Scheduled",
     employee: "Assigned field employee",
     workPlanning: "Assignment and scheduling",
     chooseEmployee: "Choose employee",
     noEmployee: "Not assigned yet",
+    addEmployee: "Add new employee",
+    noAssignableEmployees: "No employees can be assigned yet.",
+    incompleteEmployees:
+      "Active employee accounts missing a name or valid phone number and therefore unavailable for assignment:",
     norwayTime: "Date and time in Norway",
     workDate: "Work date in Norway",
     arrivalWindow: "Agreed arrival window",
     arrivalWindowPlaceholder: "For example 08:00–10:00",
     arrivalFrom: "Arrival from",
     arrivalTo: "Arrival until",
-    arrivalEndAfterStart: "The end of the arrival window must be later than the start.",
-    completePlanningRequired: "Choose an employee, date and the full arrival window.",
-    planningSavedAndNotified: "The assignment was saved and the customer was notified.",
-    planningSavedNotificationQueued: "The assignment was saved. The customer notification is safely queued.",
-    workerPhoneFallback: "The employee has no phone number. The customer will receive Takfornyelse's main number.",
+    arrivalEndAfterStart:
+      "The end of the arrival window must be later than the start.",
+    completePlanningRequired:
+      "Choose an employee, date and the full arrival window.",
+    planningSavedAndNotified:
+      "The assignment was saved and the customer was notified.",
+    planningSavedNotificationQueued:
+      "The assignment was saved. The customer notification is safely queued.",
+    workerPhoneFallback:
+      "The employee has no phone number. The customer will receive Takfornyelse's main number.",
     adminNote: "Internal note",
     adminNoteHelp: "Not shown to the customer.",
     createAndPlan: "Create work order",
@@ -527,13 +626,18 @@ const copy = {
     close: "Close case",
     closeConfirm: "Are you sure you want to close this case?",
     actionDone: "The action is complete.",
-    actionSavedQueued: "The action was saved. The customer message is safely queued for delivery.",
-    staleAction: "The case or document changed in another tab. The page is refreshing to the current version.",
-    networkTimeout: "The server took too long to respond. Refresh the case and check its status before retrying.",
+    actionSavedQueued:
+      "The action was saved. The customer message is safely queued for delivery.",
+    staleAction:
+      "The case or document changed in another tab. The page is refreshing to the current version.",
+    networkTimeout:
+      "The server took too long to respond. Refresh the case and check its status before retrying.",
     actionFailed: "The action could not be completed.",
     processing: "Processing …",
-    confirmEconomicAction: "Confirm that you reviewed the basis and want to perform this financial action.",
-    confirmClosureSend: "This is the final closure message to the customer. Confirm that the text has been reviewed and should be sent now.",
+    confirmEconomicAction:
+      "Confirm that you reviewed the basis and want to perform this financial action.",
+    confirmClosureSend:
+      "This is the final closure message to the customer. Confirm that the text has been reviewed and should be sent now.",
     noMessages: "No customer messages yet.",
     noDocuments: "No durable documents registered yet.",
     customerSignedAt: "Customer signed",
@@ -544,7 +648,8 @@ const copy = {
     signatureRequired: "Enter the full name and draw the signature.",
     signContract: "Sign contract",
     completionReview: "Administrative final review",
-    completionReviewHelp: "Review the evidence and final price before the customer is notified.",
+    completionReviewHelp:
+      "Review the evidence and final price before the customer is notified.",
     beforePhotos: "Before photos",
     afterPhotos: "After photos",
     finalArea: "Verified area",
@@ -554,13 +659,19 @@ const copy = {
     invoiceDueDays: "Suggested payment term (days)",
     warrantyMonths: "Warranty period (months)",
     warrantyScope: "Confirmed warranty scope",
-    confirmDocumentation: "I reviewed the before/after photos, completion note and delivered work.",
-    confirmFinalPrice: "I verified that the final amount follows the signed contract or accepted change agreement.",
-    invoiceDraftNotice: "The system creates an internal invoice draft, not a booked invoice. Sending requires an approved accounting process.",
-    completionCertificateNotice: "The system creates a work and completion confirmation, not an automatic commercial warranty. Statutory complaint rights continue to apply.",
+    confirmDocumentation:
+      "I reviewed the before/after photos, completion note and delivered work.",
+    confirmFinalPrice:
+      "I verified that the final amount follows the signed contract or accepted change agreement.",
+    invoiceDraftNotice:
+      "The system creates an internal invoice draft, not a booked invoice. Sending requires an approved accounting process.",
+    completionCertificateNotice:
+      "The system creates a work and completion confirmation, not an automatic commercial warranty. Statutory complaint rights continue to apply.",
     completeReview: "Approve final review and create documents",
-    completionConfirm: "Confirm the final review, warranty and invoice-draft creation. The customer will be notified after approval.",
-    completionDone: "The final review is approved. The invoice draft and warranty document were created.",
+    completionConfirm:
+      "Confirm the final review, warranty and invoice-draft creation. The customer will be notified after approval.",
+    completionDone:
+      "The final review is approved. The invoice draft and warranty document were created.",
     lifecycle: "Archive and trash",
     lifecycleActive: "Active case",
     lifecycleArchived: "Archived case",
@@ -577,7 +688,15 @@ const copy = {
     lifecycleConfirm: "This action changes the case archive state. Continue?",
     purgeConfirm: "Permanent deletion cannot be undone. Continue?",
     lifecycleSaved: "The case archive state was updated.",
-    archiveClasses: { completed: "Completed", declined: "Customer declined", lost: "Lost", invalid: "Invalid", spam: "Spam", duplicate: "Duplicate", other: "Other" },
+    archiveClasses: {
+      completed: "Completed",
+      declined: "Customer declined",
+      lost: "Lost",
+      invalid: "Invalid",
+      spam: "Spam",
+      duplicate: "Duplicate",
+      other: "Other",
+    },
     invoiceDraft: "Invoice draft",
     warranty: "Warranty",
     warrantyUntil: "Valid until",
@@ -604,7 +723,8 @@ const copy = {
       review_completion: "Final-review work and documentation",
       resolve_work_block: "Review the work block",
       schedule_work: "Schedule the work",
-      send_closure_confirmation: "Send the closure confirmation to the customer",
+      send_closure_confirmation:
+        "Send the closure confirmation to the customer",
       none: "No action required now",
       retry_message: "Retry delivery",
       wait_customer: "Waiting for customer",

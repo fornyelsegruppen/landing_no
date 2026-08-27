@@ -179,6 +179,7 @@ export default async function AdminCasePage({
       name: worker.displayName!,
       phone: worker.phone!,
     }));
+  const incompleteWorkerCount = workersResult.docs.length - workers.length;
   const seenRuleServices = new Set<string>();
   const rules = rulesResult.docs
     .filter((rule) => {
@@ -222,8 +223,9 @@ export default async function AdminCasePage({
     : caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST"
       ? caseData.messages.find((message) => message.direction === "inbound")
       : undefined;
-  const activeContractRequest = caseData.contractRequests.find((item) =>
-    !["closed", "recovered", "do_not_contact"].includes(item.status || ""),
+  const activeContractRequest = caseData.contractRequests.find(
+    (item) =>
+      !["closed", "recovered", "do_not_contact"].includes(item.status || ""),
   );
   const workingCommercial =
     caseData.commercial.workingContract || caseData.commercial.workingQuote;
@@ -236,7 +238,8 @@ export default async function AdminCasePage({
         companySignedAt: workingCommercial.companySignedAt,
       })
     : copy.notCreated;
-  const effectiveReference = effectiveCommercial?.reference || copy.noneEffective;
+  const effectiveReference =
+    effectiveCommercial?.reference || copy.noneEffective;
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
@@ -253,7 +256,9 @@ export default async function AdminCasePage({
   const actionDocument = contractActionKinds.has(caseData.nextAction.kind)
     ? caseData.commercial.contractVersions.find(
         (item) => item.id === caseData.nextAction.targetId,
-      ) || caseData.commercial.workingContract || effectiveCommercial
+      ) ||
+      caseData.commercial.workingContract ||
+      effectiveCommercial
     : quoteActionKinds.has(caseData.nextAction.kind)
       ? caseData.commercial.quoteVersions.find(
           (item) => item.id === caseData.nextAction.targetId,
@@ -262,9 +267,8 @@ export default async function AdminCasePage({
   const nextActionText = actionDocument
     ? `${nextActionBase} ${actionDocument.reference}`
     : nextActionBase;
-  const actionQuote = actionDocument?.kind === "quote"
-    ? actionDocument
-    : workingQuote;
+  const actionQuote =
+    actionDocument?.kind === "quote" ? actionDocument : workingQuote;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -316,7 +320,9 @@ export default async function AdminCasePage({
               {copy.workingVersion}
             </dt>
             <dd className="mt-1 font-bold">{workingReference}</dd>
-            <dd className="text-muted-foreground mt-1 text-xs">{workingStatus}</dd>
+            <dd className="text-muted-foreground mt-1 text-xs">
+              {workingStatus}
+            </dd>
           </div>
           <div className="rounded-2xl bg-black/15 p-3">
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
@@ -374,54 +380,94 @@ export default async function AdminCasePage({
         </p>
         <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
           <div className="min-w-0">
-            <h2 className="text-xl font-bold">
-              {nextActionText}
-            </h2>
+            <h2 className="text-xl font-bold">{nextActionText}</h2>
             <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
               {nextActionText}
             </p>
             <dl className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-2 xl:grid-cols-3">
               <div>
-                <dt className="text-muted-foreground text-xs">{copy.customer}</dt>
-                <dd className="mt-1 truncate text-sm font-bold">{caseData.lead.name}</dd>
+                <dt className="text-muted-foreground text-xs">
+                  {copy.customer}
+                </dt>
+                <dd className="mt-1 truncate text-sm font-bold">
+                  {caseData.lead.name}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-xs">{copy.service}</dt>
-                <dd className="mt-1 text-sm font-bold">{actionQuote?.serviceDescription || serviceNames[caseData.lead.inquiryType || ""] || "—"}</dd>
+                <dt className="text-muted-foreground text-xs">
+                  {copy.service}
+                </dt>
+                <dd className="mt-1 text-sm font-bold">
+                  {actionQuote?.serviceDescription ||
+                    serviceNames[caseData.lead.inquiryType || ""] ||
+                    "—"}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-xs">{copy.document}</dt>
-                <dd className="text-accent mt-1 text-sm font-bold">{actionDocument?.reference || "—"}</dd>
+                <dt className="text-muted-foreground text-xs">
+                  {copy.document}
+                </dt>
+                <dd className="text-accent mt-1 text-sm font-bold">
+                  {actionDocument?.reference || "—"}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-xs">{copy.priceIncVat}</dt>
-                <dd className="mt-1 text-sm font-bold">{nok(actionQuote?.totalIncVatOre)}</dd>
+                <dt className="text-muted-foreground text-xs">
+                  {copy.priceIncVat}
+                </dt>
+                <dd className="mt-1 text-sm font-bold">
+                  {nok(actionQuote?.totalIncVatOre)}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-xs">{copy.maximum}</dt>
-                <dd className="mt-1 text-sm font-bold">{nok(actionQuote?.maximumTotalIncVatOre)}</dd>
+                <dt className="text-muted-foreground text-xs">
+                  {copy.maximum}
+                </dt>
+                <dd className="mt-1 text-sm font-bold">
+                  {nok(actionQuote?.maximumTotalIncVatOre)}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground text-xs">{copy.deposit}</dt>
-                <dd className="mt-1 text-sm font-bold">{nok(actionQuote?.depositAmountIncVatOre || 0)}</dd>
+                <dt className="text-muted-foreground text-xs">
+                  {copy.deposit}
+                </dt>
+                <dd className="mt-1 text-sm font-bold">
+                  {nok(actionQuote?.depositAmountIncVatOre || 0)}
+                </dd>
               </div>
-              {actionDocument?.supersedesReference ? <div className="sm:col-span-2 xl:col-span-3">
-                <dt className="text-muted-foreground text-xs">{copy.replaces}</dt>
-                <dd className="mt-1 text-sm font-bold">{actionDocument.supersedesReference}</dd>
-              </div> : null}
+              {actionDocument?.supersedesReference ? (
+                <div className="sm:col-span-2 xl:col-span-3">
+                  <dt className="text-muted-foreground text-xs">
+                    {copy.replaces}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold">
+                    {actionDocument.supersedesReference}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           </div>
           <CaseActionPanel
             action={caseData.nextAction}
             actionLabel={nextActionText}
             actionReference={actionDocument?.reference}
-            contractDocumentHash={actionDocument?.kind === "contract" ? actionDocument.documentHash : caseData.contract?.documentHash}
+            contractDocumentHash={
+              actionDocument?.kind === "contract"
+                ? actionDocument.documentHash
+                : caseData.contract?.documentHash
+            }
             defaultSigner={user.displayName || user.email}
             leadId={caseData.lead.id}
             locale={user.interfaceLanguage}
             versionContext={{
-              contractReference: actionDocument?.kind === "contract" ? actionDocument.reference : caseData.commercial.workingContract?.reference,
-              contractVersion: actionDocument?.kind === "contract" ? actionDocument.version : caseData.commercial.workingContract?.version,
+              contractReference:
+                actionDocument?.kind === "contract"
+                  ? actionDocument.reference
+                  : caseData.commercial.workingContract?.reference,
+              contractVersion:
+                actionDocument?.kind === "contract"
+                  ? actionDocument.version
+                  : caseData.commercial.workingContract?.version,
               leadRevision: caseData.lead.revision,
               quoteDocumentHash: actionQuote?.documentHash,
               quoteReference: actionQuote?.reference,
@@ -891,10 +937,15 @@ export default async function AdminCasePage({
               <p className="text-muted-foreground">{copy.noMessages}</p>
             )}
           </Section>
-          {caseData.lead.nextActionBlocker === "CUSTOMER_CANCELLATION_REQUEST" && activeContractRequest ? (
-            <ContractRequestReviewPanel currentService={caseData.lead.inquiryType} locale={user.interfaceLanguage} request={activeContractRequest} />
+          {caseData.lead.nextActionBlocker ===
+            "CUSTOMER_CANCELLATION_REQUEST" && activeContractRequest ? (
+            <ContractRequestReviewPanel
+              currentService={caseData.lead.inquiryType}
+              locale={user.interfaceLanguage}
+              request={activeContractRequest}
+            />
           ) : caseData.lead.nextActionBlocker ===
-          "CUSTOMER_CANCELLATION_REQUEST" ? (
+            "CUSTOMER_CANCELLATION_REQUEST" ? (
             <CancellationReviewPanel
               customerMessage={cancellationSource?.bodyText}
               leadId={caseData.lead.id}
@@ -997,10 +1048,24 @@ export default async function AdminCasePage({
                 adminNote={caseData.workOrder?.adminNote}
                 arrivalWindow={caseData.workOrder?.arrivalWindow}
                 assignedWorkerId={caseData.workOrder?.assignedWorkerId}
+                caseId={Number(id)}
                 contractId={caseData.contract.id}
-                contractDocumentHash={caseData.commercial.contractVersions.find((item) => item.id === caseData.contract?.id)?.documentHash || caseData.contract.documentHash}
-                contractReference={caseData.commercial.contractVersions.find((item) => item.id === caseData.contract?.id)?.reference || caseData.contract.reference}
-                contractVersion={caseData.commercial.contractVersions.find((item) => item.id === caseData.contract?.id)?.version}
+                contractDocumentHash={
+                  caseData.commercial.contractVersions.find(
+                    (item) => item.id === caseData.contract?.id,
+                  )?.documentHash || caseData.contract.documentHash
+                }
+                contractReference={
+                  caseData.commercial.contractVersions.find(
+                    (item) => item.id === caseData.contract?.id,
+                  )?.reference || caseData.contract.reference
+                }
+                contractVersion={
+                  caseData.commercial.contractVersions.find(
+                    (item) => item.id === caseData.contract?.id,
+                  )?.version
+                }
+                incompleteWorkerCount={incompleteWorkerCount}
                 locale={user.interfaceLanguage}
                 scheduledLocal={
                   caseData.workOrder?.scheduledAt
