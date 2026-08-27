@@ -63,16 +63,22 @@ function repository(
     async update({
       collection,
       id,
+      where,
       data,
     }: {
       collection: string;
-      id: number;
+      id?: number;
+      where?: unknown;
       data: Record<string, unknown>;
     }) {
-      const row = collections[collection]?.find((item) => item.id === id);
+      const row = id
+        ? collections[collection]?.find((item) => item.id === id)
+        : collection === "operational-jobs" && where && ["pending", "retry"].includes(String(job.status))
+          ? job
+          : undefined;
       if (!row) throw new Error("not found");
       Object.assign(row, structuredClone(data));
-      return structuredClone(row);
+      return id ? structuredClone(row) : { docs: [structuredClone(row)] };
     },
   } as unknown as Payload;
   return { payload, lead, message, job };
@@ -197,5 +203,24 @@ describe("operational job processor", () => {
       status: "cancelled",
       result: { processed: false, reason: "lead-intake-finished" },
     });
+  });
+
+  it("skips a job when another processor wins the atomic claim", async () => {
+    const state = repository();
+    const originalUpdate = (state.payload as unknown as { update: (args: Record<string, unknown>) => Promise<unknown> }).update.bind(state.payload);
+    (state.payload as unknown as { update: (args: Record<string, unknown>) => Promise<unknown> }).update = async (args) => {
+      if (args.collection === "operational-jobs" && args.where) return { docs: [] };
+      return originalUpdate(args);
+    };
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({ completed: [], attention: [], retried: [] });
+    expect(state.job).toMatchObject({ status: "pending", attempts: 0 });
+    expect(state.message).toMatchObject({ status: "queued" });
   });
 });

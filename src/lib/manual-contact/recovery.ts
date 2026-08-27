@@ -107,7 +107,14 @@ export async function resolveManualContactRecoveryToken(
     overrideAccess: true,
   });
   const leadId = relationId(sourceMessage.lead);
-  if (!leadId || sourceMessage.direction !== "outbound") return null;
+  if (
+    !leadId ||
+    sourceMessage.direction !== "outbound" ||
+    sourceMessage.channel !== "email" ||
+    ["draft", "cancelled"].includes(sourceMessage.status)
+  ) {
+    return null;
+  }
   const lead = await payload.findByID({
     collection: "leads",
     id: leadId,
@@ -115,6 +122,30 @@ export async function resolveManualContactRecoveryToken(
     overrideAccess: true,
   });
   return { record, sourceMessage, lead };
+}
+
+export async function consumeManualContactRecoveryToken(
+  payload: Payload,
+  recordId: number,
+  usedAt: string,
+) {
+  const result = await payload.update({
+    collection: "access-tokens",
+    overrideAccess: true,
+    where: {
+      and: [
+        { id: { equals: recordId } },
+        { purpose: { equals: PURPOSE } },
+        { singleUse: { equals: true } },
+        { usedAt: { exists: false } },
+        { revokedAt: { exists: false } },
+        { expiresAt: { greater_than: usedAt } },
+      ],
+    },
+    data: { usedAt },
+  });
+
+  return Array.isArray(result.docs) && result.docs.length === 1;
 }
 
 export function manualRecoveryState(value: unknown) {

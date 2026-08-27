@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  consume: vi.fn(),
   create: vi.fn(),
   deliver: vi.fn(),
   enqueue: vi.fn(),
@@ -20,7 +21,11 @@ vi.mock("@/lib/payload", () => ({
 vi.mock("@/lib/manual-contact/recovery", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/manual-contact/recovery")>();
-  return { ...actual, resolveManualContactRecoveryToken: mocks.resolve };
+  return {
+    ...actual,
+    consumeManualContactRecoveryToken: mocks.consume,
+    resolveManualContactRecoveryToken: mocks.resolve,
+  };
 });
 vi.mock("@/lib/messages/message-engine", () => ({
   deliverMessage: mocks.deliver,
@@ -55,6 +60,7 @@ function request(email: string, emailConfirmation = email) {
 
 describe("customer manual contact recovery", () => {
   beforeEach(() => {
+    mocks.consume.mockReset().mockResolvedValue(true);
     mocks.resolve.mockReset().mockResolvedValue({
       record: { id: 12 },
       lead: {
@@ -110,12 +116,10 @@ describe("customer manual contact recovery", () => {
       }),
     );
     expect(mocks.deliver).toHaveBeenCalledTimes(1);
-    expect(mocks.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        collection: "access-tokens",
-        id: 12,
-        data: expect.objectContaining({ usedAt: expect.any(String) }),
-      }),
+    expect(mocks.consume).toHaveBeenCalledWith(
+      expect.anything(),
+      12,
+      expect.any(String),
     );
   });
 
@@ -125,5 +129,63 @@ describe("customer manual contact recovery", () => {
     });
     expect(response.status).toBe(400);
     expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when another request already consumed the token", async () => {
+    mocks.consume.mockResolvedValue(false);
+
+    const response = await POST(request("customer@example.no"), {
+      params: Promise.resolve({ token: "t".repeat(43) }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an expired, revoked or already-used token", async () => {
+    mocks.resolve.mockResolvedValue(null);
+
+    const response = await POST(request("customer@example.no"), {
+      params: Promise.resolve({ token: "t".repeat(43) }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(mocks.consume).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("reuses the same recovery message and lets delivery idempotency prevent duplicates", async () => {
+    mocks.find.mockResolvedValue({
+      docs: [{ id: 33, status: "sent", idempotencyKey: "existing" }],
+    });
+    mocks.deliver.mockResolvedValue({ duplicate: true });
+
+    const response = await POST(request("customer@example.no"), {
+      params: Promise.resolve({ token: "t".repeat(43) }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.deliver).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("queues exactly one retry when immediate delivery fails", async () => {
+    mocks.deliver.mockRejectedValue(new Error("provider unavailable"));
+
+    const response = await POST(request("customer@example.no"), {
+      params: Promise.resolve({ token: "t".repeat(43) }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ delivery: "queued" });
+    expect(mocks.enqueue).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.anything(),
+      33,
+      expect.any(String),
+    );
   });
 });

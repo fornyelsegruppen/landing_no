@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   issue: vi.fn(),
   recordAudit: vi.fn(),
   update: vi.fn(),
+  userIsAdmin: vi.fn(),
 }));
 
 vi.mock("@/lib/payload", () => ({
@@ -15,7 +16,7 @@ vi.mock("@/lib/payload", () => ({
     update: mocks.update,
   })),
 }));
-vi.mock("@/payload/access/roles", () => ({ userIsAdmin: vi.fn(() => true) }));
+vi.mock("@/payload/access/roles", () => ({ userIsAdmin: mocks.userIsAdmin }));
 vi.mock("@/lib/audit/payload-audit-writer", () => ({
   createPayloadAuditWriter: vi.fn(() => vi.fn()),
 }));
@@ -64,6 +65,7 @@ describe("admin manual contact recovery", () => {
     });
     mocks.update.mockReset().mockResolvedValue({ id: 4 });
     mocks.recordAudit.mockReset().mockResolvedValue(undefined);
+    mocks.userIsAdmin.mockReset().mockReturnValue(true);
   });
 
   it("creates a concise secure message without worker details", async () => {
@@ -82,5 +84,82 @@ describe("admin manual contact recovery", () => {
         data: expect.objectContaining({ status: "attention" }),
       }),
     );
+  });
+
+  it("requires an authenticated administrator", async () => {
+    mocks.auth.mockResolvedValue({ user: null });
+
+    const response = await POST(request({ action: "prepare" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(mocks.findByID).not.toHaveBeenCalled();
+  });
+
+  it("rejects an authenticated non-admin user", async () => {
+    mocks.userIsAdmin.mockReturnValue(false);
+
+    const response = await POST(request({ action: "prepare" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(mocks.findByID).not.toHaveBeenCalled();
+  });
+
+  it("rejects a draft or cancelled source message", async () => {
+    mocks.findByID.mockReset().mockResolvedValueOnce({
+      id: 4,
+      lead: 2,
+      direction: "outbound",
+      channel: "email",
+      status: "cancelled",
+      aiAnalysis: {},
+    });
+
+    const response = await POST(request({ action: "prepare" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.issue).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("records a manual contact only once", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: 4,
+        lead: 2,
+        direction: "outbound",
+        channel: "email",
+        status: "attention",
+        aiAnalysis: {
+          manualRecovery: {
+            status: "contacted",
+            channel: "phone",
+            contactedAt: "2026-08-28T01:00:00.000Z",
+            accessRecordId: 22,
+          },
+        },
+      })
+      .mockResolvedValueOnce({ id: 2, name: "Ola Nordmann" });
+
+    const response = await POST(
+      request({ action: "record", channel: "sms" }),
+      { params: Promise.resolve({ id: "4" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      duplicate: true,
+      channel: "phone",
+      contactedAt: "2026-08-28T01:00:00.000Z",
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
   });
 });

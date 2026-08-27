@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import {
+  consumeManualContactRecoveryToken,
   normalizeCommunicationEmail,
   resolveManualContactRecoveryToken,
   withManualRecoveryState,
@@ -87,6 +88,17 @@ export async function POST(
   const now = new Date().toISOString();
   const correlationId = correlationIdFromHeaders(request.headers);
   const source = recovery.sourceMessage;
+  const claimed = await consumeManualContactRecoveryToken(
+    payload,
+    recovery.record.id,
+    now,
+  );
+  if (!claimed) {
+    return NextResponse.json(
+      { error: "Lenken er utløpt eller er allerede brukt." },
+      { status: 409 },
+    );
+  }
   const resendKey = makeIdempotencyKey("manual-contact.recovery-resend", {
     accessRecordId: recovery.record.id,
     sourceMessageId: source.id,
@@ -179,12 +191,6 @@ export async function POST(
         resentAt: now,
       }),
     },
-  });
-  await payload.update({
-    collection: "access-tokens",
-    id: recovery.record.id,
-    overrideAccess: true,
-    data: { usedAt: now },
   });
   await recordAuditEvent(createPayloadAuditWriter(payload), {
     action: "lead.communication-email-updated",

@@ -140,6 +140,14 @@ export async function POST(
       { status: 409 },
     );
   }
+  if (recovery.status === "contacted") {
+    return NextResponse.json({
+      ok: true,
+      duplicate: true,
+      channel: recovery.channel,
+      contactedAt: recovery.contactedAt,
+    });
+  }
   await payload.update({
     collection: "messages",
     id: message.id,

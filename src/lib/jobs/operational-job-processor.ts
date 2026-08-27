@@ -243,12 +243,19 @@ export async function processOperationalJobs(
       continue;
     }
     const attempts = (job.attempts || 0) + 1;
-    await payload.update({
+    const claim = await payload.update({
       collection: "operational-jobs",
-      id: job.id,
       overrideAccess: true,
+      where: {
+        and: [
+          { id: { equals: job.id } },
+          { status: { in: ["pending", "retry"] } },
+          { availableAt: { less_than_equal: now.toISOString() } },
+        ],
+      },
       data: { status: "running", attempts, startedAt: now.toISOString() },
     });
+    if (!Array.isArray(claim.docs) || claim.docs.length !== 1) continue;
     try {
       let jobResult: Record<string, unknown> = { processed: true };
       if (job.type === "message.delivery") {
