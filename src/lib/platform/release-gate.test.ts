@@ -62,6 +62,14 @@ describe("production release gate", () => {
     expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 0 });
   });
 
+  it("does not require real-pilot evidence to run a controlled feature wave", () => {
+    const environment = { ...completeEnvironment, LEAD_INBOX_PILOT_REFERENCE: "" };
+    const gate = buildReleaseGate(environment);
+
+    expect(gate.productionReady).toBe(true);
+    expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 0 });
+  });
+
   it("blocks an enabled feature when staging evidence is missing without exposing values", () => {
     const environment = { ...completeEnvironment, WORKER_MOBILE_QA_REFERENCE: "" };
     const gate = buildReleaseGate(environment);

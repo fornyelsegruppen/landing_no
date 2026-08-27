@@ -11,7 +11,6 @@ export type ReleaseGateStatus = "disabled" | "no_go" | "go";
 const commonEvidence = [
   "STAGING_QA_REFERENCE",
   "RESTORE_TEST_REFERENCE",
-  "LEAD_INBOX_PILOT_REFERENCE",
   "PRODUCTION_OWNER_APPROVAL_REFERENCE",
 ] as const;
 
