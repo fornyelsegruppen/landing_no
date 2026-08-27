@@ -4,6 +4,8 @@ import { statusLabel } from "@/lib/admin-v2/labels";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 type VersionHistoryCopy = {
+  combinedDocument: string;
+  contractIncludedInCombinedDocument: string;
   companySignedAt: string;
   created: string;
   customerSignedAt: string;
@@ -52,12 +54,14 @@ function VersionCard({
   formatDate,
   formatMoney,
   locale,
+  sharedQuoteReference,
   version,
 }: {
   copy: VersionHistoryCopy;
   formatDate: (value?: string) => string;
   formatMoney: (value?: number) => string;
   locale: PanelLocale;
+  sharedQuoteReference?: string;
   version: CaseCommercialVersion;
 }) {
   return (
@@ -125,16 +129,27 @@ function VersionCard({
       </dl>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <a
-          aria-label={`${copy.openDocument} ${version.reference}`}
-          className="hover:border-accent/50 hover:text-accent inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-bold"
-          href={version.pdfHref}
-          rel="noreferrer"
-          target="_blank"
-        >
-          {copy.openDocument}
-          <ExternalLink aria-hidden="true" className="size-3.5" />
-        </a>
+        {sharedQuoteReference ? (
+          <p className="text-muted-foreground rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-sm">
+            {copy.contractIncludedInCombinedDocument.replace(
+              "{reference}",
+              sharedQuoteReference,
+            )}
+          </p>
+        ) : (
+          <a
+            aria-label={`${copy.openDocument} ${version.reference}`}
+            className="hover:border-accent/50 hover:text-accent inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-bold"
+            href={version.pdfHref}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {version.kind === "quote"
+              ? copy.combinedDocument
+              : copy.openDocument}
+            <ExternalLink aria-hidden="true" className="size-3.5" />
+          </a>
+        )}
         <details className="basis-full text-xs">
           <summary className="text-muted-foreground hover:text-accent cursor-pointer py-2 font-semibold">
             {copy.technicalInformation}
@@ -160,6 +175,7 @@ function Chain({
   formatDate,
   formatMoney,
   locale,
+  sharedQuoteByContractId,
   title,
   versions,
 }: {
@@ -167,6 +183,7 @@ function Chain({
   formatDate: (value?: string) => string;
   formatMoney: (value?: number) => string;
   locale: PanelLocale;
+  sharedQuoteByContractId?: Map<number, string>;
   title: string;
   versions: CaseCommercialVersion[];
 }) {
@@ -193,6 +210,7 @@ function Chain({
                 formatDate={formatDate}
                 formatMoney={formatMoney}
                 locale={locale}
+                sharedQuoteReference={sharedQuoteByContractId?.get(version.id)}
                 version={version}
               />
             </div>
@@ -220,6 +238,17 @@ export function CaseVersionHistory({
   locale: PanelLocale;
   quotes: CaseCommercialVersion[];
 }) {
+  const quoteById = new Map(quotes.map((quote) => [quote.id, quote]));
+  const sharedQuoteByContractId = new Map<number, string>();
+  for (const contract of contracts) {
+    const quote = contract.quoteId
+      ? quoteById.get(contract.quoteId)
+      : undefined;
+    if (quote && contract.pdfHref === quote.pdfHref) {
+      sharedQuoteByContractId.set(contract.id, quote.reference);
+    }
+  }
+
   return (
     <section
       aria-labelledby="version-history-title"
@@ -243,6 +272,7 @@ export function CaseVersionHistory({
           formatDate={formatDate}
           formatMoney={formatMoney}
           locale={locale}
+          sharedQuoteByContractId={sharedQuoteByContractId}
           title={copy.contractVersions}
           versions={contracts}
         />
