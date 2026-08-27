@@ -15,12 +15,40 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
+function secureQuoteButton(url: string) {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const isTakfornyelseHost =
+      hostname === "takfornyelse.as" ||
+      hostname === "www.takfornyelse.as" ||
+      hostname.endsWith(".vercel.app");
+
+    if (
+      parsed.protocol !== "https:" ||
+      !isTakfornyelseHost ||
+      !parsed.pathname.startsWith("/tilbud/")
+    ) {
+      return null;
+    }
+
+    return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:8px 0 4px;background:#f0a914;color:#101319;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 20px;border-radius:10px">Åpne ditt sikre tilbud</a>`;
+  } catch {
+    return null;
+  }
+}
+
 function linkedLine(line: string) {
-  const escaped = escapeHtml(line);
-  return escaped.replace(
-    /(https:\/\/[^\s<]+)/g,
-    '<a href="$1" style="color:#d68b00;font-weight:700;text-decoration:underline;word-break:break-all">$1</a>',
-  );
+  const parts = line.split(/(https:\/\/[^\s<]+)/g);
+  return parts
+    .map((part) => {
+      if (!part.startsWith("https://")) return escapeHtml(part);
+      return (
+        secureQuoteButton(part) ||
+        `<a href="${escapeHtml(part)}" style="color:#d68b00;font-weight:700;text-decoration:underline;word-break:break-all">${escapeHtml(part)}</a>`
+      );
+    })
+    .join("");
 }
 
 function textToHtml(text: string) {
