@@ -18,6 +18,7 @@ export type AdminActionFeedback = {
 
 export function interpretAdminActionResult(input: {
   fallbackError: string;
+  measurementEvidenceUnavailableMessage?: string;
   ok: boolean;
   queuedMessage: string;
   reference?: string;
@@ -27,7 +28,21 @@ export function interpretAdminActionResult(input: {
 }): AdminActionFeedback {
   const { result } = input;
   if (!input.ok) {
-    if (["STALE_COMMERCIAL_CONTEXT", "CASE_REVISION_CONFLICT"].includes(result.code || "")) {
+    if (
+      result.code === "MEASUREMENT_EVIDENCE_TEMPORARILY_UNAVAILABLE" &&
+      input.measurementEvidenceUnavailableMessage
+    ) {
+      return {
+        kind: "error",
+        message: input.measurementEvidenceUnavailableMessage,
+        refresh: false,
+      };
+    }
+    if (
+      ["STALE_COMMERCIAL_CONTEXT", "CASE_REVISION_CONFLICT"].includes(
+        result.code || "",
+      )
+    ) {
       return {
         kind: "stale",
         message: `${input.staleMessage}${result.currentReference ? ` ${result.currentReference}` : ""}`,
@@ -52,5 +67,17 @@ export function interpretAdminActionResult(input: {
     kind: "success",
     message: `${input.successMessage}${input.reference ? ` ${input.reference}` : ""}`,
     refresh: true,
+  };
+}
+
+export function interpretAdminActionNetworkFailure(
+  error: unknown,
+  input: { networkMessage: string; timeoutMessage: string },
+): AdminActionFeedback {
+  const timedOut = error instanceof Error && error.name === "AbortError";
+  return {
+    kind: "error",
+    message: timedOut ? input.timeoutMessage : input.networkMessage,
+    refresh: false,
   };
 }

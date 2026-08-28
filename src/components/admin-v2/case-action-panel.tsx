@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   caseActionRequiresConfirmation,
   type CaseNextAction,
@@ -12,6 +12,7 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 import { CompanySignaturePanel } from "./company-signature-panel";
 import {
   interpretAdminActionResult,
+  interpretAdminActionNetworkFailure,
   type AdminActionFeedback,
   type AdminActionResponse,
 } from "@/lib/admin-v2/action-result";
@@ -138,6 +139,7 @@ export function CaseActionPanel({
 }) {
   const copy = getAdminCaseCopy(locale);
   const router = useRouter();
+  const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<AdminActionFeedback | null>(null);
   const request = requestFor(action, leadId, versionContext);
@@ -161,7 +163,7 @@ export function CaseActionPanel({
   }
 
   async function run() {
-    if (!request || busy) return;
+    if (!request || inFlight.current) return;
     if (
       ["approve_package", "approve_quote", "issue_quote"].includes(action.kind)
     ) {
@@ -188,10 +190,12 @@ export function CaseActionPanel({
       !window.confirm(`${copy.confirmEconomicAction}\n\n${actionLabel}`)
     )
       return;
+    inFlight.current = true;
     setBusy(true);
     setFeedback(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    let refreshStarted = false;
     try {
       const response = await fetch(request.endpoint, {
         method: "POST",
@@ -204,6 +208,8 @@ export function CaseActionPanel({
         .catch(() => ({}))) as AdminActionResponse;
       const nextFeedback = interpretAdminActionResult({
         fallbackError: copy.actionFailed,
+        measurementEvidenceUnavailableMessage:
+          copy.measurementEvidenceTemporarilyUnavailable,
         ok: response.ok,
         queuedMessage: copy.actionSavedQueued,
         reference: actionReference,
@@ -212,21 +218,23 @@ export function CaseActionPanel({
         successMessage: copy.actionDone,
       });
       setFeedback(nextFeedback);
-      if (nextFeedback.refresh) router.refresh();
+      if (response.ok && nextFeedback.refresh) {
+        refreshStarted = true;
+        router.refresh();
+      }
     } catch (error) {
-      setFeedback({
-        kind: "error",
-        message:
-          error instanceof DOMException && error.name === "AbortError"
-            ? copy.networkTimeout
-            : error instanceof Error
-              ? error.message
-              : copy.actionFailed,
-        refresh: false,
-      });
+      setFeedback(
+        interpretAdminActionNetworkFailure(error, {
+          networkMessage: copy.networkFailure,
+          timeoutMessage: copy.networkTimeout,
+        }),
+      );
     } finally {
       window.clearTimeout(timeout);
-      setBusy(false);
+      if (!refreshStarted) {
+        inFlight.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -246,7 +254,7 @@ export function CaseActionPanel({
               : null;
 
   return (
-    <div>
+    <div aria-busy={busy}>
       {request ? (
         <button
           className={`min-h-12 rounded-xl px-5 font-bold shadow-lg transition disabled:opacity-60 ${action.kind === "send_closure_confirmation" ? "bg-danger shadow-danger/20 text-white hover:brightness-110" : "bg-accent text-accent-foreground shadow-accent/10 hover:bg-accent-hover"}`}

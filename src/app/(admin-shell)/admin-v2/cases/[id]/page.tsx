@@ -567,6 +567,7 @@ export default async function AdminCasePage({
               </dl>
             </div>
             <CaseActionPanel
+              key={`${caseData.nextAction.kind}:${caseData.nextAction.targetId || "none"}:${caseData.lead.revision}`}
               action={caseData.nextAction}
               actionLabel={nextActionText}
               actionReference={actionDocument?.reference}

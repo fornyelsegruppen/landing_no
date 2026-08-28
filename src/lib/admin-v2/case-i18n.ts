@@ -151,6 +151,10 @@ const copy = {
       "Saken eller dokumentet ble endret i en annen fane. Siden oppdateres til gjeldende versjon.",
     networkTimeout:
       "Serveren brukte for lang tid. Oppdater saken og kontroller status før du prøver igjen.",
+    networkFailure:
+      "Kunne ikke nå serveren. Oppdater saken og kontroller status før du prøver igjen.",
+    measurementEvidenceTemporarilyUnavailable:
+      "Måledokumentasjonen er midlertidig utilgjengelig. Kontroller målegrunnlaget, vent et øyeblikk og prøv igjen.",
     actionFailed: "Handlingen kunne ikke fullføres.",
     processing: "Behandler …",
     confirmEconomicAction:
@@ -404,6 +408,10 @@ const copy = {
       "Byla arba dokumentas pakeistas kitame lange. Puslapis atnaujinamas į galiojančią versiją.",
     networkTimeout:
       "Serveris neatsakė laiku. Prieš bandydami dar kartą atnaujinkite bylą ir patikrinkite būseną.",
+    networkFailure:
+      "Nepavyko pasiekti serverio. Prieš bandydami dar kartą atnaujinkite bylą ir patikrinkite būseną.",
+    measurementEvidenceTemporarilyUnavailable:
+      "Matavimo dokumentai laikinai nepasiekiami. Patikrinkite matavimo duomenis, šiek tiek palaukite ir bandykite dar kartą.",
     actionFailed: "Veiksmo atlikti nepavyko.",
     processing: "Vykdoma …",
     confirmEconomicAction:
@@ -657,6 +665,10 @@ const copy = {
       "The case or document changed in another tab. The page is refreshing to the current version.",
     networkTimeout:
       "The server took too long to respond. Refresh the case and check its status before retrying.",
+    networkFailure:
+      "Could not reach the server. Refresh the case and check its status before retrying.",
+    measurementEvidenceTemporarilyUnavailable:
+      "Measurement evidence is temporarily unavailable. Check the measurement basis, wait a moment, and try again.",
     actionFailed: "The action could not be completed.",
     processing: "Processing …",
     confirmEconomicAction:
