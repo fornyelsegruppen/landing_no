@@ -22,6 +22,7 @@ import {
   assertCustomerReplySourcesCurrent,
   loadCustomerReplySourceBundle,
 } from "./customer-reply-sources";
+import { reserveCustomerReplyAiRequest } from "@/lib/ai/payload-usage-limit";
 
 export const manualQuestionReplyPlaceholder =
   "Skriv et kontrollert svar til kunden her før utsending.";
@@ -364,6 +365,12 @@ export async function createCustomerReplyDraft(
     provider,
     context: sourceBundle.context,
     correlationId: input.correlationId,
+    beforeGenerate: ({ attempt, correlationId }) =>
+      reserveCustomerReplyAiRequest(payload, {
+        attempt,
+        correlationId,
+        sourceMessageId: source.id,
+      }).then(() => undefined),
   });
   const factWarnings = [
     ...generated.result.factWarnings,

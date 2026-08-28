@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   AiGenerateRequest,
   AiGenerateResult,
@@ -183,6 +183,33 @@ describe("customer reply safety", () => {
     ).toBe(true);
   });
 
+  it("requires a safe complete answer to the live control-measurement price question", () => {
+    const liveUatContext: CustomerReplyContext = {
+      ...context,
+      customerMessage:
+        "Er impregnering inkludert i dette tilbudet, og hva skjer med prisen dersom kontrollmålingen viser et større takareal?",
+    };
+
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregnering er ikke inkludert i dette tilbudet.",
+        liveUatContext,
+      ),
+    ).toThrow(/larger control measurement/);
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregnering er ikke inkludert. Kontrollmålingen viser større takareal, derfor økes prisen over maksimalprisen.",
+        liveUatContext,
+      ),
+    ).toThrow(/larger control measurement/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Impregnering er ikke inkludert i dette tilbudet. Dersom kontrollmålingen viser et større takareal over toleransen eller maksimalprisen, stanses berørt arbeid. Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale som kunden har akseptert før arbeidet fortsetter.",
+        liveUatContext,
+      ),
+    ).toBe(true);
+  });
+
   it("generates a controlled draft without changing approved facts", async () => {
     await expect(
       generateCustomerReplyDraft({
@@ -213,15 +240,50 @@ describe("customer reply safety", () => {
       },
       valid,
     ]);
+    const beforeGenerate = vi.fn(async () => undefined);
 
     await expect(
       generateCustomerReplyDraft({
         provider,
         context,
         correlationId: "reply-safety-retry",
+        beforeGenerate,
       }),
     ).resolves.toMatchObject({ result: valid });
     expect(provider.calls).toBe(2);
+    expect(beforeGenerate).toHaveBeenNthCalledWith(1, {
+      attempt: 1,
+      correlationId: "reply-safety-retry",
+    });
+    expect(beforeGenerate).toHaveBeenNthCalledWith(2, {
+      attempt: 2,
+      correlationId: "reply-safety-retry-safety-retry",
+    });
+  });
+
+  it("enforces quota before the bounded safety retry calls the provider", async () => {
+    const provider = new SequentialAiProvider([
+      {
+        ...valid,
+        replyDraft:
+          "Arbeidet stanses til kunden har akseptert en skriftlig endringsavtalel.",
+      },
+      valid,
+    ]);
+    const beforeGenerate = vi.fn(async ({ attempt }: { attempt: number }) => {
+      if (attempt === 2) throw new Error("Gemini daily request limit reached");
+    });
+
+    await expect(
+      generateCustomerReplyDraft({
+        provider,
+        context,
+        correlationId: "reply-safety-quota",
+        beforeGenerate,
+      }),
+    ).rejects.toThrow(/daily request limit/);
+    expect(provider.calls).toBe(1);
+    expect(beforeGenerate).toHaveBeenCalledTimes(2);
   });
 
   it("professionally polishes administrator text without changing verified facts", async () => {

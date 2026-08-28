@@ -245,7 +245,6 @@ export async function POST(
       };
     } else if (parsed.data.action === "prepare_question_reply") {
       assertFeatureReady("aiDrafts");
-      await assertPayloadAiUsageAvailable(payload);
       const generated = await createCustomerReplyDraft(
         payload,
         new GeminiAiProvider(),
@@ -373,7 +372,6 @@ export async function POST(
         throw new TypeError(
           "The reply draft has no verified source message context",
         );
-      await assertPayloadAiUsageAvailable(payload);
       const regenerated = await createCustomerReplyDraft(
         payload,
         new GeminiAiProvider(),

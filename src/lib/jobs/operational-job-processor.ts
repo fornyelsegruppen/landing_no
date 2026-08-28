@@ -277,7 +277,6 @@ export async function processOperationalJobs(
           throw new TypeError("Customer reply job has incomplete references");
         if (!featureReadiness("aiDrafts").ready)
           throw new Error("AI drafts require configuration");
-        await assertPayloadAiUsageAvailable(payload);
         await createCustomerReplyDraft(payload, new GeminiAiProvider(), {
           correlationId: job.correlationId,
           leadId,

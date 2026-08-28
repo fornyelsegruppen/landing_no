@@ -288,6 +288,54 @@ export function assertCustomerReplyTextSafe(
       "AI reply must explicitly answer whether impregnation is included or can be added separately",
     );
   }
+  const asksAboutControlMeasurementPrice =
+    typeof context.quote?.maximumTotalIncVatOre === "number" &&
+    /\b(?:kontrollmåling(?:en)?|større\s+(?:tak)?areal|takareal)\b/i.test(
+      context.customerMessage,
+    ) &&
+    /\b(?:pris(?:en)?|kost(?:er|nad)?|maksimalpris(?:en)?|betale)\b/i.test(
+      context.customerMessage,
+    );
+  if (asksAboutControlMeasurementPrice) {
+    const mentionsMeasurement =
+      /\b(?:kontrollmåling(?:en)?|større\s+(?:tak)?areal|takareal)\b/i.test(
+        normalized,
+      );
+    const preservesMaximumPrice =
+      /\b(?:(?:betaler?|belastes?)\s+(?:aldri|ikke)|(?:skal|kan|vil)\s+(?:aldri|ikke)\s+(?:betale|belastes?))\s+(?:mer\s+enn|over)\s+(?:den\s+)?(?:avtalte\s+)?maksimalpris(?:en)?\b/i.test(
+        normalized,
+      ) ||
+      /\bmaksimalpris(?:en)?\b.{0,60}\b(?:kan|skal|vil)\s+ikke\s+(?:overstiges|overskrides)\b/i.test(
+        normalized,
+      ) ||
+      /\b(?:pris(?:en)?|beløpet)\b.{0,40}\b(?:kan|skal|vil)\s+ikke\s+(?:overstige|overskride)\b.{0,40}\bmaksimalpris(?:en)?\b/i.test(
+        normalized,
+      );
+    const requiresWrittenAgreement =
+      /\b(?:ny\s+)?skriftlig\s+endringsavtale(?:n)?\b/i.test(normalized);
+    const requiresCustomerAcceptance =
+      /\bkunden\b.{0,80}\b(?:aksepterer|akseptert|har\s+akseptert|godkjenner|godkjent|har\s+godkjent)\b/i.test(
+        normalized,
+      ) || /\b(?:akseptert|godkjent)\b.{0,40}\bav\s+kunden\b/i.test(normalized);
+    const stopsAffectedWork =
+      /\b(?:berørt\s+)?arbeid(?:et)?\b.{0,60}\b(?:stanses|stoppes|starter\s+ikke|fortsetter\s+ikke)\b/i.test(
+        normalized,
+      ) ||
+      /\b(?:stanses|stoppes)\b.{0,40}\b(?:berørt\s+)?arbeid(?:et)?\b/i.test(
+        normalized,
+      );
+    if (
+      !mentionsMeasurement ||
+      !preservesMaximumPrice ||
+      !requiresWrittenAgreement ||
+      !requiresCustomerAcceptance ||
+      !stopsAffectedWork
+    ) {
+      throw new TypeError(
+        "AI reply must explain that a larger control measurement cannot exceed the maximum price without a written change agreement accepted by the customer and that affected work stops first",
+      );
+    }
+  }
   for (const match of normalized.matchAll(
     /(\d[\d\s.]*(?:,\d{1,2})?)\s*(?:kr|nok)\b/gi,
   )) {
@@ -355,6 +403,10 @@ export async function generateCustomerReplyDraft(input: {
   provider: AiProvider;
   context: CustomerReplyContext;
   correlationId: string;
+  beforeGenerate?: (input: {
+    attempt: number;
+    correlationId: string;
+  }) => Promise<void>;
 }) {
   const context = minimizeCustomerReplyContext(input.context);
   const promptContext = customerReplyPromptContext(context);
@@ -377,14 +429,19 @@ export async function generateCustomerReplyDraft(input: {
   let lastSafetyError: TypeError | null = null;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const attemptCorrelationId =
+      attempt === 1
+        ? input.correlationId
+        : `${input.correlationId}-safety-retry`;
+    await input.beforeGenerate?.({
+      attempt,
+      correlationId: attemptCorrelationId,
+    });
     const generated = await input.provider.generate({
       task: "customer.reply.draft",
       schemaName: "customer-reply-nb-v4",
       schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
-      correlationId:
-        attempt === 1
-          ? input.correlationId
-          : `${input.correlationId}-safety-retry`,
+      correlationId: attemptCorrelationId,
       system: [
         ...baseSystem,
         ...(attempt === 2
