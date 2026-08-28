@@ -190,6 +190,7 @@ export function CustomerQuote(props: {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const followUpDateRef = useRef<HTMLInputElement>(null);
   const questionSuccessRef = useRef<HTMLElement>(null);
+  const questionCounterRef = useRef<HTMLOutputElement>(null);
   const questionSubmissionKey = useRef<string | null>(null);
   const questionStatusCheck = useRef(false);
   const drawing = useRef(false);
@@ -778,20 +779,27 @@ export function CustomerQuote(props: {
                 maxLength={2000}
                 minLength={5}
                 name="message"
-                onChange={(event) => {
-                  setQuestionText(event.target.value);
+                onInput={(event) => {
+                  const value = event.currentTarget.value;
+                  setQuestionText(value);
+                  if (questionCounterRef.current) {
+                    questionCounterRef.current.value = `${value.length} / 2000`;
+                  }
                   questionSubmissionKey.current = null;
                   if (questionError) setQuestionError("");
                 }}
                 required
                 value={questionText}
               />
-              <p
-                className="text-muted-foreground mt-1 text-right text-xs"
+              <output
+                aria-live="polite"
+                className="text-muted-foreground mt-1 block text-right text-xs"
+                htmlFor="customer-question"
                 id="customer-question-count"
+                ref={questionCounterRef}
               >
                 {questionText.length} / 2000
-              </p>
+              </output>
               {questionError ? (
                 <p
                   className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 p-3 text-sm text-red-100"
