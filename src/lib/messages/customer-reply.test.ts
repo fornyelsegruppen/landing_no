@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DeterministicAiProvider } from "@/lib/providers/safe-providers";
 import {
   assertCustomerReplyTextSafe,
+  customerReplyPromptContext,
   generateCustomerReplyDraft,
   minimizeCustomerReplyContext,
   polishCustomerReplyDraft,
@@ -55,6 +56,43 @@ describe("customer reply safety", () => {
     expect(() => assertCustomerReplyTextSafe("Areal 99 m².", context)).toThrow(
       /approved measurement/,
     );
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Maksimalprisen er 2 029 376 øre.",
+        context,
+      ),
+    ).toThrow(/raw øre/);
+  });
+
+  it("gives the AI only customer-facing kroner and square-metre values", () => {
+    const promptContext = customerReplyPromptContext({
+      ...context,
+      businessSources: {
+        retrievedAt: "2026-08-28T12:00:00.000Z",
+        services: [],
+        priceRules: [
+          {
+            id: 1,
+            reference: "PR-TAKVASK-V1",
+            serviceKey: "takvask",
+            termsVersion: "V1",
+            unitPriceExVatOre: 9_900,
+            validFrom: "2026-01-01T00:00:00.000Z",
+            version: 1,
+          },
+        ],
+      },
+    });
+    const serialized = JSON.stringify(promptContext).replace(/\u00a0/g, " ");
+
+    expect(serialized).not.toContain("totalIncVatOre");
+    expect(serialized).not.toContain("maximumTotalIncVatOre");
+    expect(serialized).not.toContain("unitPriceExVatOre");
+    expect(serialized).not.toContain("areaMinTenths");
+    expect(serialized).toContain("17 646,75 kr");
+    expect(serialized).toContain("20 293,76 kr");
+    expect(serialized).toContain("99,00 kr/m² eks. mva.");
+    expect(serialized).toContain("93,5 m²");
   });
 
   it("blocks promises and automatic cancellation confirmation", () => {

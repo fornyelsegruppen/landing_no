@@ -390,6 +390,55 @@ describe("admin lead review marker", () => {
     );
   });
 
+  it("blocks a legacy AI draft that exposes a raw øre amount at send time", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        bodyText: "Original draft with a customer-facing pricing error.",
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        status: "draft",
+        subject: "Svar om maksimalprisen",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.assertSources.mockResolvedValue({
+      context: {
+        customerMessage: "Hva dekker maksimalprisen?",
+        purpose: "question",
+        quote: {
+          reference: "T-10-V1",
+          status: "sent",
+          totalIncVatOre: 1_266_000,
+          maximumTotalIncVatOre: 1_455_858,
+        },
+      },
+    });
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "Maksimalprisen er 1 455 858 øre inkludert mva.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Svar om maksimalprisen",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a blocked approval response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining("raw øre"),
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+  });
+
   it("rejects approval when the conditional draft update loses a race", async () => {
     mocks.findByID
       .mockReset()

@@ -174,11 +174,90 @@ function allowedAreas(context: CustomerReplyContext) {
   ].filter((value): value is number => typeof value === "number");
 }
 
+function formatNokFromOre(ore: number) {
+  return `${new Intl.NumberFormat("nb-NO", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(ore / 100)} kr`;
+}
+
+function formatSquareMetersFromTenths(tenths: number) {
+  return `${new Intl.NumberFormat("nb-NO", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(tenths / 10)} m²`;
+}
+
+/**
+ * The stored fact context uses integer øre and tenths for exact validation.
+ * Never expose those storage units to the language model: a model can otherwise
+ * repeat a raw integer as a customer-facing amount (for example "1 455 858 øre").
+ */
+export function customerReplyPromptContext(context: CustomerReplyContext) {
+  const { measurement, quote, businessSources, ...base } = context;
+
+  return {
+    ...base,
+    ...(measurement
+      ? {
+          measurement: {
+            reference: measurement.reference,
+            areaMin: formatSquareMetersFromTenths(measurement.areaMinTenths),
+            areaMax: formatSquareMetersFromTenths(measurement.areaMaxTenths),
+          },
+        }
+      : {}),
+    ...(quote
+      ? {
+          quote: {
+            reference: quote.reference,
+            status: quote.status,
+            totalIncVat: formatNokFromOre(quote.totalIncVatOre),
+            ...(typeof quote.maximumTotalIncVatOre === "number"
+              ? {
+                  maximumTotalIncVat: formatNokFromOre(
+                    quote.maximumTotalIncVatOre,
+                  ),
+                }
+              : {}),
+            ...(quote.validUntil ? { validUntil: quote.validUntil } : {}),
+            ...(quote.version ? { version: quote.version } : {}),
+            ...(quote.serviceDescription
+              ? { serviceDescription: quote.serviceDescription }
+              : {}),
+            ...(quote.termsVersion
+              ? { termsVersion: quote.termsVersion }
+              : {}),
+          },
+        }
+      : {}),
+    ...(businessSources
+      ? {
+          businessSources: {
+            ...businessSources,
+            priceRules: businessSources.priceRules.map((rule) => {
+              const { unitPriceExVatOre, ...safeRule } = rule;
+              return {
+                ...safeRule,
+                unitPriceExVat: `${formatNokFromOre(unitPriceExVatOre)}/m² eks. mva.`,
+              };
+            }),
+          },
+        }
+      : {}),
+  };
+}
+
 export function assertCustomerReplyTextSafe(
   text: string,
   context: CustomerReplyContext,
 ) {
   const normalized = text.normalize("NFKC");
+  if (/\d[\d\s.,]*\s*øre\b/i.test(normalized)) {
+    throw new TypeError(
+      "AI reply may not expose raw øre amounts to the customer",
+    );
+  }
   for (const match of normalized.matchAll(
     /(\d[\d\s.]*(?:,\d{1,2})?)\s*(?:kr|nok)\b/gi,
   )) {
@@ -248,9 +327,10 @@ export async function generateCustomerReplyDraft(input: {
   correlationId: string;
 }) {
   const context = minimizeCustomerReplyContext(input.context);
+  const promptContext = customerReplyPromptContext(context);
   const generated = await input.provider.generate({
     task: "customer.reply.draft",
-    schemaName: "customer-reply-nb-v1",
+    schemaName: "customer-reply-nb-v2",
     schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
     correlationId: input.correlationId,
     system: [
@@ -258,6 +338,7 @@ export async function generateCustomerReplyDraft(input: {
       "Svar varmt, tydelig og profesjonelt til norske boligeiere over 30 år.",
       "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
       "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
+      "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
       "Bruk den uforanderlige quote- og contract-versjonen i saken når kunden spør om et eksisterende tilbud eller en eksisterende avtale.",
       "Bruk aktive businessSources bare for gjeldende generell informasjon. En gjeldende listepris er ikke et bindende tilbud og skal ikke erstatte prisene i saken.",
       "Hvis aktive kilder avviker fra saksdokumentet, skal du forklare at den utstedte saksversjonen gjelder og foreslå et revidert tilbud når det er nødvendig.",
@@ -265,7 +346,7 @@ export async function generateCustomerReplyDraft(input: {
       "En kanselleringsforespørsel skal bare bekreftes mottatt for manuell vurdering. Ikke bekreft at avtalen er kansellert.",
       "Administrator må alltid kontrollere og godkjenne teksten før utsending.",
     ].join("\n"),
-    prompt: `Lag et strukturert svarutkast basert på denne minimerte sakskonteksten:\n${JSON.stringify(context)}`,
+    prompt: `Lag et strukturert svarutkast basert på denne minimerte sakskonteksten:\n${JSON.stringify(promptContext)}`,
   });
   const result = customerReplySchema.parse(generated.data);
   assertCustomerReplyTextSafe(
@@ -303,18 +384,20 @@ export async function polishCustomerReplyDraft(input: {
   subject: string;
 }) {
   const context = minimizeCustomerReplyContext(input.context);
+  const promptContext = customerReplyPromptContext(context);
   const generated = await input.provider.generate({
     task: "customer.reply.polish",
-    schemaName: "customer-reply-polish-nb-v1",
+    schemaName: "customer-reply-polish-nb-v2",
     schema: polishedReplyJsonSchema as unknown as Record<string, unknown>,
     correlationId: input.correlationId,
     system: [
       "Du forbedrer et internt svarutkast for Takfornyelse på profesjonell norsk.",
       "Bevar meningen og alle verifiserte fakta. Ikke legg til pris, areal, rabatt, garanti, dato eller løfte.",
+      "Alle pengebeløp i sakskonteksten er formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
       "Bruk saksdokumentet for eksisterende tilbud eller avtale. Gjeldende listepriser må aldri fremstilles som kundens bindende pris.",
       "Returner bare et forslag. Administratoren må kontrollere og godkjenne før utsending.",
     ].join("\n"),
-    prompt: `Forbedre administratorens utkast uten å endre fakta.\n\nSakskontekst:\n${JSON.stringify(context)}\n\nEmne:\n${input.subject}\n\nSvarutkast:\n${input.bodyText}`,
+    prompt: `Forbedre administratorens utkast uten å endre fakta.\n\nSakskontekst:\n${JSON.stringify(promptContext)}\n\nEmne:\n${input.subject}\n\nSvarutkast:\n${input.bodyText}`,
   });
   const result = polishedReplySchema.parse(generated.data);
   assertCustomerReplyTextSafe(

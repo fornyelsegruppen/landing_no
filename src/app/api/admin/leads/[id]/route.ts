@@ -33,6 +33,7 @@ import {
 } from "@/lib/cases/case-command";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
 import {
+  assertCustomerReplyTextSafe,
   customerReplyContextFromAnalysis,
   polishCustomerReplyDraft,
 } from "@/lib/messages/customer-reply";
@@ -488,6 +489,12 @@ export async function POST(
           payload,
           message,
         );
+        if (currentSources) {
+          assertCustomerReplyTextSafe(
+            `${parsed.data.subject}\n${parsed.data.bodyText}`,
+            currentSources.context,
+          );
+        }
         replyPurpose = currentSources?.context.purpose;
       } else if (
         !message.approvedAt ||
