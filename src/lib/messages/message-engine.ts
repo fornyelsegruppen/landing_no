@@ -18,7 +18,29 @@ import {
   generateCustomerReplyDraft,
   type CustomerReplyPurpose,
 } from "./customer-reply";
-import { loadCustomerReplySourceBundle } from "./customer-reply-sources";
+import {
+  assertCustomerReplySourcesCurrent,
+  loadCustomerReplySourceBundle,
+} from "./customer-reply-sources";
+
+export const manualQuestionReplyPlaceholder =
+  "Skriv et kontrollert svar til kunden her før utsending.";
+
+export function assertCustomerReplyDeliveryTrackingReady(
+  provider: EmailProvider,
+  purpose: CustomerReplyPurpose | null | undefined,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  if (
+    purpose === "question" &&
+    provider.health().provider === "resend" &&
+    !environment.RESEND_WEBHOOK_SECRET?.trim()
+  ) {
+    throw new TypeError(
+      "Confirmed delivery requires the Resend delivery webhook to be configured",
+    );
+  }
+}
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
@@ -403,6 +425,106 @@ export async function createCustomerReplyDraft(
   return { duplicate: false as const, message, generated, factWarnings };
 }
 
+export async function createManualCustomerQuestionReplyDraft(
+  payload: Payload,
+  input: {
+    correlationId: string;
+    leadId: number;
+    sourceMessageId: number;
+  },
+) {
+  const source = await payload.findByID({
+    collection: "messages",
+    id: input.sourceMessageId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (
+    relationId(source.lead) !== input.leadId ||
+    source.direction !== "inbound" ||
+    source.category !== "customer_question"
+  ) {
+    throw new TypeError(
+      "Manual question replies require an exact customer-question source in the same case",
+    );
+  }
+  const idempotencyKey = makeIdempotencyKey("customer.question.manual-reply", {
+    sourceMessageId: source.id,
+  });
+  const duplicate = await findMessageByKey(payload, idempotencyKey);
+  if (duplicate && duplicate.status !== "cancelled") {
+    return { duplicate: true as const, message: duplicate };
+  }
+
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: input.leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (lead.status === "closed" || lead.recordState !== "active") {
+    throw new TypeError(
+      "A reply draft cannot be generated for a closed or archived case",
+    );
+  }
+  const sourceBundle = await loadCustomerReplySourceBundle(payload, {
+    leadId: input.leadId,
+    purpose: "question",
+    sourceMessageId: source.id,
+  });
+  const subject = `Svar: ${source.subject || "Spørsmål om tilbudet"}`.slice(
+    0,
+    160,
+  );
+  const data = {
+    lead: lead.id,
+    replyToMessage: source.id,
+    direction: "outbound" as const,
+    category: "follow_up" as const,
+    channel: lead.email ? ("email" as const) : ("sms" as const),
+    subject,
+    bodyText: manualQuestionReplyPlaceholder,
+    status: "draft" as const,
+    idempotencyKey,
+    aiAssisted: false,
+    aiAnalysis: {
+      purpose: "question",
+      sourceMessageId: source.id,
+      manualQuestionReply: true,
+      manualReplyRequiresEditing: true,
+      replyFactContext: sourceBundle.context,
+      replySourceFingerprint: sourceBundle.fingerprint,
+      replySourceSnapshot: sourceBundle.snapshot,
+    },
+  };
+  const message = duplicate
+    ? await payload.update({
+        collection: "messages",
+        id: duplicate.id,
+        overrideAccess: true,
+        data,
+      })
+    : await payload.create({
+        collection: "messages",
+        overrideAccess: true,
+        data,
+      });
+  await updateCaseState(payload, {
+    leadId: lead.id,
+    command: "manual_customer_question_reply_drafted",
+    idempotencyKey: `${idempotencyKey}:${message.id}`,
+    patch: {
+      status: "customer_waiting",
+      nextActionOwner: "administrator",
+      nextAction:
+        "Skriv, kontroller og send et manuelt svar på kundens spørsmål.",
+      nextActionAt: new Date().toISOString(),
+      nextActionBlocker: "CUSTOMER_QUESTION_PENDING",
+    },
+  });
+  return { duplicate: false as const, message };
+}
+
 export async function deliverMessage(
   payload: Payload,
   provider: EmailProvider,
@@ -448,6 +570,14 @@ export async function deliverMessage(
         contentBase64: content.data.toString("base64"),
       });
     }
+    const currentSources = await assertCustomerReplySourcesCurrent(
+      payload,
+      message,
+    );
+    assertCustomerReplyDeliveryTrackingReady(
+      provider,
+      currentSources?.context.purpose,
+    );
     const result = await provider.send({
       template: message.category,
       to: deliveryEmail,
@@ -574,59 +704,63 @@ export async function deliverMessage(
         correlationId,
       );
     }
+    const isCustomerQuestionReply =
+      replyContext?.purpose === "question" ||
+      (analysis as Record<string, unknown>).manualQuestionReply === true;
     const followUp =
       lead.status === "closed" || analysis.cancellationDecision
         ? {}
-        : replyContext?.purpose === "cancellation"
-          ? {
-              status: "customer_waiting" as const,
-              nextAction:
-                "Vurder kundens kanselleringsforespørsel før arbeid kan startes.",
-              nextActionAt: new Date().toISOString(),
-            }
-          : replyContext
+        : isCustomerQuestionReply
+          ? {}
+          : replyContext?.purpose === "cancellation"
             ? {
-                status: "waiting_customer" as const,
+                status: "customer_waiting" as const,
                 nextAction:
-                  "Vent på kundens svar og følg opp dersom kunden ikke svarer.",
-                nextActionAt: new Date(
-                  Date.now() + 3 * 24 * 60 * 60_000,
-                ).toISOString(),
-                nextActionBlocker: null,
+                  "Vurder kundens kanselleringsforespørsel før arbeid kan startes.",
+                nextActionAt: new Date().toISOString(),
               }
-            : message.category === "completion"
+            : replyContext
               ? {
-                  status: "converted" as const,
-                  nextAction: "Oppdrag fullført og dokumentert.",
-                  nextActionAt: null,
+                  status: "waiting_customer" as const,
+                  nextAction:
+                    "Vent på kundens svar og følg opp dersom kunden ikke svarer.",
+                  nextActionAt: new Date(
+                    Date.now() + 3 * 24 * 60 * 60_000,
+                  ).toISOString(),
+                  nextActionBlocker: null,
                 }
-              : ["receipt", "contract", "change_confirmation"].includes(
-                    message.category,
-                  )
-                ? {}
-                : message.category === "information_request" ||
-                    analysis.recommendedNextAction === "request_information"
-                  ? {
-                      status: "waiting_customer" as const,
-                      nextAction: "Følg opp dersom kunden ikke svarer.",
-                      nextActionAt: new Date(
-                        Date.now() + 2 * 24 * 60 * 60_000,
-                      ).toISOString(),
-                    }
-                  : analysis.recommendedNextAction === "start_measurement"
+              : message.category === "completion"
+                ? {
+                    status: "converted" as const,
+                    nextAction: "Oppdrag fullført og dokumentert.",
+                    nextActionAt: null,
+                  }
+                : ["receipt", "contract", "change_confirmation"].includes(
+                      message.category,
+                    )
+                  ? {}
+                  : message.category === "information_request" ||
+                      analysis.recommendedNextAction === "request_information"
                     ? {
-                        status: "qualified" as const,
-                        nextAction: "Start kontrollert takmåling.",
-                        nextActionAt: new Date().toISOString(),
+                        status: "waiting_customer" as const,
+                        nextAction: "Følg opp dersom kunden ikke svarer.",
+                        nextActionAt: new Date(
+                          Date.now() + 2 * 24 * 60 * 60_000,
+                        ).toISOString(),
                       }
-                    : {
-                        status: "contacted" as const,
-                        nextAction:
-                          "Kontroller henvendelsen og velg neste steg.",
-                        nextActionAt: new Date().toISOString(),
-                      };
+                    : analysis.recommendedNextAction === "start_measurement"
+                      ? {
+                          status: "qualified" as const,
+                          nextAction: "Start kontrollert takmåling.",
+                          nextActionAt: new Date().toISOString(),
+                        }
+                      : {
+                          status: "contacted" as const,
+                          nextAction:
+                            "Kontroller henvendelsen og velg neste steg.",
+                          nextActionAt: new Date().toISOString(),
+                        };
     const nextActionOwner =
-      replyContext?.purpose === "question" ||
       replyContext?.purpose === "decline"
         ? ("customer" as const)
         : message.category === "completion"
@@ -636,7 +770,11 @@ export async function deliverMessage(
       leadId: lead.id,
       command: "message_delivered",
       idempotencyKey: `message-delivered:${message.id}:${result.providerMessageId}`,
-      patch: { lastContactAt: result.acceptedAt, ...followUp, nextActionOwner },
+      patch: {
+        lastContactAt: result.acceptedAt,
+        ...followUp,
+        ...(isCustomerQuestionReply ? {} : { nextActionOwner }),
+      },
     });
     return { duplicate: false as const, message: updated };
   } catch (error) {

@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { selectUnresolvedCustomerQuestion } from "./customer-question-state";
+import { describe, expect, it, vi } from "vitest";
+import type { Payload } from "payload";
+import {
+  loadUnresolvedCustomerQuestion,
+  selectUnresolvedCustomerQuestion,
+} from "./customer-question-state";
 
 describe("customer question state", () => {
   const question = {
@@ -27,7 +31,7 @@ describe("customer question state", () => {
     expect(result?.reply?.id).toBe(11);
   });
 
-  it("resolves a question only after its direct reply is sent", () => {
+  it("keeps a question unresolved while its direct reply is only accepted for sending", () => {
     const result = selectUnresolvedCustomerQuestion([
       question,
       {
@@ -35,6 +39,22 @@ describe("customer question state", () => {
         category: "ai_reply",
         direction: "outbound",
         status: "sent",
+        replyToMessage: { id: 10 },
+        createdAt: "2026-08-28T08:02:00.000Z",
+      },
+    ]);
+
+    expect(result?.question.id).toBe(10);
+  });
+
+  it("resolves a question only after its direct reply is confirmed delivered", () => {
+    const result = selectUnresolvedCustomerQuestion([
+      question,
+      {
+        id: 12,
+        category: "ai_reply",
+        direction: "outbound",
+        status: "delivered",
         replyToMessage: { id: 10 },
         createdAt: "2026-08-28T08:02:00.000Z",
       },
@@ -57,5 +77,73 @@ describe("customer question state", () => {
     ]);
 
     expect(result?.question.id).toBe(10);
+  });
+
+  it("keeps a bounced direct reply unresolved", () => {
+    const result = selectUnresolvedCustomerQuestion([
+      question,
+      {
+        id: 14,
+        category: "ai_reply",
+        direction: "outbound",
+        status: "attention",
+        replyToMessage: 10,
+        createdAt: "2026-08-28T08:02:00.000Z",
+      },
+    ]);
+
+    expect(result?.question.id).toBe(10);
+  });
+
+  it("queries exact question and direct-reply sets instead of capped case history", async () => {
+    const find = vi
+      .fn()
+      .mockResolvedValueOnce({ docs: [question] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 12,
+            category: "ai_reply",
+            direction: "outbound",
+            status: "delivered",
+            replyToMessage: 10,
+            createdAt: "2026-08-28T08:02:00.000Z",
+          },
+        ],
+      });
+
+    const result = await loadUnresolvedCustomerQuestion(
+      { find } as unknown as Payload,
+      7,
+    );
+
+    expect(result).toBeNull();
+    expect(find).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        pagination: false,
+        where: {
+          and: expect.arrayContaining([
+            { lead: { equals: 7 } },
+            { category: { equals: "customer_question" } },
+          ]),
+        },
+      }),
+    );
+    expect(find).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        pagination: false,
+        where: {
+          and: expect.arrayContaining([
+            { replyToMessage: { in: [10] } },
+            { status: { not_equals: "cancelled" } },
+          ]),
+        },
+      }),
+    );
+    expect(find.mock.calls.every(([query]) => query.limit === undefined)).toBe(
+      true,
+    );
   });
 });

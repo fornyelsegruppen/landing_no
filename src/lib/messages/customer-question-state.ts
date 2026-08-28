@@ -45,9 +45,7 @@ export function selectUnresolvedCustomerQuestion<T extends MessageLike>(
           String(left.createdAt || ""),
         ),
       );
-    const delivered = replies.some((reply) =>
-      ["sent", "delivered"].includes(reply.status || ""),
-    );
+    const delivered = replies.some((reply) => reply.status === "delivered");
     if (!delivered) return { question, reply: replies[0] || null };
   }
 
@@ -58,14 +56,44 @@ export async function loadUnresolvedCustomerQuestion(
   payload: Payload,
   leadId: number,
 ) {
-  const result = await payload.find({
+  const questions = await payload.find({
     collection: "messages",
     depth: 0,
-    limit: 250,
     overrideAccess: true,
     pagination: false,
     sort: "-createdAt",
-    where: { lead: { equals: leadId } },
+    where: {
+      and: [
+        { lead: { equals: leadId } },
+        { direction: { equals: "inbound" } },
+        { category: { equals: "customer_question" } },
+      ],
+    },
   });
-  return selectUnresolvedCustomerQuestion(result.docs as MessageLike[]);
+  const questionDocs = questions.docs as MessageLike[];
+  if (!questionDocs.length) return null;
+
+  const replies = await payload.find({
+    collection: "messages",
+    depth: 0,
+    overrideAccess: true,
+    pagination: false,
+    sort: "-createdAt",
+    where: {
+      and: [
+        { lead: { equals: leadId } },
+        { direction: { equals: "outbound" } },
+        {
+          replyToMessage: {
+            in: questionDocs.map((question) => question.id),
+          },
+        },
+        { status: { not_equals: "cancelled" } },
+      ],
+    },
+  });
+  return selectUnresolvedCustomerQuestion([
+    ...questionDocs,
+    ...(replies.docs as MessageLike[]),
+  ]);
 }

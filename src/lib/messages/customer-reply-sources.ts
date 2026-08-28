@@ -152,7 +152,9 @@ export async function loadCustomerReplySourceBundle(
   const measurement = measurements.docs[0];
   const quote = quotes.docs[0];
   if (quote && relationId(quote.lead) !== lead.id) {
-    throw new TypeError("The referenced quote does not belong to this customer case");
+    throw new TypeError(
+      "The referenced quote does not belong to this customer case",
+    );
   }
   const workOrder = workOrders.docs[0];
   const contracts = sourceContractId
@@ -168,17 +170,19 @@ export async function loadCustomerReplySourceBundle(
       }
     : quote
       ? await payload.find({
-        collection: "contracts",
-        depth: 0,
-        limit: 1,
-        sort: "-version",
-        overrideAccess: true,
-        where: { quote: { equals: quote.id } },
+          collection: "contracts",
+          depth: 0,
+          limit: 1,
+          sort: "-version",
+          overrideAccess: true,
+          where: { quote: { equals: quote.id } },
         })
       : { docs: [] };
   const contract = contracts.docs[0];
   if (contract && quote && relationId(contract.quote) !== quote.id) {
-    throw new TypeError("The referenced contract does not belong to the referenced quote");
+    throw new TypeError(
+      "The referenced contract does not belong to the referenced quote",
+    );
   }
   const parsedQuote = quote
     ? quoteSnapshotSchema.safeParse(quote.snapshot)
@@ -203,15 +207,30 @@ export async function loadCustomerReplySourceBundle(
       validFrom: rule.validFrom,
       validTo: rule.validTo || undefined,
       version: rule.version,
-    }));
+    }))
+    .sort((left, right) =>
+      [left.serviceKey, left.version, left.id]
+        .map(String)
+        .join(":")
+        .localeCompare(
+          [right.serviceKey, right.version, right.id].map(String).join(":"),
+        ),
+    );
 
-  const publishedServices = services.docs.map((service) => ({
-    id: service.id,
-    key: service.key,
-    title: service.titleNo,
-    description: service.descriptionNo,
-    updatedAt: service.updatedAt,
-  }));
+  const publishedServices = services.docs
+    .map((service) => ({
+      id: service.id,
+      key: service.key,
+      title: service.titleNo,
+      description: service.descriptionNo,
+      updatedAt: service.updatedAt,
+    }))
+    .sort((left, right) =>
+      [left.key, left.id]
+        .map(String)
+        .join(":")
+        .localeCompare([right.key, right.id].map(String).join(":")),
+    );
 
   const measurementContext = quoteSnapshot
     ? {
@@ -377,7 +396,7 @@ export async function assertCustomerReplySourcesCurrent(
     analysis.replySourceFingerprint !== current.fingerprint
   ) {
     throw new TypeError(
-      "The case documents, prices or active company terms changed after this draft was generated. Create a new AI draft before sending.",
+      "The case documents, prices or active company terms changed after this draft was generated. Create a new reply draft before sending.",
     );
   }
   return current;

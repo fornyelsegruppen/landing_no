@@ -6,10 +6,13 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import {
+  assertCustomerReplyDeliveryTrackingReady,
   createCustomerReplyDraft,
+  createManualCustomerQuestionReplyDraft,
   createLeadAiReply,
   deliverMessage,
   enqueueMessageJob,
+  manualQuestionReplyPlaceholder,
 } from "@/lib/messages/message-engine";
 import { assertMessageCanQueue } from "@/lib/messages/message-policy";
 import {
@@ -38,6 +41,15 @@ import { markLeadReviewed } from "@/lib/admin-v2/mark-lead-reviewed";
 
 export const maxDuration = 60;
 
+class MessageRevisionConflictError extends Error {
+  constructor() {
+    super(
+      "The draft was changed by another administrator. Refresh before saving.",
+    );
+    this.name = "MessageRevisionConflictError";
+  }
+}
+
 const actionSchema = z
   .discriminatedUnion("action", [
     z.object({ action: z.literal("generate_reply") }),
@@ -45,11 +57,19 @@ const actionSchema = z
       action: z.literal("prepare_question_reply"),
       sourceMessageId: z.number().int().positive(),
     }),
+    z.object({
+      action: z.literal("prepare_manual_question_reply"),
+      sourceMessageId: z.number().int().positive(),
+    }),
     z.object({ action: z.literal("prepare_package") }),
     z.object({ action: z.literal("approve_package") }),
     z.object({
       action: z.literal("approve_send"),
       messageId: z.number().int().positive(),
+      subject: z.string().trim().min(5).max(160),
+      bodyText: z.string().trim().min(20).max(3_000),
+      expectedMessageUpdatedAt: z.string().datetime({ offset: true }),
+      expectedCaseRevision: z.number().int().positive(),
     }),
     z.object({
       action: z.literal("cancel_draft"),
@@ -64,6 +84,7 @@ const actionSchema = z
       messageId: z.number().int().positive(),
       subject: z.string().trim().min(5).max(160),
       bodyText: z.string().trim().min(20).max(3_000),
+      expectedMessageUpdatedAt: z.string().datetime({ offset: true }),
     }),
     z.object({
       action: z.literal("regenerate_reply"),
@@ -156,6 +177,7 @@ export async function GET(
       aiAssisted: message.aiAssisted,
       createdAt: message.createdAt,
       sentAt: message.sentAt,
+      updatedAt: message.updatedAt,
       failureMessage: message.failureMessage,
     })),
   });
@@ -185,16 +207,20 @@ export async function POST(
     });
     const currentRevision =
       typeof lead.caseRevision === "number" ? lead.caseRevision : 1;
+    const expectedCaseRevision =
+      parsed.data.action === "approve_send"
+        ? parsed.data.expectedCaseRevision
+        : parsed.data.expectedRevision;
     if (
-      parsed.data.expectedRevision !== undefined &&
-      parsed.data.expectedRevision !== currentRevision
+      expectedCaseRevision !== undefined &&
+      expectedCaseRevision !== currentRevision
     ) {
       return NextResponse.json(
         {
           error:
             "Case was changed by another administrator. Refresh before continuing.",
           code: "CASE_REVISION_CONFLICT",
-          expected: parsed.data.expectedRevision,
+          expected: expectedCaseRevision,
           actual: currentRevision,
         },
         { status: 409 },
@@ -233,6 +259,17 @@ export async function POST(
         messageId: generated.message.id,
         duplicate: generated.duplicate,
       };
+    } else if (parsed.data.action === "prepare_manual_question_reply") {
+      const prepared = await createManualCustomerQuestionReplyDraft(payload, {
+        correlationId,
+        leadId,
+        sourceMessageId: parsed.data.sourceMessageId,
+      });
+      result = {
+        messageId: prepared.message.id,
+        duplicate: prepared.duplicate,
+        manual: true,
+      };
     } else if (parsed.data.action === "prepare_package") {
       assertFeatureReady("roofMeasurement");
       assertFeatureReady("customerQuotes");
@@ -255,23 +292,65 @@ export async function POST(
       });
       if (relationId(message.lead) !== leadId || message.status !== "draft")
         throw new TypeError("Only a draft in this customer case can be edited");
+      if (message.updatedAt !== parsed.data.expectedMessageUpdatedAt) {
+        throw new MessageRevisionConflictError();
+      }
       assertMessageCanQueue({
         ...message,
         subject: parsed.data.subject,
         bodyText: parsed.data.bodyText,
         status: "draft",
       });
-      const updated = await payload.update({
+      const analysis =
+        message.aiAnalysis && typeof message.aiAnalysis === "object"
+          ? (message.aiAnalysis as Record<string, unknown>)
+          : {};
+      const manualQuestionReply = analysis.manualQuestionReply === true;
+      if (
+        manualQuestionReply &&
+        parsed.data.bodyText.trim() === manualQuestionReplyPlaceholder
+      ) {
+        throw new TypeError(
+          "Write and save a customer-specific answer before sending",
+        );
+      }
+      const updateResult = await payload.update({
         collection: "messages",
-        id: message.id,
         overrideAccess: true,
+        where: {
+          and: [
+            { id: { equals: message.id } },
+            { lead: { equals: leadId } },
+            { status: { equals: "draft" } },
+            {
+              updatedAt: { equals: parsed.data.expectedMessageUpdatedAt },
+            },
+          ],
+        },
         data: {
           subject: parsed.data.subject,
           bodyText: parsed.data.bodyText,
           bodyHtml: null,
+          ...(manualQuestionReply
+            ? {
+                aiAnalysis: {
+                  ...analysis,
+                  manualReplyRequiresEditing: false,
+                  manualReplyEditedAt: new Date().toISOString(),
+                },
+              }
+            : {}),
         },
       });
-      result = { messageId: updated.id, saved: true };
+      const updated = updateResult.docs?.[0];
+      if (!updated) {
+        throw new MessageRevisionConflictError();
+      }
+      result = {
+        messageId: updated.id,
+        messageUpdatedAt: updated.updatedAt,
+        saved: true,
+      };
     } else if (parsed.data.action === "regenerate_reply") {
       assertFeatureReady("aiDrafts");
       const message = await payload.findByID({
@@ -379,10 +458,36 @@ export async function POST(
           { error: "Message does not belong to lead" },
           { status: 409 },
         );
+      let replyPurpose: "question" | "decline" | "cancellation" | undefined;
       if (parsed.data.action === "approve_send") {
-        assertMessageCanQueue(message);
-        if (message.category === "ai_reply")
-          await assertCustomerReplySourcesCurrent(payload, message);
+        if (
+          message.status !== "draft" ||
+          message.updatedAt !== parsed.data.expectedMessageUpdatedAt
+        ) {
+          throw new MessageRevisionConflictError();
+        }
+        assertMessageCanQueue({
+          ...message,
+          bodyText: parsed.data.bodyText,
+          subject: parsed.data.subject,
+        });
+        const analysis =
+          message.aiAnalysis && typeof message.aiAnalysis === "object"
+            ? (message.aiAnalysis as Record<string, unknown>)
+            : {};
+        if (
+          analysis.manualReplyRequiresEditing === true &&
+          parsed.data.bodyText.trim() === manualQuestionReplyPlaceholder
+        ) {
+          throw new TypeError(
+            "Write and save a customer-specific answer before sending",
+          );
+        }
+        const currentSources = await assertCustomerReplySourcesCurrent(
+          payload,
+          message,
+        );
+        replyPurpose = currentSources?.context.purpose;
       } else if (
         !message.approvedAt ||
         !["attention", "failed", "queued"].includes(message.status)
@@ -391,39 +496,93 @@ export async function POST(
           "Only an approved failed or queued message can be retried",
         );
       }
-      const now = new Date().toISOString();
-      const queued = await payload.update({
-        collection: "messages",
-        id: message.id,
-        overrideAccess: true,
-        data: {
-          status: "queued",
-          approvedBy:
-            parsed.data.action === "approve_send"
-              ? user.id
-              : message.approvedBy,
-          approvedAt:
-            parsed.data.action === "approve_send" ? now : message.approvedAt,
-          queuedAt: now,
-        },
-      });
-      await enqueueMessageJob(payload, queued.id, correlationId);
+      if (parsed.data.action === "retry_send") {
+        const currentSources = await assertCustomerReplySourcesCurrent(
+          payload,
+          message,
+        );
+        replyPurpose = currentSources?.context.purpose;
+      }
       const provider = createEmailProvider();
+      assertCustomerReplyDeliveryTrackingReady(provider, replyPurpose);
+      const now = new Date().toISOString();
+      let queued;
+      if (parsed.data.action === "approve_send") {
+        const analysis =
+          message.aiAnalysis && typeof message.aiAnalysis === "object"
+            ? (message.aiAnalysis as Record<string, unknown>)
+            : {};
+        const queueResult = await payload.update({
+          collection: "messages",
+          overrideAccess: true,
+          where: {
+            and: [
+              { id: { equals: message.id } },
+              { lead: { equals: leadId } },
+              { status: { equals: "draft" } },
+              {
+                updatedAt: { equals: parsed.data.expectedMessageUpdatedAt },
+              },
+            ],
+          },
+          data: {
+            subject: parsed.data.subject,
+            bodyText: parsed.data.bodyText,
+            bodyHtml: null,
+            status: "queued",
+            approvedBy: user.id,
+            approvedAt: now,
+            queuedAt: now,
+            ...(analysis.manualQuestionReply === true
+              ? {
+                  aiAnalysis: {
+                    ...analysis,
+                    manualReplyRequiresEditing: false,
+                    manualReplyEditedAt: now,
+                  },
+                }
+              : {}),
+          },
+        });
+        queued = queueResult.docs?.[0];
+        if (!queued) {
+          throw new MessageRevisionConflictError();
+        }
+      } else {
+        queued = await payload.update({
+          collection: "messages",
+          id: message.id,
+          overrideAccess: true,
+          data: {
+            status: "queued",
+            approvedBy: message.approvedBy,
+            approvedAt: message.approvedAt,
+            queuedAt: now,
+          },
+        });
+      }
+      const job = await enqueueMessageJob(payload, queued.id, correlationId);
+      const queueResult = {
+        caseRevision: currentRevision,
+        jobId: job.id,
+        messageId: queued.id,
+        messageUpdatedAt: queued.updatedAt,
+      };
       if (provider.health().status === "ready") {
         try {
           await deliverMessage(payload, provider, queued.id, correlationId);
-          result = { messageId: queued.id, sent: true };
+          result = { ...queueResult, sent: true };
         } catch (error) {
           captureException(error, {
             route: "POST /api/admin/leads/[id]",
             operation: "inline-delivery",
             correlationId,
           });
-          result = { messageId: queued.id, sent: false, queued: true };
+          result = { ...queueResult, sent: false, queued: true };
         }
       } else {
         result = {
-          messageId: queued.id,
+          ...queueResult,
           sent: false,
           configurationRequired: true,
         };
@@ -691,6 +850,14 @@ export async function POST(
           code: "CASE_REVISION_CONFLICT",
           expected: error.expected,
           actual: error.actual,
+        },
+        { status: 409 },
+      );
+    if (error instanceof MessageRevisionConflictError)
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: "MESSAGE_REVISION_CONFLICT",
         },
         { status: 409 },
       );

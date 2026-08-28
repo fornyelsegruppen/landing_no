@@ -4,6 +4,7 @@ import {
   automaticPreparationScope,
   processOperationalJobs,
 } from "./operational-job-processor";
+import { loadCustomerReplySourceBundle } from "@/lib/messages/customer-reply-sources";
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -12,9 +13,16 @@ function repository(
     lead?: Record<string, unknown>;
     message?: Record<string, unknown>;
     job?: Record<string, unknown>;
+    sourceMessage?: Record<string, unknown>;
   } = {},
 ) {
-  const lead: Row = { id: 1, email: "kunde@example.test", status: "new" };
+  const lead: Row = {
+    id: 1,
+    email: "kunde@example.test",
+    inquiryType: "takvask",
+    recordState: "active",
+    status: "new",
+  };
   const message: Row = {
     id: 2,
     lead: 1,
@@ -41,9 +49,24 @@ function repository(
   Object.assign(lead, overrides.lead);
   Object.assign(message, overrides.message);
   Object.assign(job, overrides.job);
+  const sourceMessage: Row | null = overrides.sourceMessage
+    ? {
+        id: 4,
+        lead: 1,
+        direction: "inbound",
+        category: "customer_question",
+        channel: "email",
+        subject: "Spørsmål om tilbudet",
+        bodyText: "Hva gjelder?",
+        status: "delivered",
+        createdAt: "2026-08-24T18:00:00.000Z",
+        updatedAt: "2026-08-24T18:00:00.000Z",
+        ...overrides.sourceMessage,
+      }
+    : null;
   const collections: Record<string, Row[]> = {
     leads: [lead],
-    messages: [message],
+    messages: sourceMessage ? [sourceMessage, message] : [message],
     "operational-jobs": [job],
   };
   const payload = {
@@ -73,7 +96,9 @@ function repository(
     }) {
       const row = id
         ? collections[collection]?.find((item) => item.id === id)
-        : collection === "operational-jobs" && where && ["pending", "retry"].includes(String(job.status))
+        : collection === "operational-jobs" &&
+            where &&
+            ["pending", "retry"].includes(String(job.status))
           ? job
           : undefined;
       if (!row) throw new Error("not found");
@@ -81,7 +106,7 @@ function repository(
       return id ? structuredClone(row) : { docs: [structuredClone(row)] };
     },
   } as unknown as Payload;
-  return { payload, lead, message, job };
+  return { payload, lead, message, job, sourceMessage };
 }
 
 describe("operational job processor", () => {
@@ -138,6 +163,44 @@ describe("operational job processor", () => {
     expect(JSON.stringify(state.job.payload)).not.toContain(
       "kunde@example.test",
     );
+  });
+
+  it("rechecks a queued reply source and refuses stale delivery", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.ALLOW_PREVIEW_EMAIL_LOG = "true";
+    delete process.env.RESEND_API_KEY;
+    const state = repository({
+      job: { status: "retry" },
+      message: {
+        aiAssisted: true,
+        category: "ai_reply",
+        replyToMessage: 4,
+      },
+      sourceMessage: {},
+    });
+    const bundle = await loadCustomerReplySourceBundle(state.payload, {
+      leadId: 1,
+      purpose: "question",
+      sourceMessageId: 4,
+    });
+    state.message.aiAnalysis = {
+      purpose: "question",
+      replyFactContext: bundle.context,
+      replySourceFingerprint: bundle.fingerprint,
+      sourceMessageId: 4,
+    };
+    state.sourceMessage!.updatedAt = "2026-08-24T19:30:00.000Z";
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({ completed: [], retried: [3] });
+    expect(state.job.status).toBe("retry");
+    expect(state.message.status).toBe("queued");
+    expect(state.lead.lastContactAt).toBeUndefined();
   });
 
   it("keeps the lead and moves an unconfigured delivery to attention", async () => {
@@ -207,9 +270,18 @@ describe("operational job processor", () => {
 
   it("skips a job when another processor wins the atomic claim", async () => {
     const state = repository();
-    const originalUpdate = (state.payload as unknown as { update: (args: Record<string, unknown>) => Promise<unknown> }).update.bind(state.payload);
-    (state.payload as unknown as { update: (args: Record<string, unknown>) => Promise<unknown> }).update = async (args) => {
-      if (args.collection === "operational-jobs" && args.where) return { docs: [] };
+    const originalUpdate = (
+      state.payload as unknown as {
+        update: (args: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).update.bind(state.payload);
+    (
+      state.payload as unknown as {
+        update: (args: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).update = async (args) => {
+      if (args.collection === "operational-jobs" && args.where)
+        return { docs: [] };
       return originalUpdate(args);
     };
 

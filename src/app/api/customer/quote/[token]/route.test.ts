@@ -175,13 +175,11 @@ describe("customer quote signing route", () => {
     mocks.processJobs.mockReset().mockResolvedValue({ completed: [55] });
     mocks.provider.health.mockClear();
     mocks.load.mockReset().mockResolvedValue({ ...baseView });
-    mocks.recordContractRequest
-      .mockReset()
-      .mockResolvedValue({
-        duplicate: false,
-        request: { id: 10, reference: "ANG-2-TEST" },
-        acknowledgementMessage: { id: 11 },
-      });
+    mocks.recordContractRequest.mockReset().mockResolvedValue({
+      duplicate: false,
+      request: { id: 10, reference: "ANG-2-TEST" },
+      acknowledgementMessage: { id: 11 },
+    });
   });
 
   it("stores an immutable signed PDF and queues one durable confirmation", async () => {
@@ -315,6 +313,7 @@ describe("customer quote signing route", () => {
       request({
         action: "question",
         message: "Kan dere forklare maksimalprisen?",
+        submissionKey: "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d",
       }),
       { params: Promise.resolve({ token: "q".repeat(43) }) },
     );
@@ -337,6 +336,155 @@ describe("customer quote signing route", () => {
       limit: 1,
       rescueStale: false,
     });
+  });
+
+  it("deduplicates a transport retry with the same submission key and body", async () => {
+    mocks.find.mockResolvedValue({
+      docs: [
+        {
+          id: 88,
+          bodyText: "Kan dere forklare maksimalprisen?",
+          status: "delivered",
+        },
+      ],
+    });
+
+    const response = await POST(
+      request({
+        action: "question",
+        message: "Kan dere forklare maksimalprisen?",
+        submissionKey: "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d",
+      }),
+      { params: Promise.resolve({ token: "q".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: "messages" }),
+    );
+    expect(mocks.enqueueReply).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sourceMessageId: 88 }),
+    );
+  });
+
+  it("rejects reusing a submission key for different question content", async () => {
+    mocks.find.mockResolvedValue({
+      docs: [
+        {
+          id: 88,
+          bodyText: "Det opprinnelige spørsmålet",
+          status: "delivered",
+        },
+      ],
+    });
+
+    const response = await POST(
+      request({
+        action: "question",
+        message: "Et helt annet spørsmål",
+        submissionKey: "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d",
+      }),
+      { params: Promise.resolve({ token: "q".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.enqueueReply).not.toHaveBeenCalled();
+  });
+
+  it("records identical later text as a new event when the client uses a new submission key", async () => {
+    const firstKey = "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d";
+    const secondKey = "10163e23-f649-473c-8358-d5de8a3d1530";
+    for (const submissionKey of [firstKey, secondKey]) {
+      const response = await POST(
+        request({
+          action: "question",
+          message: "Kan dere forklare maksimalprisen?",
+          submissionKey,
+        }),
+        { params: Promise.resolve({ token: "q".repeat(43) }) },
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const questionCreates = mocks.create.mock.calls.filter(
+      ([input]) => input.collection === "messages",
+    );
+    expect(questionCreates).toHaveLength(2);
+    expect(questionCreates[0]?.[0].data.idempotencyKey).not.toBe(
+      questionCreates[1]?.[0].data.idempotencyKey,
+    );
+  });
+
+  it("rejects new questions after the quote has reached a terminal state", async () => {
+    mocks.load.mockResolvedValue({
+      ...baseView,
+      contractStatus: "signed",
+      quoteStatus: "accepted",
+    });
+
+    const response = await POST(
+      request({
+        action: "question",
+        message: "Kan dere forklare maksimalprisen?",
+        submissionKey: "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d",
+      }),
+      { params: Promise.resolve({ token: "q".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ collection: "messages" }),
+    );
+    expect(mocks.enqueueReply).not.toHaveBeenCalled();
+  });
+
+  it("recovers a concurrent retry that won the submission-key insert", async () => {
+    mocks.find.mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({
+      docs: [
+        {
+          bodyText: "Kan dere forklare maksimalprisen?",
+          id: 88,
+          status: "delivered",
+        },
+      ],
+    });
+    mocks.create.mockRejectedValueOnce(new Error("unique constraint"));
+
+    const response = await POST(
+      request({
+        action: "question",
+        message: "Kan dere forklare maksimalprisen?",
+        submissionKey: "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d",
+      }),
+      { params: Promise.resolve({ token: "q".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.enqueueReply).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sourceMessageId: 88 }),
+    );
+  });
+
+  it("does not expose unexpected persistence errors through the public API", async () => {
+    mocks.create.mockRejectedValueOnce(
+      new TypeError("SQL password=secret internal table details"),
+    );
+
+    const response = await POST(
+      request({
+        action: "question",
+        message: "Kan dere forklare maksimalprisen?",
+        submissionKey: "7f231ef4-1c8d-4c40-a6c8-a8d3213a924d",
+      }),
+      { params: Promise.resolve({ token: "q".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body).toMatchObject({ error: "Customer action failed" });
+    expect(JSON.stringify(body)).not.toContain("password=secret");
   });
 
   it("refuses signing while an unanswered customer question exists", async () => {
@@ -372,6 +520,46 @@ describe("customer quote signing route", () => {
     expect(mocks.create).not.toHaveBeenCalledWith(
       expect.objectContaining({ collection: "private-media" }),
     );
+  });
+
+  it("keeps signing blocked while the direct reply is sent but not delivered", async () => {
+    mocks.find.mockResolvedValue({
+      docs: [
+        {
+          id: 91,
+          category: "customer_question",
+          direction: "inbound",
+          status: "delivered",
+          createdAt: "2026-08-28T08:00:00.000Z",
+        },
+        {
+          id: 92,
+          category: "ai_reply",
+          direction: "outbound",
+          status: "sent",
+          replyToMessage: 91,
+          createdAt: "2026-08-28T08:02:00.000Z",
+        },
+      ],
+    });
+    const response = await POST(
+      request({
+        action: "sign",
+        signatureData,
+        expectedDocumentHash: documentHash(contract),
+        paymentObligationAccepted: true,
+        termsAccepted: true,
+        withdrawalInformationReceived: true,
+        earlyStartRequested: false,
+        earlyStartLossAcknowledged: false,
+      }),
+      { params: Promise.resolve({ token: "b".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "CUSTOMER_QUESTION_PENDING",
+    });
   });
 
   it("keeps a declined quote for administrator follow-up and acknowledges the customer", async () => {

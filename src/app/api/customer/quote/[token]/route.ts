@@ -41,11 +41,27 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+class CustomerActionConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CustomerActionConflictError";
+  }
+}
+
+const safeSignatureConflictMessages = new Set([
+  "Contract document has changed",
+  "Early start acknowledgement is required",
+  "Required contract consents are missing",
+  "Signature drawing is invalid",
+  "Signer name is invalid",
+]);
+
 const actionSchema = z.union([
   z.discriminatedUnion("action", [
     z.object({
       action: z.literal("question"),
       message: z.string().trim().min(5).max(2_000),
+      submissionKey: z.string().uuid(),
     }),
     z.object({
       action: z.literal("decline"),
@@ -148,10 +164,19 @@ export async function POST(
     const leadId = view.snapshot.quote.leadId;
 
     if (parsed.data.action === "question") {
+      if (
+        view.contractStatus !== "issued" ||
+        !["sent", "viewed"].includes(view.quoteStatus)
+      ) {
+        throw new CustomerActionConflictError(
+          "Questions can only be submitted while the quote is awaiting a decision",
+        );
+      }
       const digest = createHash("sha256")
-        .update(parsed.data.message)
+        .update(parsed.data.submissionKey)
         .digest("hex")
         .slice(0, 24);
+      const idempotencyKey = `quote-question:${view.quoteId}:${digest}`;
       const existing = await payload.find({
         collection: "messages",
         depth: 0,
@@ -159,38 +184,64 @@ export async function POST(
         overrideAccess: true,
         where: {
           idempotencyKey: {
-            equals: `quote-question:${view.quoteId}:${digest}`,
+            equals: idempotencyKey,
           },
         },
       });
-      const sourceMessage =
-        existing.docs[0] ||
-        (await payload.create({
-          collection: "messages",
-          overrideAccess: true,
-          data: {
-            lead: leadId,
-            direction: "inbound",
-            category: "customer_question",
-            channel: "email",
-            subject: `Spørsmål om tilbud ${view.quoteReference}`,
-          bodyText: parsed.data.message,
-          status: "delivered",
-          idempotencyKey: `quote-question:${view.quoteId}:${digest}`,
-          aiAssisted: false,
-          aiAnalysis: {
-            contractId: view.contractId,
-            contractReference: view.contractReference,
-            quoteId: view.quoteId,
-            quoteReference: view.quoteReference,
-          },
-          deliveredAt: new Date().toISOString(),
-          },
-        }));
+      let sourceMessage = existing.docs[0];
+      if (sourceMessage && sourceMessage.bodyText !== parsed.data.message) {
+        throw new CustomerActionConflictError(
+          "Question submission key was already used for different content",
+        );
+      }
+      if (!sourceMessage) {
+        try {
+          sourceMessage = await payload.create({
+            collection: "messages",
+            overrideAccess: true,
+            data: {
+              lead: leadId,
+              direction: "inbound",
+              category: "customer_question",
+              channel: "email",
+              subject: `Spørsmål om tilbud ${view.quoteReference}`,
+              bodyText: parsed.data.message,
+              status: "delivered",
+              idempotencyKey,
+              aiAssisted: false,
+              aiAnalysis: {
+                contractId: view.contractId,
+                contractReference: view.contractReference,
+                quoteId: view.quoteId,
+                quoteReference: view.quoteReference,
+              },
+              deliveredAt: new Date().toISOString(),
+            },
+          });
+        } catch (error) {
+          // A concurrent transport retry can win the unique idempotency-key
+          // insert. Re-read that exact submission before deciding whether the
+          // original create error is recoverable.
+          const raced = await payload.find({
+            collection: "messages",
+            depth: 0,
+            limit: 1,
+            overrideAccess: true,
+            where: { idempotencyKey: { equals: idempotencyKey } },
+          });
+          sourceMessage = raced.docs[0];
+          if (!sourceMessage) throw error;
+          if (sourceMessage.bodyText !== parsed.data.message) {
+            throw new CustomerActionConflictError(
+              "Question submission key was already used for different content",
+            );
+          }
+        }
+      }
       await updateCaseState(payload, {
         leadId,
         command: "customer_question",
-        idempotencyKey: `quote-question:${view.quoteId}:${digest}`,
+        idempotencyKey,
         patch: {
           status: "customer_waiting",
           nextActionOwner: "administrator",
@@ -229,7 +280,9 @@ export async function POST(
           idempotent: true,
         });
       if (!["sent", "viewed"].includes(view.quoteStatus))
-        throw new Error("Quote cannot be declined in its current state");
+        throw new CustomerActionConflictError(
+          "Quote cannot be declined in its current state",
+        );
       const now = new Date().toISOString();
       const reasonLabels = {
         price: "Prisen passer ikke",
@@ -355,7 +408,9 @@ export async function POST(
       parsed.data.action === "cancel_request"
     ) {
       if (view.contractStatus !== "signed" || view.quoteStatus !== "accepted") {
-        throw new Error("This action is only available after customer signing");
+        throw new CustomerActionConflictError(
+          "This action is only available after customer signing",
+        );
       }
       let structured: CustomerContractRequestInput;
       if (parsed.data.action === "cancel_request") {
@@ -409,7 +464,7 @@ export async function POST(
     }
 
     if (parsed.data.action !== "sign")
-      throw new TypeError("Unsupported customer action");
+      throw new CustomerActionConflictError("Unsupported customer action");
     assertFeatureReady("contractSigning");
     const unresolvedQuestion = await loadUnresolvedCustomerQuestion(
       payload,
@@ -434,7 +489,9 @@ export async function POST(
       view.contractStatus !== "issued" ||
       !["sent", "viewed"].includes(view.quoteStatus)
     )
-      throw new Error("Contract is not available for signing");
+      throw new CustomerActionConflictError(
+        "Contract is not available for signing",
+      );
     const evidence = createSignatureEvidence({
       contract: view.snapshot as ContractSnapshot,
       expectedDocumentHash: parsed.data.expectedDocumentHash,
@@ -521,7 +578,7 @@ export async function POST(
           status: "signed",
           idempotent: true,
         });
-      throw new Error("Contract signing conflict");
+      throw new CustomerActionConflictError("Contract signing conflict");
     }
     await payload.update({
       collection: "quotes",
@@ -646,13 +703,22 @@ export async function POST(
         { error: error.reason, missing: error.unavailable },
         { status: 503 },
       );
+    if (
+      error instanceof CustomerActionConflictError ||
+      (error instanceof Error &&
+        safeSignatureConflictMessages.has(error.message))
+    )
+      return NextResponse.json(
+        { error: error.message, correlationId },
+        { status: 409 },
+      );
+    captureException(error, {
+      route: "POST /api/customer/quote/[token]",
+      correlationId,
+    });
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Customer action failed",
-        correlationId,
-      },
-      { status: 409 },
+      { error: "Customer action failed", correlationId },
+      { status: 500 },
     );
   }
 }
