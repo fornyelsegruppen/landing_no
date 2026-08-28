@@ -8,6 +8,7 @@ import {
   customerReplyRecoveryKind,
   type CustomerReplyRecoveryKind,
 } from "@/lib/messages/customer-reply-recovery";
+import { customerQuestionActionVisibility } from "./customer-question-action-visibility";
 import { MessageDraftEditor } from "./message-draft-editor";
 
 const copy = {
@@ -221,6 +222,10 @@ export function CustomerQuestionWorkbench(props: {
     null,
   );
   const stage = customerQuestionReplyStage(props.reply);
+  const actionVisibility = customerQuestionActionVisibility(
+    stage,
+    feedback?.kind === "error" ? feedback.recovery : null,
+  );
 
   useEffect(
     () => () => {
@@ -409,26 +414,28 @@ export function CustomerQuestionWorkbench(props: {
             <p className="text-muted-foreground mt-1 text-sm leading-6">
               {labels.prepareHelp}
             </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button
-                className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-12 rounded-xl px-4 font-bold disabled:opacity-50"
-                disabled={Boolean(busy) || Boolean(expectedMessageId)}
-                onClick={() => void prepare("ai")}
-                type="button"
-              >
-                {busy === "ai" ? labels.preparingAi : labels.aiDraft}
-              </button>
-              <button
-                className="hover:border-accent/50 min-h-12 rounded-xl border border-white/20 px-4 font-bold disabled:opacity-50"
-                disabled={Boolean(busy) || Boolean(expectedMessageId)}
-                onClick={() => void prepare("manual")}
-                type="button"
-              >
-                {busy === "manual"
-                  ? labels.preparingManual
-                  : labels.manualDraft}
-              </button>
-            </div>
+            {actionVisibility.showPrepareActions ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-12 rounded-xl px-4 font-bold disabled:opacity-50"
+                  disabled={Boolean(busy) || Boolean(expectedMessageId)}
+                  onClick={() => void prepare("ai")}
+                  type="button"
+                >
+                  {busy === "ai" ? labels.preparingAi : labels.aiDraft}
+                </button>
+                <button
+                  className="hover:border-accent/50 min-h-12 rounded-xl border border-white/20 px-4 font-bold disabled:opacity-50"
+                  disabled={Boolean(busy) || Boolean(expectedMessageId)}
+                  onClick={() => void prepare("manual")}
+                  type="button"
+                >
+                  {busy === "manual"
+                    ? labels.preparingManual
+                    : labels.manualDraft}
+                </button>
+              </div>
+            ) : null}
             {expectedMessageId ? (
               <p className="text-muted-foreground mt-3 text-sm" role="status">
                 {labels.openingEditor}
@@ -470,14 +477,16 @@ export function CustomerQuestionWorkbench(props: {
                 </p>
               ) : null}
             </div>
-            <button
-              className="bg-accent text-accent-foreground hover:bg-accent-hover mt-4 min-h-12 rounded-xl px-5 font-bold disabled:opacity-50"
-              disabled={Boolean(busy)}
-              onClick={() => void retry()}
-              type="button"
-            >
-              {busy === "retry" ? labels.retrying : labels.retry}
-            </button>
+            {actionVisibility.showRetryAction ? (
+              <button
+                className="bg-accent text-accent-foreground hover:bg-accent-hover mt-4 min-h-12 rounded-xl px-5 font-bold disabled:opacity-50"
+                disabled={Boolean(busy)}
+                onClick={() => void retry()}
+                type="button"
+              >
+                {busy === "retry" ? labels.retrying : labels.retry}
+              </button>
+            ) : null}
           </div>
         ) : (
           <div>
@@ -513,10 +522,7 @@ export function CustomerQuestionWorkbench(props: {
           {feedback.message}
         </p>
       ) : null}
-      {feedback?.kind === "error" &&
-      ["safety_rejected", "source_changed"].includes(
-        feedback.recovery || "",
-      ) ? (
+      {feedback?.kind === "error" && actionVisibility.showReplacementActions ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <button
             className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-12 rounded-xl px-4 font-bold disabled:opacity-50"
