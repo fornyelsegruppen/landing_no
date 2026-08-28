@@ -40,6 +40,7 @@ import {
 import { assertCustomerReplySourcesCurrent } from "@/lib/messages/customer-reply-sources";
 import { markLeadReviewed } from "@/lib/admin-v2/mark-lead-reviewed";
 import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
+import { customerReplyRecoveryCode } from "@/lib/messages/customer-reply-recovery";
 
 export const maxDuration = 60;
 
@@ -91,6 +92,7 @@ const actionSchema = z
     z.object({
       action: z.literal("regenerate_reply"),
       messageId: z.number().int().positive(),
+      recoveryMode: z.enum(["ai", "manual"]).optional(),
     }),
     z.object({
       action: z.literal("polish_reply"),
@@ -353,43 +355,68 @@ export async function POST(
         saved: true,
       };
     } else if (parsed.data.action === "regenerate_reply") {
-      assertFeatureReady("aiDrafts");
       const message = await payload.findByID({
         collection: "messages",
         id: parsed.data.messageId,
         depth: 0,
         overrideAccess: true,
       });
+      const analysis =
+        message.aiAnalysis && typeof message.aiAnalysis === "object"
+          ? (message.aiAnalysis as Record<string, unknown>)
+          : {};
+      const isQuestionReply = analysis.purpose === "question";
+      const isRecoverableStatus = ["draft", "failed", "attention"].includes(
+        message.status,
+      );
       if (
         relationId(message.lead) !== leadId ||
-        message.status !== "draft" ||
-        message.category !== "ai_reply"
-      )
-        throw new TypeError("Only an active AI reply draft can be regenerated");
+        !isRecoverableStatus ||
+        (!isQuestionReply && message.category !== "ai_reply")
+      ) {
+        throw new TypeError(
+          "Only an active or failed customer reply can be regenerated",
+        );
+      }
       const sourceMessageId = relationId(message.replyToMessage);
       const factContext = customerReplyContextFromAnalysis(message.aiAnalysis);
       if (!sourceMessageId || !factContext)
         throw new TypeError(
           "The reply draft has no verified source message context",
         );
-      const regenerated = await createCustomerReplyDraft(
-        payload,
-        new GeminiAiProvider(),
-        {
-          correlationId,
-          generationKey: `regenerate-${message.id}-${Date.now()}`,
-          leadId,
-          purpose: factContext.purpose,
-          sourceMessageId,
-        },
-      );
+      const recoveryMode =
+        parsed.data.recoveryMode ||
+        (analysis.manualQuestionReply === true ? "manual" : "ai");
+      const generationKey = `regenerate-${message.id}`;
+      const regenerated =
+        recoveryMode === "manual"
+          ? await createManualCustomerQuestionReplyDraft(payload, {
+              correlationId,
+              generationKey,
+              leadId,
+              sourceMessageId,
+            })
+          : await (async () => {
+              assertFeatureReady("aiDrafts");
+              return createCustomerReplyDraft(payload, new GeminiAiProvider(), {
+                correlationId,
+                generationKey,
+                leadId,
+                purpose: factContext.purpose,
+                sourceMessageId,
+              });
+            })();
       await payload.update({
         collection: "messages",
         id: message.id,
         overrideAccess: true,
         data: { status: "cancelled" },
       });
-      result = { messageId: regenerated.message.id, regenerated: true };
+      result = {
+        messageId: regenerated.message.id,
+        manual: recoveryMode === "manual",
+        regenerated: true,
+      };
     } else if (parsed.data.action === "polish_reply") {
       assertFeatureReady("aiDrafts");
       const message = await payload.findByID({
@@ -880,6 +907,20 @@ export async function POST(
         {
           error: error.message,
           code: "MESSAGE_REVISION_CONFLICT",
+        },
+        { status: 409 },
+      );
+    const customerReplyCode = customerReplyRecoveryCode({
+      error: error instanceof Error ? error.message : undefined,
+    });
+    if (customerReplyCode)
+      return NextResponse.json(
+        {
+          code: customerReplyCode,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Customer reply recovery is required",
         },
         { status: 409 },
       );

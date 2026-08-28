@@ -14,7 +14,7 @@ type MessageLike = {
 };
 
 export type CustomerQuestionReplyStage =
-  "prepare" | "review" | "queued" | "sent" | "delivery_failed";
+  "prepare" | "review" | "queued" | "sent" | "delivered" | "delivery_failed";
 
 function relationId(message: MessageLike) {
   if (typeof message.replyToMessageId === "number") {
@@ -64,7 +64,8 @@ export function customerQuestionReplyStage(
   if (["failed", "attention"].includes(reply.status || "")) {
     return "delivery_failed";
   }
-  if (["sent", "delivered"].includes(reply.status || "")) return "sent";
+  if (reply.status === "sent") return "sent";
+  if (reply.status === "delivered") return "delivered";
   return "queued";
 }
 

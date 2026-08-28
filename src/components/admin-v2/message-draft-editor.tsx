@@ -7,6 +7,10 @@ import {
   messageDraftRequest,
   type MessageDraftAction,
 } from "@/lib/admin-v2/message-draft-request";
+import {
+  customerReplyRecoveryKind,
+  type CustomerReplyRecoveryKind,
+} from "@/lib/messages/customer-reply-recovery";
 
 const copy = {
   nb: {
@@ -28,13 +32,16 @@ const copy = {
       "Jeg har kontrollert fakta og godkjenner at denne meldingen sendes til kunden.",
     saved: "Utkastet er lagret.",
     regenerated: "Et nytt AI-utkast er opprettet.",
-    sent: "Meldingen er kontrollert og sendt til kunden.",
+    sent: "E-postleverandøren har tatt imot meldingen. Vi venter på bekreftet levering før kunden kan signere.",
     queued: "Meldingen er kontrollert og ligger trygt i sendekø.",
     cancelled: "Utkastet er forkastet.",
     failed: "Handlingen kunne ikke fullføres.",
     stale: "Saken eller utkastet er endret. Oppdater siden før du fortsetter.",
     sourcesChanged:
-      "Dokumenter, priser eller vilkår er endret. Lag et nytt utkast før du sender.",
+      "Dokumenter, priser eller vilkår er endret. Lag et nytt utkast med oppdatert grunnlag før du sender.",
+    safetyRejected:
+      "Den automatiske faktakontrollen avviste teksten. Rett svaret manuelt, eller lag et nytt AI-utkast.",
+    regenerateManual: "Start nytt manuelt svar",
     aiUnavailable: "AI-funksjonen er ikke tilgjengelig nå. Prøv igjen senere.",
     manualRequired:
       "Erstatt hjelpeteksten med et kundespesifikt svar før du lagrer eller sender.",
@@ -61,7 +68,7 @@ const copy = {
       "Patvirtinu, kad patikrinau faktus ir leidžiu išsiųsti šią žinutę klientui.",
     saved: "Juodraštis išsaugotas.",
     regenerated: "Sukurtas naujas DI juodraštis.",
-    sent: "Žinutė patikrinta ir išsiųsta klientui.",
+    sent: "El. pašto paslaugų teikėjas priėmė žinutę. Laukiama patvirtinto pristatymo, kol klientas galės pasirašyti.",
     queued: "Žinutė patikrinta ir saugiai laukia siuntimo eilėje.",
     cancelled: "Juodraštis atšauktas.",
     failed: "Veiksmo atlikti nepavyko.",
@@ -69,6 +76,9 @@ const copy = {
       "Byla arba juodraštis pasikeitė. Prieš tęsdami atnaujinkite puslapį.",
     sourcesChanged:
       "Dokumentai, kainos arba sąlygos pasikeitė. Prieš siųsdami sukurkite naują juodraštį.",
+    safetyRejected:
+      "Automatinė faktų patikra atmetė tekstą. Pataisykite atsakymą rankiniu būdu arba sukurkite naują DI juodraštį.",
+    regenerateManual: "Pradėti naują rankinį atsakymą",
     aiUnavailable: "DI funkcija dabar nepasiekiama. Bandykite vėliau.",
     manualRequired:
       "Prieš išsaugodami arba siųsdami pakeiskite pagalbinį tekstą konkrečiu atsakymu klientui.",
@@ -95,13 +105,16 @@ const copy = {
       "I have checked the facts and approve sending this message to the customer.",
     saved: "The draft was saved.",
     regenerated: "A new AI draft was created.",
-    sent: "The message was reviewed and sent to the customer.",
+    sent: "The email provider accepted the message. Confirmed delivery is required before the customer can sign.",
     queued: "The message was reviewed and is safely queued for delivery.",
     cancelled: "The draft was discarded.",
     failed: "The action could not be completed.",
     stale: "The case or draft changed. Refresh before continuing.",
     sourcesChanged:
       "Documents, prices, or terms changed. Create a new draft before sending.",
+    safetyRejected:
+      "The automated fact check rejected the text. Correct the reply manually or create a new AI draft.",
+    regenerateManual: "Start a new manual reply",
     aiUnavailable: "The AI feature is unavailable right now. Try again later.",
     manualRequired:
       "Replace the helper text with a customer-specific reply before saving or sending.",
@@ -110,6 +123,16 @@ const copy = {
     processing: "Processing …",
   },
 } as const;
+
+class CustomerReplyDraftActionError extends Error {
+  constructor(
+    message: string,
+    readonly recovery: CustomerReplyRecoveryKind,
+  ) {
+    super(message);
+    this.name = "CustomerReplyDraftActionError";
+  }
+}
 
 export function MessageDraftEditor(props: {
   aiAssisted?: boolean;
@@ -136,6 +159,9 @@ export function MessageDraftEditor(props: {
     "cancel" | "polish" | "save" | "regenerate" | "send" | null
   >(null);
   const [notice, setNotice] = useState("");
+  const [recovery, setRecovery] = useState<CustomerReplyRecoveryKind | null>(
+    null,
+  );
   const [beforePolish, setBeforePolish] = useState<{
     bodyText: string;
     subject: string;
@@ -153,6 +179,7 @@ export function MessageDraftEditor(props: {
     setBodyText(props.bodyText);
     setBeforePolish(null);
     setNotice("");
+    setRecovery(null);
   }, [props.bodyText, props.messageId, props.subject]);
 
   useEffect(() => {
@@ -160,27 +187,12 @@ export function MessageDraftEditor(props: {
   }, [props.messageUpdatedAt]);
 
   function localizedFailure(result: { code?: string; error?: string }) {
-    if (
-      result.code === "CASE_REVISION_CONFLICT" ||
-      result.code === "MESSAGE_REVISION_CONFLICT"
-    ) {
-      return labels.stale;
-    }
+    const recoveryKind = customerReplyRecoveryKind(result);
+    if (recoveryKind === "refresh") return labels.stale;
+    if (recoveryKind === "source_changed") return labels.sourcesChanged;
+    if (recoveryKind === "safety_rejected") return labels.safetyRejected;
+    if (recoveryKind === "ai_unavailable") return labels.aiUnavailable;
     const error = result.error?.toLowerCase() || "";
-    if (
-      error.includes("documents, prices") ||
-      error.includes("source context") ||
-      error.includes("verified source")
-    ) {
-      return labels.sourcesChanged;
-    }
-    if (
-      error.includes("ai draft") ||
-      error.includes("gemini") ||
-      error.includes("ai usage")
-    ) {
-      return labels.aiUnavailable;
-    }
     if (
       error.includes("customer-specific answer") ||
       error.includes("manual reply")
@@ -224,7 +236,10 @@ export function MessageDraftEditor(props: {
     if (!response.ok) {
       const message = localizedFailure(result);
       if (response.status === 409 && message === labels.stale) router.refresh();
-      throw new Error(message);
+      throw new CustomerReplyDraftActionError(
+        message,
+        customerReplyRecoveryKind(result),
+      );
     }
     return result;
   }
@@ -243,6 +258,7 @@ export function MessageDraftEditor(props: {
       return;
     setBusy(kind);
     setNotice("");
+    setRecovery(null);
     try {
       if (kind === "cancel") {
         await post("cancel_draft");
@@ -278,6 +294,11 @@ export function MessageDraftEditor(props: {
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : labels.failed);
+      setRecovery(
+        error instanceof CustomerReplyDraftActionError
+          ? error.recovery
+          : "unknown",
+      );
     } finally {
       setBusy(null);
     }
@@ -385,20 +406,26 @@ export function MessageDraftEditor(props: {
               setBodyText(beforePolish.bodyText);
               setBeforePolish(null);
               setNotice("");
+              setRecovery(null);
             }}
             type="button"
           >
             {labels.undoPolish}
           </button>
         ) : null}
-        {props.aiAssisted && hasSourceContext ? (
+        {(props.aiAssisted || recovery === "source_changed") &&
+        hasSourceContext ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
             onClick={() => void run("regenerate")}
             type="button"
           >
-            {busy === "regenerate" ? labels.processing : labels.regenerate}
+            {busy === "regenerate"
+              ? labels.processing
+              : props.aiAssisted
+                ? labels.regenerate
+                : labels.regenerateManual}
           </button>
         ) : null}
         <button

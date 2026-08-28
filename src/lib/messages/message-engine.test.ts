@@ -395,6 +395,44 @@ describe("message engine", () => {
     });
   });
 
+  it("creates an idempotent replacement manual draft for a failed reply", async () => {
+    const state = repository();
+    const source = await state.payload.create({
+      collection: "messages",
+      overrideAccess: true,
+      data: {
+        lead: 1,
+        direction: "inbound",
+        category: "customer_question",
+        channel: "email",
+        subject: "Spørsmål om tilbud T-1-V1",
+        bodyText: "Hva er inkludert i maksimalprisen?",
+        status: "delivered",
+        idempotencyKey: "question-source-replacement",
+        aiAssisted: false,
+      },
+    });
+
+    const first = await createManualCustomerQuestionReplyDraft(state.payload, {
+      correlationId: "manual-question-replacement",
+      generationKey: "regenerate-44",
+      leadId: 1,
+      sourceMessageId: source.id,
+    });
+    const retry = await createManualCustomerQuestionReplyDraft(state.payload, {
+      correlationId: "manual-question-replacement-retry",
+      generationKey: "regenerate-44",
+      leadId: 1,
+      sourceMessageId: source.id,
+    });
+
+    expect(first).toMatchObject({ duplicate: false });
+    expect(retry).toMatchObject({
+      duplicate: true,
+      message: { id: first.message.id },
+    });
+  });
+
   it("rejects a manual reply source that is not the exact customer question", async () => {
     const state = repository();
     const source = await state.payload.create({

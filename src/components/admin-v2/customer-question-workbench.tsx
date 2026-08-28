@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { customerQuestionReplyStage } from "@/lib/messages/customer-question-state";
+import {
+  customerReplyRecoveryKind,
+  type CustomerReplyRecoveryKind,
+} from "@/lib/messages/customer-reply-recovery";
 import { MessageDraftEditor } from "./message-draft-editor";
 
 const copy = {
@@ -27,8 +31,12 @@ const copy = {
     queuedStatus: "Svar venter på levering",
     queuedHelp:
       "Svaret er godkjent og ligger i sendekø. Kunden kan ikke signere før leveringen er fullført.",
-    sentStatus: "Svar sendt",
-    sentHelp: "Svaret er sendt til kunden.",
+    sentStatus: "Sendt – venter på leveringsbekreftelse",
+    sentHelp:
+      "E-postleverandøren har tatt imot svaret. Kunden kan ikke signere før leveringen er bekreftet.",
+    deliveredStatus: "Svar bekreftet levert",
+    deliveredHelp:
+      "E-postleverandøren har bekreftet levering. Kunden kan fortsette til signering.",
     failedStatus: "Levering mislyktes",
     failedHelp:
       "Kontroller svar og leveringsfeil før du prøver å sende på nytt.",
@@ -36,10 +44,17 @@ const copy = {
     retrying: "Prøver på nytt …",
     retryConfirm: "Sende det kontrollerte svaret til kunden på nytt?",
     retryQueued: "Svaret er lagt tilbake i sendekøen.",
-    retrySent: "Svaret er sendt til kunden.",
+    retrySent:
+      "E-postleverandøren har tatt imot svaret. Vi venter på leveringsbekreftelse.",
     failed: "Handlingen kunne ikke fullføres. Oppdater siden og prøv igjen.",
     stale: "Saken er endret. Oppdater siden før du fortsetter.",
     aiUnavailable: "AI-utkast er ikke tilgjengelig nå. Velg «Skriv svar selv».",
+    safetyRejected:
+      "Den automatiske faktakontrollen avviste AI-utkastet. Prøv et nytt AI-utkast, eller skriv et kontrollert svar selv.",
+    sourceChanged:
+      "Dokumenter, priser eller vilkår er endret. Det gamle svaret kan ikke sendes. Lag et nytt AI-utkast eller skriv et nytt manuelt svar.",
+    replacementAi: "Lag nytt AI-utkast",
+    replacementManual: "Skriv nytt svar selv",
     outgoingReply: "Svar som skal leveres",
   },
   lt: {
@@ -63,8 +78,12 @@ const copy = {
     queuedStatus: "Atsakymas laukia pristatymo",
     queuedHelp:
       "Atsakymas patvirtintas ir laukia siuntimo. Klientas negali pasirašyti, kol pristatymas nebaigtas.",
-    sentStatus: "Atsakymas išsiųstas",
-    sentHelp: "Atsakymas išsiųstas klientui.",
+    sentStatus: "Išsiųsta – laukiama pristatymo patvirtinimo",
+    sentHelp:
+      "El. pašto paslaugų teikėjas priėmė atsakymą. Klientas negali pasirašyti, kol pristatymas nepatvirtintas.",
+    deliveredStatus: "Patvirtinta, kad atsakymas pristatytas",
+    deliveredHelp:
+      "El. pašto paslaugų teikėjas patvirtino pristatymą. Klientas gali tęsti pasirašymą.",
     failedStatus: "Pristatyti nepavyko",
     failedHelp:
       "Prieš siųsdami dar kartą patikrinkite atsakymą ir pristatymo klaidą.",
@@ -72,12 +91,19 @@ const copy = {
     retrying: "Bandoma dar kartą …",
     retryConfirm: "Dar kartą išsiųsti patikrintą atsakymą klientui?",
     retryQueued: "Atsakymas vėl įtrauktas į siuntimo eilę.",
-    retrySent: "Atsakymas išsiųstas klientui.",
+    retrySent:
+      "El. pašto paslaugų teikėjas priėmė atsakymą. Laukiama pristatymo patvirtinimo.",
     failed:
       "Veiksmo atlikti nepavyko. Atnaujinkite puslapį ir bandykite dar kartą.",
     stale: "Byla pasikeitė. Prieš tęsdami atnaujinkite puslapį.",
     aiUnavailable:
       "DI juodraštis dabar nepasiekiamas. Pasirinkite „Rašyti atsakymą pačiam“.",
+    safetyRejected:
+      "Automatinė faktų patikra atmetė DI juodraštį. Kurkite naują DI juodraštį arba parašykite patikrintą atsakymą patys.",
+    sourceChanged:
+      "Dokumentai, kainos arba sąlygos pasikeitė. Seno atsakymo siųsti negalima. Kurkite naują DI juodraštį arba naują rankinį atsakymą.",
+    replacementAi: "Kurti naują DI juodraštį",
+    replacementManual: "Rašyti naują atsakymą pačiam",
     outgoingReply: "Atsakymas, kuris bus pristatytas",
   },
   en: {
@@ -100,19 +126,30 @@ const copy = {
     queuedStatus: "Reply awaiting delivery",
     queuedHelp:
       "The reply is approved and queued. The customer cannot sign until delivery is complete.",
-    sentStatus: "Reply sent",
-    sentHelp: "The reply was sent to the customer.",
+    sentStatus: "Sent – awaiting delivery confirmation",
+    sentHelp:
+      "The email provider accepted the reply. The customer cannot sign until delivery is confirmed.",
+    deliveredStatus: "Reply confirmed delivered",
+    deliveredHelp:
+      "The email provider confirmed delivery. The customer can continue to signing.",
     failedStatus: "Delivery failed",
     failedHelp: "Review the reply and delivery error before trying again.",
     retry: "Retry delivery",
     retrying: "Retrying …",
     retryConfirm: "Send the reviewed reply to the customer again?",
     retryQueued: "The reply was placed back in the delivery queue.",
-    retrySent: "The reply was sent to the customer.",
+    retrySent:
+      "The email provider accepted the reply. Delivery confirmation is pending.",
     failed: "The action could not be completed. Refresh and try again.",
     stale: "The case changed. Refresh before continuing.",
     aiUnavailable:
       "AI drafting is unavailable right now. Choose “Write reply manually”.",
+    safetyRejected:
+      "The automated fact check rejected the AI draft. Create a new AI draft or write a controlled reply manually.",
+    sourceChanged:
+      "Documents, prices, or terms changed. The old reply cannot be sent. Create a new AI draft or write a new manual reply.",
+    replacementAi: "Create new AI draft",
+    replacementManual: "Write new reply manually",
     outgoingReply: "Reply to be delivered",
   },
 } as const;
@@ -129,26 +166,33 @@ type QuestionReply = {
   updatedAt: string;
 };
 
+class CustomerReplyActionError extends Error {
+  constructor(
+    message: string,
+    readonly recovery: CustomerReplyRecoveryKind,
+  ) {
+    super(message);
+    this.name = "CustomerReplyActionError";
+  }
+}
+
 function localizedFailure(
   locale: PanelLocale,
   result: { code?: string; error?: string },
 ) {
   const labels = copy[locale];
-  if (
-    result.code === "CASE_REVISION_CONFLICT" ||
-    result.code === "MESSAGE_REVISION_CONFLICT"
-  ) {
-    return labels.stale;
-  }
-  const error = result.error?.toLowerCase() || "";
-  if (
-    error.includes("ai draft") ||
-    error.includes("gemini") ||
-    error.includes("ai usage")
-  ) {
-    return labels.aiUnavailable;
-  }
-  return labels.failed;
+  const recovery = customerReplyRecoveryKind(result);
+  const message =
+    recovery === "refresh"
+      ? labels.stale
+      : recovery === "source_changed"
+        ? labels.sourceChanged
+        : recovery === "safety_rejected"
+          ? labels.safetyRejected
+          : recovery === "ai_unavailable"
+            ? labels.aiUnavailable
+            : labels.failed;
+  return { message, recovery };
 }
 
 export function CustomerQuestionWorkbench(props: {
@@ -171,6 +215,7 @@ export function CustomerQuestionWorkbench(props: {
   const [feedback, setFeedback] = useState<{
     kind: "error" | "success";
     message: string;
+    recovery?: CustomerReplyRecoveryKind;
   } | null>(null);
   const [expectedMessageId, setExpectedMessageId] = useState<number | null>(
     null,
@@ -206,7 +251,10 @@ export function CustomerQuestionWorkbench(props: {
       queued?: boolean;
       sent?: boolean;
     };
-    if (!response.ok) throw new Error(localizedFailure(props.locale, result));
+    if (!response.ok) {
+      const failure = localizedFailure(props.locale, result);
+      throw new CustomerReplyActionError(failure.message, failure.recovery);
+    }
     return result;
   }
 
@@ -234,6 +282,42 @@ export function CustomerQuestionWorkbench(props: {
       setFeedback({
         kind: "error",
         message: error instanceof Error ? error.message : labels.failed,
+        recovery:
+          error instanceof CustomerReplyActionError
+            ? error.recovery
+            : "unknown",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function replaceFailedReply(kind: "ai" | "manual") {
+    if (!props.reply || busy) return;
+    setBusy(kind);
+    setFeedback(null);
+    try {
+      const result = await post({
+        action: "regenerate_reply",
+        messageId: props.reply.id,
+        recoveryMode: kind,
+        expectedRevision: props.leadRevision,
+      });
+      if (typeof result.messageId !== "number") throw new Error(labels.failed);
+      setExpectedMessageId(result.messageId);
+      setFeedback({
+        kind: "success",
+        message: kind === "ai" ? labels.aiReady : labels.manualReady,
+      });
+      refreshEditor();
+    } catch (error) {
+      setFeedback({
+        kind: "error",
+        message: error instanceof Error ? error.message : labels.failed,
+        recovery:
+          error instanceof CustomerReplyActionError
+            ? error.recovery
+            : "unknown",
       });
     } finally {
       setBusy(null);
@@ -261,6 +345,10 @@ export function CustomerQuestionWorkbench(props: {
       setFeedback({
         kind: "error",
         message: error instanceof Error ? error.message : labels.failed,
+        recovery:
+          error instanceof CustomerReplyActionError
+            ? error.recovery
+            : "unknown",
       });
     } finally {
       setBusy(null);
@@ -276,7 +364,9 @@ export function CustomerQuestionWorkbench(props: {
           ? labels.failedStatus
           : stage === "sent"
             ? labels.sentStatus
-            : labels.queuedStatus;
+            : stage === "delivered"
+              ? labels.deliveredStatus
+              : labels.queuedStatus;
 
   return (
     <div className="border-warning/35 bg-warning/5 mt-4 rounded-2xl border p-4 sm:p-5">
@@ -393,7 +483,11 @@ export function CustomerQuestionWorkbench(props: {
           <div>
             <h3 className="text-lg font-bold">{statusLabel}</h3>
             <p className="text-muted-foreground mt-1 text-sm leading-6">
-              {stage === "sent" ? labels.sentHelp : labels.queuedHelp}
+              {stage === "delivered"
+                ? labels.deliveredHelp
+                : stage === "sent"
+                  ? labels.sentHelp
+                  : labels.queuedHelp}
             </p>
             {props.reply ? (
               <details className="mt-4 rounded-xl border border-white/10 bg-black/15 p-3">
@@ -418,6 +512,39 @@ export function CustomerQuestionWorkbench(props: {
         >
           {feedback.message}
         </p>
+      ) : null}
+      {feedback?.kind === "error" &&
+      ["safety_rejected", "source_changed"].includes(
+        feedback.recovery || "",
+      ) ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <button
+            className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-12 rounded-xl px-4 font-bold disabled:opacity-50"
+            disabled={Boolean(busy) || Boolean(expectedMessageId)}
+            onClick={() =>
+              void (stage === "delivery_failed"
+                ? replaceFailedReply("ai")
+                : prepare("ai"))
+            }
+            type="button"
+          >
+            {busy === "ai" ? labels.preparingAi : labels.replacementAi}
+          </button>
+          <button
+            className="hover:border-accent/50 min-h-12 rounded-xl border border-white/20 px-4 font-bold disabled:opacity-50"
+            disabled={Boolean(busy) || Boolean(expectedMessageId)}
+            onClick={() =>
+              void (stage === "delivery_failed"
+                ? replaceFailedReply("manual")
+                : prepare("manual"))
+            }
+            type="button"
+          >
+            {busy === "manual"
+              ? labels.preparingManual
+              : labels.replacementManual}
+          </button>
+        </div>
       ) : null}
     </div>
   );

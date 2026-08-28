@@ -172,7 +172,7 @@ describe("customer question state", () => {
     ["draft", "review"],
     ["queued", "queued"],
     ["sent", "sent"],
-    ["delivered", "sent"],
+    ["delivered", "delivered"],
     ["failed", "delivery_failed"],
     ["attention", "delivery_failed"],
   ])("maps reply status %s to the admin stage %s", (status, expected) => {

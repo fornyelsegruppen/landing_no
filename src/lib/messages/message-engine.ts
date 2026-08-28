@@ -436,6 +436,7 @@ export async function createManualCustomerQuestionReplyDraft(
   payload: Payload,
   input: {
     correlationId: string;
+    generationKey?: string;
     leadId: number;
     sourceMessageId: number;
   },
@@ -455,9 +456,12 @@ export async function createManualCustomerQuestionReplyDraft(
       "Manual question replies require an exact customer-question source in the same case",
     );
   }
-  const idempotencyKey = makeIdempotencyKey("customer.question.manual-reply", {
-    sourceMessageId: source.id,
-  });
+  const idempotencyKey = makeIdempotencyKey(
+    "customer.question.manual-reply",
+    input.generationKey
+      ? { generationKey: input.generationKey, sourceMessageId: source.id }
+      : { sourceMessageId: source.id },
+  );
   const duplicate = await findMessageByKey(payload, idempotencyKey);
   if (duplicate && duplicate.status !== "cancelled") {
     return { duplicate: true as const, message: duplicate };

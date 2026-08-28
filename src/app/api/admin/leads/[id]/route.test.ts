@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   capture: vi.fn(),
   create: vi.fn(),
+  customerReply: vi.fn(),
   deliver: vi.fn(),
   enqueue: vi.fn(),
   findByID: vi.fn(),
@@ -33,13 +34,16 @@ vi.mock("@/lib/payload", () => ({
 vi.mock("@/lib/monitoring", () => ({ captureException: mocks.capture }));
 vi.mock("@/lib/messages/message-engine", () => ({
   assertCustomerReplyDeliveryTrackingReady: mocks.assertTrackingReady,
-  createCustomerReplyDraft: vi.fn(),
+  createCustomerReplyDraft: mocks.customerReply,
   createLeadAiReply: vi.fn(),
   createManualCustomerQuestionReplyDraft: mocks.manualReply,
   deliverMessage: mocks.deliver,
   enqueueMessageJob: mocks.enqueue,
   manualQuestionReplyPlaceholder:
     "Skriv et kontrollert svar til kunden her før utsending.",
+}));
+vi.mock("@/lib/ai/payload-usage-limit", () => ({
+  assertPayloadAiUsageAvailable: vi.fn(),
 }));
 vi.mock("@/lib/providers/email-provider", () => ({
   createEmailProvider: () => mocks.provider,
@@ -87,6 +91,10 @@ describe("admin lead review marker", () => {
     mocks.assertTrackingReady.mockReset();
     mocks.approvePackage.mockReset();
     mocks.create.mockReset();
+    mocks.customerReply.mockReset().mockResolvedValue({
+      duplicate: false,
+      message: { id: 45 },
+    });
     mocks.deliver.mockReset().mockResolvedValue({ duplicate: false });
     mocks.enqueue.mockReset().mockResolvedValue({ id: 73 });
     mocks.find.mockReset().mockResolvedValue({ docs: [] });
@@ -156,6 +164,97 @@ describe("admin lead review marker", () => {
     );
   });
 
+  it("returns a typed recovery when AI safety rejects the replacement twice", async () => {
+    vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+    mocks.customerReply.mockRejectedValue(
+      new TypeError(
+        "AI reply contains a price that is not in the approved quote snapshot",
+      ),
+    );
+
+    const response = await POST(
+      request({
+        action: "prepare_question_reply",
+        expectedRevision: 12,
+        sourceMessageId: 33,
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a safety recovery response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "CUSTOMER_REPLY_SAFETY_REJECTED",
+    });
+  });
+
+  it.each(["ai", "manual"] as const)(
+    "replaces a stale failed reply with a fresh %s draft",
+    async (recoveryMode) => {
+      if (recoveryMode === "ai") {
+        vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+        vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+      }
+      mocks.findByID
+        .mockReset()
+        .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+        .mockResolvedValueOnce({
+          aiAnalysis: {
+            manualQuestionReply: false,
+            purpose: "question",
+            replyFactContext: {
+              customerMessage: "Hva er inkludert i maksimalprisen?",
+              purpose: "question",
+            },
+          },
+          category: "ai_reply",
+          id: 44,
+          lead: 10,
+          replyToMessage: 33,
+          status: "attention",
+        });
+      mocks.manualReply.mockResolvedValue({
+        duplicate: false,
+        message: { id: 46 },
+      });
+
+      const response = await POST(
+        request({
+          action: "regenerate_reply",
+          expectedRevision: 12,
+          messageId: 44,
+          recoveryMode,
+        }),
+        { params: Promise.resolve({ id: "10" }) },
+      );
+
+      if (!response) throw new Error("Expected a replacement draft response");
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        manual: recoveryMode === "manual",
+        regenerated: true,
+      });
+      const creator =
+        recoveryMode === "manual" ? mocks.manualReply : mocks.customerReply;
+      expect(creator).toHaveBeenCalledWith(
+        expect.anything(),
+        ...(recoveryMode === "ai" ? [expect.anything()] : []),
+        expect.objectContaining({
+          generationKey: "regenerate-44",
+          sourceMessageId: 33,
+        }),
+      );
+      expect(mocks.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          collection: "messages",
+          data: { status: "cancelled" },
+          id: 44,
+        }),
+      );
+    },
+  );
+
   it("returns a typed retryable response when secure measurement evidence is temporarily unavailable", async () => {
     vi.stubEnv("FEATURE_CUSTOMER_QUOTES", "true");
     vi.stubEnv("FEATURE_CONTRACT_SIGNING", "true");
@@ -217,6 +316,7 @@ describe("admin lead review marker", () => {
     if (!response) throw new Error("Expected a stale retry response");
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
+      code: "CUSTOMER_REPLY_SOURCE_CHANGED",
       error: "The bound source changed",
     });
     expect(mocks.update).not.toHaveBeenCalled();
