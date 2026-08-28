@@ -21,6 +21,15 @@ STOP: any 4xx/5xx, missing case, lost marker after refresh or duplicate timeline
 
 ## B. Manual contact recovery
 
+**Būsena: PASS 2026-08-28.** Savininkas Preview sintetinėje byloje `#4` patvirtino visą grandinę: saugi kliento nuoroda atsidarė be administratoriaus sesijos priklausomybės, atskiras savininko valdomas `+uat` komunikacijos adresas išsaugotas, vienas ir tik vienas pasirinktas laiškas pristatytas tam adresui, dabartinis Takfornyelse logotipas rodomas, o panaudotas tokenas antrą kartą nebeveikė. Ankstesniame žingsnyje iš tos pačios bylos išsiųstas naujas sintetinis laiškas taip pat buvo pristatytas. Istoriniai kliento tapatybės ir dokumentų laukai nebuvo perrašomi; keičiama tik būsimos komunikacijos adreso reikšmė.
+
+UAT metu užfiksuotos ir pataisytos dvi Preview kliūtys:
+
+- `d3071fa` pašalino `/kontakt/{token}` iš lokalizavimo middleware, kad saugus kliento puslapis negrąžintų klaidingo 404;
+- `3dd504f` paliko originalų patvirtintą laiško turinį ir priedus, bet recovery resend apvilko dabartiniu veikiančiu Takfornyelse šablonu, kad seni HTML logotipo adresai nebūtų kartojami.
+
+Tiksliniai route, tokeno, šablono ir proxy testai, TypeScript bei lint buvo `PASS`; savininko matomas galutinis rezultatas sutapo su automatinių testų lūkesčiais.
+
 Open: `https://takfornyelse-staging.vercel.app/admin-v2`
 
 1. Use one synthetic case with a deliberately undeliverable email message.

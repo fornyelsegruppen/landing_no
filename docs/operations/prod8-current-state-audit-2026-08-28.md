@@ -26,6 +26,7 @@ Principas: žmogaus nepatikrintas rezultatas nėra `PASS`.
 | Sutarties nutraukimas / atsisakymas | REIKIA SAVININKO UAT | Reikia atskiros sintetinės bylos ir patikrinti galutinį admin patvirtinimą. |
 | Neteisingas, pakeistas, pasibaigęs ir atšauktas tokenas | ĮRODYTA TESTAIS; GYVAS UAT NEBAIGTAS | Automatiniai neigiami testai yra žali; savininkui paliekamas vienas gyvas saugios nuorodos patikrinimas. |
 | `mark_reviewed` incidentas | SAVININKO PREVIEW UAT PASS | Pataisa `c2989a1`; 13/13 tikslinių, 581/581 vienetinių testų ir Linux CI run `33120965793` PASS; Preview `dpl_2mBbVwymveu5Jjgw5qc39X7U3dPj` READY. 2026-08-28 savininkas atidarė neperžiūrėtą sintetinę bylą `#4`, atnaujino puslapį ir patvirtino, kad klaida nepasikartojo. |
+| Rankinis kontakto atkūrimas ir būsimos komunikacijos adresas | SAVININKO PREVIEW UAT PASS | Sintetinėje byloje `#4` patvirtintas atskiras `+uat` adresas, vienas pristatytas recovery resend, dabartinis logotipas ir vienkartinis tokenas. Pataisos `d3071fa` ir `3dd504f`; istorinių tapatybės/dokumentų laukų recovery nekeičia. |
 
 ## PROD-8.3 — darbas ir darbuotojo eiga
 
@@ -61,3 +62,17 @@ Principas: žmogaus nepatikrintas rezultatas nėra `PASS`.
 3. `GO_FULL_AUTOMATION` negalimas iki 20–30 realių bylų piloto ir mažiausiai trijų fizinių matavimų palyginimo.
 4. Pasirašyta byla `#10` nenaudojama destruktyviems ar atmetimo scenarijams.
 5. `c2989a1` Preview UAT kliūtis uždaryta; Production diegimas galimas tik kartu su žaliu naujausio kandidato Linux CI ir užfiksuotu rollback.
+
+## Atidėtas administravimo UX patobulinimas
+
+**Prioritetas: po funkcinio PROD-8 užbaigimo, prieš platesnį realių bylų pilotą.** Pakeitimas nedaromas tiesiai Production: atskira kodo pataisa → trumpas Staging UAT → Production deploy.
+
+„Reikia dėmesio“ eilės priėmimo kriterijai:
+
+1. Nerodyti techninių invariantų kodų, pvz. `FINISHED_MESSAGE_WITH_ACTIVE_DELIVERY_JOB`, kaip pagrindinio administratoriaus teksto.
+2. Pavadinimas, trumpa priežastis ir rekomenduojamas veiksmas rodomi pasirinkta LT/EN/NO administravimo kalba.
+3. Pašalinti pasikartojantį prefiksą `Būsena:`; vietoje jo rodyti trumpą svarbos žymą.
+4. Naudoti keturias aiškias svarbos pakopas: `Kritinė`, `Skubu`, `Reikia dėmesio`, `Informacija`. Spalva papildoma tekstu ir piktograma, todėl nėra vienintelis signalas.
+5. Vienoje eilutėje rodyti bylos numerį arba dokumento nuorodą, trumpą problemą ir vieną konkretų kitą veiksmą.
+6. Vizualiai grupuoti arba atskirti vienodai skambančius radinius, kad administratorius suprastų, ar tai skirtingos bylos, žinutės ar darbai.
+7. Patikrinti telefoną, klaviatūros fokusą, kontrastą ir visas tris administravimo kalbas prieš Production.
