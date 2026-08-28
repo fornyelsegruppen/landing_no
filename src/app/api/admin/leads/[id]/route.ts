@@ -250,7 +250,7 @@ export async function POST(
         new GeminiAiProvider(),
         {
           correlationId,
-          generationKey: `admin-fallback-${parsed.data.sourceMessageId}-${Date.now()}`,
+          generationKey: `admin-fallback-${parsed.data.sourceMessageId}`,
           leadId,
           purpose: "question",
           sourceMessageId: parsed.data.sourceMessageId,

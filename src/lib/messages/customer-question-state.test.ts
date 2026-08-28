@@ -34,6 +34,23 @@ describe("customer question state", () => {
     expect(result?.reply?.id).toBe(11);
   });
 
+  it("connects a draft from the admin case read model to its question", () => {
+    const result = selectUnresolvedCustomerQuestion([
+      question,
+      {
+        id: 11,
+        category: "ai_reply",
+        direction: "outbound",
+        status: "draft",
+        replyToMessageId: 10,
+        createdAt: "2026-08-28T08:01:00.000Z",
+      },
+    ]);
+
+    expect(result?.question.id).toBe(10);
+    expect(result?.reply?.id).toBe(11);
+  });
+
   it("keeps a question unresolved while its direct reply is only accepted for sending", () => {
     const result = selectUnresolvedCustomerQuestion([
       question,

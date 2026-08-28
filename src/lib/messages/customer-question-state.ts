@@ -8,6 +8,7 @@ type MessageLike = {
   direction?: string | null;
   id: number;
   replyToMessage?: number | { id?: number | null } | null;
+  replyToMessageId?: number | null;
   status?: string | null;
   subject?: string | null;
 };
@@ -15,7 +16,11 @@ type MessageLike = {
 export type CustomerQuestionReplyStage =
   "prepare" | "review" | "queued" | "sent" | "delivery_failed";
 
-function relationId(value: MessageLike["replyToMessage"]) {
+function relationId(message: MessageLike) {
+  if (typeof message.replyToMessageId === "number") {
+    return message.replyToMessageId;
+  }
+  const value = message.replyToMessage;
   if (typeof value === "number") return value;
   if (value && typeof value === "object" && typeof value.id === "number") {
     return value.id;
@@ -43,7 +48,7 @@ function repliesForQuestion<T extends MessageLike>(
     .filter(
       (message) =>
         message.direction === "outbound" &&
-        relationId(message.replyToMessage) === questionId &&
+        relationId(message) === questionId &&
         message.status !== "cancelled",
     )
     .sort((left, right) =>
