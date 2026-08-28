@@ -10,10 +10,67 @@ import {
   createManualCustomerQuestionReplyDraft,
   createReceiptMessage,
   deliverMessage,
+  enqueueCustomerReplyDraft,
   enqueueMessageJob,
   manualQuestionReplyPlaceholder,
 } from "./message-engine";
 import { loadCustomerReplySourceBundle } from "./customer-reply-sources";
+
+it("recovers the single durable customer-reply job when concurrent submission loses the unique insert", async () => {
+  let requestedKey = "";
+  const winner = {
+    id: 55,
+    idempotencyKey: "",
+    status: "pending",
+    type: "customer.reply.draft",
+  };
+  const find = vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+    const key = (where.idempotencyKey as { equals?: string } | undefined)
+      ?.equals;
+    if (!requestedKey) {
+      requestedKey = key || "";
+      winner.idempotencyKey = requestedKey;
+      return { docs: [] };
+    }
+    expect(key).toBe(requestedKey);
+    return { docs: [winner] };
+  });
+  const create = vi.fn().mockRejectedValue(new Error("unique constraint"));
+  const payload = { create, find } as unknown as Payload;
+
+  await expect(
+    enqueueCustomerReplyDraft(payload, {
+      correlationId: "question-double-click",
+      leadId: 1,
+      purpose: "question",
+      sourceMessageId: 88,
+    }),
+  ).resolves.toBe(winner);
+
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(find).toHaveBeenCalledTimes(2);
+  expect(winner.idempotencyKey).toBe(requestedKey);
+  expect(requestedKey).not.toBe("");
+});
+
+it("rethrows the original insert error when no concurrent customer-reply job exists", async () => {
+  const insertError = new Error("database unavailable");
+  const find = vi.fn().mockResolvedValue({ docs: [] });
+  const create = vi.fn().mockRejectedValue(insertError);
+  const payload = { create, find } as unknown as Payload;
+
+  await expect(
+    enqueueCustomerReplyDraft(payload, {
+      correlationId: "question-insert-failure",
+      leadId: 1,
+      purpose: "question",
+      sourceMessageId: 89,
+    }),
+  ).rejects.toBe(insertError);
+
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(find).toHaveBeenCalledTimes(2);
+});
 
 type TestDocument = Record<string, unknown> & { id: number };
 type TestWhere = {

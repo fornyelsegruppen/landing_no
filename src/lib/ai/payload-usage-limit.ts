@@ -84,6 +84,7 @@ export async function reserveCustomerReplyAiRequest(
   input: {
     attempt: number;
     correlationId: string;
+    purpose?: "customer-reply-draft" | "customer-reply-polish";
     sourceMessageId: number;
     now?: Date;
   },
@@ -100,7 +101,7 @@ export async function reserveCustomerReplyAiRequest(
     changedFields: ["geminiRequest"],
     metadata: {
       attempt: input.attempt,
-      purpose: "customer-reply-draft",
+      purpose: input.purpose || "customer-reply-draft",
     },
   });
   return { ...usage, reserved: 1 as const };

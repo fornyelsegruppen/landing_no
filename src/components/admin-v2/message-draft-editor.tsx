@@ -11,6 +11,7 @@ import {
   customerReplyRecoveryKind,
   type CustomerReplyRecoveryKind,
 } from "@/lib/messages/customer-reply-recovery";
+import { customerReplyEditorActionVisibility } from "./customer-question-action-visibility";
 
 const copy = {
   nb: {
@@ -171,6 +172,11 @@ export function MessageDraftEditor(props: {
     Boolean(props.sourceBody) || Boolean(props.sourceContextAvailable);
   const manualReplyNeedsEditing =
     Boolean(props.manualReplyRequiresEditing) && !dirty;
+  const actionVisibility = customerReplyEditorActionVisibility({
+    aiAssisted: Boolean(props.aiAssisted),
+    hasSourceContext,
+    recovery,
+  });
 
   useEffect(() => {
     if (activeMessageId.current === props.messageId) return;
@@ -369,20 +375,22 @@ export function MessageDraftEditor(props: {
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          className="hover:border-accent/50 min-h-11 rounded-xl border border-white/15 px-4 font-bold disabled:opacity-50"
-          disabled={
-            Boolean(busy) ||
-            subject.trim().length < 5 ||
-            bodyText.trim().length < 20 ||
-            manualReplyNeedsEditing
-          }
-          onClick={() => void run("save")}
-          type="button"
-        >
-          {busy === "save" ? labels.processing : labels.save}
-        </button>
-        {hasSourceContext ? (
+        {actionVisibility.showDraftActions ? (
+          <button
+            className="hover:border-accent/50 min-h-11 rounded-xl border border-white/15 px-4 font-bold disabled:opacity-50"
+            disabled={
+              Boolean(busy) ||
+              subject.trim().length < 5 ||
+              bodyText.trim().length < 20 ||
+              manualReplyNeedsEditing
+            }
+            onClick={() => void run("save")}
+            type="button"
+          >
+            {busy === "save" ? labels.processing : labels.save}
+          </button>
+        ) : null}
+        {actionVisibility.showDraftActions && hasSourceContext ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={
@@ -397,7 +405,7 @@ export function MessageDraftEditor(props: {
             {busy === "polish" ? labels.processing : labels.polish}
           </button>
         ) : null}
-        {beforePolish ? (
+        {actionVisibility.showDraftActions && beforePolish ? (
           <button
             className="hover:border-accent/50 min-h-11 rounded-xl border border-white/15 px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
@@ -413,8 +421,7 @@ export function MessageDraftEditor(props: {
             {labels.undoPolish}
           </button>
         ) : null}
-        {(props.aiAssisted || recovery === "source_changed") &&
-        hasSourceContext ? (
+        {actionVisibility.showRegenerateAction ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
@@ -428,19 +435,21 @@ export function MessageDraftEditor(props: {
                 : labels.regenerateManual}
           </button>
         ) : null}
-        <button
-          className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-11 rounded-xl px-4 font-bold disabled:opacity-50"
-          disabled={
-            Boolean(busy) ||
-            subject.trim().length < 5 ||
-            bodyText.trim().length < 20 ||
-            manualReplyNeedsEditing
-          }
-          onClick={() => void run("send")}
-          type="button"
-        >
-          {busy === "send" ? labels.processing : labels.send}
-        </button>
+        {actionVisibility.showDraftActions ? (
+          <button
+            className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-11 rounded-xl px-4 font-bold disabled:opacity-50"
+            disabled={
+              Boolean(busy) ||
+              subject.trim().length < 5 ||
+              bodyText.trim().length < 20 ||
+              manualReplyNeedsEditing
+            }
+            onClick={() => void run("send")}
+            type="button"
+          >
+            {busy === "send" ? labels.processing : labels.send}
+          </button>
+        ) : null}
         <button
           className="min-h-11 rounded-xl border border-red-400/40 px-4 font-bold text-red-200 hover:bg-red-400/10 disabled:opacity-50"
           disabled={Boolean(busy)}

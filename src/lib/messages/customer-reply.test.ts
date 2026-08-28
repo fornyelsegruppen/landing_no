@@ -183,6 +183,98 @@ describe("customer reply safety", () => {
     ).toBe(true);
   });
 
+  it("requires separate inclusion and later-addition answers for impregnation", () => {
+    const impregnationContext: CustomerReplyContext = {
+      ...context,
+      customerMessage:
+        "Er impregnering inkludert i dette tilbudet, og kan jeg legge det til senere?",
+      quote: {
+        ...context.quote!,
+        serviceDescription: "Takvask",
+      },
+    };
+
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregnering er ikke inkludert i dette tilbudet.",
+        impregnationContext,
+      ),
+    ).toThrow(/later addition/);
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregnering kan avklares senere gjennom et revidert tilbud.",
+        impregnationContext,
+      ),
+    ).toThrow(/whether impregnation is included/);
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregnering er inkludert i dette tilbudet. Et eventuelt senere tillegg må avklares gjennom et revidert tilbud.",
+        impregnationContext,
+      ),
+    ).toThrow(/contradicts the selected quote/);
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregnering er ikke inkludert i dette tilbudet, men kan legges til senere.",
+        impregnationContext,
+      ),
+    ).toThrow(/controlled later addition/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Impregnering er ikke inkludert i dette tilbudet. Et eventuelt senere tillegg må avklares særskilt gjennom et revidert tilbud.",
+        impregnationContext,
+      ),
+    ).toBe(true);
+  });
+
+  it("uses the selected quote as the source of truth for included impregnation", () => {
+    const includedContext: CustomerReplyContext = {
+      ...context,
+      customerMessage: "Er impregneringen inkludert i dette tilbudet?",
+      quote: {
+        ...context.quote!,
+        serviceDescription: "Takvask og impregnering",
+      },
+    };
+
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Impregneringen er ikke inkludert i dette tilbudet.",
+        includedContext,
+      ),
+    ).toThrow(/contradicts the selected quote/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Impregneringen er inkludert i dette tilbudet.",
+        includedContext,
+      ),
+    ).toBe(true);
+  });
+
+  it("recognizes definite-form impregnation questions with a follow-up pronoun", () => {
+    const definiteFormContext: CustomerReplyContext = {
+      ...context,
+      customerMessage:
+        "Er impregneringen inkludert, og kan den legges til senere?",
+      quote: {
+        ...context.quote!,
+        serviceDescription: "Takvask",
+      },
+    };
+
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Tilbudet gjelder tjenestene som er beskrevet.",
+        definiteFormContext,
+      ),
+    ).toThrow(/whether impregnation is included/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Impregneringen er ikke inkludert. Et eventuelt senere tillegg må avtales særskilt gjennom et revidert tilbud.",
+        definiteFormContext,
+      ),
+    ).toBe(true);
+  });
+
   it("requires a safe complete answer to the live control-measurement price question", () => {
     const liveUatContext: CustomerReplyContext = {
       ...context,

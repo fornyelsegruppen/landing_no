@@ -322,12 +322,29 @@ export async function loadCustomerReplySourceBundle(
 
   const snapshot = {
     sourceMessage: { id: source.id, updatedAt: source.updatedAt },
+    lead: { id: lead.id, inquiryType: lead.inquiryType },
+    measurement:
+      !quoteSnapshot && measurement
+        ? {
+            actualAreaMaxTenths: measurement.actualAreaMaxTenths,
+            actualAreaMinTenths: measurement.actualAreaMinTenths,
+            id: measurement.id,
+            reference: measurement.reference,
+            status: measurement.status,
+            version: measurement.version,
+          }
+        : null,
     quote: quote
       ? {
           id: quote.id,
+          maximumTotalIncVatOre: quote.maximumTotalIncVatOre,
           reference: quote.reference,
+          serviceDescription: quote.serviceDescription,
           snapshotHash: quote.snapshotHash,
+          status: quote.status,
           termsVersion: quote.termsVersion,
+          totalIncVatOre: quote.totalIncVatOre,
+          validUntil: quote.validUntil,
           version: quote.version,
         }
       : null,
@@ -336,8 +353,19 @@ export async function loadCustomerReplySourceBundle(
           documentHash: contract.documentHash,
           id: contract.id,
           reference: contract.reference,
+          status: contract.status,
+          companySignedAt: contract.companySignedAt,
           termsVersion: contract.termsVersion,
           version: contract.version,
+        }
+      : null,
+    workOrder: workOrder
+      ? {
+          arrivalWindow: workOrder.arrivalWindow,
+          id: workOrder.id,
+          reference: workOrder.reference,
+          scheduledAt: workOrder.scheduledAt,
+          status: workOrder.status,
         }
       : null,
     activeTerms: currentTerms
@@ -353,6 +381,7 @@ export async function loadCustomerReplySourceBundle(
       reference: rule.reference,
       serviceKey: rule.serviceKey,
       termsVersion: rule.termsVersion,
+      unitPriceExVatOre: rule.unitPriceExVatOre,
       validFrom: rule.validFrom,
       validTo: rule.validTo,
       version: rule.version,
@@ -360,6 +389,8 @@ export async function loadCustomerReplySourceBundle(
     services: publishedServices.map((service) => ({
       id: service.id,
       key: service.key,
+      title: service.title,
+      description: service.description,
       updatedAt: service.updatedAt,
     })),
   };

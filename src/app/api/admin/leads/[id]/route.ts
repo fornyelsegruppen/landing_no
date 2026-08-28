@@ -31,7 +31,7 @@ import {
   CaseCommandConflictError,
   updateCaseState,
 } from "@/lib/cases/case-command";
-import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
+import { reserveCustomerReplyAiRequest } from "@/lib/ai/payload-usage-limit";
 import {
   assertCustomerReplyTextSafe,
   customerReplyContextFromAnalysis,
@@ -466,7 +466,15 @@ export async function POST(
       );
       if (!currentSources)
         throw new TypeError("The reply draft has no verified source context");
-      await assertPayloadAiUsageAvailable(payload);
+      const sourceMessageId = relationId(message.replyToMessage);
+      if (!sourceMessageId)
+        throw new TypeError("The reply draft has no verified source message");
+      await reserveCustomerReplyAiRequest(payload, {
+        attempt: 1,
+        correlationId,
+        purpose: "customer-reply-polish",
+        sourceMessageId,
+      });
       const polished = await polishCustomerReplyDraft({
         bodyText: parsed.data.bodyText,
         context: currentSources.context,

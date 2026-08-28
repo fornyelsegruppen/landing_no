@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { customerQuestionActionVisibility } from "./customer-question-action-visibility";
+import {
+  customerQuestionActionVisibility,
+  customerReplyEditorActionVisibility,
+} from "./customer-question-action-visibility";
 
 describe("customer question action visibility", () => {
   it.each(["safety_rejected", "source_changed"] as const)(
@@ -49,4 +52,32 @@ describe("customer question action visibility", () => {
       });
     },
   );
+});
+
+describe("customer reply editor action visibility", () => {
+  it("leaves regeneration as the only primary editor action after a source change", () => {
+    expect(
+      customerReplyEditorActionVisibility({
+        aiAssisted: false,
+        hasSourceContext: true,
+        recovery: "source_changed",
+      }),
+    ).toEqual({
+      showDraftActions: false,
+      showRegenerateAction: true,
+    });
+  });
+
+  it("keeps manual correction actions available after a safety rejection", () => {
+    expect(
+      customerReplyEditorActionVisibility({
+        aiAssisted: true,
+        hasSourceContext: true,
+        recovery: "safety_rejected",
+      }),
+    ).toEqual({
+      showDraftActions: true,
+      showRegenerateAction: true,
+    });
+  });
 });

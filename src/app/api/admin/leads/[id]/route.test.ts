@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   loadUnresolved: vi.fn(),
   markLeadReviewed: vi.fn(),
   preparePackage: vi.fn(),
+  polishReply: vi.fn(),
   recordAudit: vi.fn(),
+  reserveUsage: vi.fn(),
   update: vi.fn(),
   provider: {
     health: vi.fn(() => ({ provider: "log-email", status: "ready" })),
@@ -44,8 +46,14 @@ vi.mock("@/lib/messages/message-engine", () => ({
     "Skriv et kontrollert svar til kunden her før utsending.",
 }));
 vi.mock("@/lib/ai/payload-usage-limit", () => ({
-  assertPayloadAiUsageAvailable: vi.fn(),
+  reserveCustomerReplyAiRequest: mocks.reserveUsage,
 }));
+vi.mock("@/lib/messages/customer-reply", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/messages/customer-reply")
+  >("@/lib/messages/customer-reply");
+  return { ...actual, polishCustomerReplyDraft: mocks.polishReply };
+});
 vi.mock("@/lib/providers/email-provider", () => ({
   createEmailProvider: () => mocks.provider,
 }));
@@ -113,6 +121,12 @@ describe("admin lead review marker", () => {
     });
     mocks.recordAudit.mockReset().mockResolvedValue(undefined);
     mocks.preparePackage.mockReset();
+    mocks.polishReply.mockReset().mockResolvedValue({
+      result: {
+        replyDraft: "Et forbedret og kontrollert svar til kunden.",
+        subject: "Forbedret svar på spørsmålet ditt",
+      },
+    });
     mocks.manualReply.mockReset().mockResolvedValue({
       duplicate: false,
       message: { id: 44 },
@@ -121,6 +135,7 @@ describe("admin lead review marker", () => {
       question: { id: 33 },
       reply: null,
     });
+    mocks.reserveUsage.mockReset().mockResolvedValue({ reserved: 1 });
     mocks.update.mockReset();
   });
 
@@ -383,6 +398,47 @@ describe("admin lead review marker", () => {
       }),
     );
     expect(mocks.recordAudit).not.toHaveBeenCalled();
+  });
+
+  it("reserves and records the exact Gemini polish attempt before invoking the provider", async () => {
+    vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        replyToMessage: 33,
+        status: "draft",
+      });
+
+    const response = await POST(
+      request({
+        action: "polish_reply",
+        bodyText: "Et kontrollert utkast som administrator ønsker å forbedre.",
+        messageId: 44,
+        subject: "Svar på spørsmålet ditt",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a polished reply response");
+    expect(response.status).toBe(200);
+    expect(mocks.reserveUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        attempt: 1,
+        correlationId: expect.any(String),
+        purpose: "customer-reply-polish",
+        sourceMessageId: 33,
+      }),
+    );
+    expect(mocks.reserveUsage.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.polishReply.mock.invocationCallOrder[0],
+    );
+    expect(mocks.polishReply).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a stale customer reply before retrying delivery", async () => {

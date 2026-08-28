@@ -181,24 +181,36 @@ export async function enqueueCustomerReplyDraft(
     where: { idempotencyKey: { equals: idempotencyKey } },
   });
   if (existing.docs[0]) return existing.docs[0];
-  return payload.create({
-    collection: "operational-jobs",
-    overrideAccess: true,
-    data: {
-      type: "customer.reply.draft",
-      status: "pending",
-      idempotencyKey,
-      correlationId: input.correlationId,
-      attempts: 0,
-      maxAttempts: 3,
-      availableAt: new Date().toISOString(),
-      payload: {
-        leadId: input.leadId,
-        purpose: input.purpose,
-        sourceMessageId: input.sourceMessageId,
+  try {
+    return await payload.create({
+      collection: "operational-jobs",
+      overrideAccess: true,
+      data: {
+        type: "customer.reply.draft",
+        status: "pending",
+        idempotencyKey,
+        correlationId: input.correlationId,
+        attempts: 0,
+        maxAttempts: 3,
+        availableAt: new Date().toISOString(),
+        payload: {
+          leadId: input.leadId,
+          purpose: input.purpose,
+          sourceMessageId: input.sourceMessageId,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    const raced = await payload.find({
+      collection: "operational-jobs",
+      depth: 0,
+      limit: 1,
+      overrideAccess: true,
+      where: { idempotencyKey: { equals: idempotencyKey } },
+    });
+    if (raced.docs[0]) return raced.docs[0];
+    throw error;
+  }
 }
 
 export async function createReceiptMessage(

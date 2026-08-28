@@ -273,20 +273,91 @@ export function assertCustomerReplyTextSafe(
       );
     }
   }
-  const asksAboutAddingImpregnation =
-    /\bimpregnering\b/i.test(context.customerMessage) &&
-    /\b(?:senere|tillegg|legge\s+til|velge|inkludert|inngår)\b/i.test(
-      context.customerMessage,
-    );
-  if (
-    asksAboutAddingImpregnation &&
-    !/\b(?:ikke\s+inkludert|inngår\s+ikke|kan\s+avtales|avtales\s+særskilt|som\s+et\s+tillegg|revidert\s+tilbud|separat\s+tilbud)\b/i.test(
+  const impregnationTerm = "impregnering(?:en)?";
+  const asksAboutImpregnation = new RegExp(
+    `\\b${impregnationTerm}\\b`,
+    "i",
+  ).test(context.customerMessage);
+  const asksWhetherImpregnationIsIncluded =
+    asksAboutImpregnation &&
+    new RegExp(
+      `(?:\\ber\\s+${impregnationTerm}\\b.{0,40}\\b(?:inkludert|med)\\b|\\binngår\\s+${impregnationTerm}\\b|\\b${impregnationTerm}\\b.{0,40}\\b(?:inkludert|inngår)\\b)`,
+      "i",
+    ).test(context.customerMessage);
+  const asksAboutAddingImpregnationLater =
+    asksAboutImpregnation &&
+    (new RegExp(
+      `(?:\\b${impregnationTerm}\\b.{0,80}\\b(?:senere|tillegg|legge\\s+til|velge)\\b|\\b(?:legge\\s+til|velge)\\b.{0,40}\\b${impregnationTerm}\\b)`,
+      "i",
+    ).test(context.customerMessage) ||
+      /\b(?:den|det)\b.{0,50}\b(?:senere|tillegg|legges?\s+til|velge)\b/i.test(
+        context.customerMessage,
+      ));
+  const replySaysImpregnationNotIncluded =
+    /\bimpregnering(?:en)?\b\s+(?:er\s+)?ikke\s+inkludert\b/i.test(
       normalized,
-    )
-  ) {
-    throw new TypeError(
-      "AI reply must explicitly answer whether impregnation is included or can be added separately",
+    ) ||
+    /\bimpregnering(?:en)?\b\s+inngår\s+ikke\b/i.test(normalized) ||
+    /\b(?:tilbudet|avtalen)\b.{0,50}\b(?:inkluderer|omfatter)\s+ikke\s+impregnering(?:en)?\b/i.test(
+      normalized,
     );
+  const replySaysImpregnationIncluded =
+    !replySaysImpregnationNotIncluded &&
+    (/\bimpregnering(?:en)?\b\s+(?:er\s+)?inkludert\b/i.test(normalized) ||
+      /\bimpregnering(?:en)?\b\s+inngår\b(?!\s+ikke)/i.test(normalized) ||
+      /\b(?:tilbudet|avtalen)\b.{0,50}\b(?:inkluderer|omfatter)\s+impregnering(?:en)?\b/i.test(
+        normalized,
+      ));
+  if (asksWhetherImpregnationIsIncluded) {
+    if (!replySaysImpregnationIncluded && !replySaysImpregnationNotIncluded) {
+      throw new TypeError(
+        "AI reply must explicitly answer whether impregnation is included",
+      );
+    }
+
+    const selectedService =
+      context.quote?.serviceDescription?.trim() || context.service?.trim();
+    const sourceInclusion = selectedService
+      ? /impregner/i.test(selectedService)
+        ? true
+        : /takvask/i.test(selectedService)
+          ? false
+          : null
+      : null;
+    if (
+      (sourceInclusion === true && !replySaysImpregnationIncluded) ||
+      (sourceInclusion === false && !replySaysImpregnationNotIncluded)
+    ) {
+      throw new TypeError(
+        "AI reply contradicts the selected quote about whether impregnation is included",
+      );
+    }
+  }
+  if (asksAboutAddingImpregnationLater) {
+    const explainsLaterAddition =
+      /\bimpregnering(?:en)?\b.{0,120}\b(?:senere|tillegg|legges?\s+til|avklares|avtales|bestilles|revidert|separat|nytt)\b/i.test(
+        normalized,
+      ) ||
+      /\b(?:senere|tillegg|legges?\s+til|avklares|avtales|bestilles|revidert|separat|nytt)\b.{0,120}\bimpregnering(?:en)?\b/i.test(
+        normalized,
+      );
+    const usesControlledPath =
+      /\b(?:revidert|separat|nytt)\s+tilbud\b/i.test(normalized) ||
+      /\b(?:avklares|avtales|bestilles)\s+særskilt\b/i.test(normalized) ||
+      /\b(?:separat|skriftlig)\s+(?:avtale|endringsavtale)\b/i.test(normalized);
+    const alreadyIncludedNeedsNoAddition =
+      replySaysImpregnationIncluded &&
+      /\b(?:allerede\s+inkludert|trenger\s+ikke|ikke\s+nødvendig)\b/i.test(
+        normalized,
+      );
+    if (
+      (!explainsLaterAddition || !usesControlledPath) &&
+      !alreadyIncludedNeedsNoAddition
+    ) {
+      throw new TypeError(
+        "AI reply must explicitly answer whether impregnation has a controlled later addition path through separate agreement or a revised offer",
+      );
+    }
   }
   const asksAboutControlMeasurementPrice =
     typeof context.quote?.maximumTotalIncVatOre === "number" &&
@@ -414,6 +485,7 @@ export async function generateCustomerReplyDraft(input: {
     "Du lager bare et internt norsk svarutkast for Takfornyelse.",
     "Svar varmt, tydelig og profesjonelt til norske boligeiere over 30 år.",
     "Svar eksplisitt på hvert delspørsmål i kundens melding. Hvis konteksten ikke gir grunnlag for ja eller nei, si det tydelig og beskriv hvilket kontrollert neste steg som kreves.",
+    "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, svar separat på begge deler. Et mulig senere tillegg må avklares særskilt og håndteres i et revidert eller separat tilbud; ikke lov et tillegg uten kildegrunnlag.",
     "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
     "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
     "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
@@ -506,6 +578,7 @@ export async function polishCustomerReplyDraft(input: {
     system: [
       "Du forbedrer et internt svarutkast for Takfornyelse på profesjonell norsk.",
       "Bevar og besvar eksplisitt hvert delspørsmål i kundens opprinnelige melding.",
+      "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, bevar et separat svar på begge deler og beskriv et mulig senere tillegg som særskilt avklaring i et revidert eller separat tilbud.",
       "Bevar meningen og alle verifiserte fakta. Ikke legg til pris, areal, rabatt, garanti, dato eller løfte.",
       "Alle pengebeløp i sakskonteksten er formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
       "Når teksten omtaler maksimalpris, må den slå fast at avvik over rammen stanser berørt arbeid og krever en ny skriftlig endringsavtale som kunden aksepterer før arbeidet fortsetter. Kontrollmålingen er aldri alene et unntak fra maksimalprisen.",

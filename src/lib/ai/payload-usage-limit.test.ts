@@ -105,6 +105,31 @@ describe("combined Gemini usage limits", () => {
     );
   });
 
+  it("records polish requests as customer-reply Gemini usage", async () => {
+    const state = payloadWithReservableCustomerUsage();
+
+    await reserveCustomerReplyAiRequest(state.payload, {
+      attempt: 1,
+      correlationId: "customer-reply-polish-1",
+      purpose: "customer-reply-polish",
+      sourceMessageId: 44,
+    });
+
+    expect(state.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "audit-events",
+        data: expect.objectContaining({
+          action: "ai.customer-reply.request",
+          entityId: "44",
+          metadata: expect.objectContaining({
+            attempt: 1,
+            purpose: "customer-reply-polish",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("includes recorded customer-reply calls in combined limits", async () => {
     process.env.GEMINI_DAILY_REQUEST_LIMIT = "4";
     await expect(
