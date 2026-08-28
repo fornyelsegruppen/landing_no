@@ -344,7 +344,9 @@ export async function createCustomerReplyDraft(
     sourceMessageId: source.id,
   });
   const duplicate = await findMessageByKey(payload, idempotencyKey);
-  if (duplicate) return { duplicate: true as const, message: duplicate };
+  if (duplicate && duplicate.status !== "cancelled") {
+    return { duplicate: true as const, message: duplicate };
+  }
 
   const lead = await payload.findByID({
     collection: "leads",
@@ -386,33 +388,41 @@ export async function createCustomerReplyDraft(
         ]
       : []),
   ];
-  const message = await payload.create({
-    collection: "messages",
-    overrideAccess: true,
-    data: {
-      lead: lead.id,
-      replyToMessage: source.id,
-      direction: "outbound",
-      category: "ai_reply",
-      channel: lead.email ? "email" : "sms",
-      subject: generated.result.subject,
-      bodyText: generated.result.replyDraft,
-      status: "draft",
-      idempotencyKey,
-      aiAssisted: true,
-      aiAnalysis: {
-        ...generated.result,
-        factWarnings,
-        purpose: input.purpose,
-        sourceMessageId: source.id,
-        replyFactContext: generated.context,
-        replySourceFingerprint: sourceBundle.fingerprint,
-        replySourceSnapshot: sourceBundle.snapshot,
-      },
-      modelVersion: generated.model,
-      promptVersion: generated.promptVersion,
+  const data = {
+    lead: lead.id,
+    replyToMessage: source.id,
+    direction: "outbound" as const,
+    category: "ai_reply" as const,
+    channel: lead.email ? ("email" as const) : ("sms" as const),
+    subject: generated.result.subject,
+    bodyText: generated.result.replyDraft,
+    status: "draft" as const,
+    idempotencyKey,
+    aiAssisted: true,
+    aiAnalysis: {
+      ...generated.result,
+      factWarnings,
+      purpose: input.purpose,
+      sourceMessageId: source.id,
+      replyFactContext: generated.context,
+      replySourceFingerprint: sourceBundle.fingerprint,
+      replySourceSnapshot: sourceBundle.snapshot,
     },
-  });
+    modelVersion: generated.model,
+    promptVersion: generated.promptVersion,
+  };
+  const message = duplicate
+    ? await payload.update({
+        collection: "messages",
+        id: duplicate.id,
+        overrideAccess: true,
+        data,
+      })
+    : await payload.create({
+        collection: "messages",
+        overrideAccess: true,
+        data,
+      });
   await updateCaseState(payload, {
     leadId: lead.id,
     command: "customer_reply_drafted",

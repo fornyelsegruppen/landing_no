@@ -5,6 +5,7 @@ import {
   LogEmailProvider,
 } from "@/lib/providers/safe-providers";
 import {
+  createCustomerReplyDraft,
   createLeadAiReply,
   createManualCustomerQuestionReplyDraft,
   createReceiptMessage,
@@ -41,6 +42,9 @@ function repository() {
     "operational-jobs": jobs,
   };
   const payload = {
+    async count({ collection }: { collection: string }) {
+      return { totalDocs: (collections[collection] || []).length };
+    },
     async find({
       collection,
       where,
@@ -109,6 +113,16 @@ const validAiReply = {
   subject: "Flere opplysninger om taket",
   replyDraft:
     "Takk for henvendelsen. Send gjerne oversiktsbilder av takflatene tatt trygt fra bakken. Vi kontrollerer materialet før vi foreslår riktig neste steg.",
+};
+
+const validCustomerQuestionReply = {
+  subject: "Svar på spørsmålet ditt",
+  replyDraft:
+    "Takk for spørsmålet. Vi kontrollerer opplysningene og svarer ut fra dokumentene som er sendt til deg.",
+  summary: "Kunden ber om en avklaring før signering.",
+  intent: "question" as const,
+  factWarnings: [],
+  recommendedAdminAction: "review_and_reply" as const,
 };
 
 describe("message engine", () => {
@@ -392,6 +406,75 @@ describe("message engine", () => {
       manualReplyRequiresEditing: true,
       purpose: "question",
       sourceMessageId: source.id,
+    });
+  });
+
+  it("reactivates a cancelled AI reply with freshly generated content", async () => {
+    const state = repository();
+    const source = await state.payload.create({
+      collection: "messages",
+      overrideAccess: true,
+      data: {
+        lead: 1,
+        direction: "inbound",
+        category: "customer_question",
+        channel: "email",
+        subject: "Spørsmål om tilbud T-1-V1",
+        bodyText: "Hva er inkludert før jeg signerer?",
+        status: "delivered",
+        idempotencyKey: "question-source-ai-reprepare",
+        aiAssisted: false,
+      },
+    });
+    const input = {
+      correlationId: "ai-question-initial",
+      generationKey: `admin-fallback-${source.id}`,
+      leadId: 1,
+      purpose: "question" as const,
+      sourceMessageId: source.id,
+    };
+    const initial = await createCustomerReplyDraft(
+      state.payload,
+      new DeterministicAiProvider(validCustomerQuestionReply),
+      input,
+    );
+    await state.payload.update({
+      collection: "messages",
+      id: initial.message.id,
+      overrideAccess: true,
+      data: { status: "cancelled" },
+    });
+
+    const freshBody =
+      "Takk for spørsmålet. Dette er et nytt kontrollert svar basert på dokumentene som er sendt til deg.";
+    const recreated = await createCustomerReplyDraft(
+      state.payload,
+      new DeterministicAiProvider({
+        ...validCustomerQuestionReply,
+        replyDraft: freshBody,
+      }),
+      { ...input, correlationId: "ai-question-after-cancel" },
+    );
+    const transportRetry = await createCustomerReplyDraft(
+      state.payload,
+      new DeterministicAiProvider({ invalid: true }),
+      { ...input, correlationId: "ai-question-transport-retry" },
+    );
+
+    expect(recreated).toMatchObject({ duplicate: false });
+    expect(recreated.message).toMatchObject({
+      id: initial.message.id,
+      bodyText: freshBody,
+      status: "draft",
+    });
+    expect(transportRetry).toMatchObject({
+      duplicate: true,
+      message: { id: initial.message.id, bodyText: freshBody, status: "draft" },
+    });
+    expect(state.messages).toHaveLength(2);
+    expect(state.messages[1]).toMatchObject({
+      bodyText: freshBody,
+      status: "draft",
     });
   });
 
