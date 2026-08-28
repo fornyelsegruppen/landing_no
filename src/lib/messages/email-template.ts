@@ -59,7 +59,7 @@ function secureActionButton(url: string, label?: string) {
         : isWorkerPortalLink
           ? "Åpne oppdraget i medarbeiderportalen"
           : "Åpne ditt sikre tilbud");
-    return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:8px 0 4px;background:#f0a914;color:#101319;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 20px;border-radius:10px">${escapeHtml(buttonLabel)}</a>`;
+    return `<br><a href="${escapeHtml(url)}" style="display:inline-block;margin:12px 0 4px;background:#f0a914;color:#101319;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 20px;border-radius:10px">${escapeHtml(buttonLabel)}</a>`;
   } catch {
     return null;
   }
@@ -82,7 +82,13 @@ function textToHtml(text: string, secureLinkLabel?: string) {
   return text
     .trim()
     .split(/\n{2,}/)
-    .map((paragraph) => `<p style="margin:0 0 18px;line-height:1.65;color:#20242c">${paragraph.split(/\r?\n/).map((line) => linkedLine(line, secureLinkLabel)).join("<br>")}</p>`)
+    .map(
+      (paragraph) =>
+        `<p style="margin:0 0 18px;line-height:1.65;color:#20242c">${paragraph
+          .split(/\r?\n/)
+          .map((line) => linkedLine(line, secureLinkLabel))
+          .join("<br>")}</p>`,
+    )
     .join("");
 }
 

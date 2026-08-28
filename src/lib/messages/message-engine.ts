@@ -13,11 +13,21 @@ import { updateCaseState } from "@/lib/cases/case-command";
 import { caseReplyAddress } from "./case-reply";
 import { enqueueQuoteFollowUps } from "@/lib/quotes/follow-up-schedule";
 import { featureReadiness } from "@/lib/platform/features";
-import { customerReplyContextFromAnalysis, generateCustomerReplyDraft, type CustomerReplyPurpose } from "./customer-reply";
+import {
+  customerReplyContextFromAnalysis,
+  generateCustomerReplyDraft,
+  type CustomerReplyPurpose,
+} from "./customer-reply";
+import { loadCustomerReplySourceBundle } from "./customer-reply-sources";
 
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
-  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") {
+  if (
+    value &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof (value as { id?: unknown }).id === "number"
+  ) {
     return (value as { id: number }).id;
   }
   return undefined;
@@ -50,7 +60,11 @@ async function findMessageByKey(payload: Payload, idempotencyKey: string) {
   return result.docs[0] || null;
 }
 
-export async function enqueueMessageJob(payload: Payload, messageId: number, correlationId: string) {
+export async function enqueueMessageJob(
+  payload: Payload,
+  messageId: number,
+  correlationId: string,
+) {
   const idempotencyKey = makeIdempotencyKey("message.delivery", { messageId });
   const existing = await payload.find({
     collection: "operational-jobs",
@@ -66,7 +80,13 @@ export async function enqueueMessageJob(payload: Payload, messageId: number, cor
         collection: "operational-jobs",
         id: job.id,
         overrideAccess: true,
-        data: { status: "pending", attempts: 0, availableAt: new Date().toISOString(), lastErrorCode: null, lastErrorMessage: null },
+        data: {
+          status: "pending",
+          attempts: 0,
+          availableAt: new Date().toISOString(),
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        },
       });
     }
     return job;
@@ -87,7 +107,11 @@ export async function enqueueMessageJob(payload: Payload, messageId: number, cor
   });
 }
 
-export async function enqueueLeadAiJob(payload: Payload, leadId: number, correlationId: string) {
+export async function enqueueLeadAiJob(
+  payload: Payload,
+  leadId: number,
+  correlationId: string,
+) {
   const idempotencyKey = makeIdempotencyKey("lead.ai.reply", { leadId });
   const existing = await payload.find({
     collection: "operational-jobs",
@@ -113,12 +137,15 @@ export async function enqueueLeadAiJob(payload: Payload, leadId: number, correla
   });
 }
 
-export async function enqueueCustomerReplyDraft(payload: Payload, input: {
-  correlationId: string;
-  leadId: number;
-  purpose: CustomerReplyPurpose;
-  sourceMessageId: number;
-}) {
+export async function enqueueCustomerReplyDraft(
+  payload: Payload,
+  input: {
+    correlationId: string;
+    leadId: number;
+    purpose: CustomerReplyPurpose;
+    sourceMessageId: number;
+  },
+) {
   const idempotencyKey = makeIdempotencyKey("customer.reply.draft", {
     sourceMessageId: input.sourceMessageId,
     purpose: input.purpose,
@@ -142,17 +169,35 @@ export async function enqueueCustomerReplyDraft(payload: Payload, input: {
       attempts: 0,
       maxAttempts: 3,
       availableAt: new Date().toISOString(),
-      payload: { leadId: input.leadId, purpose: input.purpose, sourceMessageId: input.sourceMessageId },
+      payload: {
+        leadId: input.leadId,
+        purpose: input.purpose,
+        sourceMessageId: input.sourceMessageId,
+      },
     },
   });
 }
 
-export async function createReceiptMessage(payload: Payload, leadId: number, correlationId: string) {
-  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+export async function createReceiptMessage(
+  payload: Payload,
+  leadId: number,
+  correlationId: string,
+) {
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
   if (!lead.email) return { skipped: true as const, reason: "no_email" };
   const idempotencyKey = makeIdempotencyKey("lead.receipt", { leadId });
   const duplicate = await findMessageByKey(payload, idempotencyKey);
-  if (duplicate) return { skipped: false as const, duplicate: true as const, message: duplicate };
+  if (duplicate)
+    return {
+      skipped: false as const,
+      duplicate: true as const,
+      message: duplicate,
+    };
   const copy = receiptCopy(lead.language);
   const now = new Date().toISOString();
   const message = await payload.create({
@@ -165,7 +210,10 @@ export async function createReceiptMessage(payload: Payload, leadId: number, cor
       channel: "email",
       subject: copy.subject,
       bodyText: copy.text,
-      bodyHtml: buildBrandedEmailHtml({ subject: copy.subject, text: copy.text }),
+      bodyHtml: buildBrandedEmailHtml({
+        subject: copy.subject,
+        text: copy.text,
+      }),
       status: "queued",
       idempotencyKey,
       aiAssisted: false,
@@ -177,13 +225,25 @@ export async function createReceiptMessage(payload: Payload, leadId: number, cor
   return { skipped: false as const, duplicate: false as const, message, job };
 }
 
-export async function createLeadAiReply(payload: Payload, provider: AiProvider, leadId: number, correlationId: string) {
+export async function createLeadAiReply(
+  payload: Payload,
+  provider: AiProvider,
+  leadId: number,
+  correlationId: string,
+) {
   const idempotencyKey = makeIdempotencyKey("lead.ai.reply", { leadId });
   const duplicate = await findMessageByKey(payload, idempotencyKey);
   if (duplicate) return { duplicate: true as const, message: duplicate };
-  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
   if (lead.status === "converted" || lead.status === "closed") {
-    throw new TypeError("AI draft cannot be generated for a converted or closed lead");
+    throw new TypeError(
+      "AI draft cannot be generated for a converted or closed lead",
+    );
   }
   const generated = await generateLeadReplyDraft({
     provider,
@@ -216,23 +276,45 @@ export async function createLeadAiReply(payload: Payload, provider: AiProvider, 
       promptVersion: generated.promptVersion,
     },
   });
-  await updateCaseState(payload, { leadId: lead.id, command: "ai_reply_drafted", idempotencyKey, patch: {
-    status: "draft_ready", qualification: generated.result, nextActionOwner: "administrator",
-    nextAction: "Kontroller AI-utkast og velg neste handling.", nextActionAt: new Date().toISOString(),
-  } });
+  await updateCaseState(payload, {
+    leadId: lead.id,
+    command: "ai_reply_drafted",
+    idempotencyKey,
+    patch: {
+      status: "draft_ready",
+      qualification: generated.result,
+      nextActionOwner: "administrator",
+      nextAction: "Kontroller AI-utkast og velg neste handling.",
+      nextActionAt: new Date().toISOString(),
+    },
+  });
   return { duplicate: false as const, message, generated };
 }
 
-export async function createCustomerReplyDraft(payload: Payload, provider: AiProvider, input: {
-  correlationId: string;
-  generationKey?: string;
-  leadId: number;
-  purpose: CustomerReplyPurpose;
-  sourceMessageId: number;
-}) {
-  const source = await payload.findByID({ collection: "messages", id: input.sourceMessageId, depth: 0, overrideAccess: true });
-  if (relationId(source.lead) !== input.leadId || source.direction !== "inbound") {
-    throw new TypeError("Reply source must be an inbound message in the same customer case");
+export async function createCustomerReplyDraft(
+  payload: Payload,
+  provider: AiProvider,
+  input: {
+    correlationId: string;
+    generationKey?: string;
+    leadId: number;
+    purpose: CustomerReplyPurpose;
+    sourceMessageId: number;
+  },
+) {
+  const source = await payload.findByID({
+    collection: "messages",
+    id: input.sourceMessageId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (
+    relationId(source.lead) !== input.leadId ||
+    source.direction !== "inbound"
+  ) {
+    throw new TypeError(
+      "Reply source must be an inbound message in the same customer case",
+    );
   }
   const idempotencyKey = makeIdempotencyKey("customer.reply", {
     generationKey: input.generationKey || "initial",
@@ -241,54 +323,39 @@ export async function createCustomerReplyDraft(payload: Payload, provider: AiPro
   const duplicate = await findMessageByKey(payload, idempotencyKey);
   if (duplicate) return { duplicate: true as const, message: duplicate };
 
-  const lead = await payload.findByID({ collection: "leads", id: input.leadId, depth: 0, overrideAccess: true });
-  if (lead.status === "closed" || lead.recordState !== "active") throw new TypeError("A reply draft cannot be generated for a closed or archived case");
-  const [measurements, quotes, workOrders] = await Promise.all([
-    payload.find({ collection: "roof-measurements", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ lead: { equals: lead.id } }, { status: { equals: "approved" } }] } }),
-    payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { and: [{ lead: { equals: lead.id } }, { status: { not_equals: "superseded" } }] } }),
-    payload.find({ collection: "work-orders", depth: 0, limit: 1, sort: "-createdAt", overrideAccess: true, where: { lead: { equals: lead.id } } }),
-  ]);
-  const measurement = measurements.docs[0];
-  const quote = quotes.docs[0];
-  const workOrder = workOrders.docs[0];
-  const contracts = quote
-    ? await payload.find({ collection: "contracts", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { quote: { equals: quote.id } } })
-    : { docs: [] };
-  const contract = contracts.docs[0];
-  const context = {
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: input.leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (lead.status === "closed" || lead.recordState !== "active")
+    throw new TypeError(
+      "A reply draft cannot be generated for a closed or archived case",
+    );
+  const sourceBundle = await loadCustomerReplySourceBundle(payload, {
+    leadId: input.leadId,
     purpose: input.purpose,
-    customerMessage: source.bodyText,
-    service: lead.inquiryType,
-    ...(measurement ? { measurement: {
-      reference: measurement.reference,
-      areaMinTenths: measurement.actualAreaMinTenths,
-      areaMaxTenths: measurement.actualAreaMaxTenths,
-    } } : {}),
-    ...(quote ? { quote: {
-      reference: quote.reference,
-      status: quote.status,
-      totalIncVatOre: quote.totalIncVatOre,
-      ...(typeof quote.maximumTotalIncVatOre === "number" ? { maximumTotalIncVatOre: quote.maximumTotalIncVatOre } : {}),
-      validUntil: quote.validUntil,
-    } } : {}),
-    ...(contract ? { contract: {
-      reference: contract.reference,
-      status: contract.status,
-      companySigned: Boolean(contract.companySignedAt),
-    } } : {}),
-    ...(workOrder ? { workOrder: {
-      reference: workOrder.reference,
-      status: workOrder.status,
-      ...(workOrder.scheduledAt ? { scheduledAt: workOrder.scheduledAt } : {}),
-      ...(workOrder.arrivalWindow ? { arrivalWindow: workOrder.arrivalWindow } : {}),
-    } } : {}),
-  };
-  const generated = await generateCustomerReplyDraft({ provider, context, correlationId: input.correlationId });
+    sourceMessageId: input.sourceMessageId,
+  });
+  const generated = await generateCustomerReplyDraft({
+    provider,
+    context: sourceBundle.context,
+    correlationId: input.correlationId,
+  });
   const factWarnings = [
     ...generated.result.factWarnings,
-    ...(!measurement ? ["Ingen godkjent takmåling er tilgjengelig."] : []),
-    ...(!quote && input.purpose !== "cancellation" ? ["Ingen aktiv tilbudssnapshot er tilgjengelig."] : []),
-    ...(input.purpose === "cancellation" ? ["Kanselleringsforespørselen krever administratorbeslutning og må ikke bekreftes automatisk."] : []),
+    ...(!sourceBundle.context.measurement
+      ? ["Ingen godkjent takmåling er tilgjengelig."]
+      : []),
+    ...(!sourceBundle.context.quote && input.purpose !== "cancellation"
+      ? ["Ingen aktiv tilbudssnapshot er tilgjengelig."]
+      : []),
+    ...(input.purpose === "cancellation"
+      ? [
+          "Kanselleringsforespørselen krever administratorbeslutning og må ikke bekreftes automatisk.",
+        ]
+      : []),
   ];
   const message = await payload.create({
     collection: "messages",
@@ -310,32 +377,57 @@ export async function createCustomerReplyDraft(payload: Payload, provider: AiPro
         purpose: input.purpose,
         sourceMessageId: source.id,
         replyFactContext: generated.context,
+        replySourceFingerprint: sourceBundle.fingerprint,
+        replySourceSnapshot: sourceBundle.snapshot,
       },
       modelVersion: generated.model,
       promptVersion: generated.promptVersion,
     },
   });
-  await updateCaseState(payload, { leadId: lead.id, command: "customer_reply_drafted", idempotencyKey, patch: {
-    status: "customer_waiting",
-    nextActionOwner: "administrator",
-    nextAction: input.purpose === "decline"
-      ? "Kontroller avslagsårsaken og AI-utkastet. Send oppfølging, lag et revidert tilbud eller avslutt saken."
-      : input.purpose === "cancellation"
-        ? "Vurder kundens kanselleringsforespørsel. Ikke start eller opprett arbeid før administrator har besluttet saken."
-        : "Kontroller kundens spørsmål, faktavarsler og AI-utkast før utsending.",
-    nextActionAt: new Date().toISOString(),
-  } });
+  await updateCaseState(payload, {
+    leadId: lead.id,
+    command: "customer_reply_drafted",
+    idempotencyKey,
+    patch: {
+      status: "customer_waiting",
+      nextActionOwner: "administrator",
+      nextAction:
+        input.purpose === "decline"
+          ? "Kontroller avslagsårsaken og AI-utkastet. Send oppfølging, lag et revidert tilbud eller avslutt saken."
+          : input.purpose === "cancellation"
+            ? "Vurder kundens kanselleringsforespørsel. Ikke start eller opprett arbeid før administrator har besluttet saken."
+            : "Kontroller kundens spørsmål, faktavarsler og AI-utkast før utsending.",
+      nextActionAt: new Date().toISOString(),
+    },
+  });
   return { duplicate: false as const, message, generated, factWarnings };
 }
 
-export async function deliverMessage(payload: Payload, provider: EmailProvider, messageId: number, correlationId: string) {
-  const message = await payload.findByID({ collection: "messages", id: messageId, depth: 1, overrideAccess: true });
-  if (["sent", "delivered"].includes(message.status)) return { duplicate: true as const, message };
+export async function deliverMessage(
+  payload: Payload,
+  provider: EmailProvider,
+  messageId: number,
+  correlationId: string,
+) {
+  const message = await payload.findByID({
+    collection: "messages",
+    id: messageId,
+    depth: 1,
+    overrideAccess: true,
+  });
+  if (["sent", "delivered"].includes(message.status))
+    return { duplicate: true as const, message };
   assertMessageCanDeliver(message);
-  if (message.channel !== "email") throw new TypeError("SMS delivery is not enabled");
+  if (message.channel !== "email")
+    throw new TypeError("SMS delivery is not enabled");
   const leadId = relationId(message.lead);
   if (!leadId) throw new TypeError("Message has no lead");
-  const lead = await payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true });
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
   const deliveryEmail = lead.communicationEmail || lead.email;
   if (!deliveryEmail) throw new TypeError("Lead has no email address");
   try {
@@ -343,9 +435,18 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
     for (const relation of message.attachments ?? []) {
       const mediaId = relationId(relation);
       if (!mediaId) continue;
-      const media = await payload.findByID({ collection: "private-media", id: mediaId, depth: 0, overrideAccess: true });
+      const media = await payload.findByID({
+        collection: "private-media",
+        id: mediaId,
+        depth: 0,
+        overrideAccess: true,
+      });
       const content = await readPrivateMediaContent(media);
-      attachments.push({ filename: content.filename, contentType: content.contentType, contentBase64: content.data.toString("base64") });
+      attachments.push({
+        filename: content.filename,
+        contentType: content.contentType,
+        contentBase64: content.data.toString("base64"),
+      });
     }
     const result = await provider.send({
       template: message.category,
@@ -359,7 +460,12 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
           text: message.bodyText,
           secureLinkLabel: secureCustomerLinkLabel(message.category),
         }),
-      replyTo: (featureReadiness("communicationRoutingV2").ready ? caseReplyAddress(lead.id) : null) || process.env.LEAD_TO_EMAIL || "post@takfornyelse.as",
+      replyTo:
+        (featureReadiness("communicationRoutingV2").ready
+          ? caseReplyAddress(lead.id)
+          : null) ||
+        process.env.LEAD_TO_EMAIL ||
+        "post@takfornyelse.as",
       idempotencyKey: message.idempotencyKey,
       correlationId,
       ...(attachments.length ? { attachments } : {}),
@@ -377,78 +483,161 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
         failureMessage: null,
       },
     });
-    const analysis = message.aiAnalysis && typeof message.aiAnalysis === "object"
-      ? message.aiAnalysis as { alternativeQuoteId?: number; cancellationDecision?: string; recommendedNextAction?: string; quoteId?: number; officialInvoiceId?: number }
-      : {};
-    if (message.category === "invoice" && typeof analysis.officialInvoiceId === "number") {
-      const invoice = await payload.findByID({ collection: "official-invoices", id: analysis.officialInvoiceId, depth: 0, overrideAccess: true });
+    const analysis =
+      message.aiAnalysis && typeof message.aiAnalysis === "object"
+        ? (message.aiAnalysis as {
+            alternativeQuoteId?: number;
+            cancellationDecision?: string;
+            recommendedNextAction?: string;
+            quoteId?: number;
+            officialInvoiceId?: number;
+          })
+        : {};
+    if (
+      message.category === "invoice" &&
+      typeof analysis.officialInvoiceId === "number"
+    ) {
+      const invoice = await payload.findByID({
+        collection: "official-invoices",
+        id: analysis.officialInvoiceId,
+        depth: 0,
+        overrideAccess: true,
+      });
       if (invoice.status === "issued") {
-        await payload.update({ collection: "official-invoices", id: invoice.id, depth: 0, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
-        await payload.update({ collection: "official-invoices", id: invoice.id, depth: 0, overrideAccess: true, data: { status: "awaiting_payment" } });
+        await payload.update({
+          collection: "official-invoices",
+          id: invoice.id,
+          depth: 0,
+          overrideAccess: true,
+          data: { status: "sent", sentAt: result.acceptedAt },
+        });
+        await payload.update({
+          collection: "official-invoices",
+          id: invoice.id,
+          depth: 0,
+          overrideAccess: true,
+          data: { status: "awaiting_payment" },
+        });
       }
       const invoiceRecordId = relationId(invoice.invoiceRecord);
       if (invoiceRecordId) {
-        const basis = await payload.findByID({ collection: "invoice-records", id: invoiceRecordId, depth: 0, overrideAccess: true });
-        if (basis.status === "exported") await payload.update({ collection: "invoice-records", id: basis.id, depth: 0, overrideAccess: true, data: { status: "sent" } });
+        const basis = await payload.findByID({
+          collection: "invoice-records",
+          id: invoiceRecordId,
+          depth: 0,
+          overrideAccess: true,
+        });
+        if (basis.status === "exported")
+          await payload.update({
+            collection: "invoice-records",
+            id: basis.id,
+            depth: 0,
+            overrideAccess: true,
+            data: { status: "sent" },
+          });
       }
     }
     const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
     if (message.category === "quote" && typeof analysis.quoteId === "number") {
-      const quoteIds = [analysis.quoteId, analysis.alternativeQuoteId].filter((value): value is number => typeof value === "number");
+      const quoteIds = [analysis.quoteId, analysis.alternativeQuoteId].filter(
+        (value): value is number => typeof value === "number",
+      );
       for (const quoteId of quoteIds) {
-        const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
+        const quote = await payload.findByID({
+          collection: "quotes",
+          id: quoteId,
+          depth: 0,
+          overrideAccess: true,
+        });
         if (quote.status === "approved") {
-          await payload.update({ collection: "quotes", id: quote.id, overrideAccess: true, data: { status: "sent", sentAt: result.acceptedAt } });
+          await payload.update({
+            collection: "quotes",
+            id: quote.id,
+            overrideAccess: true,
+            data: { status: "sent", sentAt: result.acceptedAt },
+          });
         }
       }
-      const primary = await payload.findByID({ collection: "quotes", id: analysis.quoteId, depth: 0, overrideAccess: true });
-      await enqueueQuoteFollowUps(payload, { quoteId: primary.id, leadId: lead.id, validUntil: primary.validUntil }, correlationId);
+      const primary = await payload.findByID({
+        collection: "quotes",
+        id: analysis.quoteId,
+        depth: 0,
+        overrideAccess: true,
+      });
+      await enqueueQuoteFollowUps(
+        payload,
+        {
+          quoteId: primary.id,
+          leadId: lead.id,
+          validUntil: primary.validUntil,
+        },
+        correlationId,
+      );
     }
-    const followUp = lead.status === "closed" || analysis.cancellationDecision
-      ? {}
-      : replyContext?.purpose === "cancellation"
-        ? {
-            status: "customer_waiting" as const,
-            nextAction: "Vurder kundens kanselleringsforespørsel før arbeid kan startes.",
-            nextActionAt: new Date().toISOString(),
-          }
-      : replyContext
-        ? {
-            status: "waiting_customer" as const,
-            nextAction: "Vent på kundens svar og følg opp dersom kunden ikke svarer.",
-            nextActionAt: new Date(Date.now() + 3 * 24 * 60 * 60_000).toISOString(),
-          }
-      : message.category === "completion"
-      ? {
-          status: "converted" as const,
-          nextAction: "Oppdrag fullført og dokumentert.",
-          nextActionAt: null,
-        }
-      : ["receipt", "contract", "change_confirmation"].includes(message.category)
-      ? {}
-      : message.category === "information_request" || analysis.recommendedNextAction === "request_information"
-        ? {
-            status: "waiting_customer" as const,
-            nextAction: "Følg opp dersom kunden ikke svarer.",
-            nextActionAt: new Date(Date.now() + 2 * 24 * 60 * 60_000).toISOString(),
-          }
-        : analysis.recommendedNextAction === "start_measurement"
+    const followUp =
+      lead.status === "closed" || analysis.cancellationDecision
+        ? {}
+        : replyContext?.purpose === "cancellation"
           ? {
-              status: "qualified" as const,
-              nextAction: "Start kontrollert takmåling.",
+              status: "customer_waiting" as const,
+              nextAction:
+                "Vurder kundens kanselleringsforespørsel før arbeid kan startes.",
               nextActionAt: new Date().toISOString(),
             }
-          : {
-              status: "contacted" as const,
-              nextAction: "Kontroller henvendelsen og velg neste steg.",
-              nextActionAt: new Date().toISOString(),
-            };
-    const nextActionOwner = replyContext?.purpose === "question" || replyContext?.purpose === "decline"
-      ? "customer" as const
-      : message.category === "completion"
-        ? "system" as const
-        : "administrator" as const;
-    await updateCaseState(payload, { leadId: lead.id, command: "message_delivered", idempotencyKey: `message-delivered:${message.id}:${result.providerMessageId}`, patch: { lastContactAt: result.acceptedAt, ...followUp, nextActionOwner } });
+          : replyContext
+            ? {
+                status: "waiting_customer" as const,
+                nextAction:
+                  "Vent på kundens svar og følg opp dersom kunden ikke svarer.",
+                nextActionAt: new Date(
+                  Date.now() + 3 * 24 * 60 * 60_000,
+                ).toISOString(),
+                nextActionBlocker: null,
+              }
+            : message.category === "completion"
+              ? {
+                  status: "converted" as const,
+                  nextAction: "Oppdrag fullført og dokumentert.",
+                  nextActionAt: null,
+                }
+              : ["receipt", "contract", "change_confirmation"].includes(
+                    message.category,
+                  )
+                ? {}
+                : message.category === "information_request" ||
+                    analysis.recommendedNextAction === "request_information"
+                  ? {
+                      status: "waiting_customer" as const,
+                      nextAction: "Følg opp dersom kunden ikke svarer.",
+                      nextActionAt: new Date(
+                        Date.now() + 2 * 24 * 60 * 60_000,
+                      ).toISOString(),
+                    }
+                  : analysis.recommendedNextAction === "start_measurement"
+                    ? {
+                        status: "qualified" as const,
+                        nextAction: "Start kontrollert takmåling.",
+                        nextActionAt: new Date().toISOString(),
+                      }
+                    : {
+                        status: "contacted" as const,
+                        nextAction:
+                          "Kontroller henvendelsen og velg neste steg.",
+                        nextActionAt: new Date().toISOString(),
+                      };
+    const nextActionOwner =
+      replyContext?.purpose === "question" ||
+      replyContext?.purpose === "decline"
+        ? ("customer" as const)
+        : message.category === "completion"
+          ? ("system" as const)
+          : ("administrator" as const);
+    await updateCaseState(payload, {
+      leadId: lead.id,
+      command: "message_delivered",
+      idempotencyKey: `message-delivered:${message.id}:${result.providerMessageId}`,
+      patch: { lastContactAt: result.acceptedAt, ...followUp, nextActionOwner },
+    });
     return { duplicate: false as const, message: updated };
   } catch (error) {
     const sanitized = sanitizeJobError(error);
@@ -456,7 +645,11 @@ export async function deliverMessage(payload: Payload, provider: EmailProvider, 
       collection: "messages",
       id: message.id,
       overrideAccess: true,
-      data: { status: "queued", failureCode: sanitized.code, failureMessage: sanitized.message },
+      data: {
+        status: "queued",
+        failureCode: sanitized.code,
+        failureMessage: sanitized.message,
+      },
     });
     throw error;
   }

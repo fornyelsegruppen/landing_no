@@ -48,6 +48,19 @@ STOP: duplicate delivery, a different case opens, historical identity changes, o
 
 ## C. Commercial negative paths
 
+**Būsena: BLOCKED 2026-08-28 – taisomas kliento klausimo kelias.** Sintetinėje Preview byloje `#16` klausimas buvo patvariai įrašytas ir byla perėjo į kliento atsakymo laukimo būseną, tačiau aktyvioje administratoriaus darbo vietoje nebuvo parodytas pats klausimas. Prisegta komercinė suvestinė taip pat klaidinančiai rodė parašo laukimo būseną, o kliento puslapis po siuntimo neperkėlė fokuso į sėkmės patvirtinimą. Toliau testuoti šį scenarijų galima tik uždarius žemiau nurodytą pataisymo paketą.
+
+Kliento klausimo pataisymo priėmimo kriterijai:
+
+1. Klausimas automatiškai sukuria Gemini atsakymo juodraštį, paimdamas konkrečios bylos dokumentų versijas ir tuo metu patvirtintus įmonės šaltinius iš duomenų bazės.
+2. Administratoriaus darbo vietoje vienoje vietoje matomi: visas klausimas, gavimo laikas, susijusi pasiūlymo / sutarties versija, faktų įspėjimai ir redaguojamas atsakymo juodraštis.
+3. Tas pats redaktorius leidžia siųsti AI juodraštį, rašyti savo tekstą arba profesionaliai performuluoti dabartinį administratoriaus tekstą su Gemini. AI rezultatas niekada nesiunčiamas be administratoriaus patvirtinimo.
+4. Kiekvienas AI juodraštis išsaugo naudotų bylos ir aktyvių įmonės šaltinių versijų fingerprint. Jei šaltiniai iki siuntimo pasikeitė, siuntimas blokuojamas iki naujo patikrinimo / regeneravimo.
+5. Kol klausimas neatsakytas, kliento priėmimas ir sutarties pasirašymas pristabdomi, o admin suvestinė rodo `Gautas kliento klausimas`, ne parašo laukimą.
+6. Sėkmingai pristačius administratoriaus patvirtintą atsakymą, blokavimas pašalinamas ir klientas gali tęsti tą pačią dokumento versiją. Nepavykus pristatyti, byla lieka `Reikia dėmesio`.
+7. Kliento klausimo forma po sėkmingo siuntimo pakeičiama aiškia sėkmės kortele, į kurią automatiškai perkeliamas fokusas; pakartotinis siuntimas iš to paties vaizdo nebegalimas.
+8. Saugios nuorodos CTA klientų el. laiškuose rodomas atskiroje eilutėje po įvadiniu tekstu.
+
 Use a new synthetic Preview case, not an existing real customer case.
 
 1. Open the secure quote link and send one customer question. Confirm it appears in the case and no contract is signed.

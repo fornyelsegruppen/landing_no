@@ -32,6 +32,7 @@ import {
   formatNorwayDateTimeInput,
 } from "@/lib/norway-time";
 import { getPayload } from "@/lib/payload";
+import { selectUnresolvedCustomerQuestion } from "@/lib/messages/customer-question-state";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,27 @@ const serviceNames: Record<string, string> = {
   nytt_tak: "Nytt tak",
   usikker: "Usikker – taksjekk",
 };
+
+const questionCopy = {
+  nb: {
+    customerQuestion: "Kundens spørsmål",
+    relatedDocument: "Gjelder versjon",
+    reviewAndReply: "Kontroller og svar på kundens spørsmål",
+    waitingStatus: "Kunden venter på svar",
+  },
+  lt: {
+    customerQuestion: "Kliento klausimas",
+    relatedDocument: "Susijusi versija",
+    reviewAndReply: "Patikrinti ir atsakyti į kliento klausimą",
+    waitingStatus: "Klientas laukia atsakymo",
+  },
+  en: {
+    customerQuestion: "Customer question",
+    relatedDocument: "Related version",
+    reviewAndReply: "Review and answer the customer's question",
+    waitingStatus: "Customer is waiting for a reply",
+  },
+} as const;
 
 function Status({
   companySignedAt,
@@ -169,6 +191,14 @@ export default async function AdminCasePage({
     }),
   ]);
   if (!caseData) notFound();
+  const unresolvedQuestion = selectUnresolvedCustomerQuestion(
+    caseData.messages,
+  );
+  const unresolvedReply =
+    unresolvedQuestion?.reply?.status === "draft"
+      ? unresolvedQuestion.reply
+      : null;
+  const qCopy = questionCopy[user.interfaceLanguage];
   const workers = workersResult.docs
     .filter(
       (worker) =>
@@ -244,7 +274,9 @@ export default async function AdminCasePage({
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
-  const nextActionBase = copy.actionLabels[caseData.nextAction.kind];
+  const nextActionBase = unresolvedQuestion
+    ? qCopy.reviewAndReply
+    : copy.actionLabels[caseData.nextAction.kind];
   const quoteActionKinds = new Set([
     "approve_package",
     "approve_quote",
@@ -364,7 +396,7 @@ export default async function AdminCasePage({
         effectiveLabel={copy.effectiveContract}
         effectiveReference={effectiveReference}
         nextActionLabel={copy.nextAction}
-        status={workingStatus}
+        status={unresolvedQuestion ? qCopy.waitingStatus : workingStatus}
         workingLabel={copy.workingVersion}
         workingReference={workingReference}
       />
@@ -379,6 +411,31 @@ export default async function AdminCasePage({
         >
           {copy.nextAction}
         </p>
+        {unresolvedQuestion ? (
+          <div className="border-warning/35 bg-warning/5 mt-4 rounded-2xl border p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-warning text-xs font-bold tracking-[.16em] uppercase">
+                  {qCopy.customerQuestion}
+                </p>
+                <h2 className="mt-2 text-lg font-bold break-words">
+                  {unresolvedQuestion.question.subject}
+                </h2>
+              </div>
+              <span className="border-warning/35 bg-warning/10 text-warning rounded-full border px-3 py-1 text-xs font-bold">
+                {qCopy.waitingStatus}
+              </span>
+            </div>
+            <p className="mt-4 text-base leading-relaxed whitespace-pre-wrap text-white/90">
+              {unresolvedQuestion.question.bodyText}
+            </p>
+            {workingReference !== copy.notCreated ? (
+              <p className="mt-4 text-sm text-white/60">
+                <strong>{qCopy.relatedDocument}:</strong> {workingReference}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
           <div className="min-w-0">
             <h2 className="text-xl font-bold">{nextActionText}</h2>
@@ -448,33 +505,47 @@ export default async function AdminCasePage({
               ) : null}
             </dl>
           </div>
-          <CaseActionPanel
-            action={caseData.nextAction}
-            actionLabel={nextActionText}
-            actionReference={actionDocument?.reference}
-            contractDocumentHash={
-              actionDocument?.kind === "contract"
-                ? actionDocument.documentHash
-                : caseData.contract?.documentHash
-            }
-            defaultSigner={user.displayName || user.email}
-            leadId={caseData.lead.id}
-            locale={user.interfaceLanguage}
-            versionContext={{
-              contractReference:
+          {unresolvedReply ? (
+            <MessageDraftEditor
+              aiAssisted={unresolvedReply.aiAssisted}
+              bodyText={unresolvedReply.bodyText || ""}
+              factWarnings={factWarnings(unresolvedReply.aiAnalysis)}
+              leadId={caseData.lead.id}
+              locale={user.interfaceLanguage}
+              messageId={unresolvedReply.id}
+              sourceBody={unresolvedQuestion?.question.bodyText || undefined}
+              sourceSubject={unresolvedQuestion?.question.subject || undefined}
+              subject={unresolvedReply.subject || ""}
+            />
+          ) : (
+            <CaseActionPanel
+              action={caseData.nextAction}
+              actionLabel={nextActionText}
+              actionReference={actionDocument?.reference}
+              contractDocumentHash={
                 actionDocument?.kind === "contract"
-                  ? actionDocument.reference
-                  : caseData.commercial.workingContract?.reference,
-              contractVersion:
-                actionDocument?.kind === "contract"
-                  ? actionDocument.version
-                  : caseData.commercial.workingContract?.version,
-              leadRevision: caseData.lead.revision,
-              quoteDocumentHash: actionQuote?.documentHash,
-              quoteReference: actionQuote?.reference,
-              quoteVersion: actionQuote?.version,
-            }}
-          />
+                  ? actionDocument.documentHash
+                  : caseData.contract?.documentHash
+              }
+              defaultSigner={user.displayName || user.email}
+              leadId={caseData.lead.id}
+              locale={user.interfaceLanguage}
+              versionContext={{
+                contractReference:
+                  actionDocument?.kind === "contract"
+                    ? actionDocument.reference
+                    : caseData.commercial.workingContract?.reference,
+                contractVersion:
+                  actionDocument?.kind === "contract"
+                    ? actionDocument.version
+                    : caseData.commercial.workingContract?.version,
+                leadRevision: caseData.lead.revision,
+                quoteDocumentHash: actionQuote?.documentHash,
+                quoteReference: actionQuote?.reference,
+                quoteVersion: actionQuote?.version,
+              }}
+            />
+          )}
         </div>
       </section>
 
@@ -872,95 +943,99 @@ export default async function AdminCasePage({
           <Section id="messages-section" title={copy.messages}>
             {caseData.messages.length ? (
               <div className="grid min-w-0 gap-3">
-                {caseData.messages.map((message) => {
-                  const source = message.replyToMessageId
-                    ? caseData.messages.find(
-                        (candidate) =>
-                          candidate.id === message.replyToMessageId,
-                      )
-                    : undefined;
-                  return message.status === "draft" &&
-                    message.direction === "outbound" ? (
-                    <div
-                      className="scroll-mt-24"
-                      id={`message-${message.id}`}
-                      key={message.id}
-                    >
-                      <MessageDraftEditor
-                        aiAssisted={message.aiAssisted}
-                        bodyText={message.bodyText}
-                        factWarnings={factWarnings(message.aiAnalysis)}
-                        leadId={caseData.lead.id}
-                        locale={user.interfaceLanguage}
-                        messageId={message.id}
-                        sourceBody={source?.bodyText}
-                        sourceSubject={source?.subject}
-                        subject={message.subject}
-                      />
-                      <TechnicalLink
-                        entity={message}
-                        label={copy.technicalDetail}
-                        summary={copy.advancedTechnical}
-                      />
-                    </div>
-                  ) : (
-                    <article
-                      className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4"
-                      id={`message-${message.id}`}
-                      key={message.id}
-                    >
-                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <strong className="[overflow-wrap:anywhere] break-words">
-                            {message.subject}
-                          </strong>
-                          <p className="text-muted-foreground mt-1 text-xs break-words">
-                            {metadataLabel(
-                              user.interfaceLanguage,
-                              message.direction,
-                            )}{" "}
-                            ·{" "}
-                            {metadataLabel(
-                              user.interfaceLanguage,
-                              message.category,
-                            )}{" "}
-                            ·{" "}
-                            {metadataLabel(
-                              user.interfaceLanguage,
-                              message.channel,
-                            )}
-                          </p>
-                        </div>
-                        <Status
-                          locale={user.interfaceLanguage}
-                          value={message.status}
-                        />
-                      </div>
-                      <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
-                        {message.bodyText}
-                      </p>
-                      {message.failureMessage ? (
-                        <p className="text-danger mt-3 text-sm">
-                          {message.failureMessage}
-                        </p>
-                      ) : null}
-                      {message.direction === "outbound" &&
-                      message.channel === "email" &&
-                      !["draft", "cancelled"].includes(message.status || "") ? (
-                        <ManualContactRecoveryPanel
+                {caseData.messages
+                  .filter((message) => message.id !== unresolvedReply?.id)
+                  .map((message) => {
+                    const source = message.replyToMessageId
+                      ? caseData.messages.find(
+                          (candidate) =>
+                            candidate.id === message.replyToMessageId,
+                        )
+                      : undefined;
+                    return message.status === "draft" &&
+                      message.direction === "outbound" ? (
+                      <div
+                        className="scroll-mt-24"
+                        id={`message-${message.id}`}
+                        key={message.id}
+                      >
+                        <MessageDraftEditor
+                          aiAssisted={message.aiAssisted}
+                          bodyText={message.bodyText}
+                          factWarnings={factWarnings(message.aiAnalysis)}
+                          leadId={caseData.lead.id}
                           locale={user.interfaceLanguage}
                           messageId={message.id}
-                          recovery={message.manualRecovery}
+                          sourceBody={source?.bodyText}
+                          sourceSubject={source?.subject}
+                          subject={message.subject}
                         />
-                      ) : null}
-                      <TechnicalLink
-                        entity={message}
-                        label={copy.technicalDetail}
-                        summary={copy.advancedTechnical}
-                      />
-                    </article>
-                  );
-                })}
+                        <TechnicalLink
+                          entity={message}
+                          label={copy.technicalDetail}
+                          summary={copy.advancedTechnical}
+                        />
+                      </div>
+                    ) : (
+                      <article
+                        className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4"
+                        id={`message-${message.id}`}
+                        key={message.id}
+                      >
+                        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <strong className="[overflow-wrap:anywhere] break-words">
+                              {message.subject}
+                            </strong>
+                            <p className="text-muted-foreground mt-1 text-xs break-words">
+                              {metadataLabel(
+                                user.interfaceLanguage,
+                                message.direction,
+                              )}{" "}
+                              ·{" "}
+                              {metadataLabel(
+                                user.interfaceLanguage,
+                                message.category,
+                              )}{" "}
+                              ·{" "}
+                              {metadataLabel(
+                                user.interfaceLanguage,
+                                message.channel,
+                              )}
+                            </p>
+                          </div>
+                          <Status
+                            locale={user.interfaceLanguage}
+                            value={message.status}
+                          />
+                        </div>
+                        <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
+                          {message.bodyText}
+                        </p>
+                        {message.failureMessage ? (
+                          <p className="text-danger mt-3 text-sm">
+                            {message.failureMessage}
+                          </p>
+                        ) : null}
+                        {message.direction === "outbound" &&
+                        message.channel === "email" &&
+                        !["draft", "cancelled"].includes(
+                          message.status || "",
+                        ) ? (
+                          <ManualContactRecoveryPanel
+                            locale={user.interfaceLanguage}
+                            messageId={message.id}
+                            recovery={message.manualRecovery}
+                          />
+                        ) : null}
+                        <TechnicalLink
+                          entity={message}
+                          label={copy.technicalDetail}
+                          summary={copy.advancedTechnical}
+                        />
+                      </article>
+                    );
+                  })}
               </div>
             ) : (
               <p className="text-muted-foreground">{copy.noMessages}</p>

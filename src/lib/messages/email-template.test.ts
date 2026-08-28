@@ -11,14 +11,13 @@ describe("branded customer email", () => {
       text: "Hei!\n\nSe tilbudet: https://takfornyelse.as/tilbud/test",
     });
 
-    expect(html).toContain(
-      'src="https://www.takfornyelse.as/brand/logo.png"',
-    );
+    expect(html).toContain('src="https://www.takfornyelse.as/brand/logo.png"');
     expect(html).toContain("Fornyelse Gruppen AS");
     expect(html).toContain('href="https://takfornyelse.as/tilbud/test"');
     expect(html).toContain(">Åpne ditt sikre tilbud</a>");
     expect(html).not.toContain(">https://takfornyelse.as/tilbud/test</a>");
     expect(html).toContain("background:#f0a914");
+    expect(html).toContain('<br><a href="https://takfornyelse.as/tilbud/test"');
     expect(html).toContain("Org.nr. 916 693 168");
   });
 
@@ -28,9 +27,7 @@ describe("branded customer email", () => {
       text: "Les mer: https://www.example.com/informasjon",
     });
 
-    expect(html).toContain(
-      '>https://www.example.com/informasjon</a>',
-    );
+    expect(html).toContain(">https://www.example.com/informasjon</a>");
     expect(html).not.toContain("Åpne ditt sikre tilbud");
   });
 
@@ -46,9 +43,7 @@ describe("branded customer email", () => {
   });
 
   it("uses distinct labels for reminders and change agreements", () => {
-    expect(secureCustomerLinkLabel("quote")).toBe(
-      "Åpne ditt sikre tilbud",
-    );
+    expect(secureCustomerLinkLabel("quote")).toBe("Åpne ditt sikre tilbud");
     expect(secureCustomerLinkLabel("reminder")).toBe("Åpne tilbudet");
     expect(secureCustomerLinkLabel("change_agreement")).toBe(
       "Åpne endringsavtalen",
@@ -71,11 +66,16 @@ describe("branded customer email", () => {
 
     expect(html).toContain('href="https://www.takfornyelse.as/user/arbeid/18"');
     expect(html).toContain(">Åpne oppdraget i medarbeiderportalen</a>");
-    expect(html).not.toContain(">https://www.takfornyelse.as/user/arbeid/18</a>");
+    expect(html).not.toContain(
+      ">https://www.takfornyelse.as/user/arbeid/18</a>",
+    );
   });
 
   it("escapes customer-controlled markup", () => {
-    const html = buildBrandedEmailHtml({ subject: "<script>", text: "Hei <img src=x>" });
+    const html = buildBrandedEmailHtml({
+      subject: "<script>",
+      text: "Hei <img src=x>",
+    });
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img src=x>");
     expect(html).toContain("&lt;script&gt;");

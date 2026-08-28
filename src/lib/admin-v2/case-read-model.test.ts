@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
-import { caseActionRequiresConfirmation, deriveCaseNextAction, loadAdminCase } from "./case-read-model";
+import {
+  caseActionRequiresConfirmation,
+  deriveCaseNextAction,
+  loadAdminCase,
+} from "./case-read-model";
 
 describe("admin case next action", () => {
   it("requires confirmation for every financial action", () => {
@@ -15,32 +19,266 @@ describe("admin case next action", () => {
 
   it.each([
     [{ leadStatus: "new" }, "generate_reply"],
-    [{ leadStatus: "draft_ready", message: { id: 1, status: "draft" } }, "approve_message"],
-    [{ leadStatus: "draft_ready", canPreparePackage: true, message: { id: 1, status: "draft", category: "ai_reply" } }, "prepare_package"],
-    [{ leadStatus: "new", message: { id: 2, status: "failed" } }, "retry_message"],
-    [{ leadStatus: "measuring", message: { id: 1, status: "sent" } }, "prepare_package"],
-    [{ leadStatus: "measuring", message: { id: 1, status: "cancelled" }, measurement: { id: 3, status: "review_required" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "draft" }, contract: { id: 6, status: "draft" } }, "approve_package"],
-    [{ leadStatus: "measuring", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "review_required" } }, "approve_measurement"],
-    [{ leadStatus: "measuring", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" } }, "calculate_price"],
-    [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "ready" } }, "create_quote"],
-    [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "draft" } }, "approve_quote"],
-    [{ leadStatus: "quoted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "approved" } }, "issue_quote"],
-    [{ leadStatus: "waiting_customer", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "sent" } }, "wait_customer"],
-    [{ leadStatus: "waiting_customer", message: { id: 1, status: "sent" }, quote: { id: 5, status: "declined" } }, "follow_up_decline"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed" } }, "company_sign_contract"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" } }, "create_work_order"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "unassigned" } }, "assign_worker"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "assigned" } }, "schedule_work"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "blocked" } }, "resolve_work_block"],
-    [{ leadStatus: "converted", workOrder: { id: 7, status: "scheduled" } }, "wait_scheduled_start"],
-    [{ leadStatus: "converted", workOrder: { id: 7, status: "precheck" } }, "wait_worker_precheck"],
-    [{ leadStatus: "converted", workOrder: { id: 7, status: "in_progress" } }, "wait_work_completion"],
-    [{ leadStatus: "converted", message: { id: 1, status: "sent" }, measurement: { id: 3, status: "approved" }, price: { id: 4, status: "superseded" }, quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" }, workOrder: { id: 7, status: "completed", documentationSubmittedAt: "2026-08-25T13:00:00Z" } }, "review_completion"],
-    [{ leadStatus: "converted", workOrder: { id: 7, status: "completed" } }, "wait_worker_documentation"],
-    [{ leadStatus: "converted", quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" } }, "create_work_order"],
-    [{ leadStatus: "customer_waiting", nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST", quote: { id: 5, status: "accepted" }, contract: { id: 6, status: "signed", companySignedAt: "2026-08-25T12:00:00Z" } }, "review_cancellation"],
-    [{ leadStatus: "closed", message: { id: 8, status: "draft", category: "follow_up" } }, "approve_message"],
-    [{ leadStatus: "closed", message: { id: 9, status: "draft", category: "follow_up", closesContract: true } }, "send_closure_confirmation"],
+    [
+      {
+        leadStatus: "customer_waiting",
+        message: {
+          id: 9,
+          status: "delivered",
+          direction: "inbound",
+          category: "customer_question",
+        },
+      },
+      "prepare_question_reply",
+    ],
+    [
+      { leadStatus: "draft_ready", message: { id: 1, status: "draft" } },
+      "approve_message",
+    ],
+    [
+      {
+        leadStatus: "draft_ready",
+        canPreparePackage: true,
+        message: { id: 1, status: "draft", category: "ai_reply" },
+      },
+      "prepare_package",
+    ],
+    [
+      { leadStatus: "new", message: { id: 2, status: "failed" } },
+      "retry_message",
+    ],
+    [
+      { leadStatus: "measuring", message: { id: 1, status: "sent" } },
+      "prepare_package",
+    ],
+    [
+      {
+        leadStatus: "measuring",
+        message: { id: 1, status: "cancelled" },
+        measurement: { id: 3, status: "review_required" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "draft" },
+        contract: { id: 6, status: "draft" },
+      },
+      "approve_package",
+    ],
+    [
+      {
+        leadStatus: "measuring",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "review_required" },
+      },
+      "approve_measurement",
+    ],
+    [
+      {
+        leadStatus: "measuring",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+      },
+      "calculate_price",
+    ],
+    [
+      {
+        leadStatus: "quoted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "ready" },
+      },
+      "create_quote",
+    ],
+    [
+      {
+        leadStatus: "quoted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "draft" },
+      },
+      "approve_quote",
+    ],
+    [
+      {
+        leadStatus: "quoted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "approved" },
+      },
+      "issue_quote",
+    ],
+    [
+      {
+        leadStatus: "waiting_customer",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "sent" },
+      },
+      "wait_customer",
+    ],
+    [
+      {
+        leadStatus: "waiting_customer",
+        message: { id: 1, status: "sent" },
+        quote: { id: 5, status: "declined" },
+      },
+      "follow_up_decline",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "accepted" },
+        contract: { id: 6, status: "signed" },
+      },
+      "company_sign_contract",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+      },
+      "create_work_order",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+        workOrder: { id: 7, status: "unassigned" },
+      },
+      "assign_worker",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+        workOrder: { id: 7, status: "assigned" },
+      },
+      "schedule_work",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+        workOrder: { id: 7, status: "blocked" },
+      },
+      "resolve_work_block",
+    ],
+    [
+      { leadStatus: "converted", workOrder: { id: 7, status: "scheduled" } },
+      "wait_scheduled_start",
+    ],
+    [
+      { leadStatus: "converted", workOrder: { id: 7, status: "precheck" } },
+      "wait_worker_precheck",
+    ],
+    [
+      { leadStatus: "converted", workOrder: { id: 7, status: "in_progress" } },
+      "wait_work_completion",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        message: { id: 1, status: "sent" },
+        measurement: { id: 3, status: "approved" },
+        price: { id: 4, status: "superseded" },
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+        workOrder: {
+          id: 7,
+          status: "completed",
+          documentationSubmittedAt: "2026-08-25T13:00:00Z",
+        },
+      },
+      "review_completion",
+    ],
+    [
+      { leadStatus: "converted", workOrder: { id: 7, status: "completed" } },
+      "wait_worker_documentation",
+    ],
+    [
+      {
+        leadStatus: "converted",
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+      },
+      "create_work_order",
+    ],
+    [
+      {
+        leadStatus: "customer_waiting",
+        nextActionBlocker: "CUSTOMER_CANCELLATION_REQUEST",
+        quote: { id: 5, status: "accepted" },
+        contract: {
+          id: 6,
+          status: "signed",
+          companySignedAt: "2026-08-25T12:00:00Z",
+        },
+      },
+      "review_cancellation",
+    ],
+    [
+      {
+        leadStatus: "closed",
+        message: { id: 8, status: "draft", category: "follow_up" },
+      },
+      "approve_message",
+    ],
+    [
+      {
+        leadStatus: "closed",
+        message: {
+          id: 9,
+          status: "draft",
+          category: "follow_up",
+          closesContract: true,
+        },
+      },
+      "send_closure_confirmation",
+    ],
     [{ leadStatus: "closed" }, "none"],
   ])("derives %s as %s", (input, expected) => {
     expect(deriveCaseNextAction(input)).toMatchObject({ kind: expected });
@@ -49,7 +287,9 @@ describe("admin case next action", () => {
 
 describe("admin case read model", () => {
   it("returns null for an unknown lead", async () => {
-    const payload = { findByID: vi.fn().mockRejectedValue(new Error("not found")) } as unknown as Payload;
+    const payload = {
+      findByID: vi.fn().mockRejectedValue(new Error("not found")),
+    } as unknown as Payload;
     await expect(loadAdminCase(payload, 404)).resolves.toBeNull();
   });
 
@@ -68,20 +308,98 @@ describe("admin case read model", () => {
       createdAt: "2026-08-24T08:00:00.000Z",
     });
     const responses = [
-      { docs: [{ id: 2, reference: "TM-1-V1", status: "approved", actualAreaMinTenths: 1000, actualAreaMaxTenths: 1200, createdAt: "2026-08-24T09:00:00.000Z" }] },
-      { docs: [{ id: 3, reference: "PB-1-RAW-TIMESTAMP", status: "superseded", totalIncVatOre: 1250000, createdAt: "2026-08-24T10:00:00.000Z" }] },
-      { docs: [{ id: 4, reference: "T-1-V1", version: 1, priceCalculation: 3, status: "approved", createdAt: "2026-08-24T11:00:00.000Z" }] },
-      { docs: [{ id: 5, subject: "Takk", bodyText: "Hei", direction: "outbound", category: "receipt", channel: "email", status: "sent", aiAnalysis: { recommendedNextAction: "start_measurement" }, createdAt: "2026-08-24T08:01:00.000Z" }] },
+      {
+        docs: [
+          {
+            id: 2,
+            reference: "TM-1-V1",
+            status: "approved",
+            actualAreaMinTenths: 1000,
+            actualAreaMaxTenths: 1200,
+            createdAt: "2026-08-24T09:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 3,
+            reference: "PB-1-RAW-TIMESTAMP",
+            status: "superseded",
+            totalIncVatOre: 1250000,
+            createdAt: "2026-08-24T10:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 4,
+            reference: "T-1-V1",
+            version: 1,
+            priceCalculation: 3,
+            status: "approved",
+            createdAt: "2026-08-24T11:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 5,
+            subject: "Takk",
+            bodyText: "Hei",
+            direction: "outbound",
+            category: "receipt",
+            channel: "email",
+            status: "sent",
+            aiAnalysis: { recommendedNextAction: "start_measurement" },
+            createdAt: "2026-08-24T08:01:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
-      { docs: [{ id: 8, reference: "END-6-RAW-HASH", kind: "change_or_cancel", status: "admin_review", createdAt: "2026-08-24T12:00:00.000Z" }] },
-      { docs: [{ id: 6, reference: "K-1-V1", status: "draft", createdAt: "2026-08-24T11:01:00.000Z" }] },
+      {
+        docs: [
+          {
+            id: 8,
+            reference: "END-6-RAW-HASH",
+            kind: "change_or_cancel",
+            status: "admin_review",
+            createdAt: "2026-08-24T12:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 6,
+            reference: "K-1-V1",
+            status: "draft",
+            createdAt: "2026-08-24T11:01:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
       { docs: [] },
       { docs: [] },
-      { docs: [{ id: 7, filename: "tilbud.pdf", classification: "contract", mimeType: "application/pdf", url: "https://safe.blob.vercel-storage.com/private/file.pdf" }] },
+      {
+        docs: [
+          {
+            id: 7,
+            filename: "tilbud.pdf",
+            classification: "contract",
+            mimeType: "application/pdf",
+            url: "https://safe.blob.vercel-storage.com/private/file.pdf",
+          },
+        ],
+      },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
-    const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
+    const result = await loadAdminCase(
+      { findByID, find } as unknown as Payload,
+      1,
+    );
 
     expect(result?.lead.address).toBe("Testveien 1 0001 Oslo");
     expect(result?.quote?.reference).toBe("T-1-V1");
@@ -93,22 +411,96 @@ describe("admin case read model", () => {
     expect(result?.nextAction.kind).toBe("issue_quote");
     expect(result?.documents[0]?.href).toBe("/api/admin/media/7");
     expect(JSON.stringify(result)).not.toContain("tokenHash");
-    expect(result?.timeline.map((item) => item.type)).toEqual(expect.arrayContaining(["lead", "message", "measurement", "price", "quote", "contract"]));
+    expect(result?.timeline.map((item) => item.type)).toEqual(
+      expect.arrayContaining([
+        "lead",
+        "message",
+        "measurement",
+        "price",
+        "quote",
+        "contract",
+      ]),
+    );
   });
 
   it("does not offer an obsolete draft after a newer equivalent was sent", async () => {
-    const findByID = vi.fn().mockResolvedValue({ id: 1, name: "Test", address: "Testveien", postal: "0001", status: "waiting_customer", createdAt: "2026-08-24T08:00:00.000Z" });
+    const findByID = vi
+      .fn()
+      .mockResolvedValue({
+        id: 1,
+        name: "Test",
+        address: "Testveien",
+        postal: "0001",
+        status: "waiting_customer",
+        createdAt: "2026-08-24T08:00:00.000Z",
+      });
     const responses = [
-      { docs: [{ id: 2, reference: "TM-1", status: "approved", createdAt: "2026-08-24T09:00:00.000Z" }] },
-      { docs: [{ id: 3, reference: "PB-1", status: "superseded", createdAt: "2026-08-24T10:00:00.000Z" }] },
-      { docs: [{ id: 4, reference: "T-1", status: "viewed", createdAt: "2026-08-24T11:00:00.000Z" }] },
-      { docs: [
-        { id: 6, subject: "Tilbud T-1", category: "quote", bodyText: "Sent", direction: "outbound", channel: "email", status: "sent", createdAt: "2026-08-24T12:00:00.000Z" },
-        { id: 5, subject: "Tilbud T-1", category: "quote", bodyText: "Draft", direction: "outbound", channel: "email", status: "draft", createdAt: "2026-08-24T11:30:00.000Z" },
-      ] },
+      {
+        docs: [
+          {
+            id: 2,
+            reference: "TM-1",
+            status: "approved",
+            createdAt: "2026-08-24T09:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 3,
+            reference: "PB-1",
+            status: "superseded",
+            createdAt: "2026-08-24T10:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 4,
+            reference: "T-1",
+            status: "viewed",
+            createdAt: "2026-08-24T11:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 6,
+            subject: "Tilbud T-1",
+            category: "quote",
+            bodyText: "Sent",
+            direction: "outbound",
+            channel: "email",
+            status: "sent",
+            createdAt: "2026-08-24T12:00:00.000Z",
+          },
+          {
+            id: 5,
+            subject: "Tilbud T-1",
+            category: "quote",
+            bodyText: "Draft",
+            direction: "outbound",
+            channel: "email",
+            status: "draft",
+            createdAt: "2026-08-24T11:30:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
       { docs: [] },
-      { docs: [{ id: 7, reference: "K-1", status: "issued", createdAt: "2026-08-24T11:00:00.000Z" }] },
+      {
+        docs: [
+          {
+            id: 7,
+            reference: "K-1",
+            status: "issued",
+            createdAt: "2026-08-24T11:00:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
       { docs: [] },
       { docs: [] },
@@ -116,60 +508,222 @@ describe("admin case read model", () => {
       { docs: [] },
     ];
     const find = vi.fn().mockImplementation(async () => responses.shift());
-    const result = await loadAdminCase({ findByID, find } as unknown as Payload, 1);
+    const result = await loadAdminCase(
+      { findByID, find } as unknown as Payload,
+      1,
+    );
 
     expect(result?.nextAction.kind).toBe("wait_customer");
   });
 
   it("hides a superseded AI draft instead of presenting it as a cancelled customer message", async () => {
-    const findByID = vi.fn().mockResolvedValue({ id: 8, name: "Test", address: "Testveien", postal: "0001", inquiryType: "takvask", status: "measuring", createdAt: "2026-08-25T08:00:00.000Z" });
+    const findByID = vi
+      .fn()
+      .mockResolvedValue({
+        id: 8,
+        name: "Test",
+        address: "Testveien",
+        postal: "0001",
+        inquiryType: "takvask",
+        status: "measuring",
+        createdAt: "2026-08-25T08:00:00.000Z",
+      });
     const responses = [
-      { docs: [{ id: 20, reference: "TM-8-V1", status: "review_required", createdAt: "2026-08-25T09:00:00.000Z" }] },
-      { docs: [{ id: 21, reference: "PB-8", status: "superseded", createdAt: "2026-08-25T09:01:00.000Z" }] },
-      { docs: [{ id: 22, reference: "T-8-V1", status: "draft", createdAt: "2026-08-25T09:02:00.000Z" }] },
-      { docs: [
-        { id: 24, subject: "Angående din forespørsel", category: "ai_reply", bodyText: "Draft", direction: "outbound", channel: "email", status: "cancelled", createdAt: "2026-08-25T09:03:00.000Z" },
-        { id: 23, subject: "Vi har mottatt henvendelsen", category: "receipt", bodyText: "Sent", direction: "outbound", channel: "email", status: "sent", createdAt: "2026-08-25T08:01:00.000Z" },
-      ] },
+      {
+        docs: [
+          {
+            id: 20,
+            reference: "TM-8-V1",
+            status: "review_required",
+            createdAt: "2026-08-25T09:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 21,
+            reference: "PB-8",
+            status: "superseded",
+            createdAt: "2026-08-25T09:01:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 22,
+            reference: "T-8-V1",
+            status: "draft",
+            createdAt: "2026-08-25T09:02:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 24,
+            subject: "Angående din forespørsel",
+            category: "ai_reply",
+            bodyText: "Draft",
+            direction: "outbound",
+            channel: "email",
+            status: "cancelled",
+            createdAt: "2026-08-25T09:03:00.000Z",
+          },
+          {
+            id: 23,
+            subject: "Vi har mottatt henvendelsen",
+            category: "receipt",
+            bodyText: "Sent",
+            direction: "outbound",
+            channel: "email",
+            status: "sent",
+            createdAt: "2026-08-25T08:01:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
       { docs: [] },
-      { docs: [{ id: 25, reference: "K-8-V1", status: "draft", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      {
+        docs: [
+          {
+            id: 25,
+            reference: "K-8-V1",
+            status: "draft",
+            createdAt: "2026-08-25T09:02:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
       { docs: [] },
       { docs: [] },
       { docs: [] },
       { docs: [] },
     ];
-    const result = await loadAdminCase({ findByID, find: vi.fn().mockImplementation(async () => responses.shift()) } as unknown as Payload, 8);
+    const result = await loadAdminCase(
+      {
+        findByID,
+        find: vi.fn().mockImplementation(async () => responses.shift()),
+      } as unknown as Payload,
+      8,
+    );
 
     expect(result?.messages.map((message) => message.id)).toEqual([23]);
-    expect(result?.timeline.some((item) => item.id === "message-24")).toBe(false);
+    expect(result?.timeline.some((item) => item.id === "message-24")).toBe(
+      false,
+    );
     expect(result?.nextAction.kind).toBe("approve_package");
   });
 
   it("ignores an obsolete intake AI draft after the commercial journey has started", async () => {
-    const findByID = vi.fn().mockResolvedValue({ id: 9, name: "Test", address: "Testveien", postal: "0001", inquiryType: "takvask", status: "converted", createdAt: "2026-08-25T08:00:00.000Z" });
+    const findByID = vi
+      .fn()
+      .mockResolvedValue({
+        id: 9,
+        name: "Test",
+        address: "Testveien",
+        postal: "0001",
+        inquiryType: "takvask",
+        status: "converted",
+        createdAt: "2026-08-25T08:00:00.000Z",
+      });
     const responses = [
-      { docs: [{ id: 30, reference: "TM-9-V1", status: "approved", createdAt: "2026-08-25T09:00:00.000Z" }] },
-      { docs: [{ id: 31, reference: "PB-9", status: "ready", createdAt: "2026-08-25T09:01:00.000Z" }] },
-      { docs: [{ id: 32, reference: "T-9-V1", status: "accepted", createdAt: "2026-08-25T09:02:00.000Z" }] },
-      { docs: [
-        { id: 34, subject: "Angående din forespørsel", category: "ai_reply", bodyText: "Draft", direction: "outbound", channel: "email", status: "draft", createdAt: "2026-08-25T09:03:00.000Z" },
-        { id: 33, subject: "Ferdig", category: "completion", bodyText: "Sent", direction: "outbound", channel: "email", status: "delivered", createdAt: "2026-08-25T12:00:00.000Z" },
-      ] },
-      { docs: [{ id: 36, reference: "A-K-9-V1", status: "documented", documentationSubmittedAt: "2026-08-25T11:00:00.000Z", createdAt: "2026-08-25T10:00:00.000Z" }] },
+      {
+        docs: [
+          {
+            id: 30,
+            reference: "TM-9-V1",
+            status: "approved",
+            createdAt: "2026-08-25T09:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 31,
+            reference: "PB-9",
+            status: "ready",
+            createdAt: "2026-08-25T09:01:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 32,
+            reference: "T-9-V1",
+            status: "accepted",
+            createdAt: "2026-08-25T09:02:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 34,
+            subject: "Angående din forespørsel",
+            category: "ai_reply",
+            bodyText: "Draft",
+            direction: "outbound",
+            channel: "email",
+            status: "draft",
+            createdAt: "2026-08-25T09:03:00.000Z",
+          },
+          {
+            id: 33,
+            subject: "Ferdig",
+            category: "completion",
+            bodyText: "Sent",
+            direction: "outbound",
+            channel: "email",
+            status: "delivered",
+            createdAt: "2026-08-25T12:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 36,
+            reference: "A-K-9-V1",
+            status: "documented",
+            documentationSubmittedAt: "2026-08-25T11:00:00.000Z",
+            createdAt: "2026-08-25T10:00:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
-      { docs: [{ id: 35, reference: "K-9-V1", status: "signed", companySignedAt: "2026-08-25T09:30:00.000Z", createdAt: "2026-08-25T09:02:00.000Z" }] },
+      {
+        docs: [
+          {
+            id: 35,
+            reference: "K-9-V1",
+            status: "signed",
+            companySignedAt: "2026-08-25T09:30:00.000Z",
+            createdAt: "2026-08-25T09:02:00.000Z",
+          },
+        ],
+      },
       { docs: [] },
       { docs: [] },
       { docs: [] },
       { docs: [] },
       { docs: [] },
     ];
-    const result = await loadAdminCase({ findByID, find: vi.fn().mockImplementation(async () => responses.shift()) } as unknown as Payload, 9);
+    const result = await loadAdminCase(
+      {
+        findByID,
+        find: vi.fn().mockImplementation(async () => responses.shift()),
+      } as unknown as Payload,
+      9,
+    );
 
     expect(result?.messages.map((message) => message.id)).toEqual([33]);
-    expect(result?.timeline.some((item) => item.id === "message-34")).toBe(false);
+    expect(result?.timeline.some((item) => item.id === "message-34")).toBe(
+      false,
+    );
     expect(result?.nextAction.kind).toBe("none");
   });
 });

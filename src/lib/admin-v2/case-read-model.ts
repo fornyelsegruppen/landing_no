@@ -19,6 +19,7 @@ export type CaseNextActionKind =
   | "issue_quote"
   | "measurement_required"
   | "prepare_package"
+  | "prepare_question_reply"
   | "review_cancellation"
   | "review_completion"
   | "resolve_work_block"
@@ -130,6 +131,12 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
     !input.workOrder
   ) {
     return { kind: "create_work_order", targetId: input.contract.id };
+  }
+  if (
+    input.message?.direction === "inbound" &&
+    input.message.category === "customer_question"
+  ) {
+    return { kind: "prepare_question_reply", targetId: input.message.id };
   }
   if (!input.message || input.message.direction === "inbound") {
     return { kind: "generate_reply" };
@@ -635,7 +642,11 @@ function makeTimedEvent(
 function messageManualRecovery(value: unknown): CaseMessage["manualRecovery"] {
   if (!value || typeof value !== "object") return undefined;
   const rawRecovery = asRecord(value).manualRecovery;
-  if (!rawRecovery || typeof rawRecovery !== "object" || Array.isArray(rawRecovery)) {
+  if (
+    !rawRecovery ||
+    typeof rawRecovery !== "object" ||
+    Array.isArray(rawRecovery)
+  ) {
     return undefined;
   }
   const manualRecovery = asRecord(rawRecovery);

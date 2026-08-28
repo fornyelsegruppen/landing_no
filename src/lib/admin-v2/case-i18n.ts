@@ -122,7 +122,8 @@ const copy = {
     arrivalTo: "Ankomst til",
     arrivalEndAfterStart: "Sluttiden må være senere enn starttiden.",
     completePlanningRequired: "Velg ansatt, dato og hele ankomstintervallet.",
-    planningSavedAndNotified: "Tildelingen er lagret. Kunden og medarbeideren er varslet.",
+    planningSavedAndNotified:
+      "Tildelingen er lagret. Kunden og medarbeideren er varslet.",
     planningSavedNotificationQueued:
       "Tildelingen er lagret. Ett eller begge varslene ligger trygt i kø for nytt forsøk.",
     workerPhoneFallback:
@@ -237,6 +238,7 @@ const copy = {
       issue_quote: "Opprett kundelenke og meldingsutkast",
       measurement_required: "Takmåling må klargjøres",
       prepare_package: "Forbered måling, pris, tilbud og kontrakt",
+      prepare_question_reply: "Lag svarutkast til kundens spørsmål",
       review_cancellation: "Vurder endrings- eller kanselleringsforespørselen",
       review_completion: "Sluttkontroller arbeid og dokumentasjon",
       resolve_work_block: "Kontroller blokkeringen",
@@ -373,7 +375,8 @@ const copy = {
     arrivalEndAfterStart: "Atvykimo pabaiga turi būti vėliau už pradžią.",
     completePlanningRequired:
       "Pasirinkite darbuotoją, datą ir visą atvykimo intervalą.",
-    planningSavedAndNotified: "Paskyrimas išsaugotas. Klientas ir darbuotojas informuoti.",
+    planningSavedAndNotified:
+      "Paskyrimas išsaugotas. Klientas ir darbuotojas informuoti.",
     planningSavedNotificationQueued:
       "Paskyrimas išsaugotas. Vienas arba abu laiškai saugiai laukia pakartotinio siuntimo eilėje.",
     workerPhoneFallback:
@@ -488,6 +491,7 @@ const copy = {
       issue_quote: "Sukurti kliento nuorodą ir žinutės juodraštį",
       measurement_required: "Reikia parengti stogo matavimą",
       prepare_package: "Parengti matavimą, kainą, pasiūlymą ir sutartį",
+      prepare_question_reply: "Parengti atsakymą į kliento klausimą",
       review_cancellation: "Peržiūrėti pakeitimo arba atšaukimo prašymą",
       review_completion: "Atlikti galutinę darbo ir dokumentų patikrą",
       resolve_work_block: "Patikrinti darbo sustabdymo priežastį",
@@ -740,6 +744,7 @@ const copy = {
       issue_quote: "Create customer link and message draft",
       measurement_required: "Roof measurement must be prepared",
       prepare_package: "Prepare measurement, price, quote and contract",
+      prepare_question_reply: "Prepare a reply to the customer's question",
       review_cancellation: "Review change or cancellation request",
       review_completion: "Final-review work and documentation",
       resolve_work_block: "Review the work block",
