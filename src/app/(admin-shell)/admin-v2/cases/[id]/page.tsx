@@ -13,6 +13,7 @@ import { ChangeAgreementPanel } from "@/components/admin-v2/change-agreement-pan
 import { InformationRequestButton } from "@/components/admin-v2/information-request-button";
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
+import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
 import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
@@ -32,7 +33,12 @@ import {
   formatNorwayDateTimeInput,
 } from "@/lib/norway-time";
 import { getPayload } from "@/lib/payload";
-import { selectUnresolvedCustomerQuestion } from "@/lib/messages/customer-question-state";
+import {
+  customerQuestionDocumentReferences,
+  customerQuestionReplyStage,
+  selectLatestCustomerQuestion,
+  selectUnresolvedCustomerQuestion,
+} from "@/lib/messages/customer-question-state";
 
 export const dynamic = "force-dynamic";
 
@@ -47,22 +53,52 @@ const serviceNames: Record<string, string> = {
 
 const questionCopy = {
   nb: {
-    customerQuestion: "Kundens spørsmål",
-    relatedDocument: "Gjelder versjon",
-    reviewAndReply: "Kontroller og svar på kundens spørsmål",
-    waitingStatus: "Kunden venter på svar",
+    action: {
+      prepare: "Velg hvordan du vil svare på kundens spørsmål",
+      review: "Kontroller og svar på kundens spørsmål",
+      queued: "Følg leveringen av svaret til kunden",
+      sent: "Svaret er sendt til kunden",
+      delivery_failed: "Leveringen mislyktes – kontroller og prøv igjen",
+    },
+    status: {
+      prepare: "Kunden venter på svar",
+      review: "Svarutkast klart",
+      queued: "Svar venter på levering",
+      sent: "Svar sendt",
+      delivery_failed: "Levering mislyktes",
+    },
   },
   lt: {
-    customerQuestion: "Kliento klausimas",
-    relatedDocument: "Susijusi versija",
-    reviewAndReply: "Patikrinti ir atsakyti į kliento klausimą",
-    waitingStatus: "Klientas laukia atsakymo",
+    action: {
+      prepare: "Pasirinkti, kaip atsakyti į kliento klausimą",
+      review: "Patikrinti ir atsakyti į kliento klausimą",
+      queued: "Stebėti atsakymo pristatymą klientui",
+      sent: "Atsakymas išsiųstas klientui",
+      delivery_failed: "Pristatyti nepavyko – patikrinti ir bandyti dar kartą",
+    },
+    status: {
+      prepare: "Klientas laukia atsakymo",
+      review: "Atsakymo juodraštis parengtas",
+      queued: "Atsakymas laukia pristatymo",
+      sent: "Atsakymas išsiųstas",
+      delivery_failed: "Pristatyti nepavyko",
+    },
   },
   en: {
-    customerQuestion: "Customer question",
-    relatedDocument: "Related version",
-    reviewAndReply: "Review and answer the customer's question",
-    waitingStatus: "Customer is waiting for a reply",
+    action: {
+      prepare: "Choose how to answer the customer's question",
+      review: "Review and answer the customer's question",
+      queued: "Monitor delivery of the customer reply",
+      sent: "The reply was sent to the customer",
+      delivery_failed: "Delivery failed – review and retry",
+    },
+    status: {
+      prepare: "Customer is waiting for a reply",
+      review: "Reply draft ready",
+      queued: "Reply awaiting delivery",
+      sent: "Reply sent",
+      delivery_failed: "Delivery failed",
+    },
   },
 } as const;
 
@@ -157,6 +193,14 @@ function factWarnings(value: unknown) {
     : [];
 }
 
+function manualReplyRequiresEditing(value: unknown) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    (value as Record<string, unknown>).manualReplyRequiresEditing === true,
+  );
+}
+
 export default async function AdminCasePage({
   params,
 }: {
@@ -194,10 +238,10 @@ export default async function AdminCasePage({
   const unresolvedQuestion = selectUnresolvedCustomerQuestion(
     caseData.messages,
   );
-  const unresolvedReply =
-    unresolvedQuestion?.reply?.status === "draft"
-      ? unresolvedQuestion.reply
-      : null;
+  const displayedQuestion =
+    unresolvedQuestion || selectLatestCustomerQuestion(caseData.messages);
+  const displayedReply = displayedQuestion?.reply || null;
+  const questionStage = customerQuestionReplyStage(displayedReply);
   const qCopy = questionCopy[user.interfaceLanguage];
   const workers = workersResult.docs
     .filter(
@@ -275,7 +319,7 @@ export default async function AdminCasePage({
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
   const nextActionBase = unresolvedQuestion
-    ? qCopy.reviewAndReply
+    ? qCopy.action[questionStage]
     : copy.actionLabels[caseData.nextAction.kind];
   const quoteActionKinds = new Set([
     "approve_package",
@@ -297,9 +341,11 @@ export default async function AdminCasePage({
           (item) => item.id === caseData.nextAction.targetId,
         ) || workingQuote
       : workingCommercial;
-  const nextActionText = actionDocument
-    ? `${nextActionBase} ${actionDocument.reference}`
-    : nextActionBase;
+  const nextActionText = unresolvedQuestion
+    ? nextActionBase
+    : actionDocument
+      ? `${nextActionBase} ${actionDocument.reference}`
+      : nextActionBase;
   const actionQuote =
     actionDocument?.kind === "quote" ? actionDocument : workingQuote;
 
@@ -396,7 +442,9 @@ export default async function AdminCasePage({
         effectiveLabel={copy.effectiveContract}
         effectiveReference={effectiveReference}
         nextActionLabel={copy.nextAction}
-        status={unresolvedQuestion ? qCopy.waitingStatus : workingStatus}
+        status={
+          unresolvedQuestion ? qCopy.status[questionStage] : workingStatus
+        }
         workingLabel={copy.workingVersion}
         workingReference={workingReference}
       />
@@ -411,113 +459,113 @@ export default async function AdminCasePage({
         >
           {copy.nextAction}
         </p>
-        {unresolvedQuestion ? (
-          <div className="border-warning/35 bg-warning/5 mt-4 rounded-2xl border p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-warning text-xs font-bold tracking-[.16em] uppercase">
-                  {qCopy.customerQuestion}
-                </p>
-                <h2 className="mt-2 text-lg font-bold break-words">
-                  {unresolvedQuestion.question.subject}
-                </h2>
-              </div>
-              <span className="border-warning/35 bg-warning/10 text-warning rounded-full border px-3 py-1 text-xs font-bold">
-                {qCopy.waitingStatus}
-              </span>
-            </div>
-            <p className="mt-4 text-base leading-relaxed whitespace-pre-wrap text-white/90">
-              {unresolvedQuestion.question.bodyText}
-            </p>
-            {workingReference !== copy.notCreated ? (
-              <p className="mt-4 text-sm text-white/60">
-                <strong>{qCopy.relatedDocument}:</strong> {workingReference}
-              </p>
-            ) : null}
-          </div>
+        {displayedQuestion ? (
+          <CustomerQuestionWorkbench
+            key={`${displayedQuestion.question.id}:${displayedReply?.id || "none"}:${displayedReply?.status || "prepare"}:${displayedReply?.updatedAt || ""}`}
+            documentReferences={customerQuestionDocumentReferences(
+              displayedQuestion.question,
+            )}
+            leadId={caseData.lead.id}
+            leadRevision={caseData.lead.revision}
+            locale={user.interfaceLanguage}
+            question={{
+              bodyText: displayedQuestion.question.bodyText || "",
+              id: displayedQuestion.question.id,
+              receivedAt: formatDate(displayedQuestion.question.createdAt),
+              subject: displayedQuestion.question.subject || "",
+            }}
+            reply={
+              displayedReply
+                ? {
+                    aiAssisted: displayedReply.aiAssisted,
+                    bodyText: displayedReply.bodyText || "",
+                    factWarnings: factWarnings(displayedReply.aiAnalysis),
+                    failureMessage: displayedReply.failureMessage,
+                    id: displayedReply.id,
+                    manualReplyRequiresEditing: manualReplyRequiresEditing(
+                      displayedReply.aiAnalysis,
+                    ),
+                    status: displayedReply.status,
+                    subject: displayedReply.subject || "",
+                    updatedAt:
+                      displayedReply.updatedAt ||
+                      displayedReply.createdAt ||
+                      "",
+                  }
+                : null
+            }
+          />
         ) : null}
-        <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold">{nextActionText}</h2>
-            <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-              {nextActionText}
-            </p>
-            <dl className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div>
-                <dt className="text-muted-foreground text-xs">
-                  {copy.customer}
-                </dt>
-                <dd className="mt-1 truncate text-sm font-bold">
-                  {caseData.lead.name}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">
-                  {copy.service}
-                </dt>
-                <dd className="mt-1 text-sm font-bold">
-                  {actionQuote?.serviceDescription ||
-                    serviceNames[caseData.lead.inquiryType || ""] ||
-                    "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">
-                  {copy.document}
-                </dt>
-                <dd className="text-accent mt-1 text-sm font-bold">
-                  {actionDocument?.reference || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">
-                  {copy.priceIncVat}
-                </dt>
-                <dd className="mt-1 text-sm font-bold">
-                  {nok(actionQuote?.totalIncVatOre)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">
-                  {copy.maximum}
-                </dt>
-                <dd className="mt-1 text-sm font-bold">
-                  {nok(actionQuote?.maximumTotalIncVatOre)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">
-                  {copy.deposit}
-                </dt>
-                <dd className="mt-1 text-sm font-bold">
-                  {nok(actionQuote?.depositAmountIncVatOre || 0)}
-                </dd>
-              </div>
-              {actionDocument?.supersedesReference ? (
-                <div className="sm:col-span-2 xl:col-span-3">
+        {!unresolvedQuestion ? (
+          <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold">{nextActionText}</h2>
+              <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
+                {nextActionText}
+              </p>
+              <dl className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div>
                   <dt className="text-muted-foreground text-xs">
-                    {copy.replaces}
+                    {copy.customer}
                   </dt>
-                  <dd className="mt-1 text-sm font-bold">
-                    {actionDocument.supersedesReference}
+                  <dd className="mt-1 truncate text-sm font-bold">
+                    {caseData.lead.name}
                   </dd>
                 </div>
-              ) : null}
-            </dl>
-          </div>
-          {unresolvedReply ? (
-            <MessageDraftEditor
-              aiAssisted={unresolvedReply.aiAssisted}
-              bodyText={unresolvedReply.bodyText || ""}
-              factWarnings={factWarnings(unresolvedReply.aiAnalysis)}
-              leadId={caseData.lead.id}
-              locale={user.interfaceLanguage}
-              messageId={unresolvedReply.id}
-              sourceBody={unresolvedQuestion?.question.bodyText || undefined}
-              sourceSubject={unresolvedQuestion?.question.subject || undefined}
-              subject={unresolvedReply.subject || ""}
-            />
-          ) : (
+                <div>
+                  <dt className="text-muted-foreground text-xs">
+                    {copy.service}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold">
+                    {actionQuote?.serviceDescription ||
+                      serviceNames[caseData.lead.inquiryType || ""] ||
+                      "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">
+                    {copy.document}
+                  </dt>
+                  <dd className="text-accent mt-1 text-sm font-bold">
+                    {actionDocument?.reference || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">
+                    {copy.priceIncVat}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold">
+                    {nok(actionQuote?.totalIncVatOre)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">
+                    {copy.maximum}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold">
+                    {nok(actionQuote?.maximumTotalIncVatOre)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">
+                    {copy.deposit}
+                  </dt>
+                  <dd className="mt-1 text-sm font-bold">
+                    {nok(actionQuote?.depositAmountIncVatOre || 0)}
+                  </dd>
+                </div>
+                {actionDocument?.supersedesReference ? (
+                  <div className="sm:col-span-2 xl:col-span-3">
+                    <dt className="text-muted-foreground text-xs">
+                      {copy.replaces}
+                    </dt>
+                    <dd className="mt-1 text-sm font-bold">
+                      {actionDocument.supersedesReference}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
             <CaseActionPanel
               action={caseData.nextAction}
               actionLabel={nextActionText}
@@ -545,8 +593,8 @@ export default async function AdminCasePage({
                 quoteVersion: actionQuote?.version,
               }}
             />
-          )}
-        </div>
+          </div>
+        ) : null}
       </section>
 
       <nav
@@ -944,7 +992,7 @@ export default async function AdminCasePage({
             {caseData.messages.length ? (
               <div className="grid min-w-0 gap-3">
                 {caseData.messages
-                  .filter((message) => message.id !== unresolvedReply?.id)
+                  .filter((message) => message.id !== displayedReply?.id)
                   .map((message) => {
                     const source = message.replyToMessageId
                       ? caseData.messages.find(
@@ -957,15 +1005,22 @@ export default async function AdminCasePage({
                       <div
                         className="scroll-mt-24"
                         id={`message-${message.id}`}
-                        key={message.id}
+                        key={`${message.id}:${message.updatedAt || ""}`}
                       >
                         <MessageDraftEditor
                           aiAssisted={message.aiAssisted}
                           bodyText={message.bodyText}
+                          caseRevision={caseData.lead.revision}
                           factWarnings={factWarnings(message.aiAnalysis)}
                           leadId={caseData.lead.id}
                           locale={user.interfaceLanguage}
+                          manualReplyRequiresEditing={manualReplyRequiresEditing(
+                            message.aiAnalysis,
+                          )}
                           messageId={message.id}
+                          messageUpdatedAt={
+                            message.updatedAt || message.createdAt || ""
+                          }
                           sourceBody={source?.bodyText}
                           sourceSubject={source?.subject}
                           subject={message.subject}

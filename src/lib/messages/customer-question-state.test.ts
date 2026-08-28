@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
 import {
+  customerQuestionDocumentReferences,
+  customerQuestionReplyStage,
   loadUnresolvedCustomerQuestion,
+  selectLatestCustomerQuestion,
   selectUnresolvedCustomerQuestion,
 } from "./customer-question-state";
 
@@ -145,5 +148,49 @@ describe("customer question state", () => {
     expect(find.mock.calls.every(([query]) => query.limit === undefined)).toBe(
       true,
     );
+  });
+
+  it.each([
+    [undefined, "prepare"],
+    ["draft", "review"],
+    ["queued", "queued"],
+    ["sent", "sent"],
+    ["delivered", "sent"],
+    ["failed", "delivery_failed"],
+    ["attention", "delivery_failed"],
+  ])("maps reply status %s to the admin stage %s", (status, expected) => {
+    expect(customerQuestionReplyStage(status ? { status } : null)).toBe(
+      expected,
+    );
+  });
+
+  it("uses the immutable references captured on the customer question", () => {
+    expect(
+      customerQuestionDocumentReferences({
+        aiAnalysis: {
+          quoteReference: "T-16-V2",
+          contractReference: "K-16-V2",
+        },
+      }),
+    ).toEqual(["T-16-V2", "K-16-V2"]);
+  });
+
+  it("keeps the latest completed question available for delivered-state feedback", () => {
+    const deliveredReply = {
+      id: 13,
+      category: "ai_reply",
+      direction: "outbound",
+      status: "delivered",
+      replyToMessage: 10,
+      createdAt: "2026-08-28T10:05:00.000Z",
+    };
+
+    expect(
+      selectUnresolvedCustomerQuestion([question, deliveredReply]),
+    ).toBeNull();
+    expect(selectLatestCustomerQuestion([question, deliveredReply])).toEqual({
+      question,
+      reply: deliveredReply,
+    });
   });
 });

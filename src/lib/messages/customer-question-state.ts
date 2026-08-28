@@ -1,6 +1,7 @@
 import type { Payload } from "payload";
 
 type MessageLike = {
+  aiAnalysis?: unknown;
   bodyText?: string | null;
   category?: string | null;
   createdAt?: string | null;
@@ -11,6 +12,9 @@ type MessageLike = {
   subject?: string | null;
 };
 
+export type CustomerQuestionReplyStage =
+  "prepare" | "review" | "queued" | "sent" | "delivery_failed";
+
 function relationId(value: MessageLike["replyToMessage"]) {
   if (typeof value === "number") return value;
   if (value && typeof value === "object" && typeof value.id === "number") {
@@ -19,10 +23,8 @@ function relationId(value: MessageLike["replyToMessage"]) {
   return null;
 }
 
-export function selectUnresolvedCustomerQuestion<T extends MessageLike>(
-  messages: T[],
-) {
-  const questions = messages
+function customerQuestions<T extends MessageLike>(messages: T[]) {
+  return messages
     .filter(
       (message) =>
         message.direction === "inbound" &&
@@ -31,25 +33,74 @@ export function selectUnresolvedCustomerQuestion<T extends MessageLike>(
     .sort((left, right) =>
       String(right.createdAt || "").localeCompare(String(left.createdAt || "")),
     );
+}
+
+function repliesForQuestion<T extends MessageLike>(
+  messages: T[],
+  questionId: number,
+) {
+  return messages
+    .filter(
+      (message) =>
+        message.direction === "outbound" &&
+        relationId(message.replyToMessage) === questionId &&
+        message.status !== "cancelled",
+    )
+    .sort((left, right) =>
+      String(right.createdAt || "").localeCompare(String(left.createdAt || "")),
+    );
+}
+
+export function customerQuestionReplyStage(
+  reply?: Pick<MessageLike, "status"> | null,
+): CustomerQuestionReplyStage {
+  if (!reply || reply.status === "cancelled") return "prepare";
+  if (reply.status === "draft") return "review";
+  if (["failed", "attention"].includes(reply.status || "")) {
+    return "delivery_failed";
+  }
+  if (["sent", "delivered"].includes(reply.status || "")) return "sent";
+  return "queued";
+}
+
+export function customerQuestionDocumentReferences(
+  question: Pick<MessageLike, "aiAnalysis">,
+) {
+  if (!question.aiAnalysis || typeof question.aiAnalysis !== "object") {
+    return [];
+  }
+  const analysis = question.aiAnalysis as Record<string, unknown>;
+  return [analysis.quoteReference, analysis.contractReference].filter(
+    (value, index, values): value is string =>
+      typeof value === "string" &&
+      value.trim().length > 0 &&
+      values.indexOf(value) === index,
+  );
+}
+
+export function selectUnresolvedCustomerQuestion<T extends MessageLike>(
+  messages: T[],
+) {
+  const questions = customerQuestions(messages);
 
   for (const question of questions) {
-    const replies = messages
-      .filter(
-        (message) =>
-          message.direction === "outbound" &&
-          relationId(message.replyToMessage) === question.id &&
-          message.status !== "cancelled",
-      )
-      .sort((left, right) =>
-        String(right.createdAt || "").localeCompare(
-          String(left.createdAt || ""),
-        ),
-      );
+    const replies = repliesForQuestion(messages, question.id);
     const delivered = replies.some((reply) => reply.status === "delivered");
     if (!delivered) return { question, reply: replies[0] || null };
   }
 
   return null;
+}
+
+export function selectLatestCustomerQuestion<T extends MessageLike>(
+  messages: T[],
+) {
+  const question = customerQuestions(messages)[0];
+  if (!question) return null;
+  return {
+    question,
+    reply: repliesForQuestion(messages, question.id)[0] || null,
+  };
 }
 
 export async function loadUnresolvedCustomerQuestion(

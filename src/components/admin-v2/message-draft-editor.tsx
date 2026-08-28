@@ -1,8 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import {
+  messageDraftRequest,
+  type MessageDraftAction,
+} from "@/lib/admin-v2/message-draft-request";
 
 const copy = {
   nb: {
@@ -24,9 +28,18 @@ const copy = {
       "Jeg har kontrollert fakta og godkjenner at denne meldingen sendes til kunden.",
     saved: "Utkastet er lagret.",
     regenerated: "Et nytt AI-utkast er opprettet.",
-    sent: "Meldingen er godkjent og lagt til utsending.",
+    sent: "Meldingen er kontrollert og sendt til kunden.",
+    queued: "Meldingen er kontrollert og ligger trygt i sendekø.",
     cancelled: "Utkastet er forkastet.",
     failed: "Handlingen kunne ikke fullføres.",
+    stale: "Saken eller utkastet er endret. Oppdater siden før du fortsetter.",
+    sourcesChanged:
+      "Dokumenter, priser eller vilkår er endret. Lag et nytt utkast før du sender.",
+    aiUnavailable: "AI-funksjonen er ikke tilgjengelig nå. Prøv igjen senere.",
+    manualRequired:
+      "Erstatt hjelpeteksten med et kundespesifikt svar før du lagrer eller sender.",
+    regenerateConfirm:
+      "Erstatte utkastet med et nytt AI-utkast? Ulagrede endringer går tapt.",
     processing: "Behandler …",
   },
   lt: {
@@ -48,9 +61,19 @@ const copy = {
       "Patvirtinu, kad patikrinau faktus ir leidžiu išsiųsti šią žinutę klientui.",
     saved: "Juodraštis išsaugotas.",
     regenerated: "Sukurtas naujas DI juodraštis.",
-    sent: "Žinutė patvirtinta ir perduota siuntimui.",
+    sent: "Žinutė patikrinta ir išsiųsta klientui.",
+    queued: "Žinutė patikrinta ir saugiai laukia siuntimo eilėje.",
     cancelled: "Juodraštis atšauktas.",
     failed: "Veiksmo atlikti nepavyko.",
+    stale:
+      "Byla arba juodraštis pasikeitė. Prieš tęsdami atnaujinkite puslapį.",
+    sourcesChanged:
+      "Dokumentai, kainos arba sąlygos pasikeitė. Prieš siųsdami sukurkite naują juodraštį.",
+    aiUnavailable: "DI funkcija dabar nepasiekiama. Bandykite vėliau.",
+    manualRequired:
+      "Prieš išsaugodami arba siųsdami pakeiskite pagalbinį tekstą konkrečiu atsakymu klientui.",
+    regenerateConfirm:
+      "Pakeisti juodraštį nauju DI juodraščiu? Neišsaugoti pakeitimai bus prarasti.",
     processing: "Vykdoma …",
   },
   en: {
@@ -72,9 +95,18 @@ const copy = {
       "I have checked the facts and approve sending this message to the customer.",
     saved: "The draft was saved.",
     regenerated: "A new AI draft was created.",
-    sent: "The message was approved and queued for delivery.",
+    sent: "The message was reviewed and sent to the customer.",
+    queued: "The message was reviewed and is safely queued for delivery.",
     cancelled: "The draft was discarded.",
     failed: "The action could not be completed.",
+    stale: "The case or draft changed. Refresh before continuing.",
+    sourcesChanged:
+      "Documents, prices, or terms changed. Create a new draft before sending.",
+    aiUnavailable: "The AI feature is unavailable right now. Try again later.",
+    manualRequired:
+      "Replace the helper text with a customer-specific reply before saving or sending.",
+    regenerateConfirm:
+      "Replace this draft with a new AI draft? Unsaved changes will be lost.",
     processing: "Processing …",
   },
 } as const;
@@ -83,15 +115,21 @@ export function MessageDraftEditor(props: {
   aiAssisted?: boolean;
   bodyText: string;
   factWarnings?: string[];
+  caseRevision: number;
   leadId: number;
   locale: PanelLocale;
+  manualReplyRequiresEditing?: boolean;
   messageId: number;
+  messageUpdatedAt: string;
+  sourceContextAvailable?: boolean;
   sourceBody?: string;
   sourceSubject?: string;
   subject: string;
 }) {
   const labels = copy[props.locale];
   const router = useRouter();
+  const activeMessageId = useRef(props.messageId);
+  const expectedMessageUpdatedAt = useRef(props.messageUpdatedAt);
   const [subject, setSubject] = useState(props.subject);
   const [bodyText, setBodyText] = useState(props.bodyText);
   const [busy, setBusy] = useState<
@@ -102,29 +140,92 @@ export function MessageDraftEditor(props: {
     bodyText: string;
     subject: string;
   } | null>(null);
+  const dirty = subject !== props.subject || bodyText !== props.bodyText;
+  const hasSourceContext =
+    Boolean(props.sourceBody) || Boolean(props.sourceContextAvailable);
+  const manualReplyNeedsEditing =
+    Boolean(props.manualReplyRequiresEditing) && !dirty;
 
-  async function post(
-    action:
-      | "cancel_draft"
-      | "polish_reply"
-      | "save_draft"
-      | "regenerate_reply"
-      | "approve_send",
-  ) {
+  useEffect(() => {
+    if (activeMessageId.current === props.messageId) return;
+    activeMessageId.current = props.messageId;
+    setSubject(props.subject);
+    setBodyText(props.bodyText);
+    setBeforePolish(null);
+    setNotice("");
+  }, [props.bodyText, props.messageId, props.subject]);
+
+  useEffect(() => {
+    expectedMessageUpdatedAt.current = props.messageUpdatedAt;
+  }, [props.messageUpdatedAt]);
+
+  function localizedFailure(result: { code?: string; error?: string }) {
+    if (
+      result.code === "CASE_REVISION_CONFLICT" ||
+      result.code === "MESSAGE_REVISION_CONFLICT"
+    ) {
+      return labels.stale;
+    }
+    const error = result.error?.toLowerCase() || "";
+    if (
+      error.includes("documents, prices") ||
+      error.includes("source context") ||
+      error.includes("verified source")
+    ) {
+      return labels.sourcesChanged;
+    }
+    if (
+      error.includes("ai draft") ||
+      error.includes("gemini") ||
+      error.includes("ai usage")
+    ) {
+      return labels.aiUnavailable;
+    }
+    if (
+      error.includes("customer-specific answer") ||
+      error.includes("manual reply")
+    ) {
+      return labels.manualRequired;
+    }
+    if (
+      error.includes("only a draft") ||
+      error.includes("active ai reply") ||
+      error.includes("changed by another administrator") ||
+      error.includes("revision conflict") ||
+      error.includes("refresh before")
+    ) {
+      return labels.stale;
+    }
+    return labels.failed;
+  }
+
+  async function post(action: MessageDraftAction) {
+    const requestBody = messageDraftRequest(action, {
+      bodyText,
+      caseRevision: props.caseRevision,
+      messageId: props.messageId,
+      messageUpdatedAt: expectedMessageUpdatedAt.current,
+      subject,
+    });
     const response = await fetch(`/api/admin/leads/${props.leadId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        action === "save_draft" || action === "polish_reply"
-          ? { action, messageId: props.messageId, subject, bodyText }
-          : { action, messageId: props.messageId },
-      ),
+      body: JSON.stringify(requestBody),
     });
     const result = (await response.json().catch(() => ({}))) as {
+      code?: string;
+      configurationRequired?: boolean;
       error?: string;
+      messageUpdatedAt?: string;
       polished?: { bodyText?: string; subject?: string };
+      queued?: boolean;
+      sent?: boolean;
     };
-    if (!response.ok) throw new Error(result.error || labels.failed);
+    if (!response.ok) {
+      const message = localizedFailure(result);
+      if (response.status === 409 && message === labels.stale) router.refresh();
+      throw new Error(message);
+    }
     return result;
   }
 
@@ -134,6 +235,12 @@ export function MessageDraftEditor(props: {
     if (busy) return;
     if (kind === "send" && !window.confirm(labels.sendingConfirm)) return;
     if (kind === "cancel" && !window.confirm(labels.cancelConfirm)) return;
+    if (
+      kind === "regenerate" &&
+      dirty &&
+      !window.confirm(labels.regenerateConfirm)
+    )
+      return;
     setBusy(kind);
     setNotice("");
     try {
@@ -153,13 +260,22 @@ export function MessageDraftEditor(props: {
         await post("regenerate_reply");
         setNotice(labels.regenerated);
       } else {
-        await post("save_draft");
         if (kind === "send") {
-          await post("approve_send");
-          setNotice(labels.sent);
-        } else setNotice(labels.saved);
+          const result = await post("approve_send");
+          setNotice(result.sent ? labels.sent : labels.queued);
+        } else {
+          const result = await post("save_draft");
+          if (result.messageUpdatedAt) {
+            expectedMessageUpdatedAt.current = result.messageUpdatedAt;
+          }
+          setNotice(labels.saved);
+        }
       }
-      if (kind !== "polish") router.refresh();
+      if (kind === "send") {
+        window.setTimeout(() => router.refresh(), 800);
+      } else if (kind !== "polish") {
+        router.refresh();
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : labels.failed);
     } finally {
@@ -226,26 +342,33 @@ export function MessageDraftEditor(props: {
           value={bodyText}
         />
       </label>
+      {manualReplyNeedsEditing ? (
+        <p className="border-warning/30 bg-warning/5 text-warning mt-3 rounded-xl border p-3 text-sm">
+          {labels.manualRequired}
+        </p>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           className="hover:border-accent/50 min-h-11 rounded-xl border border-white/15 px-4 font-bold disabled:opacity-50"
           disabled={
             Boolean(busy) ||
             subject.trim().length < 5 ||
-            bodyText.trim().length < 20
+            bodyText.trim().length < 20 ||
+            manualReplyNeedsEditing
           }
           onClick={() => void run("save")}
           type="button"
         >
           {busy === "save" ? labels.processing : labels.save}
         </button>
-        {props.aiAssisted && props.sourceBody ? (
+        {hasSourceContext ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={
               Boolean(busy) ||
               subject.trim().length < 5 ||
-              bodyText.trim().length < 20
+              bodyText.trim().length < 20 ||
+              manualReplyNeedsEditing
             }
             onClick={() => void run("polish")}
             type="button"
@@ -268,7 +391,7 @@ export function MessageDraftEditor(props: {
             {labels.undoPolish}
           </button>
         ) : null}
-        {props.aiAssisted && props.sourceBody ? (
+        {props.aiAssisted && hasSourceContext ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
@@ -283,7 +406,8 @@ export function MessageDraftEditor(props: {
           disabled={
             Boolean(busy) ||
             subject.trim().length < 5 ||
-            bodyText.trim().length < 20
+            bodyText.trim().length < 20 ||
+            manualReplyNeedsEditing
           }
           onClick={() => void run("send")}
           type="button"

@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
+import {
+  FormEvent,
+  PointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import { CalendarDays } from "lucide-react";
 import { norwayDateKey } from "@/lib/norway-time";
@@ -183,6 +190,8 @@ export function CustomerQuote(props: {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const followUpDateRef = useRef<HTMLInputElement>(null);
   const questionSuccessRef = useRef<HTMLElement>(null);
+  const questionSubmissionKey = useRef<string | null>(null);
+  const questionStatusCheck = useRef(false);
   const drawing = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [pending, setPending] = useState(false);
@@ -191,6 +200,10 @@ export function CustomerQuote(props: {
     Boolean(props.questionPending),
   );
   const [questionSent, setQuestionSent] = useState(false);
+  const [questionText, setQuestionText] = useState("");
+  const [questionError, setQuestionError] = useState("");
+  const [questionResolved, setQuestionResolved] = useState(false);
+  const [checkingQuestionStatus, setCheckingQuestionStatus] = useState(false);
   const [signed, setSigned] = useState(props.contractStatus === "signed");
   const [declined, setDeclined] = useState(props.quoteStatus === "declined");
   const [declineOpen, setDeclineOpen] = useState(false);
@@ -216,7 +229,70 @@ export function CustomerQuote(props: {
     context.lineWidth = 2.5;
     context.lineCap = "round";
     context.strokeStyle = "#111827";
-  }, []);
+  }, [declined, questionPending, signed]);
+
+  const checkQuestionStatus = useCallback(
+    async (announceFailure = false) => {
+      if (!questionPending || questionStatusCheck.current) return;
+      questionStatusCheck.current = true;
+      if (announceFailure) setCheckingQuestionStatus(true);
+      try {
+        const response = await fetch(
+          `/api/customer/quote/${encodeURIComponent(props.token)}`,
+          { cache: "no-store" },
+        );
+        const result = (await response.json().catch(() => ({}))) as {
+          questionPending?: boolean;
+        };
+        if (response.ok && result.questionPending === false) {
+          setQuestionPending(false);
+          setQuestionSent(false);
+          setQuestionResolved(true);
+          setQuestionError("");
+          window.requestAnimationFrame(() => {
+            questionSuccessRef.current?.focus();
+            questionSuccessRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          });
+        } else if (!response.ok && announceFailure) {
+          setQuestionError(
+            "Vi kunne ikke kontrollere status nå. Prøv igjen om litt.",
+          );
+        }
+      } catch {
+        if (announceFailure) {
+          setQuestionError(
+            "Vi kunne ikke kontrollere status nå. Kontroller forbindelsen og prøv igjen.",
+          );
+        }
+      } finally {
+        questionStatusCheck.current = false;
+        if (announceFailure) setCheckingQuestionStatus(false);
+      }
+    },
+    [props.token, questionPending],
+  );
+
+  useEffect(() => {
+    if (!questionPending) return;
+    const onFocus = () => void checkQuestionStatus();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void checkQuestionStatus();
+    };
+    const interval = window.setInterval(
+      () => void checkQuestionStatus(),
+      30_000,
+    );
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [checkQuestionStatus, questionPending]);
 
   function point(event: PointerEvent<HTMLCanvasElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -296,10 +372,16 @@ export function CustomerQuote(props: {
   async function sendQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending || questionPending) return;
-    const form = event.currentTarget;
-    const data = new FormData(form);
+    const message = questionText.trim();
+    if (message.length < 5) {
+      setQuestionError("Skriv minst fem tegn før du sender spørsmålet.");
+      return;
+    }
+    const submissionKey =
+      questionSubmissionKey.current || window.crypto.randomUUID();
+    questionSubmissionKey.current = submissionKey;
     setPending(true);
-    setNotice("");
+    setQuestionError("");
     try {
       const response = await fetch(
         `/api/customer/quote/${encodeURIComponent(props.token)}`,
@@ -308,14 +390,26 @@ export function CustomerQuote(props: {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "question",
-            message: data.get("message"),
+            message,
+            submissionKey,
           }),
         },
       );
-      if (!response.ok) throw new Error("question failed");
-      form.reset();
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error(
+            "For mange forsøk på kort tid. Vent litt før du prøver igjen.",
+          );
+        }
+        throw new Error(
+          "Spørsmålet kunne ikke sendes. Prøv igjen eller kontakt oss direkte.",
+        );
+      }
+      setQuestionText("");
+      questionSubmissionKey.current = null;
       setQuestionPending(true);
       setQuestionSent(true);
+      setQuestionResolved(false);
       window.requestAnimationFrame(() => {
         questionSuccessRef.current?.focus();
         questionSuccessRef.current?.scrollIntoView({
@@ -323,8 +417,12 @@ export function CustomerQuote(props: {
           block: "center",
         });
       });
-    } catch {
-      setNotice("Spørsmålet kunne ikke sendes. Ring oss gjerne.");
+    } catch (error) {
+      setQuestionError(
+        error instanceof Error
+          ? error.message
+          : "Spørsmålet kunne ikke sendes. Prøv igjen eller kontakt oss direkte.",
+      );
     } finally {
       setPending(false);
     }
@@ -596,19 +694,141 @@ export function CustomerQuote(props: {
           Kilde: {d.source}. {d.measurement.evidenceAttribution || d.credits}
         </p>
       </section>
+      {!declined ? (
+        questionPending ? (
+          <section
+            aria-live="polite"
+            className="mt-8 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-5 sm:p-7"
+            ref={(element) => {
+              questionSuccessRef.current = element;
+            }}
+            role="status"
+            tabIndex={-1}
+          >
+            <p className="text-xs font-bold tracking-[.16em] text-amber-200 uppercase">
+              Signering er satt på pause
+            </p>
+            <h2 className="mt-2 text-xl font-bold">
+              {questionSent
+                ? "Spørsmålet er sendt"
+                : "Vi har mottatt spørsmålet ditt"}
+            </h2>
+            <p className="text-muted-foreground mt-2 leading-6">
+              Vi svarer på e-post etter at Takfornyelse har kontrollert saken.
+              Signering åpnes automatisk her når svaret er levert.
+            </p>
+            <button
+              className="mt-4 min-h-12 w-full rounded-xl border border-white/20 px-5 font-bold hover:bg-white/5 disabled:opacity-50 sm:w-auto"
+              disabled={checkingQuestionStatus}
+              onClick={() => void checkQuestionStatus(true)}
+              type="button"
+            >
+              {checkingQuestionStatus
+                ? "Kontrollerer status …"
+                : "Sjekk om svaret er klart"}
+            </button>
+            {questionError ? (
+              <p
+                className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 p-3 text-sm text-red-100"
+                role="alert"
+              >
+                {questionError}
+              </p>
+            ) : null}
+          </section>
+        ) : (
+          <section className="mt-8">
+            {questionResolved ? (
+              <div
+                className="mb-4 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 p-5 sm:p-7"
+                ref={(element) => {
+                  questionSuccessRef.current = element;
+                }}
+                tabIndex={-1}
+              >
+                <h2 className="text-xl font-bold">Svaret er levert</h2>
+                <p className="text-muted-foreground mt-2 leading-6">
+                  Du kan nå kontrollere dokumentet og fortsette til signering
+                  nedenfor.
+                </p>
+              </div>
+            ) : null}
+            <form
+              className="rounded-2xl border border-white/10 p-5 sm:p-7"
+              onSubmit={sendQuestion}
+            >
+              <h2 className="text-xl font-bold">Har du spørsmål?</h2>
+              <p
+                className="text-muted-foreground mt-2 text-sm leading-6"
+                id="customer-question-help"
+              >
+                Send spørsmålet før du signerer. Vi svarer på e-post etter at
+                saken er kontrollert.
+              </p>
+              <label
+                className="mt-4 block font-semibold"
+                htmlFor="customer-question"
+              >
+                Hva lurer du på?
+              </label>
+              <textarea
+                aria-describedby="customer-question-help customer-question-count"
+                className="mt-2 min-h-28 w-full rounded-lg border border-white/20 bg-white/5 p-4"
+                id="customer-question"
+                maxLength={2000}
+                minLength={5}
+                name="message"
+                onChange={(event) => {
+                  setQuestionText(event.target.value);
+                  questionSubmissionKey.current = null;
+                  if (questionError) setQuestionError("");
+                }}
+                required
+                value={questionText}
+              />
+              <p
+                className="text-muted-foreground mt-1 text-right text-xs"
+                id="customer-question-count"
+              >
+                {questionText.length} / 2000
+              </p>
+              {questionError ? (
+                <p
+                  className="mt-3 rounded-xl border border-red-400/40 bg-red-400/10 p-3 text-sm text-red-100"
+                  role="alert"
+                >
+                  {questionError} Kontakt oss på{` `}
+                  <a
+                    className="font-bold underline"
+                    href={`tel:${props.supplier.phone.replace(/\s/g, "")}`}
+                  >
+                    {props.supplier.phone}
+                  </a>
+                  {` `}
+                  eller{` `}
+                  <a
+                    className="font-bold underline"
+                    href={`mailto:${props.supplier.email}`}
+                  >
+                    e-post
+                  </a>
+                  .
+                </p>
+              ) : null}
+              <button
+                className="mt-3 min-h-12 w-full rounded-lg border border-white/20 px-5 font-bold hover:bg-white/5 disabled:opacity-50 sm:w-auto"
+                disabled={pending || questionText.trim().length < 5}
+                type="submit"
+              >
+                {pending ? "Sender …" : "Send spørsmål"}
+              </button>
+            </form>
+          </section>
+        )
+      ) : null}
       {!signed && !declined ? (
         <>
-          {questionPending ? (
-            <section className="mt-8 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-5 sm:p-7">
-              <h2 className="text-xl font-bold">
-                Vi svarer før du kan signere
-              </h2>
-              <p className="text-muted-foreground mt-2 text-sm leading-6">
-                Vi har mottatt spørsmålet ditt. Signering åpnes igjen når
-                Takfornyelse har kontrollert saken og sendt deg et svar.
-              </p>
-            </section>
-          ) : (
+          {!questionPending ? (
             <form
               className="border-accent/50 mt-8 rounded-2xl border-2 bg-[#12151c] p-5 sm:p-7"
               onSubmit={submitSign}
@@ -733,7 +953,7 @@ export function CustomerQuote(props: {
                   : "Bestilling med forpliktelse til å betale og signer"}
               </button>
             </form>
-          )}
+          ) : null}
           {!declineOpen ? (
             <button
               className="text-muted-foreground mt-8 min-h-12 text-sm underline"
@@ -812,50 +1032,6 @@ export function CustomerQuote(props: {
             </form>
           )}
         </>
-      ) : null}
-      {!declined ? (
-        questionPending ? (
-          <section
-            className="mt-8 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 p-5 sm:p-7"
-            ref={questionSuccessRef}
-            tabIndex={-1}
-          >
-            <h2 className="text-xl font-bold">
-              {questionSent
-                ? "Spørsmålet er sendt"
-                : "Spørsmålet ditt behandles"}
-            </h2>
-            <p className="text-muted-foreground mt-2 leading-6">
-              Takfornyelse kontrollerer spørsmålet og svargrunnlaget. Du får et
-              svar før tilbudet kan signeres.
-            </p>
-          </section>
-        ) : (
-          <form
-            className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7"
-            onSubmit={sendQuestion}
-          >
-            <h2 className="text-xl font-bold">Har du spørsmål?</h2>
-            <p className="text-muted-foreground mt-2 text-sm">
-              Meldingen går til saken din og besvares etter kontroll av
-              Takfornyelse.
-            </p>
-            <textarea
-              className="mt-4 min-h-28 w-full rounded-lg border border-white/20 bg-white/5 p-4"
-              maxLength={2000}
-              minLength={5}
-              name="message"
-              required
-            />
-            <button
-              className="mt-3 min-h-12 rounded-lg border border-white/20 px-5 font-bold"
-              disabled={pending}
-              type="submit"
-            >
-              {pending ? "Sender …" : "Send spørsmål"}
-            </button>
-          </form>
-        )
       ) : null}
       {signed ? (
         <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7">
