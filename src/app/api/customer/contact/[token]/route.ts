@@ -12,6 +12,10 @@ import {
   deliverMessage,
   enqueueMessageJob,
 } from "@/lib/messages/message-engine";
+import {
+  buildBrandedEmailHtml,
+  secureCustomerLinkLabel,
+} from "@/lib/messages/email-template";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
 import { createEmailProvider } from "@/lib/providers/email-provider";
@@ -142,7 +146,14 @@ export async function POST(
         channel: "email",
         subject: source.subject,
         bodyText: source.bodyText,
-        bodyHtml: source.bodyHtml || null,
+        // Preserve the approved subject/text, links and attachments, but use
+        // the current branded wrapper. Historical HTML can contain an old or
+        // protected logo URL that mail clients cannot load.
+        bodyHtml: buildBrandedEmailHtml({
+          subject: source.subject,
+          text: source.bodyText,
+          secureLinkLabel: secureCustomerLinkLabel(source.category),
+        }),
         attachments: relationIds(source.attachments),
         status: "queued",
         idempotencyKey: resendKey,

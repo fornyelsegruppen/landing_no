@@ -109,6 +109,10 @@ describe("customer manual contact recovery", () => {
         data: expect.objectContaining({
           replyToMessage: 4,
           subject: "Vi har mottatt henvendelsen din",
+          bodyText: "Takk for henvendelsen.",
+          bodyHtml: expect.stringContaining(
+            'src="https://www.takfornyelse.as/brand/logo.png"',
+          ),
           aiAnalysis: expect.not.objectContaining({
             manualRecovery: expect.anything(),
           }),
@@ -116,6 +120,9 @@ describe("customer manual contact recovery", () => {
       }),
     );
     expect(mocks.deliver).toHaveBeenCalledTimes(1);
+    expect(mocks.create.mock.calls[0]?.[0]?.data?.bodyHtml).not.toBe(
+      "<p>Takk</p>",
+    );
     expect(mocks.consume).toHaveBeenCalledWith(
       expect.anything(),
       12,
