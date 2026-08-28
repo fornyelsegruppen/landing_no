@@ -27,6 +27,6 @@ export const config = {
   // Exclude Payload admin, APIs, secure customer/worker surfaces, internals and static files.
   matcher: [
     "/api/:path*",
-    "/((?!admin|user|api|payload|media|henvendelse|tilbud|endring|_next|_vercel|.*\\..*).*)",
+    "/((?!admin|user|api|payload|media|henvendelse|tilbud|endring|kontakt|_next|_vercel|.*\\..*).*)",
   ],
 };
