@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type {
+  AiGenerateRequest,
+  AiGenerateResult,
+  AiProvider,
+  ProviderHealth,
+} from "@/lib/providers/contracts";
 import { DeterministicAiProvider } from "@/lib/providers/safe-providers";
 import {
   assertCustomerReplyTextSafe,
@@ -36,6 +42,28 @@ const valid = {
   recommendedAdminAction: "review_and_reply" as const,
 };
 
+class SequentialAiProvider implements AiProvider {
+  calls = 0;
+
+  constructor(private readonly responses: unknown[]) {}
+
+  health(): ProviderHealth {
+    return { status: "ready", provider: "sequential-ai" };
+  }
+
+  async generate(request: AiGenerateRequest): Promise<AiGenerateResult> {
+    const response =
+      this.responses[Math.min(this.calls, this.responses.length - 1)];
+    this.calls += 1;
+    return {
+      data: structuredClone(response),
+      provider: "sequential-ai",
+      model: "fixture",
+      promptVersion: request.schemaName,
+    };
+  }
+}
+
 describe("customer reply safety", () => {
   it("removes direct contact details before AI generation", () => {
     expect(minimizeCustomerReplyContext(context).customerMessage).not.toContain(
@@ -57,10 +85,7 @@ describe("customer reply safety", () => {
       /approved measurement/,
     );
     expect(() =>
-      assertCustomerReplyTextSafe(
-        "Maksimalprisen er 2 029 376 øre.",
-        context,
-      ),
+      assertCustomerReplyTextSafe("Maksimalprisen er 2 029 376 øre.", context),
     ).toThrow(/raw øre/);
   });
 
@@ -122,6 +147,21 @@ describe("customer reply safety", () => {
     ).toBe(true);
   });
 
+  it("rejects misspelled forms of endringsavtale", () => {
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Arbeidet stanses til kunden har akseptert en skriftlig endringsavtalel.",
+        context,
+      ),
+    ).toThrow(/invalid form/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Arbeidet stanses til kunden har akseptert den skriftlige endringsavtalen.",
+        context,
+      ),
+    ).toBe(true);
+  });
+
   it("requires an explicit answer when the customer asks about adding impregnation", () => {
     const multiPartContext: CustomerReplyContext = {
       ...context,
@@ -162,6 +202,26 @@ describe("customer reply safety", () => {
         correlationId: "reply-price",
       }),
     ).rejects.toThrow(/approved quote/);
+  });
+
+  it("automatically retries once when the first AI draft fails safety validation", async () => {
+    const provider = new SequentialAiProvider([
+      {
+        ...valid,
+        replyDraft:
+          "Arbeidet stanses til kunden har akseptert en skriftlig endringsavtalel.",
+      },
+      valid,
+    ]);
+
+    await expect(
+      generateCustomerReplyDraft({
+        provider,
+        context,
+        correlationId: "reply-safety-retry",
+      }),
+    ).resolves.toMatchObject({ result: valid });
+    expect(provider.calls).toBe(2);
   });
 
   it("professionally polishes administrator text without changing verified facts", async () => {

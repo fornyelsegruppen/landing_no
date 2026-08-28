@@ -225,9 +225,7 @@ export function customerReplyPromptContext(context: CustomerReplyContext) {
             ...(quote.serviceDescription
               ? { serviceDescription: quote.serviceDescription }
               : {}),
-            ...(quote.termsVersion
-              ? { termsVersion: quote.termsVersion }
-              : {}),
+            ...(quote.termsVersion ? { termsVersion: quote.termsVersion } : {}),
           },
         }
       : {}),
@@ -253,6 +251,13 @@ export function assertCustomerReplyTextSafe(
   context: CustomerReplyContext,
 ) {
   const normalized = text.normalize("NFKC");
+  for (const match of normalized.matchAll(/\bendringsavtale[a-zæøå]*\b/gi)) {
+    if (!/^endringsavtale(?:n|r|ne)?$/i.test(match[0])) {
+      throw new TypeError(
+        "AI reply contains an invalid form of the Norwegian word endringsavtale",
+      );
+    }
+  }
   if (/\d[\d\s.,]*\s*øre\b/i.test(normalized)) {
     throw new TypeError(
       "AI reply may not expose raw øre amounts to the customer",
@@ -353,39 +358,63 @@ export async function generateCustomerReplyDraft(input: {
 }) {
   const context = minimizeCustomerReplyContext(input.context);
   const promptContext = customerReplyPromptContext(context);
-  const generated = await input.provider.generate({
-    task: "customer.reply.draft",
-    schemaName: "customer-reply-nb-v3",
-    schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
-    correlationId: input.correlationId,
-    system: [
-      "Du lager bare et internt norsk svarutkast for Takfornyelse.",
-      "Svar varmt, tydelig og profesjonelt til norske boligeiere over 30 år.",
-      "Svar eksplisitt på hvert delspørsmål i kundens melding. Hvis konteksten ikke gir grunnlag for ja eller nei, si det tydelig og beskriv hvilket kontrollert neste steg som kreves.",
-      "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
-      "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
-      "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
-      "Når du forklarer maksimalpris: Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale. Hvis kontrollmålingen viser større areal eller annet omfang over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen. Beskriv aldri kontrollmålingen som et selvstendig unntak fra maksimalprisen.",
-      "Bruk den uforanderlige quote- og contract-versjonen i saken når kunden spør om et eksisterende tilbud eller en eksisterende avtale.",
-      "Bruk aktive businessSources bare for gjeldende generell informasjon. En gjeldende listepris er ikke et bindende tilbud og skal ikke erstatte prisene i saken.",
-      "Hvis aktive kilder avviker fra saksdokumentet, skal du forklare at den utstedte saksversjonen gjelder og foreslå et revidert tilbud når det er nødvendig.",
-      "Et avslag skal møtes vennlig uten press. Foreslå administrativ oppfølging, men ikke lov rabatt.",
-      "En kanselleringsforespørsel skal bare bekreftes mottatt for manuell vurdering. Ikke bekreft at avtalen er kansellert.",
-      "Administrator må alltid kontrollere og godkjenne teksten før utsending.",
-    ].join("\n"),
-    prompt: `Lag et strukturert svarutkast basert på denne minimerte sakskonteksten:\n${JSON.stringify(promptContext)}`,
-  });
-  const result = customerReplySchema.parse(generated.data);
-  assertCustomerReplyTextSafe(
-    `${result.subject}\n${result.replyDraft}`,
-    context,
-  );
-  return {
-    result,
-    context,
-    model: generated.model,
-    promptVersion: generated.promptVersion,
-  };
+  const baseSystem = [
+    "Du lager bare et internt norsk svarutkast for Takfornyelse.",
+    "Svar varmt, tydelig og profesjonelt til norske boligeiere over 30 år.",
+    "Svar eksplisitt på hvert delspørsmål i kundens melding. Hvis konteksten ikke gir grunnlag for ja eller nei, si det tydelig og beskriv hvilket kontrollert neste steg som kreves.",
+    "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
+    "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
+    "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
+    "Når du forklarer maksimalpris: Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale. Hvis kontrollmålingen viser større areal eller annet omfang over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen. Beskriv aldri kontrollmålingen som et selvstendig unntak fra maksimalprisen.",
+    "Skriv det norske ordet endringsavtale korrekt. Tillatte bøyninger er endringsavtale, endringsavtalen, endringsavtaler og endringsavtalene.",
+    "Bruk den uforanderlige quote- og contract-versjonen i saken når kunden spør om et eksisterende tilbud eller en eksisterende avtale.",
+    "Bruk aktive businessSources bare for gjeldende generell informasjon. En gjeldende listepris er ikke et bindende tilbud og skal ikke erstatte prisene i saken.",
+    "Hvis aktive kilder avviker fra saksdokumentet, skal du forklare at den utstedte saksversjonen gjelder og foreslå et revidert tilbud når det er nødvendig.",
+    "Et avslag skal møtes vennlig uten press. Foreslå administrativ oppfølging, men ikke lov rabatt.",
+    "En kanselleringsforespørsel skal bare bekreftes mottatt for manuell vurdering. Ikke bekreft at avtalen er kansellert.",
+    "Administrator må alltid kontrollere og godkjenne teksten før utsending.",
+  ];
+  let lastSafetyError: TypeError | null = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const generated = await input.provider.generate({
+      task: "customer.reply.draft",
+      schemaName: "customer-reply-nb-v4",
+      schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
+      correlationId:
+        attempt === 1
+          ? input.correlationId
+          : `${input.correlationId}-safety-retry`,
+      system: [
+        ...baseSystem,
+        ...(attempt === 2
+          ? [
+              "Et tidligere forslag ble avvist av den automatiske faktakontrollen. Lag et helt nytt svar og følg alle reglene ordrett.",
+            ]
+          : []),
+      ].join("\n"),
+      prompt: `Lag et strukturert svarutkast basert på denne minimerte sakskonteksten:\n${JSON.stringify(promptContext)}`,
+    });
+    const result = customerReplySchema.parse(generated.data);
+    try {
+      assertCustomerReplyTextSafe(
+        `${result.subject}\n${result.replyDraft}`,
+        context,
+      );
+    } catch (error) {
+      if (!(error instanceof TypeError) || attempt === 2) throw error;
+      lastSafetyError = error;
+      continue;
+    }
+    return {
+      result,
+      context,
+      model: generated.model,
+      promptVersion: generated.promptVersion,
+    };
+  }
+
+  throw lastSafetyError || new TypeError("AI reply failed safety validation");
 }
 
 const polishedReplySchema = z.object({
