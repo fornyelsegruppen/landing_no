@@ -175,6 +175,7 @@ describe("customer question state", () => {
     ["delivered", "delivered"],
     ["failed", "delivery_failed"],
     ["attention", "delivery_failed"],
+    ["cancelled", "prepare"],
   ])("maps reply status %s to the admin stage %s", (status, expected) => {
     expect(customerQuestionReplyStage(status ? { status } : null)).toBe(
       expected,

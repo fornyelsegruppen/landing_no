@@ -41,6 +41,7 @@ import { assertCustomerReplySourcesCurrent } from "@/lib/messages/customer-reply
 import { markLeadReviewed } from "@/lib/admin-v2/mark-lead-reviewed";
 import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
 import { customerReplyRecoveryCode } from "@/lib/messages/customer-reply-recovery";
+import { loadUnresolvedCustomerQuestion } from "@/lib/messages/customer-question-state";
 
 export const maxDuration = 60;
 
@@ -137,6 +138,24 @@ function relationId(value: unknown) {
   )
     return (value as { id: number }).id;
   return null;
+}
+
+async function assertQuestionReplyCanBePrepared(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  leadId: number,
+  sourceMessageId: number,
+) {
+  const unresolved = await loadUnresolvedCustomerQuestion(payload, leadId);
+  if (!unresolved || unresolved.question.id !== sourceMessageId) {
+    throw new TypeError(
+      "Only the exact currently unresolved customer question can be answered",
+    );
+  }
+  if (unresolved.reply) {
+    throw new TypeError(
+      "An active direct reply already exists for this customer question",
+    );
+  }
 }
 
 async function auth(request: Request) {
@@ -247,6 +266,11 @@ export async function POST(
       };
     } else if (parsed.data.action === "prepare_question_reply") {
       assertFeatureReady("aiDrafts");
+      await assertQuestionReplyCanBePrepared(
+        payload,
+        leadId,
+        parsed.data.sourceMessageId,
+      );
       const generated = await createCustomerReplyDraft(
         payload,
         new GeminiAiProvider(),
@@ -263,6 +287,11 @@ export async function POST(
         duplicate: generated.duplicate,
       };
     } else if (parsed.data.action === "prepare_manual_question_reply") {
+      await assertQuestionReplyCanBePrepared(
+        payload,
+        leadId,
+        parsed.data.sourceMessageId,
+      );
       const prepared = await createManualCustomerQuestionReplyDraft(payload, {
         correlationId,
         leadId,

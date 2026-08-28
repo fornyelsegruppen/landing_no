@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   findByID: vi.fn(),
   find: vi.fn(),
   manualReply: vi.fn(),
+  loadUnresolved: vi.fn(),
   markLeadReviewed: vi.fn(),
   preparePackage: vi.fn(),
   recordAudit: vi.fn(),
@@ -50,6 +51,9 @@ vi.mock("@/lib/providers/email-provider", () => ({
 }));
 vi.mock("@/lib/messages/customer-reply-sources", () => ({
   assertCustomerReplySourcesCurrent: mocks.assertSources,
+}));
+vi.mock("@/lib/messages/customer-question-state", () => ({
+  loadUnresolvedCustomerQuestion: mocks.loadUnresolved,
 }));
 vi.mock("@/lib/leads/automatic-package", () => ({
   approveAndSendPreparedLeadPackage: mocks.approvePackage,
@@ -113,6 +117,10 @@ describe("admin lead review marker", () => {
       duplicate: false,
       message: { id: 44 },
     });
+    mocks.loadUnresolved.mockReset().mockResolvedValue({
+      question: { id: 33 },
+      reply: null,
+    });
     mocks.update.mockReset();
   });
 
@@ -162,6 +170,90 @@ describe("admin lead review marker", () => {
       expect.anything(),
       expect.objectContaining({ leadId: 10, sourceMessageId: 33 }),
     );
+  });
+
+  it.each(["prepare_question_reply", "prepare_manual_question_reply"] as const)(
+    "rejects %s for a source other than the current unresolved question",
+    async (action) => {
+      if (action === "prepare_question_reply") {
+        vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+        vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+      }
+      mocks.loadUnresolved.mockResolvedValue({
+        question: { id: 34 },
+        reply: null,
+      });
+
+      const response = await POST(
+        request({ action, expectedRevision: 12, sourceMessageId: 33 }),
+        { params: Promise.resolve({ id: "10" }) },
+      );
+
+      if (!response) throw new Error("Expected a source rejection");
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error:
+          "Only the exact currently unresolved customer question can be answered",
+      });
+      expect(mocks.customerReply).not.toHaveBeenCalled();
+      expect(mocks.manualReply).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["prepare_question_reply", "prepare_manual_question_reply"] as const)(
+    "rejects %s while an active direct reply exists",
+    async (action) => {
+      if (action === "prepare_question_reply") {
+        vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+        vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+      }
+      mocks.loadUnresolved.mockResolvedValue({
+        question: { id: 33 },
+        reply: { id: 45, status: "draft" },
+      });
+
+      const response = await POST(
+        request({ action, expectedRevision: 12, sourceMessageId: 33 }),
+        { params: Promise.resolve({ id: "10" }) },
+      );
+
+      if (!response) throw new Error("Expected an active-reply rejection");
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error:
+          "An active direct reply already exists for this customer question",
+      });
+      expect(mocks.customerReply).not.toHaveBeenCalled();
+      expect(mocks.manualReply).not.toHaveBeenCalled();
+    },
+  );
+
+  it("allows AI preparation again after only cancelled replies remain", async () => {
+    vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+    mocks.customerReply.mockResolvedValue({
+      duplicate: false,
+      message: { id: 45, status: "draft" },
+    });
+
+    const response = await POST(
+      request({
+        action: "prepare_question_reply",
+        expectedRevision: 12,
+        sourceMessageId: 33,
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a recreated AI reply");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      duplicate: false,
+      messageId: 45,
+      ok: true,
+    });
+    expect(mocks.loadUnresolved).toHaveBeenCalledWith(expect.anything(), 10);
+    expect(mocks.customerReply).toHaveBeenCalledTimes(1);
   });
 
   it("returns a typed recovery when AI safety rejects the replacement twice", async () => {

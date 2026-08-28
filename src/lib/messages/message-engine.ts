@@ -396,6 +396,7 @@ export async function createCustomerReplyDraft(
     channel: lead.email ? ("email" as const) : ("sms" as const),
     subject: generated.result.subject,
     bodyText: generated.result.replyDraft,
+    bodyHtml: null,
     status: "draft" as const,
     idempotencyKey,
     aiAssisted: true,
@@ -410,19 +411,52 @@ export async function createCustomerReplyDraft(
     },
     modelVersion: generated.model,
     promptVersion: generated.promptVersion,
+    approvedBy: null,
+    approvedAt: null,
+    queuedAt: null,
+    sentAt: null,
+    deliveredAt: null,
+    provider: null,
+    providerMessageId: null,
+    failureCode: null,
+    failureMessage: null,
   };
-  const message = duplicate
-    ? await payload.update({
+  let message;
+  if (duplicate) {
+    const reactivated = await payload.update({
+      collection: "messages",
+      overrideAccess: true,
+      where: {
+        and: [
+          { id: { equals: duplicate.id } },
+          { status: { equals: "cancelled" } },
+          { updatedAt: { equals: duplicate.updatedAt } },
+        ],
+      },
+      data,
+    });
+    message = reactivated.docs?.[0];
+    if (!message) {
+      const winner = await payload.findByID({
         collection: "messages",
         id: duplicate.id,
+        depth: 0,
         overrideAccess: true,
-        data,
-      })
-    : await payload.create({
-        collection: "messages",
-        overrideAccess: true,
-        data,
       });
+      if (winner.status !== "cancelled") {
+        return { duplicate: true as const, message: winner };
+      }
+      throw new TypeError(
+        "The cancelled reply changed while a new draft was generated. Retry from the current case state.",
+      );
+    }
+  } else {
+    message = await payload.create({
+      collection: "messages",
+      overrideAccess: true,
+      data,
+    });
+  }
   await updateCaseState(payload, {
     leadId: lead.id,
     command: "customer_reply_drafted",
