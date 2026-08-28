@@ -4,6 +4,8 @@ This checklist contains the remaining human-visible checks. Complete it only wit
 
 ## A. Preview hotfix gate — required before Production hotfix
 
+**Būsena: PASS 2026-08-28.** Savininkas atidarė sintetinę bylą `#4`, atnaujino puslapį ir patvirtino, kad bendras klaidos puslapis nepasirodė.
+
 Open: `https://takfornyelse-staging.vercel.app/admin-v2`
 
 1. Sign in to Preview.

@@ -25,7 +25,7 @@ Principas: žmogaus nepatikrintas rezultatas nėra `PASS`.
 | Pasiūlymo atmetimas ir gelbėjimo klasifikacija | REIKIA SAVININKO UAT | Reikia atskiros sintetinės bylos; negalima keisti pasirašytos `#10` bylos. |
 | Sutarties nutraukimas / atsisakymas | REIKIA SAVININKO UAT | Reikia atskiros sintetinės bylos ir patikrinti galutinį admin patvirtinimą. |
 | Neteisingas, pakeistas, pasibaigęs ir atšauktas tokenas | ĮRODYTA TESTAIS; GYVAS UAT NEBAIGTAS | Automatiniai neigiami testai yra žali; savininkui paliekamas vienas gyvas saugios nuorodos patikrinimas. |
-| `mark_reviewed` incidentas | READY FOR OWNER UAT | Pataisa `c2989a1`; 13/13 tikslinių, 581/581 vienetinių testų ir Linux CI run `33120965793` PASS; Preview `dpl_2mBbVwymveu5Jjgw5qc39X7U3dPj` READY. Liko prisijungus atidaryti vieną neperžiūrėtą Preview bylą. |
+| `mark_reviewed` incidentas | SAVININKO PREVIEW UAT PASS | Pataisa `c2989a1`; 13/13 tikslinių, 581/581 vienetinių testų ir Linux CI run `33120965793` PASS; Preview `dpl_2mBbVwymveu5Jjgw5qc39X7U3dPj` READY. 2026-08-28 savininkas atidarė neperžiūrėtą sintetinę bylą `#4`, atnaujino puslapį ir patvirtino, kad klaida nepasikartojo. |
 
 ## PROD-8.3 — darbas ir darbuotojo eiga
 
@@ -60,4 +60,4 @@ Principas: žmogaus nepatikrintas rezultatas nėra `PASS`.
 2. Jokia komercinė išvestis ar mokėjimo priminimas negali būti siunčiamas be administratoriaus patvirtinimo.
 3. `GO_FULL_AUTOMATION` negalimas iki 20–30 realių bylų piloto ir mažiausiai trijų fizinių matavimų palyginimo.
 4. Pasirašyta byla `#10` nenaudojama destruktyviems ar atmetimo scenarijams.
-5. `c2989a1` nekeliama į Production, kol neprisijungusio Preview UAT kliūtis neuždaryta.
+5. `c2989a1` Preview UAT kliūtis uždaryta; Production diegimas galimas tik kartu su žaliu naujausio kandidato Linux CI ir užfiksuotu rollback.
