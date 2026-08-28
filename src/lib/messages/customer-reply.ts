@@ -268,6 +268,21 @@ export function assertCustomerReplyTextSafe(
       );
     }
   }
+  const asksAboutAddingImpregnation =
+    /\bimpregnering\b/i.test(context.customerMessage) &&
+    /\b(?:senere|tillegg|legge\s+til|velge|inkludert|inngår)\b/i.test(
+      context.customerMessage,
+    );
+  if (
+    asksAboutAddingImpregnation &&
+    !/\b(?:ikke\s+inkludert|inngår\s+ikke|kan\s+avtales|avtales\s+særskilt|som\s+et\s+tillegg|revidert\s+tilbud|separat\s+tilbud)\b/i.test(
+      normalized,
+    )
+  ) {
+    throw new TypeError(
+      "AI reply must explicitly answer whether impregnation is included or can be added separately",
+    );
+  }
   for (const match of normalized.matchAll(
     /(\d[\d\s.]*(?:,\d{1,2})?)\s*(?:kr|nok)\b/gi,
   )) {
@@ -340,12 +355,13 @@ export async function generateCustomerReplyDraft(input: {
   const promptContext = customerReplyPromptContext(context);
   const generated = await input.provider.generate({
     task: "customer.reply.draft",
-    schemaName: "customer-reply-nb-v2",
+    schemaName: "customer-reply-nb-v3",
     schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
     correlationId: input.correlationId,
     system: [
       "Du lager bare et internt norsk svarutkast for Takfornyelse.",
       "Svar varmt, tydelig og profesjonelt til norske boligeiere over 30 år.",
+      "Svar eksplisitt på hvert delspørsmål i kundens melding. Hvis konteksten ikke gir grunnlag for ja eller nei, si det tydelig og beskriv hvilket kontrollert neste steg som kreves.",
       "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
       "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
       "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
@@ -398,11 +414,12 @@ export async function polishCustomerReplyDraft(input: {
   const promptContext = customerReplyPromptContext(context);
   const generated = await input.provider.generate({
     task: "customer.reply.polish",
-    schemaName: "customer-reply-polish-nb-v2",
+    schemaName: "customer-reply-polish-nb-v3",
     schema: polishedReplyJsonSchema as unknown as Record<string, unknown>,
     correlationId: input.correlationId,
     system: [
       "Du forbedrer et internt svarutkast for Takfornyelse på profesjonell norsk.",
+      "Bevar og besvar eksplisitt hvert delspørsmål i kundens opprinnelige melding.",
       "Bevar meningen og alle verifiserte fakta. Ikke legg til pris, areal, rabatt, garanti, dato eller løfte.",
       "Alle pengebeløp i sakskonteksten er formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
       "Når teksten omtaler maksimalpris, må den slå fast at avvik over rammen stanser berørt arbeid og krever en ny skriftlig endringsavtale som kunden aksepterer før arbeidet fortsetter. Kontrollmålingen er aldri alene et unntak fra maksimalprisen.",

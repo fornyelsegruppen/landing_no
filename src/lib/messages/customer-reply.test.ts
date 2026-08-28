@@ -122,6 +122,27 @@ describe("customer reply safety", () => {
     ).toBe(true);
   });
 
+  it("requires an explicit answer when the customer asks about adding impregnation", () => {
+    const multiPartContext: CustomerReplyContext = {
+      ...context,
+      customerMessage:
+        "Hva dekker maksimalprisen, og kan jeg velge impregnering senere?",
+    };
+
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Maksimalprisen følger tilbudet. Takfornyelse utfører bare tjenestene som er beskrevet i det valgte tilbudet.",
+        multiPartContext,
+      ),
+    ).toThrow(/explicitly answer whether impregnation/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Maksimalprisen følger tilbudet. Impregnering er ikke inkludert, men kan avtales senere som et tillegg gjennom et revidert tilbud.",
+        multiPartContext,
+      ),
+    ).toBe(true);
+  });
+
   it("generates a controlled draft without changing approved facts", async () => {
     await expect(
       generateCustomerReplyDraft({
