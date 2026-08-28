@@ -258,6 +258,16 @@ export function assertCustomerReplyTextSafe(
       "AI reply may not expose raw øre amounts to the customer",
     );
   }
+  for (const sentence of normalized.split(/[.!?](?:\s|$)/)) {
+    if (!/maksimalpris/i.test(sentence) || !/\bmed mindre\b/i.test(sentence))
+      continue;
+    const exception = sentence.split(/\bmed mindre\b/i)[1] || "";
+    if (!/skriftlig\s+(?:og\s+signert\s+)?endringsavtale/i.test(exception)) {
+      throw new TypeError(
+        "AI reply may not describe an exception to the maximum price without a written change agreement",
+      );
+    }
+  }
   for (const match of normalized.matchAll(
     /(\d[\d\s.]*(?:,\d{1,2})?)\s*(?:kr|nok)\b/gi,
   )) {
@@ -339,6 +349,7 @@ export async function generateCustomerReplyDraft(input: {
       "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
       "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
       "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
+      "Når du forklarer maksimalpris: Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale. Hvis kontrollmålingen viser større areal eller annet omfang over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen. Beskriv aldri kontrollmålingen som et selvstendig unntak fra maksimalprisen.",
       "Bruk den uforanderlige quote- og contract-versjonen i saken når kunden spør om et eksisterende tilbud eller en eksisterende avtale.",
       "Bruk aktive businessSources bare for gjeldende generell informasjon. En gjeldende listepris er ikke et bindende tilbud og skal ikke erstatte prisene i saken.",
       "Hvis aktive kilder avviker fra saksdokumentet, skal du forklare at den utstedte saksversjonen gjelder og foreslå et revidert tilbud når det er nødvendig.",
@@ -394,6 +405,7 @@ export async function polishCustomerReplyDraft(input: {
       "Du forbedrer et internt svarutkast for Takfornyelse på profesjonell norsk.",
       "Bevar meningen og alle verifiserte fakta. Ikke legg til pris, areal, rabatt, garanti, dato eller løfte.",
       "Alle pengebeløp i sakskonteksten er formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
+      "Når teksten omtaler maksimalpris, må den slå fast at avvik over rammen stanser berørt arbeid og krever en ny skriftlig endringsavtale som kunden aksepterer før arbeidet fortsetter. Kontrollmålingen er aldri alene et unntak fra maksimalprisen.",
       "Bruk saksdokumentet for eksisterende tilbud eller avtale. Gjeldende listepriser må aldri fremstilles som kundens bindende pris.",
       "Returner bare et forslag. Administratoren må kontrollere og godkjenne før utsending.",
     ].join("\n"),

@@ -107,6 +107,21 @@ describe("customer reply safety", () => {
     ).toThrow(/cancellation/);
   });
 
+  it("blocks an ambiguous control-measurement exception to the maximum price", () => {
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale, med mindre kontrollmålingen viser avvik.",
+        context,
+      ),
+    ).toThrow(/exception to the maximum price/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Kunden betaler aldri mer enn maksimalprisen med mindre kunden aksepterer en ny skriftlig endringsavtale.",
+        context,
+      ),
+    ).toBe(true);
+  });
+
   it("generates a controlled draft without changing approved facts", async () => {
     await expect(
       generateCustomerReplyDraft({
