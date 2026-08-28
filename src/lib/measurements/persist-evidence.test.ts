@@ -1,6 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ readPrivateMediaContent: vi.fn() }));
+
+vi.mock("@/lib/private-media-content", () => ({
+  readPrivateMediaContent: mocks.readPrivateMediaContent,
+}));
+
+import {
+  persistSchematicMeasurementEvidence,
+  verifySchematicMeasurementEvidence,
+} from "./persist-evidence";
 import { FakeMapEvidenceProvider } from "./schematic-evidence";
-import { persistSchematicMeasurementEvidence } from "./persist-evidence";
 
 describe("persist schematic measurement evidence", () => {
   it("stores private immutable evidence and links its hash to the measurement", async () => {
@@ -66,5 +77,34 @@ describe("persist schematic measurement evidence", () => {
         }),
       }),
     );
+  });
+});
+
+describe("schematic measurement evidence verification", () => {
+  beforeEach(() => {
+    mocks.readPrivateMediaContent.mockReset();
+  });
+
+  it("returns false for a hash mismatch without repeating the media read", async () => {
+    const stored = Buffer.from("stored-evidence");
+    const payload = {
+      findByID: vi.fn().mockResolvedValue({
+        filename: "roof-evidence.svg",
+        mimeType: "image/svg+xml",
+      }),
+    };
+    mocks.readPrivateMediaContent.mockResolvedValue({
+      contentType: "image/svg+xml",
+      data: Buffer.from("different-evidence"),
+      filename: "roof-evidence.svg",
+    });
+
+    await expect(
+      verifySchematicMeasurementEvidence(payload as never, {
+        evidenceHash: createHash("sha256").update(stored).digest("hex"),
+        evidenceSnapshot: 53,
+      }),
+    ).resolves.toBe(false);
+    expect(mocks.readPrivateMediaContent).toHaveBeenCalledTimes(1);
   });
 });

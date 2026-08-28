@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   assertSources: vi.fn(),
   assertTrackingReady: vi.fn(),
+  approvePackage: vi.fn(),
   auth: vi.fn(),
   capture: vi.fn(),
   create: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   manualReply: vi.fn(),
   markLeadReviewed: vi.fn(),
+  preparePackage: vi.fn(),
   recordAudit: vi.fn(),
   update: vi.fn(),
   provider: {
@@ -45,6 +47,10 @@ vi.mock("@/lib/providers/email-provider", () => ({
 vi.mock("@/lib/messages/customer-reply-sources", () => ({
   assertCustomerReplySourcesCurrent: mocks.assertSources,
 }));
+vi.mock("@/lib/leads/automatic-package", () => ({
+  approveAndSendPreparedLeadPackage: mocks.approvePackage,
+  prepareAutomaticLeadPackage: mocks.preparePackage,
+}));
 vi.mock("@/payload/access/roles", () => ({
   userIsAdmin: vi.fn(() => true),
 }));
@@ -58,6 +64,7 @@ vi.mock("@/lib/audit/audit-event", () => ({
   recordAuditEvent: mocks.recordAudit,
 }));
 
+import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
 import { POST } from "./route";
 
 function request(body: Record<string, unknown> = { action: "mark_reviewed" }) {
@@ -78,6 +85,7 @@ describe("admin lead review marker", () => {
       .mockReset()
       .mockResolvedValue({ context: { purpose: "question" } });
     mocks.assertTrackingReady.mockReset();
+    mocks.approvePackage.mockReset();
     mocks.create.mockReset();
     mocks.deliver.mockReset().mockResolvedValue({ duplicate: false });
     mocks.enqueue.mockReset().mockResolvedValue({ id: 73 });
@@ -92,11 +100,16 @@ describe("admin lead review marker", () => {
       reviewedAt: "2026-08-28T00:00:00.000Z",
     });
     mocks.recordAudit.mockReset().mockResolvedValue(undefined);
+    mocks.preparePackage.mockReset();
     mocks.manualReply.mockReset().mockResolvedValue({
       duplicate: false,
       message: { id: 44 },
     });
     mocks.update.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("routes the automatic marker through the idempotent case command", async () => {
@@ -141,6 +154,44 @@ describe("admin lead review marker", () => {
       expect.anything(),
       expect.objectContaining({ leadId: 10, sourceMessageId: 33 }),
     );
+  });
+
+  it("returns a typed retryable response when secure measurement evidence is temporarily unavailable", async () => {
+    vi.stubEnv("FEATURE_CUSTOMER_QUOTES", "true");
+    vi.stubEnv("FEATURE_CONTRACT_SIGNING", "true");
+    vi.stubEnv("LEGAL_REVIEW_REFERENCE", "test-legal-review");
+    vi.stubEnv("PAYLOAD_SECRET", "test-payload-secret");
+    vi.stubEnv("RESEND_API_KEY", "test-resend-key");
+    mocks.approvePackage.mockRejectedValue(
+      new PrivateMediaTemporarilyUnavailableError(),
+    );
+
+    const response = await POST(
+      request({ action: "approve_package", expectedRevision: 12 }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected an evidence failure response");
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("5");
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: "MEASUREMENT_EVIDENCE_TEMPORARILY_UNAVAILABLE",
+      correlationId: expect.any(String),
+      error: expect.stringContaining("temporarily unavailable"),
+    });
+    expect(JSON.stringify(body)).not.toMatch(
+      /fetch failed|blob\.vercel-storage\.com|test-private-blob-token/i,
+    );
+    expect(mocks.approvePackage).toHaveBeenCalledTimes(1);
+    expect(mocks.capture).toHaveBeenCalledWith(
+      expect.any(PrivateMediaTemporarilyUnavailableError),
+      expect.objectContaining({
+        operation: "private-media-read",
+        route: "POST /api/admin/leads/[id]",
+      }),
+    );
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
   });
 
   it("refuses a stale customer reply before retrying delivery", async () => {

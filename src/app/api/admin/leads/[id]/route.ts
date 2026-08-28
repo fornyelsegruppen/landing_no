@@ -38,6 +38,7 @@ import {
 } from "@/lib/messages/customer-reply";
 import { assertCustomerReplySourcesCurrent } from "@/lib/messages/customer-reply-sources";
 import { markLeadReviewed } from "@/lib/admin-v2/mark-lead-reviewed";
+import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
 
 export const maxDuration = 60;
 
@@ -837,6 +838,22 @@ export async function POST(
       });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    if (error instanceof PrivateMediaTemporarilyUnavailableError) {
+      captureException(error, {
+        route: "POST /api/admin/leads/[id]",
+        operation: "private-media-read",
+        correlationId,
+      });
+      return NextResponse.json(
+        {
+          error:
+            "Secure measurement evidence is temporarily unavailable. Refresh the case and verify its status before trying again.",
+          code: "MEASUREMENT_EVIDENCE_TEMPORARILY_UNAVAILABLE",
+          correlationId,
+        },
+        { status: 503, headers: { "Retry-After": "5" } },
+      );
+    }
     if (error instanceof FeatureUnavailableError)
       return NextResponse.json(
         { error: error.reason, missing: error.unavailable },
