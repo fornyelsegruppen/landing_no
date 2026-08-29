@@ -164,6 +164,21 @@ describe("customer reply safety", () => {
     ).toBe(true);
   });
 
+  it("rejects a definite endringsavtale form after an indefinite article", () => {
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        "Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtalen.",
+        context,
+      ),
+    ).toThrow(/grammatically inconsistent form/);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale.",
+        context,
+      ),
+    ).toBe(true);
+  });
+
   it("rejects internal AI and implementation language in customer-facing text", () => {
     const internalPhrases = [
       "Vi kan ikke love dette uten kildegrunnlag.",

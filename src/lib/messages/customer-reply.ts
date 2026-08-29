@@ -329,6 +329,11 @@ export function assertCustomerReplyTextSafe(
       );
     }
   }
+  if (/\ben\s+(?:ny\s+)?(?:skriftlig\s+)?endringsavtalen\b/i.test(normalized)) {
+    throw new TypeError(
+      "AI reply contains a grammatically inconsistent form of the Norwegian word endringsavtale",
+    );
+  }
   if (/\d[\d\s.,]*\s*øre\b/i.test(normalized)) {
     throw new TypeError(
       "AI reply may not expose raw øre amounts to the customer",
