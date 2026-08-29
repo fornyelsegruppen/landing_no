@@ -558,6 +558,54 @@ describe("message engine", () => {
     });
   });
 
+  it("records the exact recipient used for a delivered customer-question reply", async () => {
+    const state = repository();
+    state.leads[0]!.communicationEmail = "confirmed@example.no";
+    const source = await state.payload.create({
+      collection: "messages",
+      overrideAccess: true,
+      data: {
+        lead: 1,
+        direction: "inbound",
+        category: "customer_question",
+        channel: "email",
+        subject: "Spørsmål om tilbud T-1-V1",
+        bodyText: "Hvilken adresse sendes svaret til?",
+        status: "delivered",
+        idempotencyKey: "question-source-recipient",
+        aiAssisted: false,
+      },
+    });
+    const draft = await createManualCustomerQuestionReplyDraft(state.payload, {
+      correlationId: "manual-question-recipient",
+      leadId: 1,
+      sourceMessageId: source.id,
+    });
+    await state.payload.update({
+      collection: "messages",
+      id: draft.message.id,
+      overrideAccess: true,
+      data: {
+        approvedAt: "2026-08-29T13:20:00.000Z",
+        bodyText: "Svaret sendes til den bekreftede kommunikasjonsadressen.",
+        status: "queued",
+      },
+    });
+
+    await deliverMessage(
+      state.payload,
+      new LogEmailProvider(),
+      draft.message.id,
+      "manual-question-recipient-delivery",
+    );
+
+    expect(state.messages[1]?.aiAnalysis).toMatchObject({
+      deliveryRecipient: "confirmed@example.no",
+      manualQuestionReply: true,
+      purpose: "question",
+    });
+  });
+
   it("reactivates a cancelled AI reply with freshly generated content", async () => {
     const state = repository();
     const source = await state.payload.create({

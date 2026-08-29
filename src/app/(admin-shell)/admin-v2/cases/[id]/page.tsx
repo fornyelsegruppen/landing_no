@@ -215,6 +215,14 @@ function manualReplyRequiresEditing(value: unknown) {
   );
 }
 
+function deliveryRecipient(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const recipient = (value as Record<string, unknown>).deliveryRecipient;
+  return typeof recipient === "string" && recipient.trim()
+    ? recipient.trim()
+    : null;
+}
+
 export default async function AdminCasePage({
   params,
 }: {
@@ -507,6 +515,14 @@ export default async function AdminCasePage({
                 ? {
                     aiAssisted: displayedReply.aiAssisted,
                     bodyText: displayedReply.bodyText || "",
+                    channel: displayedReply.channel,
+                    deliveredAt: displayedReply.deliveredAt
+                      ? formatDate(displayedReply.deliveredAt)
+                      : undefined,
+                    deliveryRecipient:
+                      deliveryRecipient(displayedReply.aiAnalysis) ||
+                      caseData.lead.communicationEmail ||
+                      caseData.lead.email,
                     factWarnings: factWarnings(displayedReply.aiAnalysis),
                     failureCode: displayedReply.failureCode,
                     failureMessage: displayedReply.failureMessage,

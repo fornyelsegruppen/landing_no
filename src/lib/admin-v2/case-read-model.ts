@@ -197,6 +197,7 @@ export type CaseMessage = CaseEntity & {
   category: string;
   channel: string;
   direction: string;
+  deliveredAt?: string;
   failureCode?: string;
   failureMessage?: string;
   manualRecovery?: {
@@ -1155,6 +1156,7 @@ export async function loadAdminCase(
     direction: stringValue(message.direction) || "outbound",
     category: stringValue(message.category) || "",
     channel: stringValue(message.channel) || "",
+    deliveredAt: stringValue(message.deliveredAt),
     sentAt: stringValue(message.sentAt),
     failureCode: stringValue(message.failureCode),
     failureMessage: stringValue(message.failureMessage),

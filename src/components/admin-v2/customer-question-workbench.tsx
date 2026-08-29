@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, ChevronDown } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { customerQuestionReplyStage } from "@/lib/messages/customer-question-state";
 import {
@@ -40,9 +41,16 @@ const copy = {
     sentStatus: "Sendt – venter på leveringsbekreftelse",
     sentHelp:
       "E-postleverandøren har tatt imot svaret. Kunden kan ikke signere før leveringen er bekreftet.",
-    deliveredStatus: "Svar bekreftet levert",
-    deliveredHelp:
-      "E-postleverandøren har bekreftet levering. Kunden kan fortsette til signering.",
+    deliveredStatus: "Svaret er levert",
+    deliveredHelp: "Kunden kan fortsette til signering.",
+    showDeliveryDetails: "Vis leveringsinformasjon",
+    hideDeliveryDetails: "Skjul leveringsinformasjon",
+    recipient: "Mottaker",
+    deliveredAt: "Levert",
+    channel: "Kanal",
+    emailChannel: "E-post",
+    deliveredReply: "Levert svar",
+    unavailable: "Ikke registrert",
     failedStatus: "Levering mislyktes",
     failedHelp:
       "Kontroller svar og leveringsfeil før du prøver å sende på nytt.",
@@ -98,9 +106,16 @@ const copy = {
     sentStatus: "Išsiųsta – laukiama pristatymo patvirtinimo",
     sentHelp:
       "El. pašto paslaugų teikėjas priėmė atsakymą. Klientas negali pasirašyti, kol pristatymas nepatvirtintas.",
-    deliveredStatus: "Patvirtinta, kad atsakymas pristatytas",
-    deliveredHelp:
-      "El. pašto paslaugų teikėjas patvirtino pristatymą. Klientas gali tęsti pasirašymą.",
+    deliveredStatus: "Atsakymas pristatytas",
+    deliveredHelp: "Klientas gali tęsti pasirašymą.",
+    showDeliveryDetails: "Rodyti pristatymo informaciją",
+    hideDeliveryDetails: "Slėpti pristatymo informaciją",
+    recipient: "Gavėjas",
+    deliveredAt: "Pristatyta",
+    channel: "Kanalas",
+    emailChannel: "El. paštas",
+    deliveredReply: "Pristatytas atsakymas",
+    unavailable: "Neužregistruota",
     failedStatus: "Pristatyti nepavyko",
     failedHelp:
       "Prieš siųsdami dar kartą patikrinkite atsakymą ir pristatymo klaidą.",
@@ -157,9 +172,16 @@ const copy = {
     sentStatus: "Sent – awaiting delivery confirmation",
     sentHelp:
       "The email provider accepted the reply. The customer cannot sign until delivery is confirmed.",
-    deliveredStatus: "Reply confirmed delivered",
-    deliveredHelp:
-      "The email provider confirmed delivery. The customer can continue to signing.",
+    deliveredStatus: "Reply delivered",
+    deliveredHelp: "The customer can continue to signing.",
+    showDeliveryDetails: "Show delivery information",
+    hideDeliveryDetails: "Hide delivery information",
+    recipient: "Recipient",
+    deliveredAt: "Delivered",
+    channel: "Channel",
+    emailChannel: "Email",
+    deliveredReply: "Delivered reply",
+    unavailable: "Not recorded",
     failedStatus: "Delivery failed",
     failedHelp: "Review the reply and delivery error before trying again.",
     retry: "Retry delivery",
@@ -195,6 +217,9 @@ const copy = {
 type QuestionReply = {
   aiAssisted?: boolean;
   bodyText: string;
+  channel?: string;
+  deliveredAt?: string;
+  deliveryRecipient?: string;
   factWarnings?: string[];
   failureCode?: string;
   failureMessage?: string;
@@ -204,6 +229,88 @@ type QuestionReply = {
   subject: string;
   updatedAt: string;
 };
+
+export function CustomerQuestionDeliverySuccess(props: {
+  locale: PanelLocale;
+  reply: QuestionReply;
+}) {
+  const labels = copy[props.locale];
+  return (
+    <details className="group border-success/45 bg-success/10 overflow-hidden rounded-2xl border text-green-50">
+      <summary className="hover:bg-success/10 focus-visible:ring-success/70 flex min-h-14 cursor-pointer list-none flex-col gap-3 p-4 transition-colors marker:content-none focus-visible:ring-2 focus-visible:outline-none sm:flex-row sm:items-center sm:justify-between sm:p-5 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-start gap-3">
+          <CheckCircle2
+            aria-hidden="true"
+            className="mt-0.5 size-6 shrink-0 text-emerald-300"
+          />
+          <span className="min-w-0">
+            <span className="block text-lg font-bold break-words">
+              {labels.deliveredStatus}
+            </span>
+            <span className="mt-1 block text-sm leading-6 text-green-50/80">
+              {labels.deliveredHelp}
+            </span>
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-sm font-bold text-emerald-200">
+          <span className="group-open:hidden">
+            {labels.showDeliveryDetails}
+          </span>
+          <span className="hidden group-open:inline">
+            {labels.hideDeliveryDetails}
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className="size-5 transition-transform group-open:rotate-180"
+          />
+        </span>
+      </summary>
+
+      <div className="border-success/25 border-t p-4 sm:p-5">
+        <dl className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="bg-success/8 min-w-0 rounded-xl border border-emerald-300/15 p-3">
+            <dt className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
+              {labels.recipient}
+            </dt>
+            <dd className="mt-1 font-semibold break-all">
+              {props.reply.deliveryRecipient || labels.unavailable}
+            </dd>
+          </div>
+          <div className="bg-success/8 min-w-0 rounded-xl border border-emerald-300/15 p-3">
+            <dt className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
+              {labels.deliveredAt}
+            </dt>
+            <dd className="mt-1 font-semibold">
+              {props.reply.deliveredAt || labels.unavailable}
+            </dd>
+          </div>
+          <div className="bg-success/8 min-w-0 rounded-xl border border-emerald-300/15 p-3 sm:col-span-2 lg:col-span-1">
+            <dt className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
+              {labels.channel}
+            </dt>
+            <dd className="mt-1 font-semibold">
+              {props.reply.channel === "email"
+                ? labels.emailChannel
+                : props.reply.channel || labels.unavailable}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 min-w-0 rounded-xl border border-white/10 bg-black/15 p-4">
+          <p className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
+            {labels.deliveredReply}
+          </p>
+          <p className="mt-2 font-semibold break-words">
+            {props.reply.subject}
+          </p>
+          <p className="mt-2 text-sm leading-6 whitespace-pre-wrap text-white/80">
+            {props.reply.bodyText}
+          </p>
+        </div>
+      </div>
+    </details>
+  );
+}
 
 class CustomerReplyActionError extends Error {
   constructor(
@@ -460,8 +567,11 @@ export function CustomerQuestionWorkbench(props: {
           </h2>
         </div>
         <span
-          className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${displayState === "source_changed" ? "border-red-400/50 bg-red-500/15 text-red-100" : "border-warning/35 bg-warning/10 text-warning"}`}
+          className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${displayState === "source_changed" ? "border-red-400/50 bg-red-500/15 text-red-100" : stage === "delivered" ? "border-success/45 bg-success/10 text-emerald-200" : "border-warning/35 bg-warning/10 text-warning"}`}
         >
+          {stage === "delivered" ? (
+            <CheckCircle2 aria-hidden="true" className="size-3.5" />
+          ) : null}
           {statusLabel}
         </span>
       </div>
@@ -573,15 +683,16 @@ export function CustomerQuestionWorkbench(props: {
               </button>
             ) : null}
           </div>
+        ) : stage === "delivered" && props.reply ? (
+          <CustomerQuestionDeliverySuccess
+            locale={props.locale}
+            reply={props.reply}
+          />
         ) : (
           <div>
             <h3 className="text-lg font-bold">{statusLabel}</h3>
             <p className="text-muted-foreground mt-1 text-sm leading-6">
-              {stage === "delivered"
-                ? labels.deliveredHelp
-                : stage === "sent"
-                  ? labels.sentHelp
-                  : labels.queuedHelp}
+              {stage === "sent" ? labels.sentHelp : labels.queuedHelp}
             </p>
             {props.reply ? (
               <details className="mt-4 rounded-xl border border-white/10 bg-black/15 p-3">

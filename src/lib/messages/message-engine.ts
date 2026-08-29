@@ -695,11 +695,32 @@ export async function deliverMessage(
       correlationId,
       ...(attachments.length ? { attachments } : {}),
     });
+    const analysis =
+      message.aiAnalysis &&
+      typeof message.aiAnalysis === "object" &&
+      !Array.isArray(message.aiAnalysis)
+        ? (message.aiAnalysis as Record<string, unknown> & {
+            alternativeQuoteId?: number;
+            cancellationDecision?: string;
+            recommendedNextAction?: string;
+            quoteId?: number;
+            officialInvoiceId?: number;
+          })
+        : {};
+    const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
+    const isCustomerQuestionReply =
+      replyContext?.purpose === "question" ||
+      analysis.manualQuestionReply === true;
     const updated = await payload.update({
       collection: "messages",
       id: message.id,
       overrideAccess: true,
       data: {
+        ...(isCustomerQuestionReply
+          ? {
+              aiAnalysis: { ...analysis, deliveryRecipient: deliveryEmail },
+            }
+          : {}),
         status: "sent",
         sentAt: result.acceptedAt,
         provider: result.provider,
@@ -708,16 +729,6 @@ export async function deliverMessage(
         failureMessage: null,
       },
     });
-    const analysis =
-      message.aiAnalysis && typeof message.aiAnalysis === "object"
-        ? (message.aiAnalysis as {
-            alternativeQuoteId?: number;
-            cancellationDecision?: string;
-            recommendedNextAction?: string;
-            quoteId?: number;
-            officialInvoiceId?: number;
-          })
-        : {};
     if (
       message.category === "invoice" &&
       typeof analysis.officialInvoiceId === "number"
@@ -762,7 +773,6 @@ export async function deliverMessage(
           });
       }
     }
-    const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
     if (message.category === "quote" && typeof analysis.quoteId === "number") {
       const quoteIds = [analysis.quoteId, analysis.alternativeQuoteId].filter(
         (value): value is number => typeof value === "number",
@@ -799,9 +809,6 @@ export async function deliverMessage(
         correlationId,
       );
     }
-    const isCustomerQuestionReply =
-      replyContext?.purpose === "question" ||
-      (analysis as Record<string, unknown>).manualQuestionReply === true;
     const followUp =
       lead.status === "closed" || analysis.cancellationDecision
         ? {}
