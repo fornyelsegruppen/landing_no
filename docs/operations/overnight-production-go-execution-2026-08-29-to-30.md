@@ -124,10 +124,22 @@ This section is updated only with completed, directly observed evidence.
 - 2026-08-29 20:19 EEST — full local gates: unit 196 files / 831 tests PASS;
   migration 21 files / 39 tests PASS; full ESLint PASS; full TypeScript PASS;
   Prettier and `git diff --check` PASS.
-- 2026-08-29 20:21 EEST — local ARM64 Windows production build could not be
-  accepted as a release gate: Turbopack cannot load its present ARM64
-  Lightning CSS native package inside the transform worker, while direct Node
-  loading succeeds; the webpack fallback reaches an existing `node:crypto`
+- 2026-08-29 20:21 EEST — Windows-on-ARM64 uses native ARM64 Node.js and the
+  Microsoft Visual C++ 2022 ARM64 runtime. `lightningcss-win32-arm64-msvc` and
+  direct `require("lightningcss")` both load successfully. A local Turbopack
+  transform worker still emits its fallback-path error, but this is not treated
+  as a missing ARM64 binary and no package version or architecture setting was
+  changed. The webpack fallback reaches an existing `node:crypto`
   client-boundary incompatibility. No application test or type failure was
-  reported. The exact-SHA Linux Quality Gate and Vercel Preview build remain
-  the authoritative build gates before GO.
+  reported.
+- 2026-08-29 20:31 EEST — exact candidate
+  `ef0e466448718b262ec29f1a60b5bae1f897dedb`, Quality Gate run
+  `33265615478`: PASS. Linux install/audit/generated types/lint/typecheck,
+  unit/API tests, migration up/down, empty PostgreSQL bootstrap, deterministic
+  public and authenticated browser smoke, production build and isolated
+  PostgreSQL backup/restore rehearsal all passed.
+- 2026-08-29 20:39 EEST — Vercel accepted the exact candidate upload but
+  blocked the Preview before build with `TEAM_ACCESS_REQUIRED`: commit author
+  `fornyelsegruppen@gmail.com` is not currently attributed to the Vercel team.
+  This is an account collaboration gate, not an application build failure.
+  The owner received the exact deployment/team links; Production is unchanged.
