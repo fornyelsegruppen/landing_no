@@ -9,6 +9,7 @@ export function customerQuestionActionVisibility(
     recovery === "safety_rejected" || recovery === "source_changed";
 
   return {
+    disableAiAction: recovery === "quota_limited",
     showPrepareActions: stage === "prepare" && !replacementRecoveryRequired,
     showReplacementActions: replacementRecoveryRequired,
     showRetryAction:

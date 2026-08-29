@@ -31,7 +31,10 @@ import {
   CaseCommandConflictError,
   updateCaseState,
 } from "@/lib/cases/case-command";
-import { reserveCustomerReplyAiRequest } from "@/lib/ai/payload-usage-limit";
+import {
+  AiUsageLimitError,
+  reserveCustomerReplyAiRequest,
+} from "@/lib/ai/payload-usage-limit";
 import {
   assertCustomerReplyTextSafe,
   customerReplyContextFromAnalysis,
@@ -907,6 +910,28 @@ export async function POST(
       });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    if (error instanceof AiUsageLimitError) {
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((Date.parse(error.retryAt) - Date.now()) / 1_000),
+      );
+      return NextResponse.json(
+        {
+          code: "AI_USAGE_LIMIT_REACHED",
+          error:
+            "AI request limit reached. Use a manual reply until it resets.",
+          period: error.period,
+          retryAt: error.retryAt,
+        },
+        {
+          status: 429,
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": String(retryAfterSeconds),
+          },
+        },
+      );
+    }
     if (error instanceof PrivateMediaTemporarilyUnavailableError) {
       captureException(error, {
         route: "POST /api/admin/leads/[id]",

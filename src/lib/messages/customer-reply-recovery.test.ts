@@ -38,4 +38,15 @@ describe("customer reply recovery", () => {
       customerReplyRecoveryKind({ code: "MESSAGE_REVISION_CONFLICT" }),
     ).toBe("refresh");
   });
+
+  it("classifies typed and legacy AI quota failures separately", () => {
+    expect(customerReplyRecoveryKind({ code: "AI_USAGE_LIMIT_REACHED" })).toBe(
+      "quota_limited",
+    );
+    expect(
+      customerReplyRecoveryKind({
+        error: "AI daily request limit reached",
+      }),
+    ).toBe("quota_limited");
+  });
 });

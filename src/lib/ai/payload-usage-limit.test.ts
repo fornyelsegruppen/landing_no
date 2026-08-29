@@ -49,7 +49,11 @@ describe("combined Gemini usage limits", () => {
         reserve: 1,
         now: new Date("2026-08-23T12:00:00Z"),
       }),
-    ).rejects.toThrow(/daily/);
+    ).rejects.toMatchObject({
+      name: "AiUsageLimitError",
+      period: "daily",
+      retryAt: "2026-08-24T00:00:00.000Z",
+    });
   });
 
   it("allows configured capacity and enforces the monthly ceiling", async () => {
@@ -59,8 +63,15 @@ describe("combined Gemini usage limits", () => {
       assertPayloadAiUsageAvailable(payloadWithCounts(1, 1), { reserve: 1 }),
     ).resolves.toMatchObject({ daily: 2 });
     await expect(
-      assertPayloadAiUsageAvailable(payloadWithCounts(3, 2), { reserve: 1 }),
-    ).rejects.toThrow(/monthly/);
+      assertPayloadAiUsageAvailable(payloadWithCounts(3, 2), {
+        reserve: 1,
+        now: new Date("2026-08-23T12:00:00Z"),
+      }),
+    ).rejects.toMatchObject({
+      name: "AiUsageLimitError",
+      period: "monthly",
+      retryAt: "2026-09-01T00:00:00.000Z",
+    });
   });
 
   it("records and enforces each customer-reply Gemini request exactly once", async () => {

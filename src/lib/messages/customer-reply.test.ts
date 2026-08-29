@@ -437,7 +437,7 @@ describe("customer reply safety", () => {
     );
   });
 
-  it("uses a validated deterministic fallback for the live compound question after two unsafe AI drafts", async () => {
+  it("uses a validated deterministic fallback after one unsafe covered AI draft", async () => {
     const liveUatContext: CustomerReplyContext = {
       ...context,
       customerMessage:
@@ -455,11 +455,6 @@ describe("customer reply safety", () => {
         replyDraft:
           "Opplysningen kan ikke bekreftes uten kildegrunnlag. Kontakt oss senere.",
       },
-      {
-        ...valid,
-        replyDraft:
-          "Impregnering er ikke inkludert. Prisen kan endres etter kontrollmålingen.",
-      },
     ]);
 
     const generated = await generateCustomerReplyDraft({
@@ -468,7 +463,7 @@ describe("customer reply safety", () => {
       correlationId: "reply-live-safety-fallback",
     });
 
-    expect(provider.calls).toBe(2);
+    expect(provider.calls).toBe(1);
     expect(generated).toMatchObject({
       safetyFallback: true,
       result: {
@@ -480,6 +475,9 @@ describe("customer reply safety", () => {
     expect(generated.result.replyDraft).toContain("14 558,58 kr");
     expect(generated.result.replyDraft).toContain(
       "Impregnering er ikke inkludert",
+    );
+    expect(generated.result.replyDraft).toContain(
+      "revidert eller separat tilbud",
     );
     expect(generated.result.replyDraft).toContain("stanses berørt arbeid");
     expect(() =>

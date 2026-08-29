@@ -4,6 +4,28 @@ import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 
 const customerReplyUsageAction = "ai.customer-reply.request";
 
+export type AiUsageLimitPeriod = "daily" | "monthly";
+
+export class AiUsageLimitError extends Error {
+  constructor(
+    readonly period: AiUsageLimitPeriod,
+    readonly retryAt: string,
+  ) {
+    super(`AI ${period} request limit reached`);
+    this.name = "AiUsageLimitError";
+  }
+}
+
+function nextDailyReset(now: Date) {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+  );
+}
+
+function nextMonthlyReset(now: Date) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
 function positiveLimit(value: string | undefined, fallback: number) {
   const parsed = Number(value || fallback);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -68,13 +90,13 @@ export async function assertPayloadAiUsageAvailable(
     daily + reserve >
     positiveLimit(process.env.GEMINI_DAILY_REQUEST_LIMIT, 20)
   ) {
-    throw new Error("Gemini daily request limit reached");
+    throw new AiUsageLimitError("daily", nextDailyReset(now).toISOString());
   }
   if (
     monthly + reserve >
     positiveLimit(process.env.GEMINI_MONTHLY_REQUEST_LIMIT, 400)
   ) {
-    throw new Error("Gemini monthly request limit reached");
+    throw new AiUsageLimitError("monthly", nextMonthlyReset(now).toISOString());
   }
   return { daily, monthly };
 }

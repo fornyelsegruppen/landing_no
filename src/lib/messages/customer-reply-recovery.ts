@@ -1,5 +1,6 @@
 export type CustomerReplyRecoveryKind =
   | "ai_unavailable"
+  | "quota_limited"
   | "refresh"
   | "safety_rejected"
   | "source_changed"
@@ -25,6 +26,9 @@ export function customerReplyRecoveryKind(
   if (failure.code === "CUSTOMER_REPLY_SAFETY_REJECTED") {
     return "safety_rejected";
   }
+  if (failure.code === "AI_USAGE_LIMIT_REACHED") {
+    return "quota_limited";
+  }
 
   const error = failure.error?.toLowerCase() || "";
   if (
@@ -39,6 +43,13 @@ export function customerReplyRecoveryKind(
     error.includes("approved measurement snapshot")
   ) {
     return "safety_rejected";
+  }
+  if (
+    error.includes("daily request limit") ||
+    error.includes("monthly request limit") ||
+    error.includes("ai usage limit")
+  ) {
+    return "quota_limited";
   }
   if (
     error.includes("ai draft") ||

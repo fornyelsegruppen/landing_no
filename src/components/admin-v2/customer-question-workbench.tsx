@@ -50,6 +50,14 @@ const copy = {
     failed: "Handlingen kunne ikke fullføres. Oppdater siden og prøv igjen.",
     stale: "Saken er endret. Oppdater siden før du fortsetter.",
     aiUnavailable: "AI-utkast er ikke tilgjengelig nå. Velg «Skriv svar selv».",
+    quotaDaily: (resetAt: string | null) =>
+      resetAt
+        ? `Dagens AI-kvote er brukt opp. Den fornyes ${resetAt} (norsk tid). Velg «Skriv svar selv» frem til da.`
+        : "Dagens AI-kvote er brukt opp. Velg «Skriv svar selv» frem til kvoten fornyes.",
+    quotaMonthly: (resetAt: string | null) =>
+      resetAt
+        ? `Månedens AI-kvote er brukt opp. Den fornyes ${resetAt} (norsk tid). Velg «Skriv svar selv» frem til da.`
+        : "Månedens AI-kvote er brukt opp. Velg «Skriv svar selv» frem til kvoten fornyes.",
     safetyRejected:
       "Den automatiske faktakontrollen avviste AI-utkastet. Prøv et nytt AI-utkast, eller skriv et kontrollert svar selv.",
     sourceChanged:
@@ -99,6 +107,14 @@ const copy = {
     stale: "Byla pasikeitė. Prieš tęsdami atnaujinkite puslapį.",
     aiUnavailable:
       "DI juodraštis dabar nepasiekiamas. Pasirinkite „Rašyti atsakymą pačiam“.",
+    quotaDaily: (resetAt: string | null) =>
+      resetAt
+        ? `DI dienos kvota išnaudota. Ji atsinaujins ${resetAt} Lietuvos laiku. Iki tol pasirinkite „Rašyti atsakymą pačiam“.`
+        : "DI dienos kvota išnaudota. Iki jos atsinaujinimo pasirinkite „Rašyti atsakymą pačiam“.",
+    quotaMonthly: (resetAt: string | null) =>
+      resetAt
+        ? `DI mėnesio kvota išnaudota. Ji atsinaujins ${resetAt} Lietuvos laiku. Iki tol pasirinkite „Rašyti atsakymą pačiam“.`
+        : "DI mėnesio kvota išnaudota. Iki jos atsinaujinimo pasirinkite „Rašyti atsakymą pačiam“.",
     safetyRejected:
       "Automatinė faktų patikra atmetė DI juodraštį. Kurkite naują DI juodraštį arba parašykite patikrintą atsakymą patys.",
     sourceChanged:
@@ -145,6 +161,14 @@ const copy = {
     stale: "The case changed. Refresh before continuing.",
     aiUnavailable:
       "AI drafting is unavailable right now. Choose “Write reply manually”.",
+    quotaDaily: (resetAt: string | null) =>
+      resetAt
+        ? `The daily AI quota is exhausted. It resets at ${resetAt} UTC. Choose “Write reply manually” until then.`
+        : "The daily AI quota is exhausted. Choose “Write reply manually” until it resets.",
+    quotaMonthly: (resetAt: string | null) =>
+      resetAt
+        ? `The monthly AI quota is exhausted. It resets at ${resetAt} UTC. Choose “Write reply manually” until then.`
+        : "The monthly AI quota is exhausted. Choose “Write reply manually” until it resets.",
     safetyRejected:
       "The automated fact check rejected the AI draft. Create a new AI draft or write a controlled reply manually.",
     sourceChanged:
@@ -177,12 +201,35 @@ class CustomerReplyActionError extends Error {
   }
 }
 
+function formatQuotaReset(locale: PanelLocale, retryAt?: string) {
+  if (!retryAt) return null;
+  const date = new Date(retryAt);
+  if (Number.isNaN(date.getTime())) return null;
+  const format =
+    locale === "lt"
+      ? { locale: "lt-LT", timeZone: "Europe/Vilnius" }
+      : locale === "nb"
+        ? { locale: "nb-NO", timeZone: "Europe/Oslo" }
+        : { locale: "en-GB", timeZone: "UTC" };
+  return new Intl.DateTimeFormat(format.locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: format.timeZone,
+  }).format(date);
+}
+
 function localizedFailure(
   locale: PanelLocale,
-  result: { code?: string; error?: string },
+  result: {
+    code?: string;
+    error?: string;
+    period?: "daily" | "monthly";
+    retryAt?: string;
+  },
 ) {
   const labels = copy[locale];
   const recovery = customerReplyRecoveryKind(result);
+  const quotaReset = formatQuotaReset(locale, result.retryAt);
   const message =
     recovery === "refresh"
       ? labels.stale
@@ -190,9 +237,13 @@ function localizedFailure(
         ? labels.sourceChanged
         : recovery === "safety_rejected"
           ? labels.safetyRejected
-          : recovery === "ai_unavailable"
-            ? labels.aiUnavailable
-            : labels.failed;
+          : recovery === "quota_limited"
+            ? result.period === "monthly"
+              ? labels.quotaMonthly(quotaReset)
+              : labels.quotaDaily(quotaReset)
+            : recovery === "ai_unavailable"
+              ? labels.aiUnavailable
+              : labels.failed;
   return { message, recovery };
 }
 
@@ -253,7 +304,9 @@ export function CustomerQuestionWorkbench(props: {
       duplicate?: boolean;
       error?: string;
       messageId?: number;
+      period?: "daily" | "monthly";
       queued?: boolean;
+      retryAt?: string;
       sent?: boolean;
     };
     if (!response.ok) {
@@ -418,7 +471,11 @@ export function CustomerQuestionWorkbench(props: {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <button
                   className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-12 rounded-xl px-4 font-bold disabled:opacity-50"
-                  disabled={Boolean(busy) || Boolean(expectedMessageId)}
+                  disabled={
+                    Boolean(busy) ||
+                    Boolean(expectedMessageId) ||
+                    actionVisibility.disableAiAction
+                  }
                   onClick={() => void prepare("ai")}
                   type="button"
                 >
@@ -526,7 +583,11 @@ export function CustomerQuestionWorkbench(props: {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <button
             className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-12 rounded-xl px-4 font-bold disabled:opacity-50"
-            disabled={Boolean(busy) || Boolean(expectedMessageId)}
+            disabled={
+              Boolean(busy) ||
+              Boolean(expectedMessageId) ||
+              actionVisibility.disableAiAction
+            }
             onClick={() =>
               void (stage === "delivery_failed"
                 ? replaceFailedReply("ai")

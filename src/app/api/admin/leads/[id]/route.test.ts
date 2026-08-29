@@ -45,9 +45,12 @@ vi.mock("@/lib/messages/message-engine", () => ({
   manualQuestionReplyPlaceholder:
     "Skriv et kontrollert svar til kunden her før utsending.",
 }));
-vi.mock("@/lib/ai/payload-usage-limit", () => ({
-  reserveCustomerReplyAiRequest: mocks.reserveUsage,
-}));
+vi.mock("@/lib/ai/payload-usage-limit", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/ai/payload-usage-limit")
+  >("@/lib/ai/payload-usage-limit");
+  return { ...actual, reserveCustomerReplyAiRequest: mocks.reserveUsage };
+});
 vi.mock("@/lib/messages/customer-reply", async () => {
   const actual = await vi.importActual<
     typeof import("@/lib/messages/customer-reply")
@@ -81,6 +84,7 @@ vi.mock("@/lib/audit/audit-event", () => ({
 }));
 
 import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
+import { AiUsageLimitError } from "@/lib/ai/payload-usage-limit";
 import { POST } from "./route";
 
 function request(body: Record<string, unknown> = { action: "mark_reviewed" }) {
@@ -294,6 +298,35 @@ describe("admin lead review marker", () => {
     expect(await response.json()).toMatchObject({
       code: "CUSTOMER_REPLY_SAFETY_REJECTED",
     });
+  });
+
+  it("returns the exact AI quota reset time without reporting a generic failure", async () => {
+    vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+    vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+    mocks.customerReply.mockRejectedValue(
+      new AiUsageLimitError("daily", "2026-08-30T00:00:00.000Z"),
+    );
+
+    const response = await POST(
+      request({
+        action: "prepare_question_reply",
+        expectedRevision: 12,
+        sourceMessageId: 33,
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected an AI quota recovery response");
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(await response.json()).toEqual({
+      code: "AI_USAGE_LIMIT_REACHED",
+      error: "AI request limit reached. Use a manual reply until it resets.",
+      period: "daily",
+      retryAt: "2026-08-30T00:00:00.000Z",
+    });
+    expect(mocks.capture).not.toHaveBeenCalled();
   });
 
   it.each(["ai", "manual"] as const)(

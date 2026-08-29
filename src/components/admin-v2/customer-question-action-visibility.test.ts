@@ -9,6 +9,7 @@ describe("customer question action visibility", () => {
     "shows only replacement actions after %s while preparing",
     (recovery) => {
       expect(customerQuestionActionVisibility("prepare", recovery)).toEqual({
+        disableAiAction: false,
         showPrepareActions: false,
         showReplacementActions: true,
         showRetryAction: false,
@@ -22,6 +23,7 @@ describe("customer question action visibility", () => {
       expect(
         customerQuestionActionVisibility("delivery_failed", recovery),
       ).toEqual({
+        disableAiAction: false,
         showPrepareActions: false,
         showReplacementActions: true,
         showRetryAction: false,
@@ -33,6 +35,7 @@ describe("customer question action visibility", () => {
     "keeps the ordinary prepare actions for %s",
     (recovery) => {
       expect(customerQuestionActionVisibility("prepare", recovery)).toEqual({
+        disableAiAction: false,
         showPrepareActions: true,
         showReplacementActions: false,
         showRetryAction: false,
@@ -46,12 +49,24 @@ describe("customer question action visibility", () => {
       expect(
         customerQuestionActionVisibility("delivery_failed", recovery),
       ).toEqual({
+        disableAiAction: false,
         showPrepareActions: false,
         showReplacementActions: false,
         showRetryAction: true,
       });
     },
   );
+
+  it("keeps manual preparation available while disabling AI after a quota failure", () => {
+    expect(
+      customerQuestionActionVisibility("prepare", "quota_limited"),
+    ).toEqual({
+      disableAiAction: true,
+      showPrepareActions: true,
+      showReplacementActions: false,
+      showRetryAction: false,
+    });
+  });
 });
 
 describe("customer reply editor action visibility", () => {

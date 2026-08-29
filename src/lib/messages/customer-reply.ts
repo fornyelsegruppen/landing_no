@@ -227,6 +227,11 @@ function deterministicLiveQuestionFallback(
     impregnationIncluded
       ? "Impregnering er inkludert i dette tilbudet."
       : "Impregnering er ikke inkludert i dette tilbudet.",
+    ...(!impregnationIncluded
+      ? [
+          "Hvis du ønsker impregnering, må dette avklares særskilt og håndteres i et revidert eller separat tilbud.",
+        ]
+      : []),
     `Maksimalprisen i tilbudet er ${maximumPrice} inkludert mva.`,
     "Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale.",
     "Dersom kontrollmålingen viser et større takareal over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen.",
@@ -238,7 +243,7 @@ function deterministicLiveQuestionFallback(
     summary: "Kunden spør om impregnering og maksimalpris ved kontrollmåling.",
     intent: "question",
     factWarnings: [
-      "En kontrollert sikkerhetsmal ble brukt etter at to AI-forslag ble avvist. Kontroller dokumentversjon og beløp før utsending.",
+      "En kontrollert sikkerhetsmal ble brukt fordi AI-forslaget ikke kunne godkjennes. Kontroller dokumentversjon og beløp før utsending.",
     ],
     recommendedAdminAction: "review_and_reply",
   });
@@ -609,19 +614,17 @@ export async function generateCustomerReplyDraft(input: {
       );
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
-      if (attempt === 2) {
-        const fallback = deterministicLiveQuestionFallback(context);
-        if (fallback) {
-          return {
-            result: fallback,
-            context,
-            model: generated.model,
-            promptVersion: generated.promptVersion,
-            safetyFallback: true as const,
-          };
-        }
-        throw error;
+      const fallback = deterministicLiveQuestionFallback(context);
+      if (fallback) {
+        return {
+          result: fallback,
+          context,
+          model: generated.model,
+          promptVersion: generated.promptVersion,
+          safetyFallback: true as const,
+        };
       }
+      if (attempt === 2) throw error;
       lastSafetyError = error;
       continue;
     }
