@@ -49,4 +49,13 @@ describe("customer reply recovery", () => {
       }),
     ).toBe("quota_limited");
   });
+
+  it("classifies a missing secure customer link without discarding the reviewed draft", () => {
+    expect(
+      customerReplyRecoveryKind({
+        code: "CUSTOMER_REPLY_SECURE_LINK_MISSING",
+        error: "No current secure customer link is available",
+      }),
+    ).toBe("secure_link_missing");
+  });
 });

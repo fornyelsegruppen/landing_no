@@ -3,6 +3,7 @@ export type CustomerReplyRecoveryKind =
   | "quota_limited"
   | "refresh"
   | "safety_rejected"
+  | "secure_link_missing"
   | "source_changed"
   | "unknown";
 
@@ -26,6 +27,9 @@ export function customerReplyRecoveryKind(
   if (failure.code === "CUSTOMER_REPLY_SAFETY_REJECTED") {
     return "safety_rejected";
   }
+  if (failure.code === "CUSTOMER_REPLY_SECURE_LINK_MISSING") {
+    return "secure_link_missing";
+  }
   if (failure.code === "AI_USAGE_LIMIT_REACHED") {
     return "quota_limited";
   }
@@ -36,6 +40,12 @@ export function customerReplyRecoveryKind(
     error.includes("bound source changed")
   ) {
     return "source_changed";
+  }
+  if (
+    error.includes("current secure customer link") ||
+    error.includes("not bound to a quote version")
+  ) {
+    return "secure_link_missing";
   }
   if (
     error.includes("ai reply") ||

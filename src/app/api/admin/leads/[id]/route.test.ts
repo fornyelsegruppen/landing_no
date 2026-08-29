@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   preparePackage: vi.fn(),
   polishReply: vi.fn(),
   recordAudit: vi.fn(),
+  replyEmailText: vi.fn(),
   reserveUsage: vi.fn(),
   update: vi.fn(),
   provider: {
@@ -63,6 +64,12 @@ vi.mock("@/lib/providers/email-provider", () => ({
 vi.mock("@/lib/messages/customer-reply-sources", () => ({
   assertCustomerReplySourcesCurrent: mocks.assertSources,
 }));
+vi.mock("@/lib/messages/customer-reply-link", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/messages/customer-reply-link")
+  >("@/lib/messages/customer-reply-link");
+  return { ...actual, customerQuestionReplyEmailText: mocks.replyEmailText };
+});
 vi.mock("@/lib/messages/customer-question-state", () => ({
   loadUnresolvedCustomerQuestion: mocks.loadUnresolved,
 }));
@@ -85,6 +92,7 @@ vi.mock("@/lib/audit/audit-event", () => ({
 
 import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
 import { AiUsageLimitError } from "@/lib/ai/payload-usage-limit";
+import { CustomerSecureLinkUnavailableError } from "@/lib/messages/customer-reply-link";
 import { POST } from "./route";
 
 function request(body: Record<string, unknown> = { action: "mark_reviewed" }) {
@@ -124,6 +132,12 @@ describe("admin lead review marker", () => {
       reviewedAt: "2026-08-28T00:00:00.000Z",
     });
     mocks.recordAudit.mockReset().mockResolvedValue(undefined);
+    mocks.replyEmailText
+      .mockReset()
+      .mockImplementation(
+        async (_payload: unknown, input: { bodyText: string }) =>
+          input.bodyText,
+      );
     mocks.preparePackage.mockReset();
     mocks.polishReply.mockReset().mockResolvedValue({
       result: {
@@ -669,6 +683,116 @@ describe("admin lead review marker", () => {
       44,
       expect.any(String),
     );
+  });
+
+  it("persists the current secure quote CTA before queueing a customer-question reply", async () => {
+    const approvedText = "Takk for spørsmålet. Maksimalprisen står i tilbudet.";
+    const emailText = `${approvedText}\n\nÅpne tilbudet og fortsett på din sikre kundeside:\nhttps://takfornyelse-staging.vercel.app/tilbud/current-token`;
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        bodyText: approvedText,
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        replyToMessage: 33,
+        status: "draft",
+        subject: "Svar på spørsmålet ditt",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.assertSources.mockResolvedValue({
+      context: { purpose: "question" },
+      fingerprint: "current",
+      snapshot: { quote: { id: 17 } },
+    });
+    mocks.replyEmailText.mockResolvedValue(emailText);
+    mocks.update.mockResolvedValue({
+      docs: [
+        {
+          id: 44,
+          status: "queued",
+          updatedAt: "2026-08-28T09:01:00.000Z",
+        },
+      ],
+    });
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: approvedText,
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Svar på spørsmålet ditt",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected an approval response");
+    expect(response.status).toBe(200);
+    expect(mocks.replyEmailText).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bodyText: approvedText,
+        leadId: 10,
+        sources: expect.objectContaining({ snapshot: { quote: { id: 17 } } }),
+      }),
+    );
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "messages",
+        data: expect.objectContaining({
+          bodyText: emailText,
+          status: "queued",
+        }),
+      }),
+    );
+  });
+
+  it("does not queue a question reply when its current secure link cannot be resolved", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        replyToMessage: 33,
+        status: "draft",
+        subject: "Svar på spørsmålet ditt",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.replyEmailText.mockRejectedValue(
+      new CustomerSecureLinkUnavailableError(
+        "No current secure customer link is available",
+      ),
+    );
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Svar på spørsmålet ditt",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a blocked approval response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "CUSTOMER_REPLY_SECURE_LINK_MISSING",
+      error: "No current secure customer link is available",
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
   });
 
   it("blocks a legacy AI draft that exposes a raw øre amount at send time", async () => {

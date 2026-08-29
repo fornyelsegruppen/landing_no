@@ -45,6 +45,10 @@ import { markLeadReviewed } from "@/lib/admin-v2/mark-lead-reviewed";
 import { PrivateMediaTemporarilyUnavailableError } from "@/lib/private-media-content";
 import { customerReplyRecoveryCode } from "@/lib/messages/customer-reply-recovery";
 import { loadUnresolvedCustomerQuestion } from "@/lib/messages/customer-question-state";
+import {
+  CustomerSecureLinkUnavailableError,
+  customerQuestionReplyEmailText,
+} from "@/lib/messages/customer-reply-link";
 
 export const maxDuration = 60;
 
@@ -526,6 +530,10 @@ export async function POST(
           { status: 409 },
         );
       let replyPurpose: "question" | "decline" | "cancellation" | undefined;
+      let approvedBodyText =
+        parsed.data.action === "approve_send"
+          ? parsed.data.bodyText
+          : message.bodyText;
       if (parsed.data.action === "approve_send") {
         if (
           message.status !== "draft" ||
@@ -561,6 +569,13 @@ export async function POST(
           );
         }
         replyPurpose = currentSources?.context.purpose;
+        if (replyPurpose === "question" && currentSources) {
+          approvedBodyText = await customerQuestionReplyEmailText(payload, {
+            bodyText: parsed.data.bodyText,
+            leadId,
+            sources: currentSources,
+          });
+        }
       } else if (
         !message.approvedAt ||
         !["attention", "failed", "queued"].includes(message.status)
@@ -600,7 +615,7 @@ export async function POST(
           },
           data: {
             subject: parsed.data.subject,
-            bodyText: parsed.data.bodyText,
+            bodyText: approvedBodyText,
             bodyHtml: null,
             status: "queued",
             approvedBy: user.id,
@@ -969,6 +984,14 @@ export async function POST(
         {
           error: error.message,
           code: "MESSAGE_REVISION_CONFLICT",
+        },
+        { status: 409 },
+      );
+    if (error instanceof CustomerSecureLinkUnavailableError)
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: "CUSTOMER_REPLY_SECURE_LINK_MISSING",
         },
         { status: 409 },
       );

@@ -62,6 +62,8 @@ const copy = {
       "Den automatiske faktakontrollen avviste AI-utkastet. Prøv et nytt AI-utkast, eller skriv et kontrollert svar selv.",
     sourceChanged:
       "Dokumenter, priser eller vilkår er endret. Det gamle svaret kan ikke sendes. Lag et nytt AI-utkast eller skriv et nytt manuelt svar.",
+    secureLinkMissing:
+      "En gyldig sikker kundelenke mangler for denne tilbudsversjonen. Utsted tilbudslenken på nytt før du sender svaret.",
     replacementAi: "Lag nytt AI-utkast",
     replacementManual: "Skriv nytt svar selv",
     outgoingReply: "Svar som skal leveres",
@@ -119,6 +121,8 @@ const copy = {
       "Automatinė faktų patikra atmetė DI juodraštį. Kurkite naują DI juodraštį arba parašykite patikrintą atsakymą patys.",
     sourceChanged:
       "Dokumentai, kainos arba sąlygos pasikeitė. Seno atsakymo siųsti negalima. Kurkite naują DI juodraštį arba naują rankinį atsakymą.",
+    secureLinkMissing:
+      "Šiai pasiūlymo versijai nėra galiojančios saugios kliento nuorodos. Prieš siųsdami atsakymą išduokite pasiūlymo nuorodą iš naujo.",
     replacementAi: "Kurti naują DI juodraštį",
     replacementManual: "Rašyti naują atsakymą pačiam",
     outgoingReply: "Atsakymas, kuris bus pristatytas",
@@ -173,6 +177,8 @@ const copy = {
       "The automated fact check rejected the AI draft. Create a new AI draft or write a controlled reply manually.",
     sourceChanged:
       "Documents, prices, or terms changed. The old reply cannot be sent. Create a new AI draft or write a new manual reply.",
+    secureLinkMissing:
+      "This quote version has no valid secure customer link. Reissue the quote link before sending the reply.",
     replacementAi: "Create new AI draft",
     replacementManual: "Write new reply manually",
     outgoingReply: "Reply to be delivered",
@@ -237,13 +243,15 @@ function localizedFailure(
         ? labels.sourceChanged
         : recovery === "safety_rejected"
           ? labels.safetyRejected
-          : recovery === "quota_limited"
-            ? result.period === "monthly"
-              ? labels.quotaMonthly(quotaReset)
-              : labels.quotaDaily(quotaReset)
-            : recovery === "ai_unavailable"
-              ? labels.aiUnavailable
-              : labels.failed;
+          : recovery === "secure_link_missing"
+            ? labels.secureLinkMissing
+            : recovery === "quota_limited"
+              ? result.period === "monthly"
+                ? labels.quotaMonthly(quotaReset)
+                : labels.quotaDaily(quotaReset)
+              : recovery === "ai_unavailable"
+                ? labels.aiUnavailable
+                : labels.failed;
   return { message, recovery };
 }
 

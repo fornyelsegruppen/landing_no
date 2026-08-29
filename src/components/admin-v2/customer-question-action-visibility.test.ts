@@ -95,4 +95,17 @@ describe("customer reply editor action visibility", () => {
       showRegenerateAction: true,
     });
   });
+
+  it("keeps the reviewed draft available when only the secure customer link is missing", () => {
+    expect(
+      customerReplyEditorActionVisibility({
+        aiAssisted: true,
+        hasSourceContext: true,
+        recovery: "secure_link_missing",
+      }),
+    ).toEqual({
+      showDraftActions: true,
+      showRegenerateAction: true,
+    });
+  });
 });
