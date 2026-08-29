@@ -1,4 +1,5 @@
 import { Archive, CircleX, Mail, Phone } from "lucide-react";
+import type { ReactNode } from "react";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 const declineCopy = {
@@ -79,6 +80,7 @@ export function quoteDeclineReasonLabel(locale: PanelLocale, reason?: string) {
 }
 
 export function QuoteDeclineWorkbench(props: {
+  caseActions?: ReactNode;
   comment?: string;
   declinedAt?: string;
   email?: string;
@@ -176,13 +178,14 @@ export function QuoteDeclineWorkbench(props: {
             </span>
           </a>
         ) : null}
-        <a
-          className="border-danger/50 hover:bg-danger/15 focus-visible:outline-danger flex min-h-12 items-center justify-center gap-3 rounded-xl border px-4 py-3 text-center font-bold text-red-100 transition focus-visible:outline-2 focus-visible:outline-offset-2"
-          href="#case-lifecycle-title"
-        >
-          <Archive aria-hidden="true" className="size-5 shrink-0" />
-          {copy.close}
-        </a>
+        {props.caseActions ? (
+          <div className="sm:col-span-2 xl:col-span-3">{props.caseActions}</div>
+        ) : (
+          <div className="border-danger/35 flex min-h-12 items-center justify-center gap-3 rounded-xl border px-4 py-3 text-center font-bold text-red-100">
+            <Archive aria-hidden="true" className="size-5 shrink-0" />
+            {copy.close}
+          </div>
+        )}
       </div>
     </article>
   );

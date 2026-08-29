@@ -57,11 +57,17 @@ type CaseWorkspaceQuestionCopy = {
 };
 
 type CaseWorkspaceProcessCopy = {
+  closeInspector: string;
   closeStage: string;
+  details: string;
+  discardChanges: string;
   help: string;
   history: string;
   historyHelp: string;
+  inspectorHelp: string;
+  openInspector: string;
   openStage: string;
+  waitForAction: string;
   states: Record<CaseProcessStageState, string>;
   title: string;
 };
@@ -115,10 +121,17 @@ const nb = {
   process: {
     title: "Saksprosess",
     help: "De seks hovedfasene i saken og hvor den står nå.",
+    closeInspector: "Lukk detaljene",
     closeStage: "Skjul informasjon",
+    details: "Saksdetaljer",
+    discardChanges: "Du har ulagrede endringer. Vil du lukke og forkaste dem?",
     history: "Hele historikken",
     historyHelp: "Vis kronologisk handlings- og hendelseshistorikk",
+    inspectorHelp:
+      "Detaljene åpnes uten at du mister plasseringen din i saken.",
+    openInspector: "Vis alle detaljer",
     openStage: "Vis informasjon",
+    waitForAction: "Vent til handlingen er ferdig før du lukker detaljene.",
     states: {
       not_started: "Ikke startet",
       current: "Nåværende fase",
@@ -244,10 +257,17 @@ const lt = {
   process: {
     title: "Bylos procesas",
     help: "Šeši pagrindiniai bylos etapai ir dabartinė jos vieta.",
+    closeInspector: "Uždaryti informaciją",
     closeStage: "Slėpti informaciją",
+    details: "Bylos informacija",
+    discardChanges: "Yra neišsaugotų pakeitimų. Uždaryti ir juos prarasti?",
     history: "Visa istorija",
     historyHelp: "Rodyti chronologinę veiksmų ir įvykių istoriją",
+    inspectorHelp:
+      "Informacija atidaroma neprarandant dabartinės vietos byloje.",
+    openInspector: "Rodyti visą informaciją",
     openStage: "Rodyti informaciją",
+    waitForAction: "Prieš uždarydami informaciją palaukite veiksmo pabaigos.",
     states: {
       not_started: "Nepradėta",
       current: "Dabartinis etapas",
@@ -374,10 +394,17 @@ const en = {
   process: {
     title: "Case process",
     help: "The six main case stages and its current position.",
+    closeInspector: "Close details",
     closeStage: "Hide details",
+    details: "Case details",
+    discardChanges: "You have unsaved changes. Close and discard them?",
     history: "Full history",
     historyHelp: "Show the chronological action and event history",
+    inspectorHelp:
+      "Details open without losing your current position in the case.",
+    openInspector: "Show all details",
     openStage: "Show details",
+    waitForAction: "Wait for the action to finish before closing the details.",
     states: {
       not_started: "Not started",
       current: "Current stage",

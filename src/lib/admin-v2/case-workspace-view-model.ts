@@ -53,7 +53,16 @@ export type CaseWorkspacePrimaryAction =
       questionId: number;
       replyId?: number;
     }
-  | { href: string; mode: "navigate" }
+  | {
+      mode: "panel";
+      panel:
+        | "cancellation"
+        | "completion"
+        | "lifecycle"
+        | "measurement"
+        | "workBlock"
+        | "workPlanning";
+    }
   | { mode: "wait" };
 
 export type CaseWorkspacePrimaryState = {
@@ -287,35 +296,28 @@ const stopActions = new Set<CaseNextActionKind>([
   "send_closure_confirmation",
 ]);
 
-const navigationTargets: Partial<Record<CaseNextActionKind, string>> = {
-  assign_worker: "#work-planning",
-  create_work_order: "#work-planning",
-  follow_up_decline: "#case-lifecycle-title",
-  measurement_required: "#measurement-section",
-  review_completion: "#completion-review",
-  resolve_work_block: "#change-agreement-workbench",
-  schedule_work: "#work-planning",
+const actionPanels: Partial<
+  Record<
+    CaseNextActionKind,
+    Extract<CaseWorkspacePrimaryAction, { mode: "panel" }>["panel"]
+  >
+> = {
+  assign_worker: "workPlanning",
+  create_work_order: "workPlanning",
+  follow_up_decline: "lifecycle",
+  measurement_required: "measurement",
+  review_completion: "completion",
+  resolve_work_block: "workBlock",
+  schedule_work: "workPlanning",
 };
 
-const activeContractRequestStatuses = new Set([
-  "received",
-  "admin_review",
-  "alternative_requested",
-  "follow_up_scheduled",
-]);
-
-function navigationTarget(
-  caseData: AdminCase,
+function actionPanel(
   action: CaseNextAction,
-): string | undefined {
+): Extract<CaseWorkspacePrimaryAction, { mode: "panel" }>["panel"] | undefined {
   if (action.kind === "review_cancellation") {
-    return caseData.contractRequests.some((request) =>
-      activeContractRequestStatuses.has(request.status || ""),
-    )
-      ? "#contract-request-section"
-      : "#cancellation-review";
+    return "cancellation";
   }
-  return navigationTargets[action.kind];
+  return actionPanels[action.kind];
 }
 
 function priorityState<
@@ -409,7 +411,7 @@ function normalAction(
 ): CaseWorkspacePrimaryState {
   const config = caseWorkspaceActionPresentation[nextAction.kind];
   const target = evidenceForTarget(caseData, nextAction.targetId);
-  const href = navigationTarget(caseData, nextAction);
+  const panel = actionPanel(nextAction);
   const priority = waitingActions.has(nextAction.kind) ? "idle" : "business";
   const processStage =
     nextAction.kind === "none"
@@ -419,8 +421,8 @@ function normalAction(
   return priorityState({
     action: waitingActions.has(nextAction.kind)
       ? { mode: "wait" }
-      : href
-        ? { href, mode: "navigate" }
+      : panel
+        ? { mode: "panel", panel }
         : {
             kind: nextAction.kind,
             mode: "mutation",
@@ -456,11 +458,11 @@ function stopState(
             code: "CUSTOMER_CANCELLATION_REQUEST",
             labelKey: "blockers.customerCancellation",
           };
-  const href = navigationTarget(caseData, action);
+  const panel = actionPanel(action);
 
   return priorityState({
-    action: href
-      ? { href, mode: "navigate" }
+    action: panel
+      ? { mode: "panel", panel }
       : { kind: action.kind, mode: "mutation", targetId: action.targetId },
     blocker,
     evidence: target.evidence,
@@ -535,7 +537,7 @@ function lifecycleState(caseData: AdminCase): CaseWorkspacePrimaryState {
   const trashed = caseData.lead.recordState === "trashed";
   const state = trashed ? "trashed" : "archived";
   return priorityState({
-    action: { href: "#case-lifecycle-title", mode: "navigate" },
+    action: { mode: "panel", panel: "lifecycle" },
     blocker: {
       code: trashed ? "CASE_TRASHED" : "CASE_ARCHIVED",
       labelKey: `blockers.${state}`,

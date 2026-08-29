@@ -11,6 +11,7 @@ import {
   FileText,
   Wrench,
 } from "lucide-react";
+import { CaseInspector } from "@/components/admin-v2/case-inspector";
 import { getCaseWorkspaceCopy } from "@/lib/admin-v2/case-workspace-i18n";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import {
@@ -30,18 +31,27 @@ export type CaseProcessRelatedLink = {
 };
 
 export type CaseProcessStageContent = {
-  /** Exact ID of a focusable rendered section heading, including '#'. */
-  sectionHref?: `#${string}`;
+  /** Exact ID of the matching section rendered inside the case inspector. */
+  inspectorTargetId?: string;
   statusText?: string | null;
   timestamp?: string | null;
   relatedLinks?: readonly CaseProcessRelatedLink[];
 };
 
+export type CaseProcessHistoryItem = {
+  description: string;
+  id: string;
+  inspectorTargetId: string;
+  status?: string;
+  title: string;
+};
+
 export type CaseProcessTimelineProps = {
   activeStageId: CaseProcessStageId;
   activeStageState?: Extract<CaseProcessStageState, "current" | "blocked">;
-  auditHistory?: ReactNode;
+  historyItems?: readonly CaseProcessHistoryItem[];
   historyId?: string;
+  inspectorContent?: ReactNode;
   locale: PanelLocale;
   sectionId?: string;
   stageContent?: Partial<Record<CaseProcessStageId, CaseProcessStageContent>>;
@@ -107,8 +117,9 @@ function RelatedLink({ link }: { link: CaseProcessRelatedLink }) {
 export function CaseProcessTimeline({
   activeStageId,
   activeStageState = "current",
-  auditHistory,
+  historyItems = [],
   historyId = "case-history",
+  inspectorContent,
   locale,
   sectionId = "case-process-title",
   stageContent = {},
@@ -123,6 +134,11 @@ export function CaseProcessTimeline({
   const [openStageId, setOpenStageId] = useState<CaseProcessStageId | null>(
     stagePanels[activeStageId] ? activeStageId : null,
   );
+  const [inspectorSelection, setInspectorSelection] = useState<{
+    description?: string;
+    targetId: string;
+    title: string;
+  } | null>(null);
   return (
     <section aria-labelledby={sectionId}>
       <div>
@@ -141,13 +157,18 @@ export function CaseProcessTimeline({
           const content = stageContent[stage.id];
           const stageLabel = workspaceLabels.stages[stage.id];
           const stateLabel = labels.states[stage.state];
-          const canNavigate =
-            stage.state !== "not_started" && Boolean(content?.sectionHref);
           const canExpand =
             stage.state !== "not_started" && Boolean(stagePanels[stage.id]);
+          const canInspect =
+            stage.state !== "not_started" &&
+            Boolean(inspectorContent && content?.inspectorTargetId);
           const isExpanded = canExpand && openStageId === stage.id;
           const relatedLinks =
-            stage.state === "not_started" ? [] : (content?.relatedLinks ?? []);
+            stage.state === "not_started"
+              ? []
+              : (content?.relatedLinks ?? []).filter(
+                  (link) => !link.href.startsWith("#"),
+                );
           const stageHeader = (
             <>
               <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-current/20">
@@ -157,19 +178,9 @@ export function CaseProcessTimeline({
                 <span className="block text-xs font-bold tracking-wider uppercase">
                   {stateLabel}
                 </span>
-                {canNavigate && !canExpand ? (
-                  <a
-                    aria-label={`${labels.openStage}: ${stageLabel}`}
-                    className="focus-visible:outline-accent mt-1 flex min-h-12 items-center rounded-lg text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    href={content?.sectionHref}
-                  >
-                    {stageLabel}
-                  </a>
-                ) : (
-                  <span className="mt-1 flex min-h-12 items-center text-base font-bold">
-                    {stageLabel}
-                  </span>
-                )}
+                <span className="mt-1 flex min-h-12 items-center text-base font-bold">
+                  {stageLabel}
+                </span>
                 {content?.statusText && stage.state !== "not_started" ? (
                   <span className="mt-1 block text-sm">
                     {content.statusText}
@@ -240,6 +251,20 @@ export function CaseProcessTimeline({
                   id={`case-process-panel-${stage.id}`}
                 >
                   {stagePanels[stage.id]}
+                  {canInspect ? (
+                    <button
+                      className="focus-visible:outline-accent mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-current/25 bg-black/15 px-4 text-sm font-bold hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-auto"
+                      onClick={() =>
+                        setInspectorSelection({
+                          targetId: content!.inspectorTargetId!,
+                          title: stageLabel,
+                        })
+                      }
+                      type="button"
+                    >
+                      {labels.openInspector}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </li>
@@ -247,7 +272,7 @@ export function CaseProcessTimeline({
         })}
       </ol>
 
-      {auditHistory ? (
+      {historyItems.length ? (
         <details
           id={historyId}
           className="group mt-5 rounded-xl border border-white/10 bg-black/10"
@@ -262,8 +287,53 @@ export function CaseProcessTimeline({
               className="size-5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
             />
           </summary>
-          <div className="border-t border-white/10 p-4">{auditHistory}</div>
+          <ol className="relative ml-6 border-l border-white/10 p-4 pl-5">
+            {historyItems.map((item) => (
+              <li className="relative pb-3 last:pb-0" key={item.id}>
+                <span className="bg-accent ring-background-elevated absolute top-4 -left-[1.57rem] size-2.5 rounded-full ring-4" />
+                <button
+                  aria-label={`${labels.openInspector}: ${item.title}`}
+                  className="focus-visible:outline-accent block min-h-12 w-full rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                  onClick={() =>
+                    setInspectorSelection({
+                      description: item.description,
+                      targetId: item.inspectorTargetId,
+                      title: item.title,
+                    })
+                  }
+                  type="button"
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <strong className="text-sm">{item.title}</strong>
+                    {item.status ? (
+                      <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[.68rem] font-bold tracking-wider text-white/75 uppercase">
+                        {item.status}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-muted-foreground mt-1 block text-xs">
+                    {item.description}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
         </details>
+      ) : null}
+
+      {inspectorContent ? (
+        <CaseInspector
+          busyCloseMessage={labels.waitForAction}
+          closeLabel={labels.closeInspector}
+          description={inspectorSelection?.description || labels.inspectorHelp}
+          initialTargetId={inspectorSelection?.targetId}
+          discardChangesMessage={labels.discardChanges}
+          onClose={() => setInspectorSelection(null)}
+          open={Boolean(inspectorSelection)}
+          title={inspectorSelection?.title || labels.details}
+        >
+          {inspectorContent}
+        </CaseInspector>
       ) : null}
     </section>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import {
@@ -238,21 +237,6 @@ export function CaseActionPanel({
     }
   }
 
-  const technicalTarget =
-    action.kind === "measurement_required"
-      ? "#measurement-section"
-      : action.kind === "review_cancellation"
-        ? "#cancellation-review"
-        : ["create_work_order", "assign_worker", "schedule_work"].includes(
-              action.kind,
-            )
-          ? "#work-planning"
-          : action.kind === "review_completion" && action.targetId
-            ? "#completion-review"
-            : action.kind === "resolve_work_block" && action.targetId
-              ? "#change-agreement-workbench"
-              : null;
-
   return (
     <div aria-busy={busy}>
       {request ? (
@@ -264,13 +248,6 @@ export function CaseActionPanel({
         >
           {busy ? copy.processing : actionLabel}
         </button>
-      ) : technicalTarget ? (
-        <Link
-          className="border-accent/50 text-accent hover:bg-accent/10 inline-flex min-h-12 items-center rounded-xl border px-5 font-bold"
-          href={technicalTarget}
-        >
-          {actionLabel}
-        </Link>
       ) : (
         <p className="font-semibold text-white/80">{actionLabel}</p>
       )}

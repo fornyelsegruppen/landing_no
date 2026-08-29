@@ -5,15 +5,15 @@ import { CaseProcessTimeline } from "./case-process-timeline";
 
 const stageContent = {
   contact: {
-    sectionHref: "#customer-section" as const,
+    inspectorTargetId: "customer-section",
     statusText: "Kontakt registruotas",
     timestamp: "2026-08-29 12:54",
   },
   measurement: {
-    sectionHref: "#measurement-section" as const,
+    inspectorTargetId: "measurement-section",
   },
   commercial: {
-    sectionHref: "#commercial-section" as const,
+    inspectorTargetId: "price-quote-section",
     relatedLinks: [
       {
         kind: "document" as const,
@@ -25,7 +25,7 @@ const stageContent = {
     ],
   },
   agreement: {
-    sectionHref: "#contract-section" as const,
+    inspectorTargetId: "contract-section",
     relatedLinks: [
       {
         kind: "recovery" as const,
@@ -36,10 +36,10 @@ const stageContent = {
     ],
   },
   work: {
-    sectionHref: "#work-section" as const,
+    inspectorTargetId: "work-section",
   },
   completion: {
-    sectionHref: "#documents-section" as const,
+    inspectorTargetId: "documents-section",
   },
 };
 
@@ -61,7 +61,7 @@ describe("case process timeline", () => {
     expect(html).toContain("Dabartinis etapas");
   });
 
-  it("does not make future stages or their supplied targets interactive", () => {
+  it("does not expose page fragment navigation for present or future stages", () => {
     const html = renderToStaticMarkup(
       createElement(CaseProcessTimeline, {
         activeStageId: "measurement",
@@ -70,15 +70,15 @@ describe("case process timeline", () => {
       }),
     );
 
-    expect(html).toContain('href="#measurement-section"');
-    expect(html).not.toContain('href="#commercial-section"');
+    expect(html).not.toContain('href="#measurement-section"');
+    expect(html).not.toContain('href="#price-quote-section"');
     expect(html).not.toContain("/api/admin/quotes/17/T-17-V1.pdf");
     expect(html).not.toContain('href="#contract-section"');
     expect(html).not.toContain('href="#work-section"');
     expect(html).not.toContain('href="#documents-section"');
   });
 
-  it("uses exact section, document and recovery targets with accessible names", () => {
+  it("keeps external evidence links but suppresses legacy fragment recovery links", () => {
     const html = renderToStaticMarkup(
       createElement(CaseProcessTimeline, {
         activeStageId: "agreement",
@@ -90,57 +90,51 @@ describe("case process timeline", () => {
 
     expect(html).toContain('aria-current="step"');
     expect(html).toContain("Etapas užblokuotas");
-    expect(html).toContain('href="#commercial-section"');
+    expect(html).not.toContain('href="#price-quote-section"');
     expect(html).toContain('href="/api/admin/quotes/17/T-17-V1.pdf"');
     expect(html).toContain('aria-label="Atidaryti pasiūlymo T-17-V1 PDF"');
     expect(html).toContain('target="_blank"');
-    expect(html).toContain('href="#cancellation-review-title"');
-    expect(html).toContain('aria-label="Pereiti į atšaukimo prašymo peržiūrą"');
+    expect(html).not.toContain('href="#cancellation-review-title"');
+    expect(html).not.toContain(
+      'aria-label="Pereiti į atšaukimo prašymo peržiūrą"',
+    );
   });
 
-  it("supports the fragment-to-focusable-heading integration contract", () => {
-    const renderedTargets = [
-      "customer-section",
-      "measurement-section",
-      "commercial-section",
-      "contract-section",
-      "cancellation-review-title",
-    ];
+  it("keeps the detail registry in the inspector instead of the page flow", () => {
     const html = renderToStaticMarkup(
-      createElement(
-        "main",
-        null,
-        createElement(CaseProcessTimeline, {
-          activeStageId: "agreement",
-          activeStageState: "blocked",
-          locale: "lt",
-          stageContent,
-        }),
-        ...renderedTargets.map((id) =>
-          createElement("h2", { id, key: id, tabIndex: -1 }, id),
+      createElement(CaseProcessTimeline, {
+        activeStageId: "agreement",
+        activeStageState: "blocked",
+        inspectorContent: createElement(
+          "section",
+          { id: "contract-section" },
+          "Sutarties detalės",
         ),
-      ),
-    );
-    const fragmentTargets = Array.from(
-      html.matchAll(/href="#([^"]+)"/g),
-      (match) => match[1],
+        locale: "lt",
+        stageContent,
+        stagePanels: {
+          agreement: createElement("p", null, "Sutarties santrauka"),
+        },
+      }),
     );
 
-    expect(fragmentTargets).toEqual(renderedTargets);
-    for (const target of fragmentTargets) {
-      expect(html).toContain(`id="${target}" tabindex="-1"`);
-    }
+    expect(html).toContain("Rodyti visą informaciją");
+    expect(html).not.toContain('href="#contract-section"');
   });
 
-  it("preserves the supplied audit history under a touch-friendly details control", () => {
+  it("renders history as inspector buttons without fragment links", () => {
     const html = renderToStaticMarkup(
       createElement(CaseProcessTimeline, {
         activeStageId: "completion",
-        auditHistory: createElement(
-          "ol",
-          { "data-testid": "legacy-audit" },
-          createElement("li", null, "Senas audito įvykis"),
-        ),
+        historyItems: [
+          {
+            description: "2026-08-29 12:54 · Žinutė",
+            id: "message-17",
+            inspectorTargetId: "messages-section",
+            status: "Pristatyta",
+            title: "Senas audito įvykis",
+          },
+        ],
         historyId: "timeline-section",
         locale: "lt",
         stageContent,
@@ -150,6 +144,8 @@ describe("case process timeline", () => {
     expect(html).toContain('<details id="timeline-section"');
     expect(html).toContain("Visa istorija");
     expect(html).toContain("Senas audito įvykis");
+    expect(html).toContain("Pristatyta");
+    expect(html).not.toContain('href="#messages-section"');
     expect(html).toContain("min-h-12");
     expect(html).toContain("motion-reduce:transition-none");
   });

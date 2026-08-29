@@ -32,7 +32,8 @@ describe("quote decline workbench", () => {
       "mailto:fornyelsegruppen+uat-question@gmail.com?subject=Oppf%C3%B8lging%20etter%20avslag%20p%C3%A5%20tilbud%20T-17-V1",
     );
     expect(html).toContain('href="tel:+4796880883"');
-    expect(html).toContain('href="#case-lifecycle-title"');
+    expect(html).toContain("Pereiti prie bylos uždarymo");
+    expect(html).not.toContain('href="#case-lifecycle-title"');
   });
 
   it("keeps the actions touch-friendly and responsive", () => {
@@ -47,6 +48,24 @@ describe("quote decline workbench", () => {
     expect(html).toContain("sm:grid-cols-2");
     expect(html).toContain("xl:grid-cols-3");
     expect(html).toContain("break-all");
+  });
+
+  it("renders supplied case actions inline instead of a scroll shortcut", () => {
+    const html = renderToStaticMarkup(
+      createElement(QuoteDeclineWorkbench, {
+        ...baseProps,
+        caseActions: createElement(
+          "div",
+          { "data-testid": "case-actions" },
+          "Bylos veiksmai",
+        ),
+        locale: "lt",
+      }),
+    );
+
+    expect(html).toContain('data-testid="case-actions"');
+    expect(html).toContain("Bylos veiksmai");
+    expect(html).not.toContain('href="#case-lifecycle-title"');
   });
 
   it.each([

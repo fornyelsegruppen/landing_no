@@ -35,13 +35,13 @@ import {
   getCaseWorkspaceCopy,
   type CaseWorkspaceQuestionRecovery,
 } from "@/lib/admin-v2/case-workspace-i18n";
-import { caseWorkspaceSectionHref } from "@/lib/admin-v2/case-workspace-sections";
 import {
   deriveCaseWorkspacePrimaryState,
   deriveCaseWorkspaceProcessStage,
   toCaseWorkspaceQuestionContext,
   type CaseWorkspaceTone,
 } from "@/lib/admin-v2/case-workspace-view-model";
+import { caseWorkspaceSectionByKey } from "@/lib/admin-v2/case-workspace-sections";
 import {
   metadataLabel,
   statusLabel,
@@ -50,6 +50,7 @@ import {
 import {
   loadAdminCaseWorkspace,
   type CaseEntity,
+  type CaseTimelineItem,
 } from "@/lib/admin-v2/case-read-model";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
@@ -100,6 +101,42 @@ function processEntityLink(
     label: accessibleName,
     openInNewTab: Boolean(options?.href?.startsWith("/api/")),
   };
+}
+
+function timelineInspectorTarget(
+  item: CaseTimelineItem,
+  excludedMessageId?: number,
+) {
+  const messageTarget = item.href?.match(/^#message-(\d+)$/);
+  if (messageTarget) {
+    return Number(messageTarget[1]) === excludedMessageId
+      ? caseWorkspaceSectionByKey.messages.id
+      : `message-${messageTarget[1]}`;
+  }
+  if (item.href?.match(/^#(?:invoice|warranty)-\d+$/)) {
+    return item.href.slice(1);
+  }
+  if (item.href === "#contract-request-section") {
+    return caseWorkspaceSectionByKey.contract.id;
+  }
+  const commercialTarget = item.id.match(/^(quote|contract)-(\d+)/);
+  if (commercialTarget) {
+    return `commercial-${commercialTarget[1]}-${commercialTarget[2]}`;
+  }
+
+  return {
+    change: caseWorkspaceSectionByKey.changes.id,
+    contract: caseWorkspaceSectionByKey.contract.id,
+    contract_request: caseWorkspaceSectionByKey.contract.id,
+    invoice: caseWorkspaceSectionByKey.documents.id,
+    lead: caseWorkspaceSectionByKey.customer.id,
+    measurement: caseWorkspaceSectionByKey.measurement.id,
+    message: caseWorkspaceSectionByKey.messages.id,
+    price: caseWorkspaceSectionByKey.commercial.id,
+    quote: caseWorkspaceSectionByKey.commercial.id,
+    warranty: caseWorkspaceSectionByKey.documents.id,
+    work: caseWorkspaceSectionByKey.work.id,
+  }[item.type];
 }
 
 function Status({
@@ -461,12 +498,12 @@ export default async function AdminCasePage({
   const processStageContent: Partial<
     Record<typeof primaryState.processStage, CaseProcessStageContent>
   > = {
-    contact: { sectionHref: caseWorkspaceSectionHref("customer") },
+    contact: { inspectorTargetId: caseWorkspaceSectionByKey.customer.id },
     measurement: {
       relatedLinks: caseData.measurement
         ? [processEntityLink(caseData.measurement)]
         : [],
-      sectionHref: caseWorkspaceSectionHref("measurement"),
+      inspectorTargetId: caseWorkspaceSectionByKey.measurement.id,
     },
     commercial: {
       relatedLinks: caseData.commercial.quoteVersions.map((entity) =>
@@ -475,7 +512,7 @@ export default async function AdminCasePage({
           kind: "document",
         }),
       ),
-      sectionHref: caseWorkspaceSectionHref("commercial"),
+      inspectorTargetId: caseWorkspaceSectionByKey.commercial.id,
     },
     agreement: {
       relatedLinks: [
@@ -489,7 +526,7 @@ export default async function AdminCasePage({
           processEntityLink(entity, { kind: "evidence" }),
         ),
       ],
-      sectionHref: caseWorkspaceSectionHref("contract"),
+      inspectorTargetId: caseWorkspaceSectionByKey.contract.id,
     },
     work: {
       relatedLinks: [
@@ -501,7 +538,7 @@ export default async function AdminCasePage({
           }),
         ),
       ],
-      sectionHref: caseWorkspaceSectionHref("work"),
+      inspectorTargetId: caseWorkspaceSectionByKey.work.id,
     },
     completion: {
       relatedLinks: [
@@ -519,7 +556,7 @@ export default async function AdminCasePage({
           openInNewTab: true,
         })),
       ],
-      sectionHref: caseWorkspaceSectionHref("documents"),
+      inspectorTargetId: caseWorkspaceSectionByKey.documents.id,
     },
   };
   const primaryEvidenceLinks = primaryState.evidence
@@ -816,6 +853,102 @@ export default async function AdminCasePage({
     ),
   } satisfies Partial<Record<typeof processActiveStage, React.ReactNode>>;
 
+  const primaryPanel =
+    primaryState.action.mode === "panel" ? primaryState.action.panel : null;
+  const primaryMeasurementAction = primaryPanel === "measurement";
+  const primaryWorkPlanningAction = primaryPanel === "workPlanning";
+  const primaryCompletionAction = primaryPanel === "completion";
+  const primaryWorkBlockAction = primaryPanel === "workBlock";
+  const primaryCancellationAction = primaryPanel === "cancellation";
+  const primaryNavigationPanel = primaryMeasurementAction ? (
+    <MeasurementReviewPanel
+      canApprovePackage={caseData.nextAction.kind === "approve_package"}
+      city={caseData.lead.city}
+      currentAreaTenths={caseData.measurement?.actualAreaMaxTenths}
+      currentBuildingId={caseData.measurement?.buildingIdentifier}
+      currentMode={caseData.measurement?.measurementMode}
+      evidenceHref={caseData.measurement?.evidenceHref}
+      inquiryType={caseData.lead.inquiryType || "usikker"}
+      leadAddress={caseData.lead.streetAddress || ""}
+      leadId={caseData.lead.id}
+      latitude={caseData.measurement?.latitude}
+      locale={user.interfaceLanguage}
+      longitude={caseData.measurement?.longitude}
+      measurementId={caseData.measurement?.id}
+      postal={caseData.lead.postal}
+      revision={caseData.lead.revision}
+      sourceUrl={caseData.measurement?.sourceUrl}
+      measurementStatus={caseData.measurement?.status}
+    />
+  ) : primaryWorkPlanningAction && caseData.contract ? (
+    <WorkOrderPlanningPanel
+      adminNote={caseData.workOrder?.adminNote}
+      arrivalWindow={caseData.workOrder?.arrivalWindow}
+      assignedWorkerId={caseData.workOrder?.assignedWorkerId}
+      caseId={Number(id)}
+      contractId={caseData.contract.id}
+      contractDocumentHash={
+        caseData.commercial.contractVersions.find(
+          (item) => item.id === caseData.contract?.id,
+        )?.documentHash || caseData.contract.documentHash
+      }
+      contractReference={
+        caseData.commercial.contractVersions.find(
+          (item) => item.id === caseData.contract?.id,
+        )?.reference || caseData.contract.reference
+      }
+      contractVersion={
+        caseData.commercial.contractVersions.find(
+          (item) => item.id === caseData.contract?.id,
+        )?.version
+      }
+      incompleteWorkerCount={incompleteWorkerCount}
+      locale={user.interfaceLanguage}
+      scheduledLocal={
+        caseData.workOrder?.scheduledAt
+          ? formatNorwayDateTimeInput(caseData.workOrder.scheduledAt)
+          : undefined
+      }
+      status={caseData.workOrder?.status}
+      workOrderId={caseData.workOrder?.id}
+      workers={workers}
+    />
+  ) : primaryCompletionAction && caseData.workOrder ? (
+    <CompletionReviewPanel
+      actualAreaTenths={caseData.workOrder.actualAreaTenths}
+      actualTotalIncVatOre={caseData.workOrder.actualTotalIncVatOre}
+      afterPhotoCount={caseData.workOrder.afterPhotoCount}
+      beforePhotoCount={caseData.workOrder.beforePhotoCount}
+      completionNotes={caseData.workOrder.completionNotes}
+      locale={user.interfaceLanguage}
+      workOrderId={caseData.workOrder.id}
+      workSummary={caseData.workOrder.workSummary}
+    />
+  ) : primaryWorkBlockAction && caseData.workOrder ? (
+    <ChangeAgreementPanel
+      actualAreaTenths={caseData.workOrder.actualAreaTenths}
+      actualTotalIncVatOre={caseData.workOrder.actualTotalIncVatOre}
+      blockingReasons={caseData.workOrder.blockingReasons}
+      changes={caseData.changes}
+      locale={user.interfaceLanguage}
+      priceOutcome={caseData.workOrder.priceOutcome}
+      scopeChangeDetails={caseData.workOrder.scopeChangeDetails}
+      workOrderId={caseData.workOrder.id}
+    />
+  ) : primaryCancellationAction && activeContractRequest ? (
+    <ContractRequestReviewPanel
+      currentService={caseData.lead.inquiryType}
+      locale={user.interfaceLanguage}
+      request={activeContractRequest}
+    />
+  ) : primaryCancellationAction ? (
+    <CancellationReviewPanel
+      customerMessage={cancellationSource?.bodyText}
+      leadId={caseData.lead.id}
+      locale={user.interfaceLanguage}
+    />
+  ) : null;
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <CaseViewedMarker
@@ -1005,6 +1138,17 @@ export default async function AdminCasePage({
           ) : null}
           {primaryState.key === "stop.follow_up_decline" && caseData.quote ? (
             <QuoteDeclineWorkbench
+              caseActions={
+                <CaseLifecyclePanel
+                  classification={
+                    caseData.lead.archiveClassification || "declined"
+                  }
+                  leadId={caseData.lead.id}
+                  locale={user.interfaceLanguage}
+                  purgeAfter={caseData.lead.purgeAfter}
+                  recordState={caseData.lead.recordState}
+                />
+              }
               comment={caseData.quote.declineComment}
               declinedAt={formatDate(
                 caseData.quote.declinedAt || caseData.quote.updatedAt,
@@ -1110,13 +1254,8 @@ export default async function AdminCasePage({
                     quoteVersion: actionQuote?.version,
                   }}
                 />
-              ) : primaryState.action.mode === "navigate" ? (
-                <a
-                  className={`inline-flex min-h-12 items-center justify-center rounded-xl border px-5 text-center font-bold ${primaryPanelClasses}`}
-                  href={primaryState.action.href}
-                >
-                  {nextActionText}
-                </a>
+              ) : primaryNavigationPanel ? (
+                <div className="min-w-0">{primaryNavigationPanel}</div>
               ) : (
                 <div className="flex min-h-12 items-center rounded-xl border border-white/10 bg-black/15 px-4 text-sm font-semibold">
                   {workspaceStatus}
@@ -1131,897 +1270,924 @@ export default async function AdminCasePage({
         <CaseProcessTimeline
           activeStageId={processActiveStage}
           activeStageState={primaryState.blocker ? "blocked" : "current"}
-          auditHistory={
-            <ol className="relative ml-2 border-l border-white/10 pl-5">
-              {caseData.timeline.map((item) => (
-                <li className="relative pb-5 last:pb-0" key={item.id}>
-                  <span className="bg-accent ring-background-elevated absolute top-1 -left-[1.57rem] size-2.5 rounded-full ring-4" />
-                  {item.href ? (
-                    <Link
-                      className="block rounded-xl p-2 transition hover:bg-white/5"
-                      href={item.href}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong className="text-sm">{item.title}</strong>
-                        <Status
-                          locale={user.interfaceLanguage}
-                          value={item.status}
-                        />
-                      </div>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {formatDate(item.at)} ·{" "}
-                        {timelineTypeLabel(user.interfaceLanguage, item.type)}
-                      </p>
-                    </Link>
-                  ) : (
-                    <div className="p-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong className="text-sm">{item.title}</strong>
-                        <Status
-                          locale={user.interfaceLanguage}
-                          value={item.status}
-                        />
-                      </div>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {formatDate(item.at)} ·{" "}
-                        {timelineTypeLabel(user.interfaceLanguage, item.type)}
-                      </p>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
-          }
+          historyItems={caseData.timeline.map((item) => ({
+            description: `${formatDate(item.at)} · ${timelineTypeLabel(user.interfaceLanguage, item.type)}`,
+            id: item.id,
+            inspectorTargetId: timelineInspectorTarget(
+              item,
+              primaryQuestionActive ? displayedReply?.id : undefined,
+            ),
+            status: item.status
+              ? statusLabel(user.interfaceLanguage, item.status)
+              : undefined,
+            title: item.title,
+          }))}
           historyId="case-audit-history"
           key={processActiveStage}
           locale={user.interfaceLanguage}
           sectionId="timeline-section"
           stageContent={processStageContent}
           stagePanels={processStagePanels}
-        />
-      </div>
-
-      <CaseVersionHistory
-        contracts={caseData.commercial.contractVersions}
-        copy={copy}
-        formatDate={formatDate}
-        formatMoney={nok}
-        locale={user.interfaceLanguage}
-        quotes={caseData.commercial.quoteVersions}
-      />
-
-      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
-        <div className="min-w-0 space-y-6">
-          <Section
-            id="customer-section"
-            title={workspaceCopy.sections.customer}
-          >
-            <dl className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                  {copy.contact}
-                </dt>
-                <dd className="mt-2 grid gap-2">
-                  {caseData.lead.email ? (
-                    <a
-                      className="hover:text-accent inline-flex items-center gap-2"
-                      href={`mailto:${caseData.lead.email}`}
-                    >
-                      <Mail aria-hidden="true" className="size-4" />
-                      {caseData.lead.email}
-                    </a>
-                  ) : null}
-                  {caseData.lead.communicationEmail &&
-                  caseData.lead.communicationEmail !== caseData.lead.email ? (
-                    <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 p-3">
-                      <p className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
-                        {user.interfaceLanguage === "lt"
-                          ? "Aktyvus komunikacijos el. paštas"
-                          : user.interfaceLanguage === "en"
-                            ? "Active communication email"
-                            : "Aktiv e-post for kommunikasjon"}
-                      </p>
-                      <a
-                        className="mt-1 inline-flex items-center gap-2 font-semibold text-emerald-50"
-                        href={`mailto:${caseData.lead.communicationEmail}`}
-                      >
-                        <Mail aria-hidden="true" className="size-4" />
-                        {caseData.lead.communicationEmail}
-                      </a>
-                    </div>
-                  ) : null}
-                  {caseData.lead.phone ? (
-                    <a
-                      className="hover:text-accent inline-flex items-center gap-2"
-                      href={`tel:${caseData.lead.phone}`}
-                    >
-                      <Phone aria-hidden="true" className="size-4" />
-                      {caseData.lead.phone}
-                    </a>
-                  ) : null}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                  {copy.address}
-                </dt>
-                <dd className="mt-2 inline-flex gap-2">
-                  <MapPin
-                    aria-hidden="true"
-                    className="text-accent mt-0.5 size-4 shrink-0"
-                  />
-                  {caseData.lead.address || "—"}
-                </dd>
-              </div>
-            </dl>
-            {caseData.lead.message ? (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm whitespace-pre-wrap text-white/85">
-                {caseData.lead.message}
-              </div>
-            ) : null}
-          </Section>
-
-          <Section id="ai-section" title={copy.ai}>
-            {qualification ? (
-              <div className="grid gap-4">
-                <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
-                  <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                    {copy.aiSummary}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-white/85">
-                    {qualification.summary || copy.nothingReported}
-                  </p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 p-4">
-                    <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                      {copy.missingInformation}
-                    </p>
-                    <p className="mt-2 text-sm">
-                      {qualification.missing.length
-                        ? qualification.missing.join(" · ")
-                        : copy.nothingReported}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 p-4">
-                    <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                      {copy.riskFlags}
-                    </p>
-                    <p className="mt-2 text-sm">
-                      {qualification.risks.length
-                        ? qualification.risks.join(" · ")
-                        : copy.nothingReported}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">{copy.missing}</p>
-            )}
-            <div className="mt-4 rounded-2xl border border-white/10 p-4">
-              <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                {copy.nextAction}
-              </p>
-              <p className="mt-2 text-sm">{nextActionText}</p>
-            </div>
-            {secondaryMutationsAllowed ? (
-              <InformationRequestButton
-                leadId={caseData.lead.id}
+          inspectorContent={
+            <div className="grid min-w-0 gap-6" data-case-inspector-registry>
+              <CaseVersionHistory
+                contracts={caseData.commercial.contractVersions}
+                copy={copy}
+                formatDate={formatDate}
+                formatMoney={nok}
                 locale={user.interfaceLanguage}
+                quotes={caseData.commercial.quoteVersions}
               />
-            ) : null}
-          </Section>
 
-          <Section
-            id="measurement-section"
-            title={workspaceCopy.sections.measurement}
-          >
-            {caseData.measurement ? (
-              <>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <strong>{caseData.measurement.reference}</strong>
-                    {caseData.measurement.normalizedAddress ? (
-                      <p className="text-muted-foreground mt-1 text-sm">
-                        {caseData.measurement.normalizedAddress}
-                      </p>
-                    ) : null}
-                  </div>
-                  <Status
-                    locale={user.interfaceLanguage}
-                    value={caseData.measurement.status}
-                  />
-                </div>
-                <dl className="mt-5 grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <dt className="text-muted-foreground text-xs">
-                      {copy.area}
-                    </dt>
-                    <dd className="mt-1 font-bold">
-                      {area(caseData.measurement.actualAreaMinTenths)}–
-                      {area(caseData.measurement.actualAreaMaxTenths)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">
-                      {copy.confidence}
-                    </dt>
-                    <dd className="mt-1 font-bold">
-                      {caseData.measurement.confidence || "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">
-                      Horizontal
-                    </dt>
-                    <dd className="mt-1 font-bold">
-                      {area(caseData.measurement.horizontalAreaTenths)}
-                    </dd>
-                  </div>
-                </dl>
-                {caseData.measurement.manualAreaOverrideTenths ? (
-                  <div className="border-accent/30 bg-accent/8 mt-4 rounded-xl border p-3 text-sm">
-                    <strong className="text-accent">
-                      {copy.manualOverrideBadge}
-                    </strong>
-                    <span className="ml-2">
-                      {area(caseData.measurement.manualAreaOverrideTenths)}
-                    </span>
-                    {caseData.measurement.manualOverrideReason ? (
-                      <p className="text-muted-foreground mt-1">
-                        {caseData.measurement.manualOverrideReason}
-                      </p>
-                    ) : null}
-                    {caseData.measurement.manualOverriddenAt ? (
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {formatDate(caseData.measurement.manualOverriddenAt)}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {caseData.measurement.confidenceReasoning ? (
-                  <p className="text-muted-foreground mt-4 text-sm">
-                    {caseData.measurement.confidenceReasoning}
-                  </p>
-                ) : null}
-                <TechnicalLink
-                  entity={caseData.measurement}
-                  label={copy.technicalDetail}
-                  summary={copy.advancedTechnical}
-                />
-              </>
-            ) : (
-              <p className="text-muted-foreground">{copy.missing}</p>
-            )}
-            {secondaryMutationsAllowed ? (
-              <MeasurementReviewPanel
-                canApprovePackage={
-                  caseData.nextAction.kind === "approve_package"
-                }
-                city={caseData.lead.city}
-                currentAreaTenths={caseData.measurement?.actualAreaMaxTenths}
-                currentBuildingId={caseData.measurement?.buildingIdentifier}
-                currentMode={caseData.measurement?.measurementMode}
-                evidenceHref={caseData.measurement?.evidenceHref}
-                inquiryType={caseData.lead.inquiryType || "usikker"}
-                leadAddress={caseData.lead.streetAddress || ""}
-                leadId={caseData.lead.id}
-                latitude={caseData.measurement?.latitude}
-                locale={user.interfaceLanguage}
-                longitude={caseData.measurement?.longitude}
-                measurementId={caseData.measurement?.id}
-                postal={caseData.lead.postal}
-                revision={caseData.lead.revision}
-                sourceUrl={caseData.measurement?.sourceUrl}
-                measurementStatus={caseData.measurement?.status}
-              />
-            ) : null}
-          </Section>
-
-          <Section
-            id="price-quote-section"
-            title={workspaceCopy.sections.commercial}
-          >
-            {caseData.price ? (
-              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.priceExVat}
-                  </dt>
-                  <dd className="mt-1 font-bold">
-                    {nok(caseData.price.subtotalExVatOre)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">{copy.vat}</dt>
-                  <dd className="mt-1 font-bold">
-                    {nok(caseData.price.vatOre)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.priceIncVat}
-                  </dt>
-                  <dd className="text-accent mt-1 font-bold">
-                    {nok(caseData.price.totalIncVatOre)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.maximum}
-                  </dt>
-                  <dd className="mt-1 font-bold">
-                    {nok(caseData.price.maximumTotalIncVatOre)}
-                  </dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="text-muted-foreground">{copy.missing}</p>
-            )}
-            {caseData.quote ? (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <strong>{caseData.quote.reference}</strong>
-                    <p className="text-muted-foreground mt-1 text-sm">
-                      {copy.validUntil}: {formatDate(caseData.quote.validUntil)}
-                    </p>
-                  </div>
-                  <Status
-                    locale={user.interfaceLanguage}
-                    value={caseData.quote.status}
-                  />
-                </div>
-                {caseData.quote.declineReason ||
-                caseData.quote.declineComment ? (
-                  <div className="border-warning/25 bg-warning/5 mt-3 rounded-xl border p-3 text-sm">
-                    <strong>
-                      {quoteDeclineReasonLabel(
-                        user.interfaceLanguage,
-                        caseData.quote.declineReason,
-                      ) || metadataLabel(user.interfaceLanguage, "declined")}
-                    </strong>
-                    {caseData.quote.declineComment ? (
-                      <p className="mt-1 whitespace-pre-wrap text-white/75">
-                        {caseData.quote.declineComment}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                <a
-                  className="hover:border-accent/50 hover:text-accent mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold"
-                  href={`/api/admin/quotes/${caseData.quote.id}/pdf`}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {copy.previewQuotePdf}
-                  <ExternalLink aria-hidden="true" className="size-4" />
-                </a>
-                <TechnicalLink
-                  entity={caseData.quote}
-                  label={copy.technicalDetail}
-                  summary={copy.advancedTechnical}
-                />
-              </div>
-            ) : null}
-            {caseData.quoteOptions.length > 1 ? (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {caseData.quoteOptions.map((option) => (
-                  <article
-                    className="border-accent/25 rounded-2xl border bg-black/15 p-4"
-                    key={option.id}
+              <div className="grid min-w-0 gap-6">
+                <div className="min-w-0 space-y-6">
+                  <Section
+                    id="customer-section"
+                    title={workspaceCopy.sections.customer}
                   >
-                    <p className="text-accent text-xs font-bold tracking-wider uppercase">
-                      {option.optionKind === "recommended"
-                        ? copy.recommendedOption
-                        : copy.originalOption}
-                    </p>
-                    <h3 className="mt-2 font-bold">
-                      {option.serviceDescription}
-                    </h3>
-                    <p className="mt-2 text-2xl font-black">
-                      {nok(option.totalIncVatOre)}
-                    </p>
-                    <p className="text-muted-foreground mt-1 text-sm">
-                      {copy.maximum}: {nok(option.maximumTotalIncVatOre)}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between">
-                      <Status
-                        locale={user.interfaceLanguage}
-                        value={option.status}
-                      />
-                      <a
-                        className="text-accent text-sm font-semibold hover:underline"
-                        href={`/api/admin/quotes/${option.id}/pdf`}
-                        target="_blank"
-                      >
-                        PDF
-                      </a>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-            {secondaryMutationsAllowed &&
-            caseData.quote &&
-            ["draft", "declined"].includes(caseData.quote.status || "") &&
-            caseData.price ? (
-              <CommercialQuoteEditor
-                currentService={caseData.lead.inquiryType}
-                leadId={caseData.lead.id}
-                locale={user.interfaceLanguage}
-                rules={rules}
-                unitPriceExVatOre={
-                  caseData.quote.optionKind === "recommended"
-                    ? undefined
-                    : caseData.price.unitPriceExVatOre
-                }
-              />
-            ) : null}
-          </Section>
+                    <dl className="grid gap-5 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                          {copy.contact}
+                        </dt>
+                        <dd className="mt-2 grid gap-2">
+                          {caseData.lead.email ? (
+                            <a
+                              className="hover:text-accent inline-flex items-center gap-2"
+                              href={`mailto:${caseData.lead.email}`}
+                            >
+                              <Mail aria-hidden="true" className="size-4" />
+                              {caseData.lead.email}
+                            </a>
+                          ) : null}
+                          {caseData.lead.communicationEmail &&
+                          caseData.lead.communicationEmail !==
+                            caseData.lead.email ? (
+                            <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 p-3">
+                              <p className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
+                                {user.interfaceLanguage === "lt"
+                                  ? "Aktyvus komunikacijos el. paštas"
+                                  : user.interfaceLanguage === "en"
+                                    ? "Active communication email"
+                                    : "Aktiv e-post for kommunikasjon"}
+                              </p>
+                              <a
+                                className="mt-1 inline-flex items-center gap-2 font-semibold text-emerald-50"
+                                href={`mailto:${caseData.lead.communicationEmail}`}
+                              >
+                                <Mail aria-hidden="true" className="size-4" />
+                                {caseData.lead.communicationEmail}
+                              </a>
+                            </div>
+                          ) : null}
+                          {caseData.lead.phone ? (
+                            <a
+                              className="hover:text-accent inline-flex items-center gap-2"
+                              href={`tel:${caseData.lead.phone}`}
+                            >
+                              <Phone aria-hidden="true" className="size-4" />
+                              {caseData.lead.phone}
+                            </a>
+                          ) : null}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                          {copy.address}
+                        </dt>
+                        <dd className="mt-2 inline-flex gap-2">
+                          <MapPin
+                            aria-hidden="true"
+                            className="text-accent mt-0.5 size-4 shrink-0"
+                          />
+                          {caseData.lead.address || "—"}
+                        </dd>
+                      </div>
+                    </dl>
+                    {caseData.lead.message ? (
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm whitespace-pre-wrap text-white/85">
+                        {caseData.lead.message}
+                      </div>
+                    ) : null}
+                  </Section>
 
-          <Section
-            id="messages-section"
-            title={workspaceCopy.sections.messages}
-          >
-            {caseData.messages.length ? (
-              <div className="grid min-w-0 gap-3">
-                {caseData.messages
-                  .filter(
-                    (message) =>
-                      message.id !==
-                      (primaryQuestionActive ? displayedReply?.id : undefined),
-                  )
-                  .map((message) => {
-                    const draftAccess = customerQuestionDraftAccess(
-                      caseData.customerQuestionContext,
-                      message,
-                    );
-                    const source = draftAccess.replyTarget;
-                    return message.status === "draft" &&
-                      message.direction === "outbound" &&
-                      secondaryMutationsAllowed ? (
-                      <div
-                        className="scroll-mt-24"
-                        id={`message-${message.id}`}
-                        key={message.id}
-                      >
-                        <MessageDraftEditor
-                          aiAssisted={message.aiAssisted}
-                          blockedByActiveQuestion={draftAccess.readOnly}
-                          bodyText={message.bodyText}
-                          caseRevision={caseData.lead.revision}
-                          factWarnings={factWarnings(message.aiAnalysis)}
-                          leadId={caseData.lead.id}
-                          locale={user.interfaceLanguage}
-                          manualReplyRequiresEditing={manualReplyRequiresEditing(
-                            message.aiAnalysis,
-                          )}
-                          messageId={message.id}
-                          messageUpdatedAt={
-                            message.updatedAt || message.createdAt || ""
-                          }
-                          replyTarget={
-                            source
-                              ? {
-                                  bodyText: source.bodyText,
-                                  id: source.id,
-                                  subject: source.subject,
-                                }
-                              : null
-                          }
-                          sourceBody={source?.bodyText}
-                          sourceSubject={source?.subject}
-                          subject={message.subject}
-                        />
+                  <Section id="ai-section" title={copy.ai}>
+                    {qualification ? (
+                      <div className="grid gap-4">
+                        <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
+                          <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                            {copy.aiSummary}
+                          </p>
+                          <p className="mt-2 text-sm leading-relaxed text-white/85">
+                            {qualification.summary || copy.nothingReported}
+                          </p>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-2xl border border-white/10 p-4">
+                            <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                              {copy.missingInformation}
+                            </p>
+                            <p className="mt-2 text-sm">
+                              {qualification.missing.length
+                                ? qualification.missing.join(" · ")
+                                : copy.nothingReported}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 p-4">
+                            <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                              {copy.riskFlags}
+                            </p>
+                            <p className="mt-2 text-sm">
+                              {qualification.risks.length
+                                ? qualification.risks.join(" · ")
+                                : copy.nothingReported}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">{copy.missing}</p>
+                    )}
+                    <div className="mt-4 rounded-2xl border border-white/10 p-4">
+                      <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                        {copy.nextAction}
+                      </p>
+                      <p className="mt-2 text-sm">{nextActionText}</p>
+                    </div>
+                    {secondaryMutationsAllowed ? (
+                      <InformationRequestButton
+                        leadId={caseData.lead.id}
+                        locale={user.interfaceLanguage}
+                      />
+                    ) : null}
+                  </Section>
+
+                  <Section
+                    id="measurement-section"
+                    title={workspaceCopy.sections.measurement}
+                  >
+                    {caseData.measurement ? (
+                      <>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <strong>{caseData.measurement.reference}</strong>
+                            {caseData.measurement.normalizedAddress ? (
+                              <p className="text-muted-foreground mt-1 text-sm">
+                                {caseData.measurement.normalizedAddress}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Status
+                            locale={user.interfaceLanguage}
+                            value={caseData.measurement.status}
+                          />
+                        </div>
+                        <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              {copy.area}
+                            </dt>
+                            <dd className="mt-1 font-bold">
+                              {area(caseData.measurement.actualAreaMinTenths)}–
+                              {area(caseData.measurement.actualAreaMaxTenths)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              {copy.confidence}
+                            </dt>
+                            <dd className="mt-1 font-bold">
+                              {caseData.measurement.confidence || "—"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              Horizontal
+                            </dt>
+                            <dd className="mt-1 font-bold">
+                              {area(caseData.measurement.horizontalAreaTenths)}
+                            </dd>
+                          </div>
+                        </dl>
+                        {caseData.measurement.manualAreaOverrideTenths ? (
+                          <div className="border-accent/30 bg-accent/8 mt-4 rounded-xl border p-3 text-sm">
+                            <strong className="text-accent">
+                              {copy.manualOverrideBadge}
+                            </strong>
+                            <span className="ml-2">
+                              {area(
+                                caseData.measurement.manualAreaOverrideTenths,
+                              )}
+                            </span>
+                            {caseData.measurement.manualOverrideReason ? (
+                              <p className="text-muted-foreground mt-1">
+                                {caseData.measurement.manualOverrideReason}
+                              </p>
+                            ) : null}
+                            {caseData.measurement.manualOverriddenAt ? (
+                              <p className="text-muted-foreground mt-1 text-xs">
+                                {formatDate(
+                                  caseData.measurement.manualOverriddenAt,
+                                )}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {caseData.measurement.confidenceReasoning ? (
+                          <p className="text-muted-foreground mt-4 text-sm">
+                            {caseData.measurement.confidenceReasoning}
+                          </p>
+                        ) : null}
                         <TechnicalLink
-                          entity={message}
+                          entity={caseData.measurement}
                           label={copy.technicalDetail}
                           summary={copy.advancedTechnical}
                         />
-                      </div>
+                      </>
                     ) : (
-                      <article
-                        className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4"
-                        id={`message-${message.id}`}
-                        key={message.id}
-                      >
-                        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <strong className="[overflow-wrap:anywhere] break-words">
-                              {message.subject}
-                            </strong>
-                            <p className="text-muted-foreground mt-1 text-xs break-words">
-                              {metadataLabel(
-                                user.interfaceLanguage,
-                                message.direction,
-                              )}{" "}
-                              ·{" "}
-                              {metadataLabel(
-                                user.interfaceLanguage,
-                                message.category,
-                              )}{" "}
-                              ·{" "}
-                              {metadataLabel(
-                                user.interfaceLanguage,
-                                message.channel,
-                              )}
+                      <p className="text-muted-foreground">{copy.missing}</p>
+                    )}
+                    {secondaryMutationsAllowed && !primaryMeasurementAction ? (
+                      <MeasurementReviewPanel
+                        canApprovePackage={
+                          caseData.nextAction.kind === "approve_package"
+                        }
+                        city={caseData.lead.city}
+                        currentAreaTenths={
+                          caseData.measurement?.actualAreaMaxTenths
+                        }
+                        currentBuildingId={
+                          caseData.measurement?.buildingIdentifier
+                        }
+                        currentMode={caseData.measurement?.measurementMode}
+                        evidenceHref={caseData.measurement?.evidenceHref}
+                        inquiryType={caseData.lead.inquiryType || "usikker"}
+                        leadAddress={caseData.lead.streetAddress || ""}
+                        leadId={caseData.lead.id}
+                        latitude={caseData.measurement?.latitude}
+                        locale={user.interfaceLanguage}
+                        longitude={caseData.measurement?.longitude}
+                        measurementId={caseData.measurement?.id}
+                        postal={caseData.lead.postal}
+                        revision={caseData.lead.revision}
+                        sourceUrl={caseData.measurement?.sourceUrl}
+                        measurementStatus={caseData.measurement?.status}
+                      />
+                    ) : null}
+                  </Section>
+
+                  <Section
+                    id="price-quote-section"
+                    title={workspaceCopy.sections.commercial}
+                  >
+                    {caseData.price ? (
+                      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          <dt className="text-muted-foreground text-xs">
+                            {copy.priceExVat}
+                          </dt>
+                          <dd className="mt-1 font-bold">
+                            {nok(caseData.price.subtotalExVatOre)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground text-xs">
+                            {copy.vat}
+                          </dt>
+                          <dd className="mt-1 font-bold">
+                            {nok(caseData.price.vatOre)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground text-xs">
+                            {copy.priceIncVat}
+                          </dt>
+                          <dd className="text-accent mt-1 font-bold">
+                            {nok(caseData.price.totalIncVatOre)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground text-xs">
+                            {copy.maximum}
+                          </dt>
+                          <dd className="mt-1 font-bold">
+                            {nok(caseData.price.maximumTotalIncVatOre)}
+                          </dd>
+                        </div>
+                      </dl>
+                    ) : (
+                      <p className="text-muted-foreground">{copy.missing}</p>
+                    )}
+                    {caseData.quote ? (
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <strong>{caseData.quote.reference}</strong>
+                            <p className="text-muted-foreground mt-1 text-sm">
+                              {copy.validUntil}:{" "}
+                              {formatDate(caseData.quote.validUntil)}
                             </p>
                           </div>
                           <Status
                             locale={user.interfaceLanguage}
-                            value={message.status}
+                            value={caseData.quote.status}
                           />
                         </div>
-                        <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
-                          {message.bodyText}
-                        </p>
-                        {message.failureMessage ? (
-                          <p className="text-danger mt-3 text-sm">
-                            {message.failureMessage}
-                          </p>
+                        {caseData.quote.declineReason ||
+                        caseData.quote.declineComment ? (
+                          <div className="border-warning/25 bg-warning/5 mt-3 rounded-xl border p-3 text-sm">
+                            <strong>
+                              {quoteDeclineReasonLabel(
+                                user.interfaceLanguage,
+                                caseData.quote.declineReason,
+                              ) ||
+                                metadataLabel(
+                                  user.interfaceLanguage,
+                                  "declined",
+                                )}
+                            </strong>
+                            {caseData.quote.declineComment ? (
+                              <p className="mt-1 whitespace-pre-wrap text-white/75">
+                                {caseData.quote.declineComment}
+                              </p>
+                            ) : null}
+                          </div>
                         ) : null}
-                        {secondaryMutationsAllowed &&
-                        message.direction === "outbound" &&
-                        message.channel === "email" &&
-                        !["draft", "cancelled"].includes(
-                          message.status || "",
-                        ) ? (
-                          <ManualContactRecoveryPanel
-                            locale={user.interfaceLanguage}
-                            messageId={message.id}
-                            recovery={message.manualRecovery}
-                          />
-                        ) : null}
+                        <a
+                          className="hover:border-accent/50 hover:text-accent mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold"
+                          href={`/api/admin/quotes/${caseData.quote.id}/pdf`}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {copy.previewQuotePdf}
+                          <ExternalLink aria-hidden="true" className="size-4" />
+                        </a>
                         <TechnicalLink
-                          entity={message}
+                          entity={caseData.quote}
                           label={copy.technicalDetail}
                           summary={copy.advancedTechnical}
                         />
-                      </article>
-                    );
-                  })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">{copy.noMessages}</p>
-            )}
-          </Section>
-          {caseData.lead.nextActionBlocker ===
-            "CUSTOMER_CANCELLATION_REQUEST" && activeContractRequest ? (
-            <ContractRequestReviewPanel
-              currentService={caseData.lead.inquiryType}
-              locale={user.interfaceLanguage}
-              request={activeContractRequest}
-            />
-          ) : caseData.lead.nextActionBlocker ===
-            "CUSTOMER_CANCELLATION_REQUEST" ? (
-            <CancellationReviewPanel
-              customerMessage={cancellationSource?.bodyText}
-              leadId={caseData.lead.id}
-              locale={user.interfaceLanguage}
-            />
-          ) : null}
-        </div>
-
-        <aside className="min-w-0 space-y-6">
-          <Section
-            id="contract-section"
-            title={workspaceCopy.sections.contract}
-          >
-            {caseData.contract ? (
-              <>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <strong>{caseData.contract.reference}</strong>
-                  <Status
-                    companySignedAt={caseData.contract.companySignedAt}
-                    contract
-                    locale={user.interfaceLanguage}
-                    value={caseData.contract.status}
-                  />
-                </div>
-                {caseData.contract.signedAt ? (
-                  <p className="text-muted-foreground mt-3 text-sm">
-                    {copy.customerSignedAt}:{" "}
-                    {formatDate(caseData.contract.signedAt)}
-                  </p>
-                ) : null}
-                {caseData.contract.companySignedAt ? (
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    {copy.companySignedAt}:{" "}
-                    {formatDate(caseData.contract.companySignedAt)}
-                  </p>
-                ) : null}
-                <TechnicalLink
-                  entity={caseData.contract}
-                  label={copy.technicalDetail}
-                  summary={copy.advancedTechnical}
-                />
-              </>
-            ) : (
-              <p className="text-muted-foreground">{copy.missing}</p>
-            )}
-          </Section>
-
-          <Section id="work-section" title={workspaceCopy.sections.work}>
-            {caseData.workOrder ? (
-              <>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <strong>{caseData.workOrder.reference}</strong>
-                  <Status
-                    locale={user.interfaceLanguage}
-                    value={caseData.workOrder.status}
-                  />
-                </div>
-                <dl className="mt-4 grid gap-3">
-                  <div>
-                    <dt className="text-muted-foreground text-xs">
-                      {copy.employee}
-                    </dt>
-                    <dd className="font-semibold">
-                      {caseData.workOrder.assignedWorker || copy.unassigned}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">
-                      {copy.scheduled}
-                    </dt>
-                    <dd className="font-semibold">
-                      {formatDate(caseData.workOrder.scheduledAt)}
-                    </dd>
-                  </div>
-                  {caseData.workOrder.arrivalWindow ? (
-                    <div>
-                      <dt className="text-muted-foreground text-xs">
-                        {copy.arrivalWindow}
-                      </dt>
-                      <dd className="font-semibold">
-                        {caseData.workOrder.arrivalWindow}
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-                <TechnicalLink
-                  entity={caseData.workOrder}
-                  label={copy.technicalDetail}
-                  summary={copy.advancedTechnical}
-                />
-              </>
-            ) : (
-              <p className="text-muted-foreground">{copy.missing}</p>
-            )}
-            {secondaryMutationsAllowed &&
-            caseData.contract &&
-            ((caseData.nextAction.kind === "create_work_order" &&
-              !caseData.workOrder) ||
-              (caseData.workOrder &&
-                ["unassigned", "assigned", "scheduled"].includes(
-                  caseData.workOrder.status || "",
-                ))) ? (
-              <WorkOrderPlanningPanel
-                adminNote={caseData.workOrder?.adminNote}
-                arrivalWindow={caseData.workOrder?.arrivalWindow}
-                assignedWorkerId={caseData.workOrder?.assignedWorkerId}
-                caseId={Number(id)}
-                contractId={caseData.contract.id}
-                contractDocumentHash={
-                  caseData.commercial.contractVersions.find(
-                    (item) => item.id === caseData.contract?.id,
-                  )?.documentHash || caseData.contract.documentHash
-                }
-                contractReference={
-                  caseData.commercial.contractVersions.find(
-                    (item) => item.id === caseData.contract?.id,
-                  )?.reference || caseData.contract.reference
-                }
-                contractVersion={
-                  caseData.commercial.contractVersions.find(
-                    (item) => item.id === caseData.contract?.id,
-                  )?.version
-                }
-                incompleteWorkerCount={incompleteWorkerCount}
-                locale={user.interfaceLanguage}
-                scheduledLocal={
-                  caseData.workOrder?.scheduledAt
-                    ? formatNorwayDateTimeInput(caseData.workOrder.scheduledAt)
-                    : undefined
-                }
-                status={caseData.workOrder?.status}
-                workOrderId={caseData.workOrder?.id}
-                workers={workers}
-              />
-            ) : null}
-            {caseData.workOrder &&
-            caseData.nextAction.kind === "review_completion" ? (
-              <div id="completion-review">
-                <CompletionReviewPanel
-                  actualAreaTenths={caseData.workOrder.actualAreaTenths}
-                  actualTotalIncVatOre={caseData.workOrder.actualTotalIncVatOre}
-                  afterPhotoCount={caseData.workOrder.afterPhotoCount}
-                  beforePhotoCount={caseData.workOrder.beforePhotoCount}
-                  completionNotes={caseData.workOrder.completionNotes}
-                  locale={user.interfaceLanguage}
-                  workOrderId={caseData.workOrder.id}
-                  workSummary={caseData.workOrder.workSummary}
-                />
-              </div>
-            ) : null}
-          </Section>
-
-          <Section id="changes-section" title={workspaceCopy.sections.changes}>
-            {caseData.workOrder?.status === "blocked" ? (
-              <ChangeAgreementPanel
-                actualAreaTenths={caseData.workOrder.actualAreaTenths}
-                actualTotalIncVatOre={caseData.workOrder.actualTotalIncVatOre}
-                blockingReasons={caseData.workOrder.blockingReasons}
-                changes={caseData.changes}
-                locale={user.interfaceLanguage}
-                priceOutcome={caseData.workOrder.priceOutcome}
-                scopeChangeDetails={caseData.workOrder.scopeChangeDetails}
-                workOrderId={caseData.workOrder.id}
-              />
-            ) : caseData.changes.length ? (
-              <div className="grid gap-3">
-                {caseData.changes.map((change) => (
-                  <div
-                    className="rounded-xl border border-white/10 p-3"
-                    key={change.id}
-                  >
-                    <div className="flex justify-between gap-2">
-                      <strong>{change.reference}</strong>
-                      <Status
-                        locale={user.interfaceLanguage}
-                        value={change.status}
-                      />
-                    </div>
-                    {change.summary ? (
-                      <p className="text-muted-foreground mt-2 text-sm">
-                        {change.summary}
-                      </p>
-                    ) : null}
-                    <a
-                      className="text-accent mt-3 inline-flex text-sm font-semibold hover:underline"
-                      href={`/api/admin/change-agreements/${change.id}/pdf`}
-                      target="_blank"
-                    >
-                      PDF
-                    </a>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">{copy.missing}</p>
-            )}
-          </Section>
-
-          <Section
-            id="documents-section"
-            title={workspaceCopy.sections.documents}
-          >
-            {caseData.invoice || caseData.warranty ? (
-              <div className="mb-4 grid gap-3">
-                {caseData.invoice ? (
-                  <div
-                    className="scroll-mt-24 rounded-xl border border-white/10 p-3"
-                    id={`invoice-${caseData.invoice.id}`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                          {copy.invoiceDraft}
-                        </p>
-                        <strong>{caseData.invoice.reference}</strong>
                       </div>
-                      <Status
-                        locale={user.interfaceLanguage}
-                        value={caseData.invoice.status}
-                      />
-                    </div>
-                    <p className="text-muted-foreground mt-2 text-sm">
-                      {nok(caseData.invoice.totalIncVatOre)} · {copy.due}:{" "}
-                      {formatDate(caseData.invoice.dueAt)}
-                    </p>
-                    {caseData.invoice.documentId ? (
-                      <a
-                        className="text-accent mt-3 inline-flex items-center gap-2 text-sm font-semibold hover:underline"
-                        href={`/api/admin/media/${caseData.invoice.documentId}`}
-                        target="_blank"
-                      >
-                        PDF
-                        <ExternalLink aria-hidden="true" className="size-4" />
-                      </a>
                     ) : null}
-                    {secondaryMutationsAllowed ? (
+                    {caseData.quoteOptions.length > 1 ? (
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        {caseData.quoteOptions.map((option) => (
+                          <article
+                            className="border-accent/25 rounded-2xl border bg-black/15 p-4"
+                            key={option.id}
+                          >
+                            <p className="text-accent text-xs font-bold tracking-wider uppercase">
+                              {option.optionKind === "recommended"
+                                ? copy.recommendedOption
+                                : copy.originalOption}
+                            </p>
+                            <h3 className="mt-2 font-bold">
+                              {option.serviceDescription}
+                            </h3>
+                            <p className="mt-2 text-2xl font-black">
+                              {nok(option.totalIncVatOre)}
+                            </p>
+                            <p className="text-muted-foreground mt-1 text-sm">
+                              {copy.maximum}:{" "}
+                              {nok(option.maximumTotalIncVatOre)}
+                            </p>
+                            <div className="mt-3 flex items-center justify-between">
+                              <Status
+                                locale={user.interfaceLanguage}
+                                value={option.status}
+                              />
+                              <a
+                                className="text-accent text-sm font-semibold hover:underline"
+                                href={`/api/admin/quotes/${option.id}/pdf`}
+                                target="_blank"
+                              >
+                                PDF
+                              </a>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                    {secondaryMutationsAllowed &&
+                    caseData.quote &&
+                    ["draft", "declined"].includes(
+                      caseData.quote.status || "",
+                    ) &&
+                    caseData.price ? (
+                      <CommercialQuoteEditor
+                        currentService={caseData.lead.inquiryType}
+                        leadId={caseData.lead.id}
+                        locale={user.interfaceLanguage}
+                        rules={rules}
+                        unitPriceExVatOre={
+                          caseData.quote.optionKind === "recommended"
+                            ? undefined
+                            : caseData.price.unitPriceExVatOre
+                        }
+                      />
+                    ) : null}
+                  </Section>
+
+                  <Section
+                    id="messages-section"
+                    title={workspaceCopy.sections.messages}
+                  >
+                    {caseData.messages.length ? (
+                      <div className="grid min-w-0 gap-3">
+                        {caseData.messages
+                          .filter(
+                            (message) =>
+                              message.id !==
+                              (primaryQuestionActive
+                                ? displayedReply?.id
+                                : undefined),
+                          )
+                          .map((message) => {
+                            const draftAccess = customerQuestionDraftAccess(
+                              caseData.customerQuestionContext,
+                              message,
+                            );
+                            const source = draftAccess.replyTarget;
+                            return message.status === "draft" &&
+                              message.direction === "outbound" &&
+                              secondaryMutationsAllowed ? (
+                              <div
+                                className="scroll-mt-24"
+                                id={`message-${message.id}`}
+                                key={message.id}
+                              >
+                                <MessageDraftEditor
+                                  aiAssisted={message.aiAssisted}
+                                  blockedByActiveQuestion={draftAccess.readOnly}
+                                  bodyText={message.bodyText}
+                                  caseRevision={caseData.lead.revision}
+                                  factWarnings={factWarnings(
+                                    message.aiAnalysis,
+                                  )}
+                                  leadId={caseData.lead.id}
+                                  locale={user.interfaceLanguage}
+                                  manualReplyRequiresEditing={manualReplyRequiresEditing(
+                                    message.aiAnalysis,
+                                  )}
+                                  messageId={message.id}
+                                  messageUpdatedAt={
+                                    message.updatedAt || message.createdAt || ""
+                                  }
+                                  replyTarget={
+                                    source
+                                      ? {
+                                          bodyText: source.bodyText,
+                                          id: source.id,
+                                          subject: source.subject,
+                                        }
+                                      : null
+                                  }
+                                  sourceBody={source?.bodyText}
+                                  sourceSubject={source?.subject}
+                                  subject={message.subject}
+                                />
+                                <TechnicalLink
+                                  entity={message}
+                                  label={copy.technicalDetail}
+                                  summary={copy.advancedTechnical}
+                                />
+                              </div>
+                            ) : (
+                              <article
+                                className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4"
+                                id={`message-${message.id}`}
+                                key={message.id}
+                              >
+                                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <strong className="[overflow-wrap:anywhere] break-words">
+                                      {message.subject}
+                                    </strong>
+                                    <p className="text-muted-foreground mt-1 text-xs break-words">
+                                      {metadataLabel(
+                                        user.interfaceLanguage,
+                                        message.direction,
+                                      )}{" "}
+                                      ·{" "}
+                                      {metadataLabel(
+                                        user.interfaceLanguage,
+                                        message.category,
+                                      )}{" "}
+                                      ·{" "}
+                                      {metadataLabel(
+                                        user.interfaceLanguage,
+                                        message.channel,
+                                      )}
+                                    </p>
+                                  </div>
+                                  <Status
+                                    locale={user.interfaceLanguage}
+                                    value={message.status}
+                                  />
+                                </div>
+                                <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
+                                  {message.bodyText}
+                                </p>
+                                {message.failureMessage ? (
+                                  <p className="text-danger mt-3 text-sm">
+                                    {message.failureMessage}
+                                  </p>
+                                ) : null}
+                                {secondaryMutationsAllowed &&
+                                message.direction === "outbound" &&
+                                message.channel === "email" &&
+                                !["draft", "cancelled"].includes(
+                                  message.status || "",
+                                ) ? (
+                                  <ManualContactRecoveryPanel
+                                    locale={user.interfaceLanguage}
+                                    messageId={message.id}
+                                    recovery={message.manualRecovery}
+                                  />
+                                ) : null}
+                                <TechnicalLink
+                                  entity={message}
+                                  label={copy.technicalDetail}
+                                  summary={copy.advancedTechnical}
+                                />
+                              </article>
+                            );
+                          })}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">{copy.noMessages}</p>
+                    )}
+                  </Section>
+                  {!primaryCancellationAction &&
+                  caseData.lead.nextActionBlocker ===
+                    "CUSTOMER_CANCELLATION_REQUEST" &&
+                  activeContractRequest ? (
+                    <ContractRequestReviewPanel
+                      currentService={caseData.lead.inquiryType}
+                      locale={user.interfaceLanguage}
+                      request={activeContractRequest}
+                    />
+                  ) : !primaryCancellationAction &&
+                    caseData.lead.nextActionBlocker ===
+                      "CUSTOMER_CANCELLATION_REQUEST" ? (
+                    <CancellationReviewPanel
+                      customerMessage={cancellationSource?.bodyText}
+                      leadId={caseData.lead.id}
+                      locale={user.interfaceLanguage}
+                    />
+                  ) : null}
+                </div>
+
+                <aside className="min-w-0 space-y-6">
+                  <Section
+                    id="contract-section"
+                    title={workspaceCopy.sections.contract}
+                  >
+                    {caseData.contract ? (
                       <>
-                        <InvoiceRecordPanel
-                          adminNote={caseData.invoice.adminNote}
-                          externalReference={caseData.invoice.externalReference}
-                          id={caseData.invoice.id}
-                          locale={user.interfaceLanguage}
-                          status={caseData.invoice.status || "draft"}
-                        />
-                        <OfficialInvoiceManager
-                          invoiceRecordId={caseData.invoice.id}
-                          invoiceRecordStatus={
-                            caseData.invoice.status || "draft"
-                          }
-                          items={caseData.officialInvoices}
-                          locale={user.interfaceLanguage}
+                        <div className="flex flex-wrap justify-between gap-3">
+                          <strong>{caseData.contract.reference}</strong>
+                          <Status
+                            companySignedAt={caseData.contract.companySignedAt}
+                            contract
+                            locale={user.interfaceLanguage}
+                            value={caseData.contract.status}
+                          />
+                        </div>
+                        {caseData.contract.signedAt ? (
+                          <p className="text-muted-foreground mt-3 text-sm">
+                            {copy.customerSignedAt}:{" "}
+                            {formatDate(caseData.contract.signedAt)}
+                          </p>
+                        ) : null}
+                        {caseData.contract.companySignedAt ? (
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            {copy.companySignedAt}:{" "}
+                            {formatDate(caseData.contract.companySignedAt)}
+                          </p>
+                        ) : null}
+                        <TechnicalLink
+                          entity={caseData.contract}
+                          label={copy.technicalDetail}
+                          summary={copy.advancedTechnical}
                         />
                       </>
-                    ) : null}
-                  </div>
-                ) : null}
-                {caseData.warranty ? (
-                  <div
-                    className="scroll-mt-24 rounded-xl border border-white/10 p-3"
-                    id={`warranty-${caseData.warranty.id}`}
+                    ) : (
+                      <p className="text-muted-foreground">{copy.missing}</p>
+                    )}
+                  </Section>
+
+                  <Section
+                    id="work-section"
+                    title={workspaceCopy.sections.work}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                          {copy.warranty}
-                        </p>
-                        <strong>{caseData.warranty.reference}</strong>
-                      </div>
-                      <Status
+                    {caseData.workOrder ? (
+                      <>
+                        <div className="flex flex-wrap justify-between gap-3">
+                          <strong>{caseData.workOrder.reference}</strong>
+                          <Status
+                            locale={user.interfaceLanguage}
+                            value={caseData.workOrder.status}
+                          />
+                        </div>
+                        <dl className="mt-4 grid gap-3">
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              {copy.employee}
+                            </dt>
+                            <dd className="font-semibold">
+                              {caseData.workOrder.assignedWorker ||
+                                copy.unassigned}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              {copy.scheduled}
+                            </dt>
+                            <dd className="font-semibold">
+                              {formatDate(caseData.workOrder.scheduledAt)}
+                            </dd>
+                          </div>
+                          {caseData.workOrder.arrivalWindow ? (
+                            <div>
+                              <dt className="text-muted-foreground text-xs">
+                                {copy.arrivalWindow}
+                              </dt>
+                              <dd className="font-semibold">
+                                {caseData.workOrder.arrivalWindow}
+                              </dd>
+                            </div>
+                          ) : null}
+                        </dl>
+                        <TechnicalLink
+                          entity={caseData.workOrder}
+                          label={copy.technicalDetail}
+                          summary={copy.advancedTechnical}
+                        />
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">{copy.missing}</p>
+                    )}
+                    {secondaryMutationsAllowed &&
+                    !primaryWorkPlanningAction &&
+                    caseData.contract &&
+                    ((caseData.nextAction.kind === "create_work_order" &&
+                      !caseData.workOrder) ||
+                      (caseData.workOrder &&
+                        ["unassigned", "assigned", "scheduled"].includes(
+                          caseData.workOrder.status || "",
+                        ))) ? (
+                      <WorkOrderPlanningPanel
+                        adminNote={caseData.workOrder?.adminNote}
+                        arrivalWindow={caseData.workOrder?.arrivalWindow}
+                        assignedWorkerId={caseData.workOrder?.assignedWorkerId}
+                        caseId={Number(id)}
+                        contractId={caseData.contract.id}
+                        contractDocumentHash={
+                          caseData.commercial.contractVersions.find(
+                            (item) => item.id === caseData.contract?.id,
+                          )?.documentHash || caseData.contract.documentHash
+                        }
+                        contractReference={
+                          caseData.commercial.contractVersions.find(
+                            (item) => item.id === caseData.contract?.id,
+                          )?.reference || caseData.contract.reference
+                        }
+                        contractVersion={
+                          caseData.commercial.contractVersions.find(
+                            (item) => item.id === caseData.contract?.id,
+                          )?.version
+                        }
+                        incompleteWorkerCount={incompleteWorkerCount}
                         locale={user.interfaceLanguage}
-                        value={caseData.warranty.status}
+                        scheduledLocal={
+                          caseData.workOrder?.scheduledAt
+                            ? formatNorwayDateTimeInput(
+                                caseData.workOrder.scheduledAt,
+                              )
+                            : undefined
+                        }
+                        status={caseData.workOrder?.status}
+                        workOrderId={caseData.workOrder?.id}
+                        workers={workers}
                       />
-                    </div>
-                    <p className="text-muted-foreground mt-2 text-sm">
-                      {copy.warrantyUntil}:{" "}
-                      {formatDate(caseData.warranty.endsAt)}
-                    </p>
-                    {caseData.warranty.documentId ? (
-                      <a
-                        className="text-accent mt-3 inline-flex items-center gap-2 text-sm font-semibold hover:underline"
-                        href={`/api/admin/media/${caseData.warranty.documentId}`}
-                        target="_blank"
-                      >
-                        PDF
-                        <ExternalLink aria-hidden="true" className="size-4" />
-                      </a>
                     ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {caseData.documents.length ? (
-              <div className="grid min-w-0 gap-2">
-                {caseData.documents.map((document) => (
-                  <a
-                    className="hover:border-accent/50 hover:text-accent flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold"
-                    href={document.href}
-                    key={document.id}
-                    rel="noreferrer"
-                    target="_blank"
+                    {!primaryCompletionAction &&
+                    caseData.workOrder &&
+                    caseData.nextAction.kind === "review_completion" ? (
+                      <div id="completion-review">
+                        <CompletionReviewPanel
+                          actualAreaTenths={caseData.workOrder.actualAreaTenths}
+                          actualTotalIncVatOre={
+                            caseData.workOrder.actualTotalIncVatOre
+                          }
+                          afterPhotoCount={caseData.workOrder.afterPhotoCount}
+                          beforePhotoCount={caseData.workOrder.beforePhotoCount}
+                          completionNotes={caseData.workOrder.completionNotes}
+                          locale={user.interfaceLanguage}
+                          workOrderId={caseData.workOrder.id}
+                          workSummary={caseData.workOrder.workSummary}
+                        />
+                      </div>
+                    ) : null}
+                  </Section>
+
+                  <Section
+                    id="changes-section"
+                    title={workspaceCopy.sections.changes}
                   >
-                    <span className="min-w-0 flex-1 truncate">
-                      {document.filename}
-                    </span>
-                    <ExternalLink
-                      aria-hidden="true"
-                      className="size-4 shrink-0"
-                    />
-                  </a>
-                ))}
+                    {caseData.workOrder?.status === "blocked" &&
+                    !primaryWorkBlockAction ? (
+                      <ChangeAgreementPanel
+                        actualAreaTenths={caseData.workOrder.actualAreaTenths}
+                        actualTotalIncVatOre={
+                          caseData.workOrder.actualTotalIncVatOre
+                        }
+                        blockingReasons={caseData.workOrder.blockingReasons}
+                        changes={caseData.changes}
+                        locale={user.interfaceLanguage}
+                        priceOutcome={caseData.workOrder.priceOutcome}
+                        scopeChangeDetails={
+                          caseData.workOrder.scopeChangeDetails
+                        }
+                        workOrderId={caseData.workOrder.id}
+                      />
+                    ) : caseData.changes.length ? (
+                      <div className="grid gap-3">
+                        {caseData.changes.map((change) => (
+                          <div
+                            className="rounded-xl border border-white/10 p-3"
+                            key={change.id}
+                          >
+                            <div className="flex justify-between gap-2">
+                              <strong>{change.reference}</strong>
+                              <Status
+                                locale={user.interfaceLanguage}
+                                value={change.status}
+                              />
+                            </div>
+                            {change.summary ? (
+                              <p className="text-muted-foreground mt-2 text-sm">
+                                {change.summary}
+                              </p>
+                            ) : null}
+                            <a
+                              className="text-accent mt-3 inline-flex text-sm font-semibold hover:underline"
+                              href={`/api/admin/change-agreements/${change.id}/pdf`}
+                              target="_blank"
+                            >
+                              PDF
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">{copy.missing}</p>
+                    )}
+                  </Section>
+
+                  <Section
+                    id="documents-section"
+                    title={workspaceCopy.sections.documents}
+                  >
+                    {caseData.invoice || caseData.warranty ? (
+                      <div className="mb-4 grid gap-3">
+                        {caseData.invoice ? (
+                          <div
+                            className="scroll-mt-24 rounded-xl border border-white/10 p-3"
+                            id={`invoice-${caseData.invoice.id}`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                                  {copy.invoiceDraft}
+                                </p>
+                                <strong>{caseData.invoice.reference}</strong>
+                              </div>
+                              <Status
+                                locale={user.interfaceLanguage}
+                                value={caseData.invoice.status}
+                              />
+                            </div>
+                            <p className="text-muted-foreground mt-2 text-sm">
+                              {nok(caseData.invoice.totalIncVatOre)} ·{" "}
+                              {copy.due}: {formatDate(caseData.invoice.dueAt)}
+                            </p>
+                            {caseData.invoice.documentId ? (
+                              <a
+                                className="text-accent mt-3 inline-flex items-center gap-2 text-sm font-semibold hover:underline"
+                                href={`/api/admin/media/${caseData.invoice.documentId}`}
+                                target="_blank"
+                              >
+                                PDF
+                                <ExternalLink
+                                  aria-hidden="true"
+                                  className="size-4"
+                                />
+                              </a>
+                            ) : null}
+                            {secondaryMutationsAllowed ? (
+                              <>
+                                <InvoiceRecordPanel
+                                  adminNote={caseData.invoice.adminNote}
+                                  externalReference={
+                                    caseData.invoice.externalReference
+                                  }
+                                  id={caseData.invoice.id}
+                                  locale={user.interfaceLanguage}
+                                  status={caseData.invoice.status || "draft"}
+                                />
+                                <OfficialInvoiceManager
+                                  invoiceRecordId={caseData.invoice.id}
+                                  invoiceRecordStatus={
+                                    caseData.invoice.status || "draft"
+                                  }
+                                  items={caseData.officialInvoices}
+                                  locale={user.interfaceLanguage}
+                                />
+                              </>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {caseData.warranty ? (
+                          <div
+                            className="scroll-mt-24 rounded-xl border border-white/10 p-3"
+                            id={`warranty-${caseData.warranty.id}`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                                  {copy.warranty}
+                                </p>
+                                <strong>{caseData.warranty.reference}</strong>
+                              </div>
+                              <Status
+                                locale={user.interfaceLanguage}
+                                value={caseData.warranty.status}
+                              />
+                            </div>
+                            <p className="text-muted-foreground mt-2 text-sm">
+                              {copy.warrantyUntil}:{" "}
+                              {formatDate(caseData.warranty.endsAt)}
+                            </p>
+                            {caseData.warranty.documentId ? (
+                              <a
+                                className="text-accent mt-3 inline-flex items-center gap-2 text-sm font-semibold hover:underline"
+                                href={`/api/admin/media/${caseData.warranty.documentId}`}
+                                target="_blank"
+                              >
+                                PDF
+                                <ExternalLink
+                                  aria-hidden="true"
+                                  className="size-4"
+                                />
+                              </a>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {caseData.documents.length ? (
+                      <div className="grid min-w-0 gap-2">
+                        {caseData.documents.map((document) => (
+                          <a
+                            className="hover:border-accent/50 hover:text-accent flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold"
+                            href={document.href}
+                            key={document.id}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {document.filename}
+                            </span>
+                            <ExternalLink
+                              aria-hidden="true"
+                              className="size-4 shrink-0"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        {copy.noDocuments}
+                      </p>
+                    )}
+                  </Section>
+                </aside>
               </div>
-            ) : (
-              <p className="text-muted-foreground">{copy.noDocuments}</p>
-            )}
-          </Section>
-        </aside>
+            </div>
+          }
+        />
       </div>
-      <CaseLifecyclePanel
-        classification={
-          caseData.lead.archiveClassification ||
-          (declineFollowUp ? "declined" : undefined)
-        }
-        leadId={caseData.lead.id}
-        locale={user.interfaceLanguage}
-        purgeAfter={caseData.lead.purgeAfter}
-        recordState={caseData.lead.recordState}
-      />
+      {!declineFollowUp ? (
+        <CaseLifecyclePanel
+          classification={caseData.lead.archiveClassification}
+          leadId={caseData.lead.id}
+          locale={user.interfaceLanguage}
+          purgeAfter={caseData.lead.purgeAfter}
+          recordState={caseData.lead.recordState}
+        />
+      ) : null}
     </div>
   );
 }

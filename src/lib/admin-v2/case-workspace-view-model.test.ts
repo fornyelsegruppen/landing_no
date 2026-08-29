@@ -162,8 +162,8 @@ describe("deriveCaseWorkspacePrimaryState", () => {
       expect(result.key).toBe(`lifecycle.${recordState}`);
       expect(result.priority).toBe("lifecycle");
       expect(result.action).toEqual({
-        href: "#case-lifecycle-title",
-        mode: "navigate",
+        mode: "panel",
+        panel: "lifecycle",
       });
     }
   });
@@ -185,7 +185,7 @@ describe("deriveCaseWorkspacePrimaryState", () => {
     expect(result.blocker?.code).toBe("CUSTOMER_CANCELLATION_REQUEST");
   });
 
-  it("navigates structured cancellation review to the rendered request panel", () => {
+  it("selects the structured cancellation panel without fragment navigation", () => {
     const result = deriveCaseWorkspacePrimaryState(
       makeCase("review_cancellation", {
         contractRequests: [
@@ -205,8 +205,8 @@ describe("deriveCaseWorkspacePrimaryState", () => {
     );
 
     expect(result.action).toEqual({
-      href: "#contract-request-section",
-      mode: "navigate",
+      mode: "panel",
+      panel: "cancellation",
     });
   });
 

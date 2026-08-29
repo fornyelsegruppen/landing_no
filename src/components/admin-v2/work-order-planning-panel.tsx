@@ -62,7 +62,7 @@ export function WorkOrderPlanningPanel(props: {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<AdminActionFeedback | null>(null);
   const creating = !props.workOrderId;
-  const employeeManagementHref = `/admin-v2/employees?returnTo=${encodeURIComponent(`/admin-v2/cases/${props.caseId}#work-planning`)}#add-employee`;
+  const employeeManagementHref = `/admin-v2/employees?returnTo=${encodeURIComponent(`/admin-v2/cases/${props.caseId}`)}#add-employee`;
 
   async function save() {
     if (busy) return;
