@@ -78,7 +78,7 @@ export function restoreInspectorTriggerFocus(
     window.requestAnimationFrame(callback),
 ) {
   if (!trigger) return;
-  schedule(() => trigger.focus({ preventScroll: true }));
+  schedule(() => schedule(() => trigger.focus({ preventScroll: true })));
 }
 
 export type CaseProcessTimelineProps = {
@@ -399,6 +399,7 @@ export function CaseProcessTimeline({
           discardChangesMessage={labels.discardChanges}
           onClose={closeInspector}
           open
+          returnFocusRef={inspectorTriggerRef}
           title={inspectorSelection.title}
         >
           {selectedInspectorContent}

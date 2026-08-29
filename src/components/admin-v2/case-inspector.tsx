@@ -2,7 +2,13 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 export type CaseInspectorProps = {
   busyCloseMessage?: string;
@@ -13,6 +19,7 @@ export type CaseInspectorProps = {
   initialTargetId?: string;
   onClose: () => void;
   open: boolean;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   title: string;
 };
 
@@ -55,6 +62,7 @@ export function CaseInspector({
   initialTargetId,
   onClose,
   open,
+  returnFocusRef,
   title,
 }: CaseInspectorProps) {
   const descriptionId = useId();
@@ -136,6 +144,12 @@ export function CaseInspector({
           aria-modal="true"
           className="bg-background-elevated text-foreground fixed inset-0 z-[130] flex h-[100dvh] w-screen flex-col overflow-hidden border-white/10 shadow-2xl shadow-black/60 outline-none data-[state=closed]:translate-x-full data-[state=open]:translate-x-0 motion-safe:transition-transform sm:inset-y-3 sm:right-3 sm:left-auto sm:h-[calc(100dvh-1.5rem)] sm:w-[calc(100vw-1.5rem)] sm:max-w-none sm:rounded-3xl sm:border xl:inset-y-0 xl:right-0 xl:h-[100dvh] xl:w-[min(46vw,44rem)] xl:rounded-none xl:rounded-l-3xl xl:border-y-0 xl:border-r-0"
           data-case-inspector=""
+          onCloseAutoFocus={(event) => {
+            const trigger = returnFocusRef?.current;
+            if (!trigger) return;
+            event.preventDefault();
+            trigger.focus({ preventScroll: true });
+          }}
         >
           <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 sm:px-6 sm:pt-5">
             <div className="min-w-0 flex-1">

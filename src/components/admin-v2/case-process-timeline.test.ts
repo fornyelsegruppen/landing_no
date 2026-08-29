@@ -54,7 +54,7 @@ describe("case process timeline", () => {
 
     restoreInspectorTriggerFocus({ focus }, schedule);
 
-    expect(schedule).toHaveBeenCalledOnce();
+    expect(schedule).toHaveBeenCalledTimes(2);
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 
