@@ -44,6 +44,7 @@ const valid = {
 
 class SequentialAiProvider implements AiProvider {
   calls = 0;
+  requests: AiGenerateRequest[] = [];
 
   constructor(private readonly responses: unknown[]) {}
 
@@ -52,6 +53,7 @@ class SequentialAiProvider implements AiProvider {
   }
 
   async generate(request: AiGenerateRequest): Promise<AiGenerateResult> {
+    this.requests.push(request);
     const response =
       this.responses[Math.min(this.calls, this.responses.length - 1)];
     this.calls += 1;
@@ -405,6 +407,98 @@ describe("customer reply safety", () => {
     expect(provider.calls).toBe(2);
   });
 
+  it("does not prime the provider with forbidden internal vocabulary", async () => {
+    const provider = new SequentialAiProvider([valid]);
+
+    await generateCustomerReplyDraft({
+      provider,
+      context,
+      correlationId: "reply-customer-language-only",
+    });
+
+    expect(provider.requests[0]?.schemaName).toBe("customer-reply-nb-v6");
+    expect(provider.requests[0]?.system).not.toMatch(
+      /kildegrunnlag|faktakontekst|systemprompt|JSON-kontekst|automatisk faktakontroll/i,
+    );
+  });
+
+  it("uses a validated deterministic fallback for the live compound question after two unsafe AI drafts", async () => {
+    const liveUatContext: CustomerReplyContext = {
+      ...context,
+      customerMessage:
+        "Er impregnering inkludert i dette tilbudet, og hva skjer med prisen dersom kontrollmålingen viser et større takareal?",
+      quote: {
+        ...context.quote!,
+        reference: "T-17-V1",
+        maximumTotalIncVatOre: 1_455_858,
+        serviceDescription: "Takvask",
+      },
+    };
+    const provider = new SequentialAiProvider([
+      {
+        ...valid,
+        replyDraft:
+          "Opplysningen kan ikke bekreftes uten kildegrunnlag. Kontakt oss senere.",
+      },
+      {
+        ...valid,
+        replyDraft:
+          "Impregnering er ikke inkludert. Prisen kan endres etter kontrollmålingen.",
+      },
+    ]);
+
+    const generated = await generateCustomerReplyDraft({
+      provider,
+      context: liveUatContext,
+      correlationId: "reply-live-safety-fallback",
+    });
+
+    expect(provider.calls).toBe(2);
+    expect(generated).toMatchObject({
+      safetyFallback: true,
+      result: {
+        subject: "Svar på spørsmål om tilbud T-17-V1",
+        intent: "question",
+        recommendedAdminAction: "review_and_reply",
+      },
+    });
+    expect(generated.result.replyDraft).toContain("14 558,58 kr");
+    expect(generated.result.replyDraft).toContain(
+      "Impregnering er ikke inkludert",
+    );
+    expect(generated.result.replyDraft).toContain("stanses berørt arbeid");
+    expect(() =>
+      assertCustomerReplyTextSafe(
+        `${generated.result.subject}\n${generated.result.replyDraft}`,
+        liveUatContext,
+      ),
+    ).not.toThrow();
+  });
+
+  it("keeps rejecting two unsafe drafts when a deterministic fallback cannot cover the question", async () => {
+    const provider = new SequentialAiProvider([
+      {
+        ...valid,
+        replyDraft:
+          "Dette svaret bygger på faktakonteksten i systemet og skal derfor ikke brukes som kundetekst.",
+      },
+      {
+        ...valid,
+        replyDraft:
+          "Dette svaret bygger på faktakonteksten i systemet og skal derfor ikke brukes som kundetekst.",
+      },
+    ]);
+
+    await expect(
+      generateCustomerReplyDraft({
+        provider,
+        context,
+        correlationId: "reply-no-unsafe-generic-fallback",
+      }),
+    ).rejects.toThrow(/internal technical wording/);
+    expect(provider.calls).toBe(2);
+  });
+
   it("enforces quota before the bounded safety retry calls the provider", async () => {
     const provider = new SequentialAiProvider([
       {
@@ -464,5 +558,30 @@ describe("customer reply safety", () => {
         subject: "Svar om tilbud T-8-V1",
       }),
     ).rejects.toThrow(/internal technical wording/);
+  });
+
+  it("does not prime polishing with forbidden internal vocabulary", async () => {
+    const provider = new SequentialAiProvider([
+      {
+        subject: "Svar om tilbud T-8-V1",
+        replyDraft:
+          "Takk for spørsmålet. Vi forklarer gjerne tilbudet og neste steg før du bestemmer deg.",
+      },
+    ]);
+
+    await polishCustomerReplyDraft({
+      bodyText: "Forklar tilbudet og hva kunden kan gjøre videre.",
+      context,
+      correlationId: "polish-customer-language-only",
+      provider,
+      subject: "Svar om tilbud T-8-V1",
+    });
+
+    expect(provider.requests[0]?.schemaName).toBe(
+      "customer-reply-polish-nb-v5",
+    );
+    expect(provider.requests[0]?.system).not.toMatch(
+      /kildegrunnlag|faktakontekst|systemprompt|JSON-kontekst|automatisk faktakontroll/i,
+    );
   });
 });

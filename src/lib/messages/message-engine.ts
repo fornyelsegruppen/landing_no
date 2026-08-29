@@ -420,6 +420,7 @@ export async function createCustomerReplyDraft(
       replyFactContext: generated.context,
       replySourceFingerprint: sourceBundle.fingerprint,
       replySourceSnapshot: sourceBundle.snapshot,
+      ...(generated.safetyFallback ? { safetyFallback: true } : {}),
     },
     modelVersion: generated.model,
     promptVersion: generated.promptVersion,

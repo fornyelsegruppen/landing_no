@@ -188,6 +188,68 @@ function formatSquareMetersFromTenths(tenths: number) {
   }).format(tenths / 10)} m²`;
 }
 
+function deterministicLiveQuestionFallback(
+  context: CustomerReplyContext,
+): CustomerReplyResult | null {
+  if (context.purpose !== "question" || !context.quote) return null;
+
+  const asksWhetherImpregnationIsIncluded =
+    /\ber\s+impregnering(?:en)?\b.{0,40}\b(?:inkludert|med)\b/i.test(
+      context.customerMessage,
+    );
+  const asksAboutControlMeasurementPrice =
+    typeof context.quote.maximumTotalIncVatOre === "number" &&
+    /\b(?:kontrollmåling(?:en)?|større\s+(?:tak)?areal|takareal)\b/i.test(
+      context.customerMessage,
+    ) &&
+    /\b(?:pris(?:en)?|kost(?:er|nad)?|maksimalpris(?:en)?|betale)\b/i.test(
+      context.customerMessage,
+    );
+  if (!asksWhetherImpregnationIsIncluded || !asksAboutControlMeasurementPrice)
+    return null;
+
+  const selectedService =
+    context.quote.serviceDescription?.trim() || context.service?.trim();
+  const impregnationIncluded = selectedService
+    ? /impregner/i.test(selectedService)
+      ? true
+      : /takvask/i.test(selectedService)
+        ? false
+        : null
+    : null;
+  if (impregnationIncluded === null) return null;
+
+  const maximumTotalIncVatOre = context.quote.maximumTotalIncVatOre;
+  if (typeof maximumTotalIncVatOre !== "number") return null;
+  const maximumPrice = formatNokFromOre(maximumTotalIncVatOre);
+  const replyDraft = [
+    `Takk for spørsmålet om tilbud ${context.quote.reference}.`,
+    impregnationIncluded
+      ? "Impregnering er inkludert i dette tilbudet."
+      : "Impregnering er ikke inkludert i dette tilbudet.",
+    `Maksimalprisen i tilbudet er ${maximumPrice} inkludert mva.`,
+    "Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale.",
+    "Dersom kontrollmålingen viser et større takareal over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen.",
+    "Ta gjerne kontakt dersom du ønsker at vi går gjennom tilbudet med deg.",
+  ].join(" ");
+  const result = customerReplySchema.parse({
+    subject: `Svar på spørsmål om tilbud ${context.quote.reference}`,
+    replyDraft,
+    summary: "Kunden spør om impregnering og maksimalpris ved kontrollmåling.",
+    intent: "question",
+    factWarnings: [
+      "En kontrollert sikkerhetsmal ble brukt etter at to AI-forslag ble avvist. Kontroller dokumentversjon og beløp før utsending.",
+    ],
+    recommendedAdminAction: "review_and_reply",
+  });
+
+  assertCustomerReplyTextSafe(
+    `${result.subject}\n${result.replyDraft}`,
+    context,
+  );
+  return result;
+}
+
 /**
  * The stored fact context uses integer øre and tenths for exact validation.
  * Never expose those storage units to the language model: a model can otherwise
@@ -496,9 +558,9 @@ export async function generateCustomerReplyDraft(input: {
     "Svar eksplisitt på hvert delspørsmål i kundens melding. Hvis konteksten ikke gir grunnlag for ja eller nei, si det tydelig og beskriv hvilket kontrollert neste steg som kreves.",
     "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, svar separat på begge deler. Et mulig senere tillegg må avklares særskilt og håndteres i et revidert eller separat tilbud. Inviter kunden til å kontakte Takfornyelse dersom de ønsker et slikt tilbud.",
     "Bruk bare kontrollerte fakta i sakskonteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
-    "Kundeteksten må aldri omtale interne tekniske mekanismer eller bruke uttrykk som kildegrunnlag, faktakontekst, systemkontekst, systemprompt, JSON-kontekst, database, språkmodell eller automatisk faktakontroll.",
+    "Kundeteksten må aldri omtale interne tekniske mekanismer, modellprosesser eller hvordan fakta ble hentet. Beskriv bare kundens tilbud, avtale og neste steg i vanlig kundespråk.",
     "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
-    "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
+    "Alle pengebeløp i sakskonteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
     "Når du forklarer maksimalpris: Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale. Hvis kontrollmålingen viser større areal eller annet omfang over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen. Beskriv aldri kontrollmålingen som et selvstendig unntak fra maksimalprisen.",
     "Skriv det norske ordet endringsavtale korrekt. Tillatte bøyninger er endringsavtale, endringsavtalen, endringsavtaler og endringsavtalene.",
     "Bruk den uforanderlige quote- og contract-versjonen i saken når kunden spør om et eksisterende tilbud eller en eksisterende avtale.",
@@ -521,14 +583,14 @@ export async function generateCustomerReplyDraft(input: {
     });
     const generated = await input.provider.generate({
       task: "customer.reply.draft",
-      schemaName: "customer-reply-nb-v5",
+      schemaName: "customer-reply-nb-v6",
       schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
       correlationId: attemptCorrelationId,
       system: [
         ...baseSystem,
         ...(attempt === 2
           ? [
-              "Et tidligere forslag ble avvist av den automatiske faktakontrollen. Lag et helt nytt svar og følg alle reglene ordrett.",
+              "Et tidligere forslag oppfylte ikke svarreglene. Lag et helt nytt svar med bare kundevendt språk og følg alle reglene ordrett.",
             ]
           : []),
       ].join("\n"),
@@ -541,7 +603,20 @@ export async function generateCustomerReplyDraft(input: {
         context,
       );
     } catch (error) {
-      if (!(error instanceof TypeError) || attempt === 2) throw error;
+      if (!(error instanceof TypeError)) throw error;
+      if (attempt === 2) {
+        const fallback = deterministicLiveQuestionFallback(context);
+        if (fallback) {
+          return {
+            result: fallback,
+            context,
+            model: generated.model,
+            promptVersion: generated.promptVersion,
+            safetyFallback: true as const,
+          };
+        }
+        throw error;
+      }
       lastSafetyError = error;
       continue;
     }
@@ -582,7 +657,7 @@ export async function polishCustomerReplyDraft(input: {
   const promptContext = customerReplyPromptContext(context);
   const generated = await input.provider.generate({
     task: "customer.reply.polish",
-    schemaName: "customer-reply-polish-nb-v4",
+    schemaName: "customer-reply-polish-nb-v5",
     schema: polishedReplyJsonSchema as unknown as Record<string, unknown>,
     correlationId: input.correlationId,
     system: [
@@ -590,7 +665,7 @@ export async function polishCustomerReplyDraft(input: {
       "Bevar og besvar eksplisitt hvert delspørsmål i kundens opprinnelige melding.",
       "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, bevar et separat svar på begge deler og beskriv et mulig senere tillegg som særskilt avklaring i et revidert eller separat tilbud.",
       "Bevar meningen og alle verifiserte fakta. Ikke legg til pris, areal, rabatt, garanti, dato eller løfte.",
-      "Kundeteksten må aldri omtale interne tekniske mekanismer eller bruke uttrykk som kildegrunnlag, faktakontekst, systemkontekst, systemprompt, JSON-kontekst, database, språkmodell eller automatisk faktakontroll.",
+      "Kundeteksten må aldri omtale interne tekniske mekanismer, modellprosesser eller hvordan fakta ble hentet. Beskriv bare kundens tilbud, avtale og neste steg i vanlig kundespråk.",
       "Alle pengebeløp i sakskonteksten er formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
       "Når teksten omtaler maksimalpris, må den slå fast at avvik over rammen stanser berørt arbeid og krever en ny skriftlig endringsavtale som kunden aksepterer før arbeidet fortsetter. Kontrollmålingen er aldri alene et unntak fra maksimalprisen.",
       "Bruk saksdokumentet for eksisterende tilbud eller avtale. Gjeldende listepriser må aldri fremstilles som kundens bindende pris.",
