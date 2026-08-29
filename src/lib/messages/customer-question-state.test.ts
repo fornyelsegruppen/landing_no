@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
 import {
+  customerQuestionContext,
+  customerQuestionDraftAccess,
   customerQuestionState,
   customerQuestionDocumentReferences,
   customerQuestionReplyStage,
   loadCustomerQuestionState,
+  loadCustomerQuestionContext,
   loadUnresolvedCustomerQuestion,
   selectLatestCustomerQuestion,
   selectUnresolvedCustomerQuestion,
@@ -189,6 +192,93 @@ describe("customer question state", () => {
         },
       }),
     );
+    expect(find.mock.calls.every(([query]) => query.limit === undefined)).toBe(
+      true,
+    );
+  });
+
+  it("exposes every exact question thread through the first-class context", () => {
+    const olderQuestion = {
+      ...question,
+      id: 8,
+      createdAt: "2026-08-28T07:00:00.000Z",
+      subject: "Older question",
+    };
+    const context = customerQuestionContext([
+      question,
+      olderQuestion,
+      {
+        id: 9,
+        category: "ai_reply",
+        direction: "outbound",
+        status: "delivered",
+        replyToMessage: 8,
+        createdAt: "2026-08-28T07:05:00.000Z",
+      },
+    ]);
+
+    expect(context.status).toBe("pending");
+    expect(context.unresolved?.question.id).toBe(10);
+    expect(context.threads.map((thread) => thread.question.id)).toEqual([
+      10, 8,
+    ]);
+    expect(context.threads[1]?.reply?.id).toBe(9);
+  });
+
+  it("makes unrelated outbound drafts read-only while keeping the active exact reply editable", () => {
+    const context = customerQuestionContext([question]);
+
+    expect(
+      customerQuestionDraftAccess(context, {
+        direction: "outbound",
+        replyToMessageId: 10,
+        status: "draft",
+      }),
+    ).toMatchObject({
+      isActiveQuestionReply: true,
+      readOnly: false,
+      replyTarget: { id: 10 },
+    });
+    expect(
+      customerQuestionDraftAccess(context, {
+        direction: "outbound",
+        status: "draft",
+      }),
+    ).toEqual({
+      isActiveQuestionReply: false,
+      readOnly: true,
+      replyTarget: null,
+    });
+  });
+
+  it("reuses the uncapped exact loader for the public customer question context", async () => {
+    const find = vi
+      .fn()
+      .mockResolvedValueOnce({ docs: [question] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 12,
+            bodyText: "Exact reply",
+            direction: "outbound",
+            replyToMessage: 10,
+            status: "draft",
+            subject: "Reply",
+          },
+        ],
+      });
+
+    const context = await loadCustomerQuestionContext(
+      { find } as unknown as Payload,
+      7,
+    );
+
+    expect(context.unresolved?.reply).toMatchObject({
+      bodyText: "Exact reply",
+      id: 12,
+      replyToMessageId: 10,
+    });
+    expect(find).toHaveBeenCalledTimes(2);
     expect(find.mock.calls.every(([query]) => query.limit === undefined)).toBe(
       true,
     );

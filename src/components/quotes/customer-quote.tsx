@@ -194,7 +194,166 @@ export function CustomerQuoteDeclinedNotice(props: { reference: string }) {
   );
 }
 
+export type CustomerContractRequestKind = "change_or_cancel" | "withdrawal";
+
+export type CustomerContractRequestStatus =
+  | "received"
+  | "admin_review"
+  | "alternative_requested"
+  | "follow_up_scheduled"
+  | "recovered"
+  | "closed"
+  | "do_not_contact";
+
+export type CustomerContractRequestView = {
+  kind: CustomerContractRequestKind;
+  status: CustomerContractRequestStatus;
+};
+
+const activeContractRequestStatuses = new Set<CustomerContractRequestStatus>([
+  "received",
+  "admin_review",
+  "alternative_requested",
+  "follow_up_scheduled",
+]);
+
+export function isActiveCustomerContractRequest(
+  request?: CustomerContractRequestView | null,
+) {
+  return Boolean(request && activeContractRequestStatuses.has(request.status));
+}
+
+export function canSubmitCustomerContractRequest(
+  request?: CustomerContractRequestView | null,
+) {
+  return !request || request.status === "recovered";
+}
+
+export function customerQuoteScrollBehavior(reducedMotion: boolean) {
+  return reducedMotion ? ("auto" as const) : ("smooth" as const);
+}
+
+export function customerContractRequestReceiptNotice(
+  kind: CustomerContractRequestKind,
+  requestReference?: string,
+) {
+  const reference = requestReference ? ` (${requestReference})` : "";
+  return kind === "withdrawal"
+    ? `Angremeldingen er mottatt${reference}. Eventuell arbeidsstart er satt på pause. Mottaksbekreftelsen er registrert for e-postutsending.`
+    : `Forespørselen er mottatt${reference}. Eventuell arbeidsstart er satt på pause mens vi vurderer saken.`;
+}
+
+function preferredCustomerQuoteScrollBehavior() {
+  return customerQuoteScrollBehavior(
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+}
+
+export function CustomerQuoteSignedNotice(props: {
+  companySignedAt?: string | null;
+  contractRequest?: CustomerContractRequestView | null;
+  token: string;
+}) {
+  if (isActiveCustomerContractRequest(props.contractRequest)) {
+    return (
+      <section
+        aria-live="polite"
+        className="mb-8 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-6"
+        role="status"
+      >
+        <h2 className="text-xl font-bold">
+          Videre behandling er satt på pause
+        </h2>
+        <p className="mt-2">
+          {props.contractRequest?.kind === "withdrawal"
+            ? "Angremeldingen din er registrert. Takfornyelse kontrollerer saken og følger opp skriftlig."
+            : "Forespørselen din om endring eller kansellering er registrert. Avtalen endres ikke før du mottar en skriftlig bekreftelse."}
+        </p>
+        <a
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-white/25 px-4 font-bold"
+          href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}
+        >
+          Åpne signert PDF
+        </a>
+      </section>
+    );
+  }
+
+  if (
+    props.contractRequest?.status === "closed" ||
+    props.contractRequest?.status === "do_not_contact"
+  ) {
+    return (
+      <section
+        className="border-danger/50 bg-danger/10 mb-8 rounded-2xl border p-6"
+        role="status"
+      >
+        <h2 className="text-xl font-bold">Avtalen er avsluttet</h2>
+        <p className="mt-2">
+          {props.contractRequest.kind === "withdrawal"
+            ? "Angremeldingen er behandlet, og avtalen er registrert som avsluttet."
+            : "Forespørselen er behandlet, og avtalen er registrert som avsluttet."}
+          {props.contractRequest.status === "do_not_contact"
+            ? " Ønsket om ikke å bli kontaktet om alternative tilbud er registrert."
+            : " Se den skriftlige bekreftelsen fra Takfornyelse for detaljer."}
+        </p>
+        <a
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-white/25 px-4 font-bold"
+          href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}
+        >
+          Åpne signert PDF
+        </a>
+      </section>
+    );
+  }
+
+  if (props.contractRequest?.status === "recovered") {
+    return (
+      <section
+        className="mb-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6"
+        role="status"
+      >
+        <h2 className="text-xl font-bold">Avtalen fortsetter</h2>
+        <p className="mt-2">
+          Takfornyelse har behandlet forespørselen. Avtalen står fortsatt
+          registrert som aktiv.
+        </p>
+        <a
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-white px-4 font-bold text-black"
+          href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}
+        >
+          Åpne signert PDF
+        </a>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mb-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6">
+      <h2 className="text-xl font-bold">
+        {props.companySignedAt
+          ? "Kontrakten er signert av begge parter"
+          : "Signaturen din er mottatt"}
+      </h2>
+      <p className="mt-2">
+        {props.companySignedAt
+          ? "Den endelige kontrakten er sendt til e-postadressen din. Vi følger opp planlagt oppstart."
+          : "Takfornyelse kontrollerer og medsignerer avtalen. Du får den endelige kontrakten på e-post når begge parter har signert."}
+      </p>
+      <a
+        className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-white px-4 font-bold text-black"
+        href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}
+      >
+        {props.companySignedAt
+          ? "Åpne endelig signert PDF"
+          : "Åpne kundesignert PDF"}
+      </a>
+    </section>
+  );
+}
+
 export function CustomerQuote(props: {
+  contractRequest?: CustomerContractRequestView | null;
   token: string;
   quoteStatus: string;
   contractStatus: string;
@@ -224,6 +383,7 @@ export function CustomerQuote(props: {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const focusDeclineAfterSubmit = useRef(false);
   const followUpDateRef = useRef<HTMLInputElement>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
   const questionSuccessRef = useRef<HTMLElement>(null);
   const questionCounterRef = useRef<HTMLOutputElement>(null);
   const questionSubmissionKey = useRef<string | null>(null);
@@ -252,6 +412,9 @@ export function CustomerQuote(props: {
   const [contractRequestOpen, setContractRequestOpen] = useState<
     "withdrawal" | "change_or_cancel" | null
   >(null);
+  const [contractRequest, setContractRequest] = useState(
+    props.contractRequest || null,
+  );
   const [contractRequestReason, setContractRequestReason] = useState("");
   const [followUpConsent, setFollowUpConsent] = useState(false);
   const [doNotContact, setDoNotContact] = useState(false);
@@ -263,11 +426,22 @@ export function CustomerQuote(props: {
     window.requestAnimationFrame(() => {
       questionSuccessRef.current?.focus();
       questionSuccessRef.current?.scrollIntoView({
-        behavior: "smooth",
+        behavior: preferredCustomerQuoteScrollBehavior(),
         block: "center",
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    window.requestAnimationFrame(() => {
+      noticeRef.current?.focus();
+      noticeRef.current?.scrollIntoView({
+        behavior: preferredCustomerQuoteScrollBehavior(),
+        block: "start",
+      });
+    });
+  }, [notice]);
 
   useEffect(() => {
     if (!declined || !focusDeclineAfterSubmit.current) return;
@@ -276,7 +450,7 @@ export function CustomerQuote(props: {
       const declineStatus = document.getElementById("quote-declined-status");
       declineStatus?.focus();
       declineStatus?.scrollIntoView({
-        behavior: "smooth",
+        behavior: preferredCustomerQuoteScrollBehavior(),
         block: "center",
       });
     });
@@ -323,7 +497,7 @@ export function CustomerQuote(props: {
           window.requestAnimationFrame(() => {
             questionSuccessRef.current?.focus();
             questionSuccessRef.current?.scrollIntoView({
-              behavior: "smooth",
+              behavior: preferredCustomerQuoteScrollBehavior(),
               block: "center",
             });
           });
@@ -484,7 +658,7 @@ export function CustomerQuote(props: {
       window.requestAnimationFrame(() => {
         questionSuccessRef.current?.focus();
         questionSuccessRef.current?.scrollIntoView({
-          behavior: "smooth",
+          behavior: preferredCustomerQuoteScrollBehavior(),
           block: "center",
         });
       });
@@ -541,6 +715,7 @@ export function CustomerQuote(props: {
     const form = event.currentTarget;
     const data = new FormData(form);
     if (!contractRequestOpen) return;
+    const submittedKind = contractRequestOpen;
     setPending(true);
     setNotice("");
     try {
@@ -578,10 +753,12 @@ export function CustomerQuote(props: {
       setFollowUpConsent(false);
       setDoNotContact(false);
       setFollowUpChoice("");
+      setContractRequest({ kind: submittedKind, status: "admin_review" });
       setNotice(
-        contractRequestOpen === "withdrawal"
-          ? `Angremeldingen er mottatt${result.requestReference ? ` (${result.requestReference})` : ""}. Eventuell arbeidsstart er satt på pause, og en mottaksbekreftelse er sendt på e-post.`
-          : `Forespørselen er mottatt${result.requestReference ? ` (${result.requestReference})` : ""}. Eventuell arbeidsstart er satt på pause mens vi vurderer saken.`,
+        customerContractRequestReceiptNotice(
+          submittedKind,
+          result.requestReference,
+        ),
       );
     } catch {
       setNotice(
@@ -614,34 +791,21 @@ export function CustomerQuote(props: {
       </header>
       {notice ? (
         <div
+          ref={noticeRef}
           className="border-accent/40 bg-accent/10 mb-6 rounded-xl border p-4"
           role="status"
           aria-live="polite"
+          tabIndex={-1}
         >
           {notice}
         </div>
       ) : null}
-      {signed ? (
-        <section className="mb-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6">
-          <h2 className="text-xl font-bold">
-            {props.companySignedAt
-              ? "Kontrakten er signert av begge parter"
-              : "Signaturen din er mottatt"}
-          </h2>
-          <p className="mt-2">
-            {props.companySignedAt
-              ? "Den endelige kontrakten er sendt til e-postadressen din. Vi følger opp planlagt oppstart."
-              : "Takfornyelse kontrollerer og medsignerer avtalen. Du får den endelige kontrakten på e-post når begge parter har signert."}
-          </p>
-          <a
-            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-white px-4 font-bold text-black"
-            href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}
-          >
-            {props.companySignedAt
-              ? "Åpne endelig signert PDF"
-              : "Åpne kundesignert PDF"}
-          </a>
-        </section>
+      {signed && !notice ? (
+        <CustomerQuoteSignedNotice
+          companySignedAt={props.companySignedAt}
+          contractRequest={contractRequest}
+          token={props.token}
+        />
       ) : null}
       {declined ? (
         <CustomerQuoteDeclinedNotice reference={d.reference} />
@@ -1106,7 +1270,7 @@ export function CustomerQuote(props: {
           )}
         </>
       ) : null}
-      {signed ? (
+      {signed && canSubmitCustomerContractRequest(contractRequest) ? (
         <section className="mt-8 rounded-2xl border border-white/10 p-5 sm:p-7">
           <h2 className="text-xl font-bold">
             Vil du endre eller avslutte avtalen?

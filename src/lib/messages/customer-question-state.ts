@@ -1,17 +1,52 @@
 import type { Payload } from "payload";
 
-type MessageLike = {
+export type CustomerQuestionMessageLike = {
   aiAnalysis?: unknown;
+  aiAssisted?: boolean | null;
   bodyText?: string | null;
   category?: string | null;
+  channel?: string | null;
   createdAt?: string | null;
+  deliveredAt?: string | null;
   direction?: string | null;
   failureCode?: string | null;
+  failureMessage?: string | null;
   id: number;
   replyToMessage?: number | { id?: number | null } | null;
   replyToMessageId?: number | null;
   status?: string | null;
   subject?: string | null;
+  updatedAt?: string | null;
+};
+
+export type CustomerQuestionContextMessage = {
+  aiAnalysis?: unknown;
+  aiAssisted: boolean;
+  bodyText: string;
+  category?: string;
+  channel?: string;
+  createdAt?: string;
+  deliveredAt?: string;
+  direction?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  id: number;
+  replyToMessageId?: number;
+  status?: string;
+  subject: string;
+  updatedAt?: string;
+};
+
+export type CustomerQuestionContextThread = {
+  question: CustomerQuestionContextMessage;
+  reply: CustomerQuestionContextMessage | null;
+};
+
+export type CustomerQuestionContext = {
+  latest: CustomerQuestionContextThread | null;
+  status: CustomerQuestionStateStatus;
+  threads: CustomerQuestionContextThread[];
+  unresolved: CustomerQuestionContextThread | null;
 };
 
 export type CustomerQuestionReplyStage =
@@ -19,7 +54,7 @@ export type CustomerQuestionReplyStage =
 
 export type CustomerQuestionStateStatus = "none" | "pending" | "resolved";
 
-function relationId(message: MessageLike) {
+function relationId(message: CustomerQuestionMessageLike) {
   if (typeof message.replyToMessageId === "number") {
     return message.replyToMessageId;
   }
@@ -31,7 +66,9 @@ function relationId(message: MessageLike) {
   return null;
 }
 
-function customerQuestions<T extends MessageLike>(messages: T[]) {
+function customerQuestions<T extends CustomerQuestionMessageLike>(
+  messages: T[],
+) {
   return messages
     .filter(
       (message) =>
@@ -43,7 +80,7 @@ function customerQuestions<T extends MessageLike>(messages: T[]) {
     );
 }
 
-function repliesForQuestion<T extends MessageLike>(
+function repliesForQuestion<T extends CustomerQuestionMessageLike>(
   messages: T[],
   questionId: number,
 ) {
@@ -60,7 +97,7 @@ function repliesForQuestion<T extends MessageLike>(
 }
 
 export function customerQuestionReplyStage(
-  reply?: Pick<MessageLike, "failureCode" | "status"> | null,
+  reply?: Pick<CustomerQuestionMessageLike, "failureCode" | "status"> | null,
 ): CustomerQuestionReplyStage {
   if (!reply || reply.status === "cancelled") return "prepare";
   if (reply.status === "draft") return "review";
@@ -76,7 +113,7 @@ export function customerQuestionReplyStage(
 }
 
 export function customerQuestionDocumentReferences(
-  question: Pick<MessageLike, "aiAnalysis">,
+  question: Pick<CustomerQuestionMessageLike, "aiAnalysis">,
 ) {
   if (!question.aiAnalysis || typeof question.aiAnalysis !== "object") {
     return [];
@@ -90,9 +127,9 @@ export function customerQuestionDocumentReferences(
   );
 }
 
-export function selectUnresolvedCustomerQuestion<T extends MessageLike>(
-  messages: T[],
-) {
+export function selectUnresolvedCustomerQuestion<
+  T extends CustomerQuestionMessageLike,
+>(messages: T[]) {
   const questions = customerQuestions(messages);
 
   for (const question of questions) {
@@ -104,9 +141,9 @@ export function selectUnresolvedCustomerQuestion<T extends MessageLike>(
   return null;
 }
 
-export function selectLatestCustomerQuestion<T extends MessageLike>(
-  messages: T[],
-) {
+export function selectLatestCustomerQuestion<
+  T extends CustomerQuestionMessageLike,
+>(messages: T[]) {
   const question = customerQuestions(messages)[0];
   if (!question) return null;
   return {
@@ -115,15 +152,108 @@ export function selectLatestCustomerQuestion<T extends MessageLike>(
   };
 }
 
-export function customerQuestionState<T extends MessageLike>(messages: T[]) {
+export function customerQuestionThreads<T extends CustomerQuestionMessageLike>(
+  messages: T[],
+) {
+  return customerQuestions(messages).map((question) => ({
+    question,
+    reply: repliesForQuestion(messages, question.id)[0] || null,
+  }));
+}
+
+export function customerQuestionState<T extends CustomerQuestionMessageLike>(
+  messages: T[],
+) {
   const unresolved = selectUnresolvedCustomerQuestion(messages);
   const latest = selectLatestCustomerQuestion(messages);
+  const threads = customerQuestionThreads(messages);
   const status: CustomerQuestionStateStatus = unresolved
     ? "pending"
     : latest
       ? "resolved"
       : "none";
-  return { latest, status, unresolved };
+  return { latest, status, threads, unresolved };
+}
+
+function optionalString(value?: string | null) {
+  return typeof value === "string" && value.length ? value : undefined;
+}
+
+function contextMessage(
+  message: CustomerQuestionMessageLike,
+): CustomerQuestionContextMessage {
+  return {
+    aiAnalysis: message.aiAnalysis,
+    aiAssisted: Boolean(message.aiAssisted),
+    bodyText: message.bodyText || "",
+    category: optionalString(message.category),
+    channel: optionalString(message.channel),
+    createdAt: optionalString(message.createdAt),
+    deliveredAt: optionalString(message.deliveredAt),
+    direction: optionalString(message.direction),
+    failureCode: optionalString(message.failureCode),
+    failureMessage: optionalString(message.failureMessage),
+    id: message.id,
+    replyToMessageId: relationId(message) || undefined,
+    status: optionalString(message.status),
+    subject: message.subject || "",
+    updatedAt: optionalString(message.updatedAt),
+  };
+}
+
+function contextThread<T extends CustomerQuestionMessageLike>(thread: {
+  question: T;
+  reply: T | null;
+}): CustomerQuestionContextThread {
+  return {
+    question: contextMessage(thread.question),
+    reply: thread.reply ? contextMessage(thread.reply) : null,
+  };
+}
+
+export function customerQuestionContext<T extends CustomerQuestionMessageLike>(
+  messages: T[],
+): CustomerQuestionContext {
+  const state = customerQuestionState(messages);
+  return {
+    latest: state.latest ? contextThread(state.latest) : null,
+    status: state.status,
+    threads: state.threads.map(contextThread),
+    unresolved: state.unresolved ? contextThread(state.unresolved) : null,
+  };
+}
+
+export type CustomerQuestionDraftAccess = {
+  isActiveQuestionReply: boolean;
+  readOnly: boolean;
+  replyTarget: CustomerQuestionContextMessage | null;
+};
+
+export function customerQuestionDraftAccess(
+  context: CustomerQuestionContext,
+  draft: Pick<
+    CustomerQuestionMessageLike,
+    "direction" | "replyToMessage" | "replyToMessageId" | "status"
+  >,
+): CustomerQuestionDraftAccess {
+  const replyTargetId = relationId({ id: 0, ...draft });
+  const replyTarget = replyTargetId
+    ? context.threads.find((thread) => thread.question.id === replyTargetId)
+        ?.question || null
+    : null;
+  const activeQuestionId = context.unresolved?.question.id;
+  const isOutboundDraft =
+    draft.direction === "outbound" && draft.status === "draft";
+  const isActiveQuestionReply = Boolean(
+    activeQuestionId && replyTargetId === activeQuestionId,
+  );
+  return {
+    isActiveQuestionReply,
+    readOnly: Boolean(
+      isOutboundDraft && activeQuestionId && !isActiveQuestionReply,
+    ),
+    replyTarget,
+  };
 }
 
 export async function loadCustomerQuestionState(
@@ -144,7 +274,7 @@ export async function loadCustomerQuestionState(
       ],
     },
   });
-  const questionDocs = questions.docs as MessageLike[];
+  const questionDocs = questions.docs as CustomerQuestionMessageLike[];
   if (!questionDocs.length) {
     return customerQuestionState(questionDocs);
   }
@@ -170,8 +300,21 @@ export async function loadCustomerQuestionState(
   });
   return customerQuestionState([
     ...questionDocs,
-    ...(replies.docs as MessageLike[]),
+    ...(replies.docs as CustomerQuestionMessageLike[]),
   ]);
+}
+
+export async function loadCustomerQuestionContext(
+  payload: Payload,
+  leadId: number,
+): Promise<CustomerQuestionContext> {
+  const state = await loadCustomerQuestionState(payload, leadId);
+  return {
+    latest: state.latest ? contextThread(state.latest) : null,
+    status: state.status,
+    threads: state.threads.map(contextThread),
+    unresolved: state.unresolved ? contextThread(state.unresolved) : null,
+  };
 }
 
 export async function loadUnresolvedCustomerQuestion(

@@ -1,5 +1,9 @@
 import type { Payload, Where } from "payload";
 import {
+  loadCustomerQuestionContext,
+  type CustomerQuestionContext,
+} from "@/lib/messages/customer-question-state";
+import {
   deriveCaseCommercialContext,
   type CaseCommercialContext,
 } from "./case-commercial-context";
@@ -1483,4 +1487,23 @@ export async function loadAdminCase(
     timeline,
     nextAction,
   };
+}
+
+export type AdminCaseWorkspace = AdminCase & {
+  customerQuestionContext: CustomerQuestionContext;
+};
+
+/**
+ * Workspace integration loader. Customer questions intentionally come from
+ * their exact, uncapped query instead of the case history's presentation cap.
+ */
+export async function loadAdminCaseWorkspace(
+  payload: Payload,
+  leadId: number,
+): Promise<AdminCaseWorkspace | null> {
+  const [caseData, customerQuestionContext] = await Promise.all([
+    loadAdminCase(payload, leadId),
+    loadCustomerQuestionContext(payload, leadId),
+  ]);
+  return caseData ? { ...caseData, customerQuestionContext } : null;
 }

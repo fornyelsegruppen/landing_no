@@ -14,10 +14,14 @@ import { InformationRequestButton } from "@/components/admin-v2/information-requ
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
-import { customerQuestionDisplayState } from "@/components/admin-v2/customer-question-action-visibility";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
 import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
+import {
+  CaseProcessTimeline,
+  type CaseProcessRelatedLink,
+  type CaseProcessStageContent,
+} from "@/components/admin-v2/case-process-timeline";
 import { CaseVersionHistory } from "@/components/admin-v2/case-version-history";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
@@ -25,14 +29,31 @@ import {
   quoteDeclineReasonLabel,
 } from "@/components/admin-v2/quote-decline-workbench";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
-import { caseHeaderStatus } from "@/lib/admin-v2/case-header-status";
 import { selectPrimaryCustomerQuestion } from "@/lib/admin-v2/case-primary-question";
+import {
+  caseWorkspaceText,
+  getCaseWorkspaceCopy,
+  type CaseWorkspaceQuestionRecovery,
+} from "@/lib/admin-v2/case-workspace-i18n";
+import {
+  caseWorkspaceSections,
+  caseWorkspaceSectionHref,
+} from "@/lib/admin-v2/case-workspace-sections";
+import {
+  deriveCaseWorkspacePrimaryState,
+  deriveCaseWorkspaceProcessStage,
+  toCaseWorkspaceQuestionContext,
+  type CaseWorkspaceTone,
+} from "@/lib/admin-v2/case-workspace-view-model";
 import {
   metadataLabel,
   statusLabel,
   timelineTypeLabel,
 } from "@/lib/admin-v2/labels";
-import { loadAdminCase, type CaseEntity } from "@/lib/admin-v2/case-read-model";
+import {
+  loadAdminCaseWorkspace,
+  type CaseEntity,
+} from "@/lib/admin-v2/case-read-model";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import {
@@ -41,12 +62,13 @@ import {
 } from "@/lib/norway-time";
 import { getPayload } from "@/lib/payload";
 import {
+  customerQuestionDraftAccess,
   customerQuestionDocumentReferences,
-  customerQuestionReplyStage,
-  selectLatestCustomerQuestion,
-  selectUnresolvedCustomerQuestion,
 } from "@/lib/messages/customer-question-state";
-import { customerReplyRecoveryKind } from "@/lib/messages/customer-reply-recovery";
+import {
+  customerReplyRecoveryKind,
+  type CustomerReplyRecoveryKind,
+} from "@/lib/messages/customer-reply-recovery";
 
 export const dynamic = "force-dynamic";
 
@@ -59,68 +81,29 @@ const serviceNames: Record<string, string> = {
   usikker: "Usikker – taksjekk",
 };
 
-const questionCopy = {
-  nb: {
-    action: {
-      prepare: "Velg hvordan du vil svare på kundens spørsmål",
-      review: "Kontroller og svar på kundens spørsmål",
-      source_changed: "Lag et nytt svarutkast med oppdaterte kilder",
-      queued: "Følg leveringen av svaret til kunden",
-      sent: "Vent på bekreftet levering av kundesvaret",
-      delivered: "Svaret er bekreftet levert til kunden",
-      delivery_failed: "Leveringen mislyktes – kontroller og prøv igjen",
-    },
-    status: {
-      prepare: "Kunden venter på svar",
-      review: "Svarutkast klart",
-      source_changed: "Sending blokkert – nytt utkast kreves",
-      queued: "Svar venter på levering",
-      sent: "Sendt – venter på leveringsbekreftelse",
-      delivered: "Svar bekreftet levert",
-      delivery_failed: "Levering mislyktes",
-    },
+function processEntityLink(
+  entity: {
+    href?: string;
+    id: number;
+    reference: string;
+    status?: string;
   },
-  lt: {
-    action: {
-      prepare: "Pasirinkti, kaip atsakyti į kliento klausimą",
-      review: "Patikrinti ir atsakyti į kliento klausimą",
-      source_changed: "Sukurti naują juodraštį pagal atnaujintus duomenis",
-      queued: "Stebėti atsakymo pristatymą klientui",
-      sent: "Laukti patvirtinto atsakymo pristatymo",
-      delivered: "Patvirtinta, kad atsakymas pristatytas klientui",
-      delivery_failed: "Pristatyti nepavyko – patikrinti ir bandyti dar kartą",
-    },
-    status: {
-      prepare: "Klientas laukia atsakymo",
-      review: "Atsakymo juodraštis parengtas",
-      source_changed: "Siuntimas užblokuotas – būtinas naujas juodraštis",
-      queued: "Atsakymas laukia pristatymo",
-      sent: "Išsiųsta – laukiama pristatymo patvirtinimo",
-      delivered: "Patvirtinta, kad atsakymas pristatytas",
-      delivery_failed: "Pristatyti nepavyko",
-    },
+  options?: {
+    href?: string;
+    kind?: CaseProcessRelatedLink["kind"];
   },
-  en: {
-    action: {
-      prepare: "Choose how to answer the customer's question",
-      review: "Review and answer the customer's question",
-      source_changed: "Create a new reply draft from the updated sources",
-      queued: "Monitor delivery of the customer reply",
-      sent: "Wait for confirmed delivery of the customer reply",
-      delivered: "The reply was confirmed delivered to the customer",
-      delivery_failed: "Delivery failed – review and retry",
-    },
-    status: {
-      prepare: "Customer is waiting for a reply",
-      review: "Reply draft ready",
-      source_changed: "Sending blocked – a new draft is required",
-      queued: "Reply awaiting delivery",
-      sent: "Sent – awaiting delivery confirmation",
-      delivered: "Reply confirmed delivered",
-      delivery_failed: "Delivery failed",
-    },
-  },
-} as const;
+): CaseProcessRelatedLink {
+  const accessibleName = entity.status
+    ? `${entity.reference} · ${entity.status}`
+    : entity.reference;
+  return {
+    accessibleName,
+    href: options?.href || entity.href || "#",
+    kind: options?.kind || "evidence",
+    label: accessibleName,
+    openInNewTab: Boolean(options?.href?.startsWith("/api/")),
+  };
+}
 
 function Status({
   companySignedAt,
@@ -134,7 +117,7 @@ function Status({
   contract?: boolean;
   label?: string;
   locale?: "nb" | "lt" | "en";
-  tone?: "accent" | "danger";
+  tone?: CaseWorkspaceTone | "accent" | "danger";
   value?: string;
 }) {
   const displayedLabel =
@@ -143,13 +126,22 @@ function Status({
       ? statusLabel(locale, value, { contract, companySignedAt })
       : "");
 
+  const toneClass =
+    tone === "danger" || tone === "critical"
+      ? "border-danger/45 bg-danger/15 text-danger"
+      : tone === "success"
+        ? "border-success/45 bg-success/15 text-success"
+        : tone === "warning"
+          ? "border-warning/45 bg-warning/15 text-warning"
+          : tone === "waiting"
+            ? "border-white/25 bg-white/10 text-white/85"
+            : tone === "neutral"
+              ? "border-white/20 bg-white/5 text-white/75"
+              : "border-accent/25 bg-accent/10 text-accent";
+
   return displayedLabel ? (
     <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wider uppercase ${
-        tone === "danger"
-          ? "border-danger/45 bg-danger/15 text-danger"
-          : "border-accent/25 bg-accent/10 text-accent"
-      }`}
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wider uppercase ${toneClass}`}
     >
       {displayedLabel}
     </span>
@@ -170,7 +162,7 @@ function Section({
       aria-labelledby={id}
       className="bg-background-elevated/75 min-w-0 scroll-mt-36 rounded-3xl border border-white/10 p-5 sm:p-6"
     >
-      <h2 className="text-xl font-bold" id={id}>
+      <h2 className="text-xl font-bold" id={id} tabIndex={-1}>
         {title}
       </h2>
       <div className="mt-5">{children}</div>
@@ -256,7 +248,7 @@ export default async function AdminCasePage({
   if (!/^\d+$/.test(id)) notFound();
   const payload = await getPayload();
   const [caseData, workersResult, rulesResult] = await Promise.all([
-    loadAdminCase(payload, Number(id)),
+    loadAdminCaseWorkspace(payload, Number(id)),
     payload.find({
       collection: "users",
       depth: 0,
@@ -280,36 +272,65 @@ export default async function AdminCasePage({
   ]);
   if (!caseData) notFound();
   const declineFollowUp = caseData.nextAction.kind === "follow_up_decline";
-  const headerStatus = caseHeaderStatus({
-    leadStatus: caseData.lead.status,
-    locale: user.interfaceLanguage,
-    nextActionKind: caseData.nextAction.kind,
-  });
-  const unresolvedQuestion = selectUnresolvedCustomerQuestion(
-    caseData.messages,
-  );
+  const unresolvedQuestion = caseData.customerQuestionContext.unresolved;
+  const workspaceQuestionThread =
+    unresolvedQuestion || caseData.customerQuestionContext.latest;
   const displayedQuestion = selectPrimaryCustomerQuestion({
-    latest: selectLatestCustomerQuestion(caseData.messages),
+    latest: caseData.customerQuestionContext.latest,
     nextActionKind: caseData.nextAction.kind,
     unresolved: unresolvedQuestion,
   });
-  const primaryUnresolvedQuestion = displayedQuestion
-    ? unresolvedQuestion
-    : null;
   const displayedReply = displayedQuestion?.reply || null;
-  const questionStage = customerQuestionReplyStage(displayedReply);
   const detectedQuestionRecovery = displayedReply
     ? customerReplyRecoveryKind({ code: displayedReply.failureCode })
     : null;
-  const questionRecovery =
-    detectedQuestionRecovery === "source_changed"
+  const questionRecovery: CustomerReplyRecoveryKind | null =
+    detectedQuestionRecovery && detectedQuestionRecovery !== "unknown"
       ? detectedQuestionRecovery
       : null;
-  const questionDisplayState = customerQuestionDisplayState(
-    questionStage,
-    questionRecovery,
+  const workspaceDetectedRecovery = workspaceQuestionThread?.reply
+    ? customerReplyRecoveryKind({
+        code: workspaceQuestionThread.reply.failureCode,
+      })
+    : null;
+  const workspaceQuestionRecovery: CaseWorkspaceQuestionRecovery | undefined =
+    workspaceDetectedRecovery === "source_changed" ||
+    workspaceDetectedRecovery === "safety_rejected"
+      ? workspaceDetectedRecovery
+      : workspaceDetectedRecovery === "refresh"
+        ? "stale_revision"
+        : workspaceDetectedRecovery === "ai_unavailable" ||
+            workspaceDetectedRecovery === "quota_limited"
+          ? "ai_unavailable"
+          : undefined;
+  const workspaceQuestionContext = toCaseWorkspaceQuestionContext(
+    workspaceQuestionThread,
+    workspaceQuestionRecovery,
   );
-  const qCopy = questionCopy[user.interfaceLanguage];
+  const primaryState = deriveCaseWorkspacePrimaryState(
+    caseData,
+    workspaceQuestionContext,
+  );
+  const workspaceCopy = getCaseWorkspaceCopy(user.interfaceLanguage);
+  const workspaceStatus = caseWorkspaceText(
+    user.interfaceLanguage,
+    primaryState.statusLabelKey,
+  );
+  const workspaceTitle = caseWorkspaceText(
+    user.interfaceLanguage,
+    primaryState.titleKey,
+  );
+  const workspaceHelp = primaryState.helpKey
+    ? caseWorkspaceText(user.interfaceLanguage, primaryState.helpKey)
+    : "";
+  const primaryQuestionActive = primaryState.priority === "question";
+  const secondaryMutationsAllowed =
+    caseData.lead.recordState === "active" &&
+    (primaryState.priority === "business" || primaryState.priority === "idle");
+  const processActiveStage = deriveCaseWorkspaceProcessStage(
+    caseData,
+    primaryState.processStage,
+  );
   const workers = workersResult.docs
     .filter(
       (worker) =>
@@ -385,9 +406,17 @@ export default async function AdminCasePage({
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
-  const nextActionBase = primaryUnresolvedQuestion
-    ? qCopy.action[questionDisplayState]
-    : copy.actionLabels[caseData.nextAction.kind];
+  const primaryMutationAction =
+    primaryState.action.mode === "mutation"
+      ? {
+          kind: primaryState.action.kind,
+          targetId: primaryState.action.targetId,
+        }
+      : null;
+  const primaryActionKind =
+    primaryMutationAction?.kind || caseData.nextAction.kind;
+  const primaryTargetId =
+    primaryMutationAction?.targetId || caseData.nextAction.targetId;
   const quoteActionKinds = new Set([
     "approve_package",
     "approve_quote",
@@ -397,24 +426,131 @@ export default async function AdminCasePage({
     "company_sign_contract",
     "create_work_order",
   ]);
-  const actionDocument = contractActionKinds.has(caseData.nextAction.kind)
+  const actionDocument = contractActionKinds.has(primaryActionKind)
     ? caseData.commercial.contractVersions.find(
-        (item) => item.id === caseData.nextAction.targetId,
+        (item) => item.id === primaryTargetId,
       ) ||
       caseData.commercial.workingContract ||
       effectiveCommercial
-    : quoteActionKinds.has(caseData.nextAction.kind)
+    : quoteActionKinds.has(primaryActionKind)
       ? caseData.commercial.quoteVersions.find(
-          (item) => item.id === caseData.nextAction.targetId,
+          (item) => item.id === primaryTargetId,
         ) || workingQuote
       : workingCommercial;
-  const nextActionText = primaryUnresolvedQuestion
-    ? nextActionBase
-    : actionDocument
-      ? `${nextActionBase} ${actionDocument.reference}`
-      : nextActionBase;
+  const nextActionText =
+    primaryState.targetReference &&
+    primaryState.action.mode !== "question" &&
+    !workspaceTitle.includes(primaryState.targetReference)
+      ? `${workspaceTitle} ${primaryState.targetReference}`
+      : workspaceTitle;
   const actionQuote =
     actionDocument?.kind === "quote" ? actionDocument : workingQuote;
+  const primaryPanelClasses = {
+    critical: "border-danger/50 bg-danger/10",
+    warning: "border-warning/50 bg-warning/10",
+    action: "border-accent/35 bg-accent/8",
+    waiting: "border-white/25 bg-white/[.06]",
+    success: "border-success/45 bg-success/10",
+    neutral: "border-white/15 bg-white/[.03]",
+  }[primaryState.tone];
+  const primaryEmphasisClass = {
+    critical: "text-danger",
+    warning: "text-warning",
+    action: "text-accent",
+    waiting: "text-white/80",
+    success: "text-success",
+    neutral: "text-white/70",
+  }[primaryState.tone];
+  const processStageContent: Partial<
+    Record<typeof primaryState.processStage, CaseProcessStageContent>
+  > = {
+    contact: { sectionHref: caseWorkspaceSectionHref("customer") },
+    measurement: {
+      relatedLinks: caseData.measurement
+        ? [processEntityLink(caseData.measurement)]
+        : [],
+      sectionHref: caseWorkspaceSectionHref("measurement"),
+    },
+    commercial: {
+      relatedLinks: caseData.commercial.quoteVersions.map((entity) =>
+        processEntityLink(entity, {
+          href: `/api/admin/quotes/${entity.id}/pdf`,
+          kind: "document",
+        }),
+      ),
+      sectionHref: caseWorkspaceSectionHref("commercial"),
+    },
+    agreement: {
+      relatedLinks: [
+        ...caseData.commercial.contractVersions.map((entity) =>
+          processEntityLink(entity, {
+            href: `/admin/collections/contracts/${entity.id}`,
+            kind: "document",
+          }),
+        ),
+        ...caseData.contractRequests.map((entity) =>
+          processEntityLink(entity, { kind: "evidence" }),
+        ),
+      ],
+      sectionHref: caseWorkspaceSectionHref("contract"),
+    },
+    work: {
+      relatedLinks: [
+        ...(caseData.workOrder ? [processEntityLink(caseData.workOrder)] : []),
+        ...caseData.changes.map((entity) =>
+          processEntityLink(entity, {
+            href: `/api/admin/change-agreements/${entity.id}/pdf`,
+            kind: "document",
+          }),
+        ),
+      ],
+      sectionHref: caseWorkspaceSectionHref("work"),
+    },
+    completion: {
+      relatedLinks: [
+        ...(caseData.invoice
+          ? [processEntityLink(caseData.invoice, { kind: "document" })]
+          : []),
+        ...(caseData.warranty
+          ? [processEntityLink(caseData.warranty, { kind: "document" })]
+          : []),
+        ...caseData.documents.map((document) => ({
+          accessibleName: document.filename,
+          href: document.href,
+          kind: "document" as const,
+          label: document.filename,
+          openInNewTab: true,
+        })),
+      ],
+      sectionHref: caseWorkspaceSectionHref("documents"),
+    },
+  };
+  const primaryEvidenceLinks = primaryState.evidence
+    .filter((item): item is typeof item & { href: string } =>
+      Boolean(item.href),
+    )
+    .map((item) => {
+      const label = `${caseWorkspaceText(user.interfaceLanguage, item.labelKey)}: ${item.value}`;
+      return {
+        accessibleName: label,
+        href: item.href,
+        kind: "evidence" as const,
+        label,
+      };
+    });
+  const activeStageContent = processStageContent[processActiveStage];
+  processStageContent[processActiveStage] = {
+    ...activeStageContent,
+    relatedLinks: Array.from(
+      new Map(
+        [
+          ...(activeStageContent?.relatedLinks || []),
+          ...primaryEvidenceLinks,
+        ].map((item) => [`${item.kind}:${item.href}`, item]),
+      ).values(),
+    ),
+    statusText: workspaceStatus,
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -432,9 +568,11 @@ export default async function AdminCasePage({
 
       <header
         className={`rounded-3xl border p-5 sm:p-7 ${
-          declineFollowUp
+          primaryState.tone === "critical"
             ? "border-danger/40 bg-[linear-gradient(135deg,rgba(235,87,87,.16),rgba(23,28,38,.78)_42%)]"
-            : "border-white/10 bg-[linear-gradient(135deg,rgba(232,163,23,.13),rgba(23,28,38,.75)_42%)]"
+            : primaryState.tone === "success"
+              ? "border-success/35 bg-[linear-gradient(135deg,rgba(62,207,142,.14),rgba(23,28,38,.78)_42%)]"
+              : "border-white/10 bg-[linear-gradient(135deg,rgba(232,163,23,.13),rgba(23,28,38,.75)_42%)]"
         }`}
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -446,7 +584,7 @@ export default async function AdminCasePage({
               {caseData.lead.name}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Status label={headerStatus.label} tone={headerStatus.tone} />
+              <Status label={workspaceStatus} tone={primaryState.tone} />
               <span className="text-muted-foreground text-sm">
                 {serviceNames[caseData.lead.inquiryType || ""] ||
                   caseData.lead.inquiryType ||
@@ -461,7 +599,7 @@ export default async function AdminCasePage({
             <strong
               className={
                 due === copy.dueNow
-                  ? declineFollowUp
+                  ? primaryState.tone === "critical"
                     ? "text-danger"
                     : "text-accent"
                   : undefined
@@ -520,74 +658,88 @@ export default async function AdminCasePage({
         effectiveLabel={copy.effectiveContract}
         effectiveReference={effectiveReference}
         nextActionLabel={copy.nextAction}
-        status={
-          primaryUnresolvedQuestion
-            ? qCopy.status[questionDisplayState]
-            : workingStatus
-        }
-        tone={declineFollowUp ? "danger" : "default"}
+        status={workspaceStatus}
+        tone={primaryState.tone}
         workingLabel={copy.workingVersion}
         workingReference={workingReference}
       />
 
       <section
         aria-labelledby="next-action-title"
-        className={`scroll-mt-36 rounded-3xl border p-5 sm:p-6 ${caseData.nextAction.kind === "send_closure_confirmation" || declineFollowUp ? "border-danger/50 bg-danger/10" : "border-accent/35 bg-accent/8"}`}
+        className={`scroll-mt-36 rounded-3xl border p-5 sm:p-6 ${primaryPanelClasses}`}
+        data-case-primary-action={primaryState.key}
+        tabIndex={-1}
       >
         <p
-          className={`${caseData.nextAction.kind === "send_closure_confirmation" || declineFollowUp ? "text-danger" : "text-accent"} text-xs font-bold tracking-[.18em] uppercase`}
-          id="next-action-title"
+          className={`${primaryEmphasisClass} text-xs font-bold tracking-[.18em] uppercase`}
         >
           {copy.nextAction}
         </p>
-        {displayedQuestion ? (
-          <CustomerQuestionWorkbench
-            key={`${displayedQuestion.question.id}:${displayedReply?.id || "none"}:${displayedReply?.status || "prepare"}:${displayedReply?.updatedAt || ""}:${questionRecovery || "none"}`}
-            documentReferences={customerQuestionDocumentReferences(
-              displayedQuestion.question,
-            )}
-            leadId={caseData.lead.id}
-            leadRevision={caseData.lead.revision}
-            locale={user.interfaceLanguage}
-            recovery={questionRecovery}
-            question={{
-              bodyText: displayedQuestion.question.bodyText || "",
-              id: displayedQuestion.question.id,
-              receivedAt: formatDate(displayedQuestion.question.createdAt),
-              subject: displayedQuestion.question.subject || "",
-            }}
-            reply={
-              displayedReply
-                ? {
-                    aiAssisted: displayedReply.aiAssisted,
-                    bodyText: displayedReply.bodyText || "",
-                    channel: displayedReply.channel,
-                    deliveredAt: displayedReply.deliveredAt
-                      ? formatDate(displayedReply.deliveredAt)
-                      : undefined,
-                    deliveryRecipient:
-                      deliveryRecipient(displayedReply.aiAnalysis) ||
-                      caseData.lead.communicationEmail ||
-                      caseData.lead.email,
-                    factWarnings: factWarnings(displayedReply.aiAnalysis),
-                    failureCode: displayedReply.failureCode,
-                    failureMessage: displayedReply.failureMessage,
-                    id: displayedReply.id,
-                    manualReplyRequiresEditing: manualReplyRequiresEditing(
-                      displayedReply.aiAnalysis,
-                    ),
-                    status: displayedReply.status,
-                    subject: displayedReply.subject || "",
-                    updatedAt:
-                      displayedReply.updatedAt ||
-                      displayedReply.createdAt ||
-                      "",
-                  }
-                : null
-            }
-          />
+        <h2
+          className="mt-2 text-xl font-bold sm:text-2xl"
+          id="next-action-title"
+          tabIndex={-1}
+        >
+          {nextActionText}
+        </h2>
+        {workspaceHelp ? (
+          <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
+            {workspaceHelp}
+          </p>
         ) : null}
-        {declineFollowUp && caseData.quote ? (
+        {primaryQuestionActive && displayedQuestion ? (
+          <div
+            className="scroll-mt-36"
+            id={displayedReply ? `message-${displayedReply.id}` : undefined}
+          >
+            <CustomerQuestionWorkbench
+              key={displayedQuestion.question.id}
+              documentReferences={customerQuestionDocumentReferences(
+                displayedQuestion.question,
+              )}
+              leadId={caseData.lead.id}
+              leadRevision={caseData.lead.revision}
+              locale={user.interfaceLanguage}
+              recovery={questionRecovery}
+              question={{
+                bodyText: displayedQuestion.question.bodyText || "",
+                id: displayedQuestion.question.id,
+                receivedAt: formatDate(displayedQuestion.question.createdAt),
+                subject: displayedQuestion.question.subject || "",
+              }}
+              reply={
+                displayedReply
+                  ? {
+                      aiAssisted: displayedReply.aiAssisted,
+                      bodyText: displayedReply.bodyText || "",
+                      channel: displayedReply.channel,
+                      deliveredAt: displayedReply.deliveredAt
+                        ? formatDate(displayedReply.deliveredAt)
+                        : undefined,
+                      deliveryRecipient:
+                        deliveryRecipient(displayedReply.aiAnalysis) ||
+                        caseData.lead.communicationEmail ||
+                        caseData.lead.email,
+                      factWarnings: factWarnings(displayedReply.aiAnalysis),
+                      failureCode: displayedReply.failureCode,
+                      failureMessage: displayedReply.failureMessage,
+                      id: displayedReply.id,
+                      manualReplyRequiresEditing: manualReplyRequiresEditing(
+                        displayedReply.aiAnalysis,
+                      ),
+                      status: displayedReply.status,
+                      subject: displayedReply.subject || "",
+                      updatedAt:
+                        displayedReply.updatedAt ||
+                        displayedReply.createdAt ||
+                        "",
+                    }
+                  : null
+              }
+            />
+          </div>
+        ) : null}
+        {primaryState.key === "stop.follow_up_decline" && caseData.quote ? (
           <QuoteDeclineWorkbench
             comment={caseData.quote.declineComment}
             declinedAt={formatDate(
@@ -599,13 +751,9 @@ export default async function AdminCasePage({
             reason={caseData.quote.declineReason}
             reference={caseData.quote.reference}
           />
-        ) : !primaryUnresolvedQuestion ? (
+        ) : !primaryQuestionActive ? (
           <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
             <div className="min-w-0">
-              <h2 className="text-xl font-bold">{nextActionText}</h2>
-              <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
-                {nextActionText}
-              </p>
               <dl className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 <div>
                   <dt className="text-muted-foreground text-xs">
@@ -669,34 +817,47 @@ export default async function AdminCasePage({
                 ) : null}
               </dl>
             </div>
-            <CaseActionPanel
-              key={`${caseData.nextAction.kind}:${caseData.nextAction.targetId || "none"}:${caseData.lead.revision}`}
-              action={caseData.nextAction}
-              actionLabel={nextActionText}
-              actionReference={actionDocument?.reference}
-              contractDocumentHash={
-                actionDocument?.kind === "contract"
-                  ? actionDocument.documentHash
-                  : caseData.contract?.documentHash
-              }
-              defaultSigner={user.displayName || user.email}
-              leadId={caseData.lead.id}
-              locale={user.interfaceLanguage}
-              versionContext={{
-                contractReference:
+            {primaryMutationAction ? (
+              <CaseActionPanel
+                key={`${primaryMutationAction.kind}:${primaryMutationAction.targetId || "none"}:${caseData.lead.revision}`}
+                action={primaryMutationAction}
+                actionLabel={nextActionText}
+                actionReference={actionDocument?.reference}
+                contractDocumentHash={
                   actionDocument?.kind === "contract"
-                    ? actionDocument.reference
-                    : caseData.commercial.workingContract?.reference,
-                contractVersion:
-                  actionDocument?.kind === "contract"
-                    ? actionDocument.version
-                    : caseData.commercial.workingContract?.version,
-                leadRevision: caseData.lead.revision,
-                quoteDocumentHash: actionQuote?.documentHash,
-                quoteReference: actionQuote?.reference,
-                quoteVersion: actionQuote?.version,
-              }}
-            />
+                    ? actionDocument.documentHash
+                    : caseData.contract?.documentHash
+                }
+                defaultSigner={user.displayName || user.email}
+                leadId={caseData.lead.id}
+                locale={user.interfaceLanguage}
+                versionContext={{
+                  contractReference:
+                    actionDocument?.kind === "contract"
+                      ? actionDocument.reference
+                      : caseData.commercial.workingContract?.reference,
+                  contractVersion:
+                    actionDocument?.kind === "contract"
+                      ? actionDocument.version
+                      : caseData.commercial.workingContract?.version,
+                  leadRevision: caseData.lead.revision,
+                  quoteDocumentHash: actionQuote?.documentHash,
+                  quoteReference: actionQuote?.reference,
+                  quoteVersion: actionQuote?.version,
+                }}
+              />
+            ) : primaryState.action.mode === "navigate" ? (
+              <a
+                className={`inline-flex min-h-12 items-center justify-center rounded-xl border px-5 text-center font-bold ${primaryPanelClasses}`}
+                href={primaryState.action.href}
+              >
+                {nextActionText}
+              </a>
+            ) : (
+              <div className="flex min-h-12 items-center rounded-xl border border-white/10 bg-black/15 px-4 text-sm font-semibold">
+                {workspaceStatus}
+              </div>
+            )}
           </div>
         ) : null}
       </section>
@@ -705,26 +866,68 @@ export default async function AdminCasePage({
         aria-label={copy.overview}
         className="bg-background-elevated/60 flex gap-2 overflow-x-auto rounded-2xl border border-white/10 p-2 text-sm font-semibold"
       >
-        {[
-          ["version-history-section", copy.versionHistory],
-          ["customer-section", copy.customer],
-          ["measurement-section", copy.measurement],
-          ["price-quote-section", copy.quote],
-          ["messages-section", copy.messages],
-          ["contract-section", copy.contract],
-          ["work-section", copy.work],
-          ["documents-section", copy.documents],
-          ["timeline-section", copy.timeline],
-        ].map(([href, label]) => (
+        {caseWorkspaceSections.map((section) => (
           <a
-            className="hover:text-accent shrink-0 rounded-xl px-3 py-2 text-white/75 hover:bg-white/5"
-            href={`#${href}`}
-            key={href}
+            className="hover:text-accent inline-flex min-h-11 shrink-0 items-center rounded-xl px-3 py-2 text-white/75 hover:bg-white/5"
+            href={`#${section.id}`}
+            key={section.id}
           >
-            {label}
+            {caseWorkspaceText(user.interfaceLanguage, section.labelKey)}
           </a>
         ))}
       </nav>
+
+      <div className="bg-background-elevated/75 min-w-0 rounded-3xl border border-white/10 p-5 sm:p-6">
+        <CaseProcessTimeline
+          activeStageId={processActiveStage}
+          activeStageState={primaryState.blocker ? "blocked" : "current"}
+          auditHistory={
+            <ol className="relative ml-2 border-l border-white/10 pl-5">
+              {caseData.timeline.map((item) => (
+                <li className="relative pb-5 last:pb-0" key={item.id}>
+                  <span className="bg-accent ring-background-elevated absolute top-1 -left-[1.57rem] size-2.5 rounded-full ring-4" />
+                  {item.href ? (
+                    <Link
+                      className="block rounded-xl p-2 transition hover:bg-white/5"
+                      href={item.href}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-sm">{item.title}</strong>
+                        <Status
+                          locale={user.interfaceLanguage}
+                          value={item.status}
+                        />
+                      </div>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {formatDate(item.at)} ·{" "}
+                        {timelineTypeLabel(user.interfaceLanguage, item.type)}
+                      </p>
+                    </Link>
+                  ) : (
+                    <div className="p-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong className="text-sm">{item.title}</strong>
+                        <Status
+                          locale={user.interfaceLanguage}
+                          value={item.status}
+                        />
+                      </div>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {formatDate(item.at)} ·{" "}
+                        {timelineTypeLabel(user.interfaceLanguage, item.type)}
+                      </p>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          }
+          historyId="case-audit-history"
+          locale={user.interfaceLanguage}
+          sectionId="timeline-section"
+          stageContent={processStageContent}
+        />
+      </div>
 
       <CaseVersionHistory
         contracts={caseData.commercial.contractVersions}
@@ -737,7 +940,10 @@ export default async function AdminCasePage({
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
         <div className="min-w-0 space-y-6">
-          <Section id="customer-section" title={copy.customer}>
+          <Section
+            id="customer-section"
+            title={workspaceCopy.sections.customer}
+          >
             <dl className="grid gap-5 sm:grid-cols-2">
               <div>
                 <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
@@ -844,17 +1050,20 @@ export default async function AdminCasePage({
               <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
                 {copy.nextAction}
               </p>
-              <p className="mt-2 text-sm">
-                {copy.actionLabels[caseData.nextAction.kind]}
-              </p>
+              <p className="mt-2 text-sm">{nextActionText}</p>
             </div>
-            <InformationRequestButton
-              leadId={caseData.lead.id}
-              locale={user.interfaceLanguage}
-            />
+            {secondaryMutationsAllowed ? (
+              <InformationRequestButton
+                leadId={caseData.lead.id}
+                locale={user.interfaceLanguage}
+              />
+            ) : null}
           </Section>
 
-          <Section id="measurement-section" title={copy.measurement}>
+          <Section
+            id="measurement-section"
+            title={workspaceCopy.sections.measurement}
+          >
             {caseData.measurement ? (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -932,30 +1141,34 @@ export default async function AdminCasePage({
             ) : (
               <p className="text-muted-foreground">{copy.missing}</p>
             )}
-            <MeasurementReviewPanel
-              canApprovePackage={caseData.nextAction.kind === "approve_package"}
-              city={caseData.lead.city}
-              currentAreaTenths={caseData.measurement?.actualAreaMaxTenths}
-              currentBuildingId={caseData.measurement?.buildingIdentifier}
-              currentMode={caseData.measurement?.measurementMode}
-              evidenceHref={caseData.measurement?.evidenceHref}
-              inquiryType={caseData.lead.inquiryType || "usikker"}
-              leadAddress={caseData.lead.streetAddress || ""}
-              leadId={caseData.lead.id}
-              latitude={caseData.measurement?.latitude}
-              locale={user.interfaceLanguage}
-              longitude={caseData.measurement?.longitude}
-              measurementId={caseData.measurement?.id}
-              postal={caseData.lead.postal}
-              revision={caseData.lead.revision}
-              sourceUrl={caseData.measurement?.sourceUrl}
-              measurementStatus={caseData.measurement?.status}
-            />
+            {secondaryMutationsAllowed ? (
+              <MeasurementReviewPanel
+                canApprovePackage={
+                  caseData.nextAction.kind === "approve_package"
+                }
+                city={caseData.lead.city}
+                currentAreaTenths={caseData.measurement?.actualAreaMaxTenths}
+                currentBuildingId={caseData.measurement?.buildingIdentifier}
+                currentMode={caseData.measurement?.measurementMode}
+                evidenceHref={caseData.measurement?.evidenceHref}
+                inquiryType={caseData.lead.inquiryType || "usikker"}
+                leadAddress={caseData.lead.streetAddress || ""}
+                leadId={caseData.lead.id}
+                latitude={caseData.measurement?.latitude}
+                locale={user.interfaceLanguage}
+                longitude={caseData.measurement?.longitude}
+                measurementId={caseData.measurement?.id}
+                postal={caseData.lead.postal}
+                revision={caseData.lead.revision}
+                sourceUrl={caseData.measurement?.sourceUrl}
+                measurementStatus={caseData.measurement?.status}
+              />
+            ) : null}
           </Section>
 
           <Section
             id="price-quote-section"
-            title={`${copy.pricing} · ${copy.quote}`}
+            title={workspaceCopy.sections.commercial}
           >
             {caseData.price ? (
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1077,7 +1290,8 @@ export default async function AdminCasePage({
                 ))}
               </div>
             ) : null}
-            {caseData.quote &&
+            {secondaryMutationsAllowed &&
+            caseData.quote &&
             ["draft", "declined"].includes(caseData.quote.status || "") &&
             caseData.price ? (
               <CommercialQuoteEditor
@@ -1094,27 +1308,35 @@ export default async function AdminCasePage({
             ) : null}
           </Section>
 
-          <Section id="messages-section" title={copy.messages}>
+          <Section
+            id="messages-section"
+            title={workspaceCopy.sections.messages}
+          >
             {caseData.messages.length ? (
               <div className="grid min-w-0 gap-3">
                 {caseData.messages
-                  .filter((message) => message.id !== displayedReply?.id)
+                  .filter(
+                    (message) =>
+                      message.id !==
+                      (primaryQuestionActive ? displayedReply?.id : undefined),
+                  )
                   .map((message) => {
-                    const source = message.replyToMessageId
-                      ? caseData.messages.find(
-                          (candidate) =>
-                            candidate.id === message.replyToMessageId,
-                        )
-                      : undefined;
+                    const draftAccess = customerQuestionDraftAccess(
+                      caseData.customerQuestionContext,
+                      message,
+                    );
+                    const source = draftAccess.replyTarget;
                     return message.status === "draft" &&
-                      message.direction === "outbound" ? (
+                      message.direction === "outbound" &&
+                      secondaryMutationsAllowed ? (
                       <div
                         className="scroll-mt-24"
                         id={`message-${message.id}`}
-                        key={`${message.id}:${message.updatedAt || ""}`}
+                        key={message.id}
                       >
                         <MessageDraftEditor
                           aiAssisted={message.aiAssisted}
+                          blockedByActiveQuestion={draftAccess.readOnly}
                           bodyText={message.bodyText}
                           caseRevision={caseData.lead.revision}
                           factWarnings={factWarnings(message.aiAnalysis)}
@@ -1126,6 +1348,15 @@ export default async function AdminCasePage({
                           messageId={message.id}
                           messageUpdatedAt={
                             message.updatedAt || message.createdAt || ""
+                          }
+                          replyTarget={
+                            source
+                              ? {
+                                  bodyText: source.bodyText,
+                                  id: source.id,
+                                  subject: source.subject,
+                                }
+                              : null
                           }
                           sourceBody={source?.bodyText}
                           sourceSubject={source?.subject}
@@ -1178,7 +1409,8 @@ export default async function AdminCasePage({
                             {message.failureMessage}
                           </p>
                         ) : null}
-                        {message.direction === "outbound" &&
+                        {secondaryMutationsAllowed &&
+                        message.direction === "outbound" &&
                         message.channel === "email" &&
                         !["draft", "cancelled"].includes(
                           message.status || "",
@@ -1220,7 +1452,10 @@ export default async function AdminCasePage({
         </div>
 
         <aside className="min-w-0 space-y-6">
-          <Section id="contract-section" title={copy.contract}>
+          <Section
+            id="contract-section"
+            title={workspaceCopy.sections.contract}
+          >
             {caseData.contract ? (
               <>
                 <div className="flex flex-wrap justify-between gap-3">
@@ -1255,7 +1490,7 @@ export default async function AdminCasePage({
             )}
           </Section>
 
-          <Section id="work-section" title={copy.work}>
+          <Section id="work-section" title={workspaceCopy.sections.work}>
             {caseData.workOrder ? (
               <>
                 <div className="flex flex-wrap justify-between gap-3">
@@ -1302,7 +1537,8 @@ export default async function AdminCasePage({
             ) : (
               <p className="text-muted-foreground">{copy.missing}</p>
             )}
-            {caseData.contract &&
+            {secondaryMutationsAllowed &&
+            caseData.contract &&
             ((caseData.nextAction.kind === "create_work_order" &&
               !caseData.workOrder) ||
               (caseData.workOrder &&
@@ -1359,7 +1595,7 @@ export default async function AdminCasePage({
             ) : null}
           </Section>
 
-          <Section id="changes-section" title={copy.changes}>
+          <Section id="changes-section" title={workspaceCopy.sections.changes}>
             {caseData.workOrder?.status === "blocked" ? (
               <ChangeAgreementPanel
                 actualAreaTenths={caseData.workOrder.actualAreaTenths}
@@ -1405,7 +1641,10 @@ export default async function AdminCasePage({
             )}
           </Section>
 
-          <Section id="documents-section" title={copy.documents}>
+          <Section
+            id="documents-section"
+            title={workspaceCopy.sections.documents}
+          >
             {caseData.invoice || caseData.warranty ? (
               <div className="mb-4 grid gap-3">
                 {caseData.invoice ? (
@@ -1439,19 +1678,25 @@ export default async function AdminCasePage({
                         <ExternalLink aria-hidden="true" className="size-4" />
                       </a>
                     ) : null}
-                    <InvoiceRecordPanel
-                      adminNote={caseData.invoice.adminNote}
-                      externalReference={caseData.invoice.externalReference}
-                      id={caseData.invoice.id}
-                      locale={user.interfaceLanguage}
-                      status={caseData.invoice.status || "draft"}
-                    />
-                    <OfficialInvoiceManager
-                      invoiceRecordId={caseData.invoice.id}
-                      invoiceRecordStatus={caseData.invoice.status || "draft"}
-                      items={caseData.officialInvoices}
-                      locale={user.interfaceLanguage}
-                    />
+                    {secondaryMutationsAllowed ? (
+                      <>
+                        <InvoiceRecordPanel
+                          adminNote={caseData.invoice.adminNote}
+                          externalReference={caseData.invoice.externalReference}
+                          id={caseData.invoice.id}
+                          locale={user.interfaceLanguage}
+                          status={caseData.invoice.status || "draft"}
+                        />
+                        <OfficialInvoiceManager
+                          invoiceRecordId={caseData.invoice.id}
+                          invoiceRecordStatus={
+                            caseData.invoice.status || "draft"
+                          }
+                          items={caseData.officialInvoices}
+                          locale={user.interfaceLanguage}
+                        />
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
                 {caseData.warranty ? (
@@ -1512,48 +1757,6 @@ export default async function AdminCasePage({
             ) : (
               <p className="text-muted-foreground">{copy.noDocuments}</p>
             )}
-          </Section>
-
-          <Section id="timeline-section" title={copy.timeline}>
-            <ol className="relative ml-2 border-l border-white/10 pl-5">
-              {caseData.timeline.map((item) => (
-                <li className="relative pb-5 last:pb-0" key={item.id}>
-                  <span className="bg-accent ring-background-elevated absolute top-1 -left-[1.57rem] size-2.5 rounded-full ring-4" />
-                  {item.href ? (
-                    <Link
-                      className="block rounded-xl p-2 transition hover:bg-white/5"
-                      href={item.href}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong className="text-sm">{item.title}</strong>
-                        <Status
-                          locale={user.interfaceLanguage}
-                          value={item.status}
-                        />
-                      </div>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {formatDate(item.at)} ·{" "}
-                        {timelineTypeLabel(user.interfaceLanguage, item.type)}
-                      </p>
-                    </Link>
-                  ) : (
-                    <div className="p-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong className="text-sm">{item.title}</strong>
-                        <Status
-                          locale={user.interfaceLanguage}
-                          value={item.status}
-                        />
-                      </div>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {formatDate(item.at)} ·{" "}
-                        {timelineTypeLabel(user.interfaceLanguage, item.type)}
-                      </p>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
           </Section>
         </aside>
       </div>

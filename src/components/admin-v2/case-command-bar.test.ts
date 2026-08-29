@@ -28,4 +28,34 @@ describe("case command bar", () => {
     expect(html).toContain('href="#next-action-title"');
     expect(html).not.toContain("<button");
   });
+
+  it.each([
+    ["critical", "border-danger/45", "text-danger"],
+    ["warning", "border-amber-400/45", "text-amber-200"],
+    ["action", "border-accent/30", "text-accent"],
+    ["waiting", "border-sky-400/35", "text-sky-200"],
+    ["success", "border-success/45", "text-success"],
+    ["neutral", "border-white/20", "text-white/80"],
+  ] as const)(
+    "renders a distinct %s semantic tone",
+    (tone, borderClass, emphasisClass) => {
+      const html = renderToStaticMarkup(
+        createElement(CaseCommandBar, { ...props, tone }),
+      );
+
+      expect(html).toContain(borderClass);
+      expect(html).toContain(emphasisClass);
+    },
+  );
+
+  it("marks both responsive variants as primary shortcuts", () => {
+    const html = renderToStaticMarkup(
+      createElement(CaseCommandBar, { ...props, tone: "waiting" }),
+    );
+
+    expect(html.match(/data-case-primary-shortcut=/g)).toHaveLength(2);
+    expect(html).toContain('data-case-primary-shortcut="desktop"');
+    expect(html).toContain('data-case-primary-shortcut="mobile"');
+    expect(html.match(/href="#next-action-title"/g)).toHaveLength(2);
+  });
 });

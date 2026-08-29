@@ -12,6 +12,13 @@ import {
   type CustomerReplyRecoveryKind,
 } from "@/lib/messages/customer-reply-recovery";
 import { customerReplyEditorActionVisibility } from "./customer-question-action-visibility";
+import {
+  acceptSavedMessageDraft,
+  createMessageDraftEditorState,
+  messageDraftIsDirty,
+  reconcileMessageDraftEditorState,
+  updateMessageDraftEditorState,
+} from "./message-draft-editor-state";
 
 const copy = {
   nb: {
@@ -51,6 +58,11 @@ const copy = {
     regenerateConfirm:
       "Erstatte utkastet med et nytt AI-utkast? Ulagrede endringer går tapt.",
     processing: "Behandler …",
+    blockedByQuestion:
+      "Et annet ubesvart kundespørsmål er aktivt. Dette utkastet er skrivebeskyttet til det aktive spørsmålet er ferdigbehandlet.",
+    serverChanged:
+      "Utkastet ble endret på serveren mens du skrev. Den ulagrede teksten din er bevart. Kopier den ved behov og last siden på nytt før du fortsetter.",
+    replyTarget: "Svar på kundespørsmål",
   },
   lt: {
     aiDraft: "DI juodraštis – administratorius privalo patikrinti",
@@ -91,6 +103,11 @@ const copy = {
     regenerateConfirm:
       "Pakeisti juodraštį nauju DI juodraščiu? Neišsaugoti pakeitimai bus prarasti.",
     processing: "Vykdoma …",
+    blockedByQuestion:
+      "Aktyvus kitas neatsakytas kliento klausimas. Šis juodraštis yra tik skaitomas, kol bus užbaigtas aktyvus klausimas.",
+    serverChanged:
+      "Jums rašant juodraštis serveryje pasikeitė. Jūsų neįrašytas tekstas išsaugotas redaktoriuje. Jei reikia, nukopijuokite jį ir prieš tęsdami atnaujinkite puslapį.",
+    replyTarget: "Atsakoma į kliento klausimą",
   },
   en: {
     aiDraft: "AI draft – administrator review required",
@@ -130,6 +147,11 @@ const copy = {
     regenerateConfirm:
       "Replace this draft with a new AI draft? Unsaved changes will be lost.",
     processing: "Processing …",
+    blockedByQuestion:
+      "Another unanswered customer question is active. This draft is read-only until the active question is completed.",
+    serverChanged:
+      "The server draft changed while you were writing. Your unsaved text is preserved in the editor. Copy it if needed and reload the page before continuing.",
+    replyTarget: "Replying to customer question",
   },
 } as const;
 
@@ -145,6 +167,7 @@ class CustomerReplyDraftActionError extends Error {
 
 export function MessageDraftEditor(props: {
   aiAssisted?: boolean;
+  blockedByActiveQuestion?: boolean;
   bodyText: string;
   factWarnings?: string[];
   initialRecovery?: CustomerReplyRecoveryKind | null;
@@ -154,6 +177,11 @@ export function MessageDraftEditor(props: {
   manualReplyRequiresEditing?: boolean;
   messageId: number;
   messageUpdatedAt: string;
+  replyTarget?: {
+    bodyText: string;
+    id: number;
+    subject: string;
+  } | null;
   sourceContextAvailable?: boolean;
   sourceBody?: string;
   sourceSubject?: string;
@@ -161,11 +189,20 @@ export function MessageDraftEditor(props: {
 }) {
   const labels = copy[props.locale];
   const router = useRouter();
-  const activeMessageId = useRef(props.messageId);
   const sourceChangedAlert = useRef<HTMLDivElement>(null);
-  const expectedMessageUpdatedAt = useRef(props.messageUpdatedAt);
-  const [subject, setSubject] = useState(props.subject);
-  const [bodyText, setBodyText] = useState(props.bodyText);
+  const incomingSnapshot = {
+    bodyText: props.bodyText,
+    messageId: props.messageId,
+    subject: props.subject,
+    updatedAt: props.messageUpdatedAt,
+  };
+  const [editorState, setEditorState] = useState(() =>
+    createMessageDraftEditorState(incomingSnapshot),
+  );
+  const [lastServerProps, setLastServerProps] = useState(() => ({
+    ...incomingSnapshot,
+    initialRecovery: props.initialRecovery || null,
+  }));
   const [busy, setBusy] = useState<
     "cancel" | "polish" | "save" | "regenerate" | "send" | null
   >(null);
@@ -177,27 +214,45 @@ export function MessageDraftEditor(props: {
     bodyText: string;
     subject: string;
   } | null>(null);
-  const dirty = subject !== props.subject || bodyText !== props.bodyText;
+  const serverPropsChanged =
+    lastServerProps.bodyText !== incomingSnapshot.bodyText ||
+    lastServerProps.messageId !== incomingSnapshot.messageId ||
+    lastServerProps.subject !== incomingSnapshot.subject ||
+    lastServerProps.updatedAt !== incomingSnapshot.updatedAt ||
+    lastServerProps.initialRecovery !== (props.initialRecovery || null);
+  if (serverPropsChanged) {
+    const messageChanged =
+      lastServerProps.messageId !== incomingSnapshot.messageId;
+    setLastServerProps({
+      ...incomingSnapshot,
+      initialRecovery: props.initialRecovery || null,
+    });
+    setEditorState(
+      reconcileMessageDraftEditorState(editorState, incomingSnapshot),
+    );
+    setRecovery(props.initialRecovery || null);
+    if (messageChanged) {
+      setBeforePolish(null);
+      setNotice("");
+    }
+  }
+  const { bodyText, subject } = editorState;
+  const dirty = messageDraftIsDirty(editorState);
   const hasSourceContext =
-    Boolean(props.sourceBody) || Boolean(props.sourceContextAvailable);
+    Boolean(props.replyTarget) ||
+    Boolean(props.sourceBody) ||
+    Boolean(props.sourceContextAvailable);
   const manualReplyNeedsEditing =
     Boolean(props.manualReplyRequiresEditing) && !dirty;
   const sourceChanged = recovery === "source_changed";
+  const interactionBlocked =
+    Boolean(props.blockedByActiveQuestion) || editorState.hasServerConflict;
+  const readOnly = sourceChanged || interactionBlocked;
   const actionVisibility = customerReplyEditorActionVisibility({
     aiAssisted: Boolean(props.aiAssisted),
     hasSourceContext,
     recovery,
   });
-
-  useEffect(() => {
-    if (activeMessageId.current === props.messageId) return;
-    activeMessageId.current = props.messageId;
-    setSubject(props.subject);
-    setBodyText(props.bodyText);
-    setBeforePolish(null);
-    setNotice("");
-    setRecovery(props.initialRecovery || null);
-  }, [props.bodyText, props.initialRecovery, props.messageId, props.subject]);
 
   useEffect(() => {
     if (!sourceChanged) return;
@@ -210,10 +265,6 @@ export function MessageDraftEditor(props: {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [sourceChanged]);
-
-  useEffect(() => {
-    expectedMessageUpdatedAt.current = props.messageUpdatedAt;
-  }, [props.messageUpdatedAt]);
 
   function localizedFailure(result: { code?: string; error?: string }) {
     const recoveryKind = customerReplyRecoveryKind(result);
@@ -245,7 +296,7 @@ export function MessageDraftEditor(props: {
       bodyText,
       caseRevision: props.caseRevision,
       messageId: props.messageId,
-      messageUpdatedAt: expectedMessageUpdatedAt.current,
+      messageUpdatedAt: editorState.updatedAt,
       subject,
     });
     const response = await fetch(`/api/admin/leads/${props.leadId}`, {
@@ -264,7 +315,6 @@ export function MessageDraftEditor(props: {
     };
     if (!response.ok) {
       const message = localizedFailure(result);
-      if (response.status === 409 && message === labels.stale) router.refresh();
       throw new CustomerReplyDraftActionError(
         message,
         customerReplyRecoveryKind(result),
@@ -298,8 +348,12 @@ export function MessageDraftEditor(props: {
         if (!result.polished?.subject || !result.polished.bodyText)
           throw new Error(labels.failed);
         setBeforePolish(original);
-        setSubject(result.polished.subject);
-        setBodyText(result.polished.bodyText);
+        setEditorState((current) =>
+          updateMessageDraftEditorState(current, {
+            bodyText: result.polished?.bodyText,
+            subject: result.polished?.subject,
+          }),
+        );
         setNotice(labels.polished);
       } else if (kind === "regenerate") {
         await post("regenerate_reply");
@@ -310,15 +364,15 @@ export function MessageDraftEditor(props: {
           setNotice(result.sent ? labels.sent : labels.queued);
         } else {
           const result = await post("save_draft");
-          if (result.messageUpdatedAt) {
-            expectedMessageUpdatedAt.current = result.messageUpdatedAt;
-          }
+          setEditorState((current) =>
+            acceptSavedMessageDraft(current, result.messageUpdatedAt),
+          );
           setNotice(labels.saved);
         }
       }
       if (kind === "send") {
-        window.setTimeout(() => router.refresh(), 800);
-      } else if (kind !== "polish") {
+        router.refresh();
+      } else if (kind !== "polish" && kind !== "save") {
         router.refresh();
       }
     } catch (error) {
@@ -328,7 +382,12 @@ export function MessageDraftEditor(props: {
           ? error.recovery
           : "unknown";
       setRecovery(nextRecovery);
-      if (nextRecovery === "source_changed") router.refresh();
+      if (nextRecovery === "refresh") {
+        setEditorState((current) => ({
+          ...current,
+          hasServerConflict: true,
+        }));
+      }
     } finally {
       setBusy(null);
     }
@@ -341,21 +400,44 @@ export function MessageDraftEditor(props: {
           {labels.aiDraft}
         </p>
       ) : null}
-      {props.sourceBody ? (
+      {props.replyTarget || props.sourceBody ? (
         <details
           className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3"
           open
         >
           <summary className="cursor-pointer text-sm font-bold">
-            {labels.original}
+            {props.replyTarget ? labels.replyTarget : labels.original}
           </summary>
-          {props.sourceSubject ? (
-            <p className="mt-3 text-sm font-semibold">{props.sourceSubject}</p>
+          {props.replyTarget ? (
+            <p className="text-muted-foreground mt-3 text-xs font-bold tracking-wider uppercase">
+              #{props.replyTarget.id}
+            </p>
+          ) : null}
+          {props.replyTarget?.subject || props.sourceSubject ? (
+            <p className="mt-2 text-sm font-semibold">
+              {props.replyTarget?.subject || props.sourceSubject}
+            </p>
           ) : null}
           <p className="mt-2 text-sm whitespace-pre-wrap text-white/75">
-            {props.sourceBody}
+            {props.replyTarget?.bodyText || props.sourceBody}
           </p>
         </details>
+      ) : null}
+      {props.blockedByActiveQuestion ? (
+        <p
+          className="border-warning/35 bg-warning/10 text-warning mt-4 rounded-xl border p-3 text-sm leading-6"
+          role="alert"
+        >
+          {labels.blockedByQuestion}
+        </p>
+      ) : null}
+      {editorState.hasServerConflict ? (
+        <p
+          className="border-danger/35 bg-danger/10 mt-4 rounded-xl border p-3 text-sm leading-6 text-red-100"
+          role="alert"
+        >
+          {labels.serverChanged}
+        </p>
       ) : null}
       {props.factWarnings?.length ? (
         <div className="border-warning/30 bg-warning/5 mt-3 rounded-xl border p-3">
@@ -391,8 +473,14 @@ export function MessageDraftEditor(props: {
           className="min-h-12 rounded-xl border border-white/10 bg-[#0d1118] px-3"
           maxLength={160}
           minLength={5}
-          onChange={(event) => setSubject(event.target.value)}
-          readOnly={sourceChanged}
+          onChange={(event) =>
+            setEditorState((current) =>
+              updateMessageDraftEditorState(current, {
+                subject: event.target.value,
+              }),
+            )
+          }
+          readOnly={readOnly}
           value={subject}
         />
       </label>
@@ -404,8 +492,14 @@ export function MessageDraftEditor(props: {
           className="min-h-56 rounded-xl border border-white/10 bg-[#0d1118] p-3"
           maxLength={3_000}
           minLength={20}
-          onChange={(event) => setBodyText(event.target.value)}
-          readOnly={sourceChanged}
+          onChange={(event) =>
+            setEditorState((current) =>
+              updateMessageDraftEditorState(current, {
+                bodyText: event.target.value,
+              }),
+            )
+          }
+          readOnly={readOnly}
           value={bodyText}
         />
       </label>
@@ -415,7 +509,7 @@ export function MessageDraftEditor(props: {
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
-        {actionVisibility.showDraftActions ? (
+        {actionVisibility.showDraftActions && !readOnly ? (
           <button
             className="hover:border-accent/50 min-h-11 rounded-xl border border-white/15 px-4 font-bold disabled:opacity-50"
             disabled={
@@ -430,7 +524,7 @@ export function MessageDraftEditor(props: {
             {busy === "save" ? labels.processing : labels.save}
           </button>
         ) : null}
-        {actionVisibility.showDraftActions && hasSourceContext ? (
+        {actionVisibility.showDraftActions && hasSourceContext && !readOnly ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={
@@ -445,13 +539,14 @@ export function MessageDraftEditor(props: {
             {busy === "polish" ? labels.processing : labels.polish}
           </button>
         ) : null}
-        {actionVisibility.showDraftActions && beforePolish ? (
+        {actionVisibility.showDraftActions && beforePolish && !readOnly ? (
           <button
             className="hover:border-accent/50 min-h-11 rounded-xl border border-white/15 px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
             onClick={() => {
-              setSubject(beforePolish.subject);
-              setBodyText(beforePolish.bodyText);
+              setEditorState((current) =>
+                updateMessageDraftEditorState(current, beforePolish),
+              );
               setBeforePolish(null);
               setNotice("");
               setRecovery(null);
@@ -461,7 +556,7 @@ export function MessageDraftEditor(props: {
             {labels.undoPolish}
           </button>
         ) : null}
-        {actionVisibility.showRegenerateAction ? (
+        {actionVisibility.showRegenerateAction && !interactionBlocked ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
@@ -477,7 +572,7 @@ export function MessageDraftEditor(props: {
                   : labels.regenerateManual}
           </button>
         ) : null}
-        {actionVisibility.showDraftActions ? (
+        {actionVisibility.showDraftActions && !readOnly ? (
           <button
             className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-11 rounded-xl px-4 font-bold disabled:opacity-50"
             disabled={
@@ -492,14 +587,16 @@ export function MessageDraftEditor(props: {
             {busy === "send" ? labels.processing : labels.send}
           </button>
         ) : null}
-        <button
-          className="min-h-11 rounded-xl border border-red-400/40 px-4 font-bold text-red-200 hover:bg-red-400/10 disabled:opacity-50"
-          disabled={Boolean(busy)}
-          onClick={() => void run("cancel")}
-          type="button"
-        >
-          {busy === "cancel" ? labels.processing : labels.cancel}
-        </button>
+        {!interactionBlocked ? (
+          <button
+            className="min-h-11 rounded-xl border border-red-400/40 px-4 font-bold text-red-200 hover:bg-red-400/10 disabled:opacity-50"
+            disabled={Boolean(busy)}
+            onClick={() => void run("cancel")}
+            type="button"
+          >
+            {busy === "cancel" ? labels.processing : labels.cancel}
+          </button>
+        ) : null}
       </div>
       {notice && !sourceChanged ? (
         <p

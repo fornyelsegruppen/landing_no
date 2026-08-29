@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronDown } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
@@ -386,7 +386,6 @@ export function CustomerQuestionWorkbench(props: {
 }) {
   const labels = copy[props.locale];
   const router = useRouter();
-  const refreshTimers = useRef<number[]>([]);
   const [busy, setBusy] = useState<"ai" | "manual" | "retry" | null>(null);
   const [feedback, setFeedback] = useState<{
     kind: "error" | "success";
@@ -405,19 +404,8 @@ export function CustomerQuestionWorkbench(props: {
     effectiveRecovery,
   );
 
-  useEffect(
-    () => () => {
-      for (const timer of refreshTimers.current) window.clearTimeout(timer);
-    },
-    [],
-  );
-
   function refreshEditor() {
     router.refresh();
-    refreshTimers.current.push(
-      window.setTimeout(() => router.refresh(), 500),
-      window.setTimeout(() => router.refresh(), 1_500),
-    );
   }
 
   async function post(body: Record<string, unknown>) {
@@ -523,9 +511,7 @@ export function CustomerQuestionWorkbench(props: {
         kind: "success",
         message: result.sent ? labels.retrySent : labels.retryQueued,
       });
-      refreshTimers.current.push(
-        window.setTimeout(() => router.refresh(), 800),
-      );
+      router.refresh();
     } catch (error) {
       setFeedback({
         kind: "error",
@@ -635,7 +621,7 @@ export function CustomerQuestionWorkbench(props: {
           </div>
         ) : stage === "review" && props.reply ? (
           <MessageDraftEditor
-            key={`${props.reply.id}:${props.reply.updatedAt}`}
+            key={props.reply.id}
             aiAssisted={props.reply.aiAssisted}
             bodyText={props.reply.bodyText}
             caseRevision={props.leadRevision}
@@ -646,6 +632,11 @@ export function CustomerQuestionWorkbench(props: {
             manualReplyRequiresEditing={props.reply.manualReplyRequiresEditing}
             messageId={props.reply.id}
             messageUpdatedAt={props.reply.updatedAt}
+            replyTarget={{
+              bodyText: props.question.bodyText,
+              id: props.question.id,
+              subject: props.question.subject,
+            }}
             sourceContextAvailable
             subject={props.reply.subject}
           />

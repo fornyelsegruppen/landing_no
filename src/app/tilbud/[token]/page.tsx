@@ -27,10 +27,18 @@ export default async function CustomerQuotePage({
   const payload = await getPayload();
   const view = await loadCustomerQuote(payload, token, { markViewed: true });
   if (!view) notFound();
-  const questionState = await loadCustomerQuestionState(
-    payload,
-    view.snapshot.quote.leadId,
-  );
+  const [questionState, contractRequests] = await Promise.all([
+    loadCustomerQuestionState(payload, view.snapshot.quote.leadId),
+    payload.find({
+      collection: "customer-contract-requests",
+      depth: 0,
+      limit: 1,
+      overrideAccess: true,
+      sort: "-receivedAt",
+      where: { contract: { equals: view.contractId } },
+    }),
+  ]);
+  const latestContractRequest = contractRequests.docs[0];
   return (
     <html className={manrope.variable} lang="no">
       <body className="bg-background text-foreground min-h-svh font-sans antialiased">
@@ -46,6 +54,14 @@ export default async function CustomerQuotePage({
           terms={view.snapshot.terms}
           signedAt={view.signedAt}
           companySignedAt={view.companySignedAt}
+          contractRequest={
+            latestContractRequest
+              ? {
+                  kind: latestContractRequest.kind,
+                  status: latestContractRequest.status,
+                }
+              : null
+          }
           optionKind={view.optionKind}
           measurementEvidenceHref={
             view.snapshot.quote.measurement.mode === "manual_no_visual"
