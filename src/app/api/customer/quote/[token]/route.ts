@@ -6,7 +6,10 @@ import {
   enqueueCustomerReplyDraft,
   enqueueMessageJob,
 } from "@/lib/messages/message-engine";
-import { loadUnresolvedCustomerQuestion } from "@/lib/messages/customer-question-state";
+import {
+  loadCustomerQuestionState,
+  loadUnresolvedCustomerQuestion,
+} from "@/lib/messages/customer-question-state";
 import { processOperationalJobs } from "@/lib/jobs/operational-job-processor";
 import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
@@ -102,7 +105,7 @@ export async function GET(
   const payload = await getPayload();
   const view = await loadCustomerQuote(payload, token, { markViewed: true });
   if (!view) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const unresolvedQuestion = await loadUnresolvedCustomerQuestion(
+  const questionState = await loadCustomerQuestionState(
     payload,
     view.snapshot.quote.leadId,
   );
@@ -121,7 +124,8 @@ export async function GET(
       signedAt: view.signedAt,
       companySignedAt: view.companySignedAt,
       pdfUrl: `/api/customer/quote/${encodeURIComponent(token)}/pdf`,
-      questionPending: Boolean(unresolvedQuestion),
+      questionPending: questionState.status === "pending",
+      questionState: questionState.status,
     },
     {
       headers: {

@@ -16,6 +16,8 @@ type MessageLike = {
 export type CustomerQuestionReplyStage =
   "prepare" | "review" | "queued" | "sent" | "delivered" | "delivery_failed";
 
+export type CustomerQuestionStateStatus = "none" | "pending" | "resolved";
+
 function relationId(message: MessageLike) {
   if (typeof message.replyToMessageId === "number") {
     return message.replyToMessageId;
@@ -109,7 +111,18 @@ export function selectLatestCustomerQuestion<T extends MessageLike>(
   };
 }
 
-export async function loadUnresolvedCustomerQuestion(
+export function customerQuestionState<T extends MessageLike>(messages: T[]) {
+  const unresolved = selectUnresolvedCustomerQuestion(messages);
+  const latest = selectLatestCustomerQuestion(messages);
+  const status: CustomerQuestionStateStatus = unresolved
+    ? "pending"
+    : latest
+      ? "resolved"
+      : "none";
+  return { latest, status, unresolved };
+}
+
+export async function loadCustomerQuestionState(
   payload: Payload,
   leadId: number,
 ) {
@@ -128,7 +141,9 @@ export async function loadUnresolvedCustomerQuestion(
     },
   });
   const questionDocs = questions.docs as MessageLike[];
-  if (!questionDocs.length) return null;
+  if (!questionDocs.length) {
+    return customerQuestionState(questionDocs);
+  }
 
   const replies = await payload.find({
     collection: "messages",
@@ -149,8 +164,15 @@ export async function loadUnresolvedCustomerQuestion(
       ],
     },
   });
-  return selectUnresolvedCustomerQuestion([
+  return customerQuestionState([
     ...questionDocs,
     ...(replies.docs as MessageLike[]),
   ]);
+}
+
+export async function loadUnresolvedCustomerQuestion(
+  payload: Payload,
+  leadId: number,
+) {
+  return (await loadCustomerQuestionState(payload, leadId)).unresolved;
 }

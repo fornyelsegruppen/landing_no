@@ -185,7 +185,7 @@ export function CustomerQuote(props: {
   companySignedAt?: string | null;
   optionKind?: string | null;
   measurementEvidenceHref?: string;
-  questionPending?: boolean;
+  questionState?: "none" | "pending" | "resolved";
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const followUpDateRef = useRef<HTMLInputElement>(null);
@@ -193,17 +193,22 @@ export function CustomerQuote(props: {
   const questionCounterRef = useRef<HTMLOutputElement>(null);
   const questionSubmissionKey = useRef<string | null>(null);
   const questionStatusCheck = useRef(false);
+  const focusResolvedQuestionOnMount = useRef(
+    props.questionState === "resolved",
+  );
   const drawing = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const [questionPending, setQuestionPending] = useState(
-    Boolean(props.questionPending),
+    props.questionState === "pending",
   );
   const [questionSent, setQuestionSent] = useState(false);
   const [questionText, setQuestionText] = useState("");
   const [questionError, setQuestionError] = useState("");
-  const [questionResolved, setQuestionResolved] = useState(false);
+  const [questionResolved, setQuestionResolved] = useState(
+    props.questionState === "resolved",
+  );
   const [checkingQuestionStatus, setCheckingQuestionStatus] = useState(false);
   const [signed, setSigned] = useState(props.contractStatus === "signed");
   const [declined, setDeclined] = useState(props.quoteStatus === "declined");
@@ -216,6 +221,18 @@ export function CustomerQuote(props: {
   const [followUpConsent, setFollowUpConsent] = useState(false);
   const [doNotContact, setDoNotContact] = useState(false);
   const [followUpChoice, setFollowUpChoice] = useState("");
+
+  useEffect(() => {
+    if (!focusResolvedQuestionOnMount.current) return;
+    focusResolvedQuestionOnMount.current = false;
+    window.requestAnimationFrame(() => {
+      questionSuccessRef.current?.focus();
+      questionSuccessRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -244,8 +261,13 @@ export function CustomerQuote(props: {
         );
         const result = (await response.json().catch(() => ({}))) as {
           questionPending?: boolean;
+          questionState?: "none" | "pending" | "resolved";
         };
-        if (response.ok && result.questionPending === false) {
+        const resolved =
+          result.questionState === "resolved" ||
+          (result.questionState === undefined &&
+            result.questionPending === false);
+        if (response.ok && resolved) {
           setQuestionPending(false);
           setQuestionSent(false);
           setQuestionResolved(true);
@@ -741,10 +763,12 @@ export function CustomerQuote(props: {
           <section className="mt-8">
             {questionResolved ? (
               <div
+                aria-live="polite"
                 className="mb-4 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 p-5 sm:p-7"
                 ref={(element) => {
                   questionSuccessRef.current = element;
                 }}
+                role="status"
                 tabIndex={-1}
               >
                 <h2 className="text-xl font-bold">Svaret er levert</h2>

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
 import {
+  customerQuestionState,
   customerQuestionDocumentReferences,
   customerQuestionReplyStage,
+  loadCustomerQuestionState,
   loadUnresolvedCustomerQuestion,
   selectLatestCustomerQuestion,
   selectUnresolvedCustomerQuestion,
@@ -81,6 +83,31 @@ describe("customer question state", () => {
     ]);
 
     expect(result).toBeNull();
+  });
+
+  it("exposes persistent none, pending and resolved customer states", () => {
+    const draftReply = {
+      id: 11,
+      category: "ai_reply",
+      direction: "outbound",
+      status: "draft",
+      replyToMessage: 10,
+      createdAt: "2026-08-28T08:01:00.000Z",
+    };
+    const deliveredReply = {
+      ...draftReply,
+      id: 12,
+      status: "delivered",
+      createdAt: "2026-08-28T08:02:00.000Z",
+    };
+
+    expect(customerQuestionState([]).status).toBe("none");
+    expect(customerQuestionState([question, draftReply]).status).toBe(
+      "pending",
+    );
+    expect(customerQuestionState([question, deliveredReply]).status).toBe(
+      "resolved",
+    );
   });
 
   it("does not resolve one question with a reply to another question", () => {
@@ -165,6 +192,34 @@ describe("customer question state", () => {
     expect(find.mock.calls.every(([query]) => query.limit === undefined)).toBe(
       true,
     );
+  });
+
+  it("loads the delivered state needed after a customer page reload", async () => {
+    const find = vi
+      .fn()
+      .mockResolvedValueOnce({ docs: [question] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 12,
+            category: "ai_reply",
+            direction: "outbound",
+            status: "delivered",
+            replyToMessage: 10,
+            createdAt: "2026-08-28T08:02:00.000Z",
+          },
+        ],
+      });
+
+    const state = await loadCustomerQuestionState(
+      { find } as unknown as Payload,
+      7,
+    );
+
+    expect(state.status).toBe("resolved");
+    expect(state.unresolved).toBeNull();
+    expect(state.latest?.question.id).toBe(10);
+    expect(state.latest?.reply?.status).toBe("delivered");
   });
 
   it.each([

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CustomerQuote } from "@/components/quotes/customer-quote";
 import { getPayload } from "@/lib/payload";
 import { loadCustomerQuote } from "@/lib/quotes/customer-view";
-import { loadUnresolvedCustomerQuestion } from "@/lib/messages/customer-question-state";
+import { loadCustomerQuestionState } from "@/lib/messages/customer-question-state";
 import "../../globals.css";
 
 const manrope = Manrope({
@@ -27,7 +27,7 @@ export default async function CustomerQuotePage({
   const payload = await getPayload();
   const view = await loadCustomerQuote(payload, token, { markViewed: true });
   if (!view) notFound();
-  const unresolvedQuestion = await loadUnresolvedCustomerQuestion(
+  const questionState = await loadCustomerQuestionState(
     payload,
     view.snapshot.quote.leadId,
   );
@@ -52,7 +52,7 @@ export default async function CustomerQuotePage({
               ? undefined
               : `/api/customer/quote/${encodeURIComponent(token)}/measurement-evidence`
           }
-          questionPending={Boolean(unresolvedQuestion)}
+          questionState={questionState.status}
         />
       </body>
     </html>

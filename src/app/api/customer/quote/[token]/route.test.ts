@@ -65,7 +65,7 @@ vi.mock("@/lib/contracts/customer-contract-request", async (importOriginal) => {
   };
 });
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const quote = buildQuoteSnapshot({
   quoteReference: "T-1-V1",
@@ -179,6 +179,46 @@ describe("customer quote signing route", () => {
       duplicate: false,
       request: { id: 10, reference: "ANG-2-TEST" },
       acknowledgementMessage: { id: 11 },
+    });
+  });
+
+  it("returns the persistent resolved question state after delivery", async () => {
+    mocks.find
+      .mockReset()
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 31,
+            category: "customer_question",
+            direction: "inbound",
+            status: "delivered",
+            createdAt: "2026-08-28T08:00:00.000Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            id: 32,
+            category: "ai_reply",
+            direction: "outbound",
+            status: "delivered",
+            replyToMessage: 31,
+            createdAt: "2026-08-28T08:02:00.000Z",
+          },
+        ],
+      });
+
+    const response = await GET(
+      new Request("http://localhost/api/customer/quote/token"),
+      { params: Promise.resolve({ token: "t".repeat(43) }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      questionPending: false,
+      questionState: "resolved",
+      quoteReference: "T-1-V1",
     });
   });
 
