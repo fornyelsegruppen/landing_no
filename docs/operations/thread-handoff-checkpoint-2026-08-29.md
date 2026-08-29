@@ -22,7 +22,9 @@ Nauja užduotis prieš bet kokį pakeitimą privalo perskaityti:
 - GitHub PR: `https://github.com/darbasnorvegija4-eng/landing_no/pull/52`
 - Bazinis commit prieš šį pataisymą: `0966a52a17f9b192afbe7b77f3d291a11913b755`
 - DI terminijos saugos commit: `f75db31` (`fix(ai): block internal wording in customer replies`)
-- Checkpoint commit ir dabartinis branch HEAD: `f67d4e50c8644027190bff55c4833265bbd4de3f`
+- Pradinis checkpoint commit: `f67d4e5`; tikslų naujausią branch HEAD visada
+  nustatyti read-only komanda `git rev-parse HEAD`, nes dokumentacijos vartų
+  atnaujinimai yra vėlesni commitai.
 - Darbo šakos remote: `origin` → `https://github.com/fornyelsegruppen/landing_no.git`
 - Upstream: `https://github.com/darbasnorvegija4-eng/landing_no.git`
 
@@ -144,9 +146,10 @@ Visada stage'inti tik konkrečiai įvardytus failus. Nenaudoti `git add .`.
 ## 8. Release būklė checkpointo metu
 
 - Push į `origin/codex/master-platform-implementation` — **PASS**; origin ir
-  lokalus HEAD sutampa su `f67d4e5`.
+  lokalus HEAD perdavimo metu sutapo.
 - PR `#52` atviras.
-- Vercel check kandidatui `f67d4e5` rodo `Authorization required to deploy`.
+- Vercel check naujausiam branch kandidatui rodo
+  `Authorization required to deploy`.
   Tai nėra build rezultatas: Linux/Vercel build dar nepradėtas, kol savininkas
   nepatvirtino GitHub/Vercel autorizavimo nuorodos.
 - Production nėra šio pataisymo taikinys ir neturi būti keičiama.
@@ -159,7 +162,7 @@ Visada stage'inti tik konkrečiai įvardytus failus. Nenaudoti `git add .`.
 
 ### H-1 — Push ir Linux/Preview vartai
 
-1. Patikrinti, kad origin ir lokalus HEAD tebėra `f67d4e5`.
+1. Patikrinti, kad origin ir lokalus HEAD sutampa.
 2. Patikrinti GitHub PR `#52` checkus.
 3. Vercel reikalauja savininko autorizavimo; pateikti savininkui tikslų
    autorizavimo linką ir vieną veiksmą.
@@ -236,7 +239,7 @@ užfiksuotas checkpointe arba naujoje fazės ataskaitoje.
 - Siaura DI vidinės kalbos pataisa: **CODE PASS / PEER REVIEW PASS**.
 - Lokalūs testai: **PASS**, išskyrus aiškiai dokumentuotą Windows ARM
   Turbopack native modulio build apribojimą.
-- GitHub push: **PASS**, HEAD `f67d4e5`.
+- GitHub push: **PASS**; tikslų HEAD gauti su `git rev-parse HEAD`.
 - Linux CI / galutinis Preview kandidatas: **BLOCKED / OWNER ACTION** —
   autorizuoti Vercel deploy iš PR `#52`, tada sulaukti `READY`.
 - Preview savininko UAT naujam DI juodraščiui: **PENDING**.
