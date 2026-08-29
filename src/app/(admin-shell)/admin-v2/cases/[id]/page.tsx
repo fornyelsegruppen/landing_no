@@ -35,10 +35,7 @@ import {
   getCaseWorkspaceCopy,
   type CaseWorkspaceQuestionRecovery,
 } from "@/lib/admin-v2/case-workspace-i18n";
-import {
-  caseWorkspaceSections,
-  caseWorkspaceSectionHref,
-} from "@/lib/admin-v2/case-workspace-sections";
+import { caseWorkspaceSectionHref } from "@/lib/admin-v2/case-workspace-sections";
 import {
   deriveCaseWorkspacePrimaryState,
   deriveCaseWorkspaceProcessStage,
@@ -551,6 +548,273 @@ export default async function AdminCasePage({
     ),
     statusText: workspaceStatus,
   };
+  const latestMessage = caseData.messages[0];
+  const processStagePanels = {
+    contact: (
+      <div className="grid gap-4">
+        <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.contact}
+            </dt>
+            <dd className="mt-1 font-semibold break-words">
+              {caseData.lead.communicationEmail || caseData.lead.email || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {user.interfaceLanguage === "lt"
+                ? "Telefonas"
+                : user.interfaceLanguage === "en"
+                  ? "Phone"
+                  : "Telefon"}
+            </dt>
+            <dd className="mt-1 font-semibold">{caseData.lead.phone || "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {copy.address}
+            </dt>
+            <dd className="mt-1 font-semibold break-words">
+              {caseData.lead.address || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {workspaceCopy.sections.messages}
+            </dt>
+            <dd className="mt-1 font-semibold">{caseData.messages.length}</dd>
+          </div>
+        </dl>
+        {caseData.lead.message ? (
+          <p className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm whitespace-pre-wrap text-white/80">
+            {caseData.lead.message}
+          </p>
+        ) : null}
+        {latestMessage ? (
+          <div className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <strong className="break-words">{latestMessage.subject}</strong>
+              <Status
+                locale={user.interfaceLanguage}
+                value={latestMessage.status}
+              />
+            </div>
+            <p className="text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">
+              {latestMessage.bodyText}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    ),
+    measurement: caseData.measurement ? (
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <strong>{caseData.measurement.reference}</strong>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {caseData.measurement.normalizedAddress || caseData.lead.address}
+            </p>
+          </div>
+          <Status
+            locale={user.interfaceLanguage}
+            value={caseData.measurement.status}
+          />
+        </div>
+        <dl className="grid gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.area}</dt>
+            <dd className="mt-1 font-bold">
+              {area(caseData.measurement.actualAreaMinTenths)}–
+              {area(caseData.measurement.actualAreaMaxTenths)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.confidence}</dt>
+            <dd className="mt-1 font-bold">
+              {caseData.measurement.confidence || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">Horizontal</dt>
+            <dd className="mt-1 font-bold">
+              {area(caseData.measurement.horizontalAreaTenths)}
+            </dd>
+          </div>
+        </dl>
+        {caseData.measurement.confidenceReasoning ? (
+          <p className="text-muted-foreground text-sm">
+            {caseData.measurement.confidenceReasoning}
+          </p>
+        ) : null}
+      </div>
+    ) : (
+      <p className="text-muted-foreground">{copy.missing}</p>
+    ),
+    commercial: (
+      <div className="grid gap-4">
+        <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.priceExVat}</dt>
+            <dd className="mt-1 font-bold">
+              {nok(caseData.price?.subtotalExVatOre)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.vat}</dt>
+            <dd className="mt-1 font-bold">{nok(caseData.price?.vatOre)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">
+              {copy.priceIncVat}
+            </dt>
+            <dd className="text-accent mt-1 font-bold">
+              {nok(caseData.price?.totalIncVatOre)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.maximum}</dt>
+            <dd className="mt-1 font-bold">
+              {nok(caseData.price?.maximumTotalIncVatOre)}
+            </dd>
+          </div>
+        </dl>
+        {caseData.quote ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/15 p-3">
+            <div>
+              <strong>{caseData.quote.reference}</strong>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {copy.validUntil}: {formatDate(caseData.quote.validUntil)}
+              </p>
+            </div>
+            <Status
+              locale={user.interfaceLanguage}
+              value={caseData.quote.status}
+            />
+          </div>
+        ) : null}
+      </div>
+    ),
+    agreement: (
+      <div className="grid gap-4">
+        {caseData.contract ? (
+          <div className="rounded-xl border border-white/10 bg-black/15 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <strong>{caseData.contract.reference}</strong>
+              <Status
+                companySignedAt={caseData.contract.companySignedAt}
+                contract
+                locale={user.interfaceLanguage}
+                value={caseData.contract.status}
+              />
+            </div>
+            {caseData.contract.signedAt ? (
+              <p className="text-muted-foreground mt-2 text-sm">
+                {copy.customerSignedAt}:{" "}
+                {formatDate(caseData.contract.signedAt)}
+              </p>
+            ) : null}
+            {caseData.contract.companySignedAt ? (
+              <p className="text-muted-foreground mt-1 text-sm">
+                {copy.companySignedAt}:{" "}
+                {formatDate(caseData.contract.companySignedAt)}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-muted-foreground">{copy.missing}</p>
+        )}
+        {activeContractRequest ? (
+          <div className="border-warning/30 bg-warning/5 rounded-xl border p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <strong>{activeContractRequest.reference}</strong>
+              <Status
+                locale={user.interfaceLanguage}
+                value={activeContractRequest.status}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ),
+    work: caseData.workOrder ? (
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <strong>{caseData.workOrder.reference}</strong>
+          <Status
+            locale={user.interfaceLanguage}
+            value={caseData.workOrder.status}
+          />
+        </div>
+        <dl className="grid gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.employee}</dt>
+            <dd className="mt-1 font-semibold">
+              {caseData.workOrder.assignedWorker || copy.unassigned}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">{copy.scheduled}</dt>
+            <dd className="mt-1 font-semibold">
+              {formatDate(caseData.workOrder.scheduledAt)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">
+              {workspaceCopy.sections.changes}
+            </dt>
+            <dd className="mt-1 font-semibold">{caseData.changes.length}</dd>
+          </div>
+        </dl>
+        {caseData.workOrder.blockingReasons.length ? (
+          <div className="border-danger/35 bg-danger/10 rounded-xl border p-3 text-sm">
+            {caseData.workOrder.blockingReasons.map((reason) => (
+              <p className="break-words" key={reason}>
+                {reason}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    ) : (
+      <p className="text-muted-foreground">{copy.missing}</p>
+    ),
+    completion: (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm">
+          <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+            {copy.invoiceDraft}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <strong>{caseData.invoice?.reference || "—"}</strong>
+            {caseData.invoice ? (
+              <Status
+                locale={user.interfaceLanguage}
+                value={caseData.invoice.status}
+              />
+            ) : null}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm">
+          <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+            {copy.warranty}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <strong>{caseData.warranty?.reference || "—"}</strong>
+            {caseData.warranty ? (
+              <Status
+                locale={user.interfaceLanguage}
+                value={caseData.warranty.status}
+              />
+            ) : null}
+          </div>
+        </div>
+        <p className="text-muted-foreground text-sm sm:col-span-2">
+          {workspaceCopy.sections.documents}: {caseData.documents.length}
+        </p>
+      </div>
+    ),
+  } satisfies Partial<Record<typeof processActiveStage, React.ReactNode>>;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -862,21 +1126,6 @@ export default async function AdminCasePage({
         ) : null}
       </section>
 
-      <nav
-        aria-label={copy.overview}
-        className="bg-background-elevated/60 flex gap-2 overflow-x-auto rounded-2xl border border-white/10 p-2 text-sm font-semibold"
-      >
-        {caseWorkspaceSections.map((section) => (
-          <a
-            className="hover:text-accent inline-flex min-h-11 shrink-0 items-center rounded-xl px-3 py-2 text-white/75 hover:bg-white/5"
-            href={`#${section.id}`}
-            key={section.id}
-          >
-            {caseWorkspaceText(user.interfaceLanguage, section.labelKey)}
-          </a>
-        ))}
-      </nav>
-
       <div className="bg-background-elevated/75 min-w-0 rounded-3xl border border-white/10 p-5 sm:p-6">
         <CaseProcessTimeline
           activeStageId={processActiveStage}
@@ -923,9 +1172,11 @@ export default async function AdminCasePage({
             </ol>
           }
           historyId="case-audit-history"
+          key={processActiveStage}
           locale={user.interfaceLanguage}
           sectionId="timeline-section"
           stageContent={processStageContent}
+          stagePanels={processStagePanels}
         />
       </div>
 

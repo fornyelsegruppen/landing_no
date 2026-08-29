@@ -154,6 +154,31 @@ describe("case process timeline", () => {
     expect(html).toContain("motion-reduce:transition-none");
   });
 
+  it("renders the active stage as an inline disclosure without a scroll link", () => {
+    const html = renderToStaticMarkup(
+      createElement(CaseProcessTimeline, {
+        activeStageId: "measurement",
+        locale: "lt",
+        stageContent,
+        stagePanels: {
+          measurement: createElement(
+            "section",
+            { id: "measurement-section" },
+            "Matavimo turinys",
+          ),
+        },
+      }),
+    );
+
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-controls="case-process-panel-measurement"');
+    expect(html).toContain("w-full items-start");
+    expect(html).toContain('id="case-process-panel-measurement"');
+    expect(html).toContain("Matavimo turinys");
+    expect(html).toContain("Slėpti informaciją");
+    expect(html).not.toContain('href="#measurement-section"');
+  });
+
   it.each([
     ["en", "Case process", "Customer decision and contract"],
     ["nb", "Saksprosess", "Kundebeslutning og kontrakt"],

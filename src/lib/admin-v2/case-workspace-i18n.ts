@@ -57,6 +57,7 @@ type CaseWorkspaceQuestionCopy = {
 };
 
 type CaseWorkspaceProcessCopy = {
+  closeStage: string;
   help: string;
   history: string;
   historyHelp: string;
@@ -114,9 +115,10 @@ const nb = {
   process: {
     title: "Saksprosess",
     help: "De seks hovedfasene i saken og hvor den står nå.",
+    closeStage: "Skjul informasjon",
     history: "Hele historikken",
     historyHelp: "Vis kronologisk handlings- og hendelseshistorikk",
-    openStage: "Gå til fase",
+    openStage: "Vis informasjon",
     states: {
       not_started: "Ikke startet",
       current: "Nåværende fase",
@@ -242,9 +244,10 @@ const lt = {
   process: {
     title: "Bylos procesas",
     help: "Šeši pagrindiniai bylos etapai ir dabartinė jos vieta.",
+    closeStage: "Slėpti informaciją",
     history: "Visa istorija",
     historyHelp: "Rodyti chronologinę veiksmų ir įvykių istoriją",
-    openStage: "Pereiti į etapą",
+    openStage: "Rodyti informaciją",
     states: {
       not_started: "Nepradėta",
       current: "Dabartinis etapas",
@@ -371,9 +374,10 @@ const en = {
   process: {
     title: "Case process",
     help: "The six main case stages and its current position.",
+    closeStage: "Hide details",
     history: "Full history",
     historyHelp: "Show the chronological action and event history",
-    openStage: "Go to stage",
+    openStage: "Show details",
     states: {
       not_started: "Not started",
       current: "Current stage",

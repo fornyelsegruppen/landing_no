@@ -59,6 +59,7 @@ export type IntegrationName =
   | "signature"
   | "legal"
   | "searchData"
+  | "stockImages"
   | "jobs"
   | "rateLimit"
   | "botProtection"
@@ -183,6 +184,16 @@ export function readIntegrationStatus(
         ? []
         : ["GOOGLE_SEARCH_CONSOLE_CREDENTIALS or SEO_IMPORT_BUCKET"],
     },
+    stockImages: {
+      name: "stockImages",
+      readiness: configured(environment, "PEXELS_API_KEY")
+        ? "ready"
+        : "configuration_required",
+      provider: "pexels",
+      missing: configured(environment, "PEXELS_API_KEY")
+        ? []
+        : ["PEXELS_API_KEY"],
+    },
     jobs: {
       name: "jobs",
       readiness: cronReady ? "ready" : "configuration_required",
@@ -255,7 +266,7 @@ const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   contractSigning: ["signature", "email", "legal"],
   workerPortal: [],
   automatedReminders: ["email", "jobs"],
-  seoScheduler: ["ai", "jobs"],
+  seoScheduler: ["ai", "jobs", "stockImages"],
   caseStateEngineV2: [],
   measurementEvidenceV2: ["maps", "buildingFootprints", "privateStorage"],
   adminExceptionFlowsV2: [],

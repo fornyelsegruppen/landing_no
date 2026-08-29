@@ -32,7 +32,7 @@ removed. Every integration commit must stage explicit paths only.
 | Question safety | uncapped question context, deterministic refresh, dirty state and read-only unrelated drafts | no case page edits                  | IMPLEMENTED; ROOT INTEGRATED; TARGETED CHECKS PASS |
 | Lean process    | six-stage process resolver, accessible timeline and exact targets                            | new process modules/components only | IMPLEMENTED; ROOT INTEGRATED; TARGETED CHECKS PASS |
 | Integration     | case page, sticky shell, one primary action, responsive/a11y and final composition           | root agent is sole owner            | IMPLEMENTED; FULL STATIC/UNIT GATES PASS           |
-| UAT/release     | PROD-8.2/8.3/8.4 evidence, exact-SHA gate, Preview, backup/restore and GO card               | no Production mutation              | PREPARING                                          |
+| UAT/release     | PROD-8.2/8.3/8.4 evidence, exact-SHA gate, Preview, backup/restore and GO card               | no Production mutation              | PREVIEW READY; OWNER UAT IN PROGRESS               |
 
 ## Required gates before GO packet
 
@@ -143,3 +143,80 @@ This section is updated only with completed, directly observed evidence.
   `fornyelsegruppen@gmail.com` is not currently attributed to the Vercel team.
   This is an account collaboration gate, not an application build failure.
   The owner received the exact deployment/team links; Production is unchanged.
+- 2026-08-29 20:49 EEST — the Vercel attribution blocker was resolved without
+  changing global Git configuration or buying a team seat. Evidence-only commit
+  `70f61c3d988a7a9abc65a6c85f478c71e2d2b394` uses the project-linked GitHub
+  owner identity and leaves the integrated V3 code from `ef0e466` unchanged.
+- 2026-08-29 20:55 EEST — exact candidate `70f61c3`, Quality Gate run
+  `33266638688`: PASS in 5m11s. The full Linux chain repeated dependency audit,
+  generated types, lint, typecheck, 831 unit/API tests, 39 migration tests,
+  empty PostgreSQL bootstrap, deterministic public/authenticated Chromium
+  smoke, production build and isolated PostgreSQL backup/restore rehearsal.
+- 2026-08-29 20:58 EEST — immutable Preview
+  `dpl_4efpLLWQPss15zjnjxokxY488Q7d` is `READY` at exact SHA `70f61c3`.
+  `takfornyelse-staging.vercel.app` now points to that deployment; the previous
+  Preview target `landing-1jnn0itr0-darbasnorvegija4-8212s-projects.vercel.app`
+  is the recorded alias rollback target. Production remains deployment
+  `dpl_CvS7U3tgY16XmLss8aAciiKtZzK5`, SHA `c5ecf4b`, and was not changed.
+- 2026-08-29 20:59 EEST — Preview smoke: `/no` and `/en` return 200;
+  unauthenticated `/admin-v2` and `/user` return their expected login redirects;
+  no Preview 500 logs were present after deployment. Browser viewport checks
+  found no horizontal overflow at 360, 375, 768 or 1280 px on the public page,
+  and the admin login surface fits both 360 and 768 px.
+- 2026-08-29 21:05 EEST — PROD-8.3 focused worker/authorization/scheduling,
+  precheck/tolerance, communication, change-agreement and completion suite:
+  14 files / 46 tests PASS. PROD-8.4 jobs, cron auth, reminder communication,
+  SEO draft/editorial/manual-publication suite: 23 files / 73 tests PASS.
+  Preview environment-name inventory contains `CRON_SECRET`, `PEXELS_API_KEY`,
+  `FEATURE_AUTOMATED_REMINDERS` and `FEATURE_SEO_SCHEDULER`; unauthenticated
+  requests to both operational-jobs and SEO-drafts cron routes return 401.
+- 2026-08-29 21:07 EEST — fresh read-only Production inventory reconfirmed
+  deployment `dpl_CvS7U3tgY16XmLss8aAciiKtZzK5` at SHA `c5ecf4b`, all named
+  PROD-8 feature controls, emergency pause, customer token, Resend and database
+  configuration entries, and no 500 logs in the preceding hour. Production
+  still has no `CRON_SECRET` or `PEXELS_API_KEY` entry; those are explicit
+  go-time PROD-8.4 configuration prerequisites and were not added or changed.
+- 2026-08-29 21:26 EEST — the final read-only audits found two release defects
+  before owner UAT. A price-blocked worker action rendered a repeat-precheck
+  button while the API accepted `begin_precheck` only from `arrived`, and the
+  SEO scheduler release gate did not require licensed stock imagery. The
+  candidate now permits `blocked -> precheck` only after an accepted change
+  agreement (or for a retryable HMS stop), keeps an unresolved customer
+  cancellation frozen for both `begin_precheck` and `submit_precheck`, and
+  localizes the worker-facing stop reason. `seoScheduler` now requires a ready
+  Pexels stock-image integration and exposes only the missing key name.
+- 2026-08-29 21:30 EEST — owner-visible Case Workspace feedback was verified
+  against signed-in Preview case 16. The six-stage process formerly used hash
+  links that moved the viewport away from the process context. The candidate
+  replaces those links with touch-friendly inline disclosures: one stage is
+  open at a time, the active stage opens by default, `aria-expanded` and
+  `aria-controls` preserve keyboard/screen-reader meaning, evidence/PDF links
+  remain independent, the duplicate horizontal fragment navigation is removed,
+  and chronological history remains an inline disclosure. Stage summaries use
+  the same server snapshot and LT/EN/NB copy as the rest of the workspace.
+- 2026-08-29 21:31 EEST — post-fix local verification: targeted 5 files / 40
+  tests PASS; full unit/API 196 files / 837 tests PASS; migrations 21 files / 39
+  tests PASS; full ESLint PASS; full TypeScript PASS; `git diff --check` PASS.
+  Exact-SHA Linux Quality Gate and immutable Preview are required again after
+  the new commit.
+
+## Current GO blockers
+
+The packet remains **NO-GO** until each item below has direct evidence:
+
+1. Exact-SHA Linux Quality Gate and immutable Preview for the post-audit fixes.
+2. Owner-visible signed-in V3 UAT at 360/375/768/1280 px, including inline
+   disclosures, LT/EN/NB, keyboard focus and the final PROD-8.2 receipt-state
+   retests.
+3. Two synthetic Preview PROD-8.3 worker paths: happy completion and
+   maximum-price/change-agreement recovery, including authorization,
+   idempotency, media, invoice and warranty evidence.
+4. Authenticated Preview PROD-8.4 no-send/idempotency UAT and 5/15/30 minute
+   monitoring evidence.
+5. Production `CRON_SECRET`, Production `PEXELS_API_KEY` and GitHub
+   `TAKFORNYELSE_CRON_SECRET` are absent. They are recorded dependencies and are
+   not authorized for mutation before the owner's action-moment approval.
+6. Fresh Production snapshot, isolated restore, full row/relationship parity,
+   restored-application smoke and private Blob inventory/access proof.
+7. Fresh owner verification of Production flags, emergency pause and provider
+   health; named incident lead; final GO card; separate owner `Production GO`.

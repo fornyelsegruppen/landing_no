@@ -23,6 +23,7 @@ const completeEnvironment = {
   LEGAL_REVIEW_REFERENCE: "LEGAL-1",
   GOOGLE_SEARCH_CONSOLE_CREDENTIALS: "secret-search",
   CRON_SECRET: "secret-cron",
+  PEXELS_API_KEY: "secret-pexels",
   UPSTASH_REDIS_REST_URL: "https://example.invalid",
   UPSTASH_REDIS_REST_TOKEN: "secret-upstash",
   TURNSTILE_SECRET_KEY: "secret-turnstile",
@@ -103,5 +104,18 @@ describe("production release gate", () => {
     const serialized = JSON.stringify(gate);
     expect(serialized).not.toContain("secret-gemini");
     expect(serialized).not.toContain("secret-resend");
+  });
+
+  it("blocks the SEO scheduler when licensed stock imagery is not configured", () => {
+    const gate = buildReleaseGate({
+      ...completeEnvironment,
+      PEXELS_API_KEY: "",
+    });
+
+    expect(gate.features.seoScheduler).toMatchObject({
+      status: "no_go",
+      unavailableIntegrations: ["stockImages"],
+    });
+    expect(gate.productionReady).toBe(false);
   });
 });

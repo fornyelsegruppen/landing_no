@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
@@ -43,6 +45,7 @@ export type CaseProcessTimelineProps = {
   locale: PanelLocale;
   sectionId?: string;
   stageContent?: Partial<Record<CaseProcessStageId, CaseProcessStageContent>>;
+  stagePanels?: Partial<Record<CaseProcessStageId, ReactNode>>;
 };
 
 const stateStyles: Record<CaseProcessStageState, string> = {
@@ -109,6 +112,7 @@ export function CaseProcessTimeline({
   locale,
   sectionId = "case-process-title",
   stageContent = {},
+  stagePanels = {},
 }: CaseProcessTimelineProps) {
   const workspaceLabels = getCaseWorkspaceCopy(locale);
   const labels = workspaceLabels.process;
@@ -116,7 +120,9 @@ export function CaseProcessTimeline({
     activeStageId,
     activeStageState,
   });
-
+  const [openStageId, setOpenStageId] = useState<CaseProcessStageId | null>(
+    stagePanels[activeStageId] ? activeStageId : null,
+  );
   return (
     <section aria-labelledby={sectionId}>
       <div>
@@ -137,8 +143,57 @@ export function CaseProcessTimeline({
           const stateLabel = labels.states[stage.state];
           const canNavigate =
             stage.state !== "not_started" && Boolean(content?.sectionHref);
+          const canExpand =
+            stage.state !== "not_started" && Boolean(stagePanels[stage.id]);
+          const isExpanded = canExpand && openStageId === stage.id;
           const relatedLinks =
             stage.state === "not_started" ? [] : (content?.relatedLinks ?? []);
+          const stageHeader = (
+            <>
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-current/20">
+                <StateIcon state={stage.state} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-bold tracking-wider uppercase">
+                  {stateLabel}
+                </span>
+                {canNavigate && !canExpand ? (
+                  <a
+                    aria-label={`${labels.openStage}: ${stageLabel}`}
+                    className="focus-visible:outline-accent mt-1 flex min-h-12 items-center rounded-lg text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    href={content?.sectionHref}
+                  >
+                    {stageLabel}
+                  </a>
+                ) : (
+                  <span className="mt-1 flex min-h-12 items-center text-base font-bold">
+                    {stageLabel}
+                  </span>
+                )}
+                {content?.statusText && stage.state !== "not_started" ? (
+                  <span className="mt-1 block text-sm">
+                    {content.statusText}
+                  </span>
+                ) : null}
+                {content?.timestamp && stage.state !== "not_started" ? (
+                  <time className="text-muted-foreground mt-1 block text-xs">
+                    {content.timestamp}
+                  </time>
+                ) : null}
+              </span>
+              {canExpand ? (
+                <span className="mt-3 flex shrink-0 items-center gap-2 text-xs font-bold">
+                  <span>
+                    {isExpanded ? labels.closeStage : labels.openStage}
+                  </span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`size-5 shrink-0 transition-transform motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}
+                  />
+                </span>
+              ) : null}
+            </>
+          );
 
           return (
             <li
@@ -148,37 +203,24 @@ export function CaseProcessTimeline({
               data-process-stage={stage.id}
               data-process-state={stage.state}
             >
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-current/20">
-                  <StateIcon state={stage.state} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-bold tracking-wider uppercase">
-                    {stateLabel}
-                  </span>
-                  {canNavigate ? (
-                    <a
-                      aria-label={`${labels.openStage}: ${stageLabel}`}
-                      className="focus-visible:outline-accent mt-1 flex min-h-12 items-center rounded-lg text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      href={content?.sectionHref}
-                    >
-                      {stageLabel}
-                    </a>
-                  ) : (
-                    <span className="mt-1 flex min-h-12 items-center text-base font-bold">
-                      {stageLabel}
-                    </span>
-                  )}
-                  {content?.statusText && stage.state !== "not_started" ? (
-                    <p className="mt-1 text-sm">{content.statusText}</p>
-                  ) : null}
-                  {content?.timestamp && stage.state !== "not_started" ? (
-                    <time className="text-muted-foreground mt-1 block text-xs">
-                      {content.timestamp}
-                    </time>
-                  ) : null}
-                </div>
-              </div>
+              {canExpand ? (
+                <button
+                  aria-controls={`case-process-panel-${stage.id}`}
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? labels.closeStage : labels.openStage}: ${stageLabel}`}
+                  className="focus-visible:outline-accent flex min-h-12 w-full items-start gap-3 rounded-lg p-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                  onClick={() =>
+                    setOpenStageId((current) =>
+                      current === stage.id ? null : stage.id,
+                    )
+                  }
+                  type="button"
+                >
+                  {stageHeader}
+                </button>
+              ) : (
+                <div className="flex items-start gap-3">{stageHeader}</div>
+              )}
 
               {relatedLinks.length > 0 ? (
                 <div className="mt-3 grid gap-2">
@@ -188,6 +230,16 @@ export function CaseProcessTimeline({
                       link={link}
                     />
                   ))}
+                </div>
+              ) : null}
+
+              {canExpand ? (
+                <div
+                  className="mt-3 border-t border-current/15 pt-4"
+                  hidden={!isExpanded}
+                  id={`case-process-panel-${stage.id}`}
+                >
+                  {stagePanels[stage.id]}
                 </div>
               ) : null}
             </li>

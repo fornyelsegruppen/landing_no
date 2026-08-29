@@ -70,7 +70,8 @@ const workerCopies = {
     uploading: "Laster opp …",
     registered: "Registrert.",
     customerNotified: "Registrert. Kunden er varslet.",
-    customerNotificationQueued: "Registrert. Kundevarslingen ligger i utsendingskøen.",
+    customerNotificationQueued:
+      "Registrert. Kundevarslingen ligger i utsendingskøen.",
     uploadFailed: "Opplasting feilet",
     imageUploadFailed: "Bildet kunne ikke lastes opp",
     uploaded: "bilde(r) lastet opp.",
@@ -78,6 +79,10 @@ const workerCopies = {
     arrived: "Jeg har ankommet",
     startPrecheck: "Start før-kontroll",
     workBlocked: "Arbeidet er blokkert.",
+    customerCancellationPending:
+      "Kundens endrings- eller kanselleringsforespørsel må avklares av administrator før arbeidet kan fortsette.",
+    changeAgreementRequired:
+      "Vent til kunden har akseptert den skriftlige endringsavtalen før du utfører en ny før-kontroll.",
     repeatPrecheck: "Utfør ny før-kontroll",
     beforePhotos: "Før-bilder (minst 2)",
     afterPhotos: "Etterbilder (minst 2)",
@@ -101,7 +106,8 @@ const workerCopies = {
     completionMessage: "Ferdigmelding",
     submitDocumentation: "Lever dokumentasjon",
     jobDelivered: "Oppdraget og dokumentasjonen er levert.",
-    pendingAdminReview: "Dokumentasjonen er levert og venter på administrativ sluttkontroll.",
+    pendingAdminReview:
+      "Dokumentasjonen er levert og venter på administrativ sluttkontroll.",
     uploadedCount: "Lastet opp",
     status: {
       unassigned: "Ikke tildelt",
@@ -171,7 +177,8 @@ const workerCopies = {
     uploading: "Įkeliama …",
     registered: "Išsaugota.",
     customerNotified: "Išsaugota. Klientas informuotas.",
-    customerNotificationQueued: "Išsaugota. Pranešimas klientui laukia siuntimo eilėje.",
+    customerNotificationQueued:
+      "Išsaugota. Pranešimas klientui laukia siuntimo eilėje.",
     uploadFailed: "Įkelti nepavyko",
     imageUploadFailed: "Nuotraukos įkelti nepavyko",
     uploaded: "nuotr. įkelta.",
@@ -179,6 +186,10 @@ const workerCopies = {
     arrived: "Atvykau",
     startPrecheck: "Pradėti patikrą prieš darbus",
     workBlocked: "Darbas sustabdytas.",
+    customerCancellationPending:
+      "Administratorius turi išnagrinėti kliento pakeitimo arba atšaukimo prašymą prieš tęsiant darbus.",
+    changeAgreementRequired:
+      "Prieš pakartotinę patikrą palaukite, kol klientas priims rašytinį pakeitimo susitarimą.",
     repeatPrecheck: "Pakartoti patikrą prieš darbus",
     beforePhotos: "Nuotraukos prieš (mažiausiai 2)",
     afterPhotos: "Nuotraukos po (mažiausiai 2)",
@@ -202,7 +213,8 @@ const workerCopies = {
     completionMessage: "Baigimo pastabos",
     submitDocumentation: "Pateikti dokumentus",
     jobDelivered: "Darbas ir dokumentai pateikti.",
-    pendingAdminReview: "Dokumentai pateikti ir laukia administratoriaus galutinės patikros.",
+    pendingAdminReview:
+      "Dokumentai pateikti ir laukia administratoriaus galutinės patikros.",
     uploadedCount: "Įkelta",
     status: {
       unassigned: "Nepriskirta",
@@ -280,6 +292,10 @@ const workerCopies = {
     arrived: "I have arrived",
     startPrecheck: "Start pre-work inspection",
     workBlocked: "Work is blocked.",
+    customerCancellationPending:
+      "An administrator must resolve the customer's change or cancellation request before work can continue.",
+    changeAgreementRequired:
+      "Wait until the customer has accepted the written change agreement before repeating the pre-work inspection.",
     repeatPrecheck: "Repeat pre-work inspection",
     beforePhotos: "Before photos (at least 2)",
     afterPhotos: "After photos (at least 2)",
@@ -303,7 +319,8 @@ const workerCopies = {
     completionMessage: "Completion notes",
     submitDocumentation: "Submit documentation",
     jobDelivered: "The job and documentation have been submitted.",
-    pendingAdminReview: "The documentation has been submitted and is awaiting the administrator's final review.",
+    pendingAdminReview:
+      "The documentation has been submitted and is awaiting the administrator's final review.",
     uploadedCount: "Uploaded",
     status: {
       unassigned: "Unassigned",

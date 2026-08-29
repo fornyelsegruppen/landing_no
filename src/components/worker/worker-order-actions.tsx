@@ -20,6 +20,7 @@ type Props = {
   initialBeforePhotoIds: number[];
   initialAfterPhotoIds: number[];
   initialBlockingReasons: string[];
+  initialCanRepeatPrecheck: boolean;
   initialActualTotalIncVatOre?: number | null;
   initialDocumentationSubmittedAt?: string | null;
 };
@@ -43,8 +44,12 @@ export function WorkerOrderActions(props: Props) {
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [documentationSubmitted, setDocumentationSubmitted] = useState(Boolean(props.initialDocumentationSubmittedAt));
-  const [draftState, setDraftState] = useState<"unsent" | "saved" | "sending" | "sent" | "error">("sent");
+  const [documentationSubmitted, setDocumentationSubmitted] = useState(
+    Boolean(props.initialDocumentationSubmittedAt),
+  );
+  const [draftState, setDraftState] = useState<
+    "unsent" | "saved" | "sending" | "sent" | "error"
+  >("sent");
   const precheckFormRef = useRef<HTMLFormElement>(null);
   const completionFormRef = useRef<HTMLFormElement>(null);
   const draftKey = `takfornyelse:worker:${props.orderId}`;
@@ -53,12 +58,26 @@ export function WorkerOrderActions(props: Props) {
     const saved = window.localStorage.getItem(draftKey);
     if (!saved) return;
     let values: Record<string, string | boolean>;
-    try { values = JSON.parse(saved) as Record<string, string | boolean>; } catch { return; }
+    try {
+      values = JSON.parse(saved) as Record<string, string | boolean>;
+    } catch {
+      return;
+    }
     for (const form of [precheckFormRef.current, completionFormRef.current]) {
       if (!form) continue;
       for (const element of Array.from(form.elements)) {
-        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) || !element.name || !(element.name in values)) continue;
-        if (element instanceof HTMLInputElement && element.type === "checkbox") element.checked = Boolean(values[element.name]);
+        if (
+          !(
+            element instanceof HTMLInputElement ||
+            element instanceof HTMLTextAreaElement ||
+            element instanceof HTMLSelectElement
+          ) ||
+          !element.name ||
+          !(element.name in values)
+        )
+          continue;
+        if (element instanceof HTMLInputElement && element.type === "checkbox")
+          element.checked = Boolean(values[element.name]);
         else element.value = String(values[element.name] ?? "");
       }
     }
@@ -69,14 +88,29 @@ export function WorkerOrderActions(props: Props) {
   function saveLocalDraft(form: HTMLFormElement) {
     const values: Record<string, string | boolean> = {};
     for (const element of Array.from(form.elements)) {
-      if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) || !element.name || element.type === "file") continue;
-      values[element.name] = element instanceof HTMLInputElement && element.type === "checkbox" ? element.checked : element.value;
+      if (
+        !(
+          element instanceof HTMLInputElement ||
+          element instanceof HTMLTextAreaElement ||
+          element instanceof HTMLSelectElement
+        ) ||
+        !element.name ||
+        element.type === "file"
+      )
+        continue;
+      values[element.name] =
+        element instanceof HTMLInputElement && element.type === "checkbox"
+          ? element.checked
+          : element.value;
     }
     window.localStorage.setItem(draftKey, JSON.stringify(values));
     setDraftState("saved");
   }
 
-  function clearLocalDraft() { window.localStorage.removeItem(draftKey); setDraftState("sent"); }
+  function clearLocalDraft() {
+    window.localStorage.removeItem(draftKey);
+    setDraftState("sent");
+  }
 
   async function send(body: Record<string, unknown>) {
     if (busy) return false;
@@ -93,6 +127,7 @@ export function WorkerOrderActions(props: Props) {
         },
       );
       const result = (await response.json()) as {
+        code?: string;
         error?: string;
         issues?: string[];
         status?: string;
@@ -103,6 +138,11 @@ export function WorkerOrderActions(props: Props) {
       if (!response.ok) {
         throw new Error(
           result.issues?.join(" ") ||
+            (result.code === "customer_cancellation_pending"
+              ? copy.customerCancellationPending
+              : result.code === "change_agreement_required"
+                ? copy.changeAgreementRequired
+                : undefined) ||
             (result.error === "disabled" ||
             result.error === "configuration_required"
               ? copy.featureUnavailable
@@ -111,13 +151,20 @@ export function WorkerOrderActions(props: Props) {
         );
       }
       if (result.status) setStatus(result.status);
-      if (body.action === "submit_documentation") setDocumentationSubmitted(true);
+      if (body.action === "submit_documentation")
+        setDocumentationSubmitted(true);
       setBlockingReasons(
         Array.isArray(result.blockingReasons) ? result.blockingReasons : [],
       );
       if (typeof result.actualTotalIncVatOre === "number")
         setActualTotal(result.actualTotalIncVatOre);
-      setNotice(result.customerNotification === "sent" ? copy.customerNotified : result.customerNotification === "queued" ? copy.customerNotificationQueued : copy.registered);
+      setNotice(
+        result.customerNotification === "sent"
+          ? copy.customerNotified
+          : result.customerNotification === "queued"
+            ? copy.customerNotificationQueued
+            : copy.registered,
+      );
       router.refresh();
       setDraftState("sent");
       return true;
@@ -150,8 +197,23 @@ export function WorkerOrderActions(props: Props) {
         form.set("file", prepared.file);
         let response: Response | null = null;
         for (let attempt = 0; attempt < 3; attempt += 1) {
-          response = await fetchWithTimeout(`/api/worker/work-orders/${props.orderId}/photos`, { method: "POST", headers: { "X-Upload-SHA256": prepared.sha256 }, body: form }, 45_000).catch(() => null);
-          if (response?.ok || (response && response.status < 500 && response.status !== 408 && response.status !== 429)) break;
+          response = await fetchWithTimeout(
+            `/api/worker/work-orders/${props.orderId}/photos`,
+            {
+              method: "POST",
+              headers: { "X-Upload-SHA256": prepared.sha256 },
+              body: form,
+            },
+            45_000,
+          ).catch(() => null);
+          if (
+            response?.ok ||
+            (response &&
+              response.status < 500 &&
+              response.status !== 408 &&
+              response.status !== 429)
+          )
+            break;
         }
         if (!response) throw new Error(copy.uploadFailed);
         const result = (await response.json()) as {
@@ -202,6 +264,10 @@ export function WorkerOrderActions(props: Props) {
     if (sent) clearLocalDraft();
   }
 
+  const customerCancellationPending = blockingReasons.includes(
+    "CUSTOMER_CANCELLATION_REQUEST",
+  );
+
   return (
     <section className="bg-background-elevated mt-6 rounded-2xl border border-white/10 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -225,12 +291,39 @@ export function WorkerOrderActions(props: Props) {
           </p>
         ) : null}
       </div>
-      <p className={`mt-3 text-xs font-semibold ${draftState === "error" ? "text-red-300" : "text-muted-foreground"}`} role="status">
-        {draftState === "unsent" ? (props.locale === "lt" ? "Neišsiųsta" : props.locale === "en" ? "Not sent" : "Ikke sendt")
-          : draftState === "saved" ? (props.locale === "lt" ? "Juodraštis saugomas šiame telefone" : props.locale === "en" ? "Draft saved on this phone" : "Utkast lagret på denne telefonen")
-            : draftState === "sending" ? (props.locale === "lt" ? "Siunčiama …" : props.locale === "en" ? "Sending …" : "Sender …")
-              : draftState === "error" ? (props.locale === "lt" ? "Klaida – duomenys liko telefone" : props.locale === "en" ? "Error – data remains on this phone" : "Feil – dataene er fortsatt på telefonen")
-                : (props.locale === "lt" ? "Išsiųsta" : props.locale === "en" ? "Sent" : "Sendt")}
+      <p
+        className={`mt-3 text-xs font-semibold ${draftState === "error" ? "text-red-300" : "text-muted-foreground"}`}
+        role="status"
+      >
+        {draftState === "unsent"
+          ? props.locale === "lt"
+            ? "Neišsiųsta"
+            : props.locale === "en"
+              ? "Not sent"
+              : "Ikke sendt"
+          : draftState === "saved"
+            ? props.locale === "lt"
+              ? "Juodraštis saugomas šiame telefone"
+              : props.locale === "en"
+                ? "Draft saved on this phone"
+                : "Utkast lagret på denne telefonen"
+            : draftState === "sending"
+              ? props.locale === "lt"
+                ? "Siunčiama …"
+                : props.locale === "en"
+                  ? "Sending …"
+                  : "Sender …"
+              : draftState === "error"
+                ? props.locale === "lt"
+                  ? "Klaida – duomenys liko telefone"
+                  : props.locale === "en"
+                    ? "Error – data remains on this phone"
+                    : "Feil – dataene er fortsatt på telefonen"
+                : props.locale === "lt"
+                  ? "Išsiųsta"
+                  : props.locale === "en"
+                    ? "Sent"
+                    : "Sendt"}
       </p>
 
       {status === "scheduled" ? (
@@ -264,24 +357,41 @@ export function WorkerOrderActions(props: Props) {
         <div className="mt-5">
           <div className="rounded-xl border border-red-400/40 bg-red-400/10 p-4 text-sm">
             <strong>{copy.workBlocked}</strong>
-            {blockingReasons.map((reason) => (
-              <p className="mt-1" key={reason}>
-                {reason}
-              </p>
-            ))}
+            {blockingReasons.map((reason) =>
+              reason === "CUSTOMER_CANCELLATION_REQUEST" ? null : (
+                <p className="mt-1" key={reason}>
+                  {reason}
+                </p>
+              ),
+            )}
+            {customerCancellationPending ? (
+              <p className="mt-2">{copy.customerCancellationPending}</p>
+            ) : !props.initialCanRepeatPrecheck ? (
+              <p className="mt-2">{copy.changeAgreementRequired}</p>
+            ) : null}
           </div>
-          <ActionButton
-            busy={busy}
-            busyLabel={copy.processing}
-            onClick={() => send({ action: "begin_precheck" })}
-          >
-            {copy.repeatPrecheck}
-          </ActionButton>
+          {!customerCancellationPending && props.initialCanRepeatPrecheck ? (
+            <ActionButton
+              busy={busy}
+              busyLabel={copy.processing}
+              onClick={() => send({ action: "begin_precheck" })}
+            >
+              {copy.repeatPrecheck}
+            </ActionButton>
+          ) : null}
         </div>
       ) : null}
 
       {status === "precheck" ? (
-        <form action={submitPrecheck} className="mt-5 grid gap-4" onInput={(event) => { setDraftState("unsent"); saveLocalDraft(event.currentTarget); }} ref={precheckFormRef}>
+        <form
+          action={submitPrecheck}
+          className="mt-5 grid gap-4"
+          onInput={(event) => {
+            setDraftState("unsent");
+            saveLocalDraft(event.currentTarget);
+          }}
+          ref={precheckFormRef}
+        >
           <PhotoInput
             busy={busy}
             count={beforePhotoIds.length}
@@ -450,7 +560,10 @@ export function WorkerOrderActions(props: Props) {
             if (sent) clearLocalDraft();
           }}
           className="mt-5 grid gap-4"
-          onInput={(event) => { setDraftState("unsent"); saveLocalDraft(event.currentTarget); }}
+          onInput={(event) => {
+            setDraftState("unsent");
+            saveLocalDraft(event.currentTarget);
+          }}
           ref={completionFormRef}
         >
           <PhotoInput
@@ -481,7 +594,7 @@ export function WorkerOrderActions(props: Props) {
         </form>
       ) : null}
       {status === "completed" && documentationSubmitted ? (
-        <p className="mt-5 rounded-xl border border-accent/40 bg-accent/10 p-4 font-semibold">
+        <p className="border-accent/40 bg-accent/10 mt-5 rounded-xl border p-4 font-semibold">
           {copy.pendingAdminReview}
         </p>
       ) : null}

@@ -64,19 +64,22 @@ describe("case workspace i18n", () => {
     expect(caseWorkspaceCopies.lt.process).toMatchObject({
       title: "Bylos procesas",
       history: "Visa istorija",
-      openStage: "Pereiti į etapą",
+      closeStage: "Slėpti informaciją",
+      openStage: "Rodyti informaciją",
       states: { blocked: "Etapas užblokuotas" },
     });
     expect(caseWorkspaceCopies.en.process).toMatchObject({
       title: "Case process",
       history: "Full history",
-      openStage: "Go to stage",
+      closeStage: "Hide details",
+      openStage: "Show details",
       states: { blocked: "Stage blocked" },
     });
     expect(caseWorkspaceCopies.nb.process).toMatchObject({
       title: "Saksprosess",
       history: "Hele historikken",
-      openStage: "Gå til fase",
+      closeStage: "Skjul informasjon",
+      openStage: "Vis informasjon",
       states: { blocked: "Fasen er blokkert" },
     });
   });

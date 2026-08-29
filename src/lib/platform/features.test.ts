@@ -44,6 +44,12 @@ describe("platform feature configuration", () => {
     expect(readIntegrationStatus({}).privateStorage.missing).toEqual([
       "BLOB_READ_WRITE_TOKEN",
     ]);
+    expect(readIntegrationStatus({}).stockImages).toEqual({
+      name: "stockImages",
+      readiness: "configuration_required",
+      provider: "pexels",
+      missing: ["PEXELS_API_KEY"],
+    });
   });
 
   it("does not consider an enabled feature ready without dependencies", () => {
@@ -52,7 +58,7 @@ describe("platform feature configuration", () => {
     ).toEqual({
       enabled: true,
       ready: false,
-      unavailable: ["ai", "jobs"],
+      unavailable: ["ai", "jobs", "stockImages"],
     });
   });
 
@@ -61,6 +67,7 @@ describe("platform feature configuration", () => {
       FEATURE_SEO_SCHEDULER: "1",
       GEMINI_API_KEY: "configured",
       CRON_SECRET: "configured",
+      PEXELS_API_KEY: "configured",
     };
 
     expect(() => assertFeatureReady("seoScheduler", environment)).not.toThrow();
