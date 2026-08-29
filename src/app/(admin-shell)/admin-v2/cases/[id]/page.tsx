@@ -25,6 +25,7 @@ import {
   quoteDeclineReasonLabel,
 } from "@/components/admin-v2/quote-decline-workbench";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
+import { caseHeaderStatus } from "@/lib/admin-v2/case-header-status";
 import { selectPrimaryCustomerQuestion } from "@/lib/admin-v2/case-primary-question";
 import {
   metadataLabel,
@@ -124,17 +125,33 @@ const questionCopy = {
 function Status({
   companySignedAt,
   contract,
+  label,
   locale,
+  tone,
   value,
 }: {
   companySignedAt?: string;
   contract?: boolean;
-  locale: "nb" | "lt" | "en";
+  label?: string;
+  locale?: "nb" | "lt" | "en";
+  tone?: "accent" | "danger";
   value?: string;
 }) {
-  return value ? (
-    <span className="border-accent/25 bg-accent/10 text-accent inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wider uppercase">
-      {statusLabel(locale, value, { contract, companySignedAt })}
+  const displayedLabel =
+    label ||
+    (locale && value
+      ? statusLabel(locale, value, { contract, companySignedAt })
+      : "");
+
+  return displayedLabel ? (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wider uppercase ${
+        tone === "danger"
+          ? "border-danger/45 bg-danger/15 text-danger"
+          : "border-accent/25 bg-accent/10 text-accent"
+      }`}
+    >
+      {displayedLabel}
     </span>
   ) : null;
 }
@@ -263,6 +280,11 @@ export default async function AdminCasePage({
   ]);
   if (!caseData) notFound();
   const declineFollowUp = caseData.nextAction.kind === "follow_up_decline";
+  const headerStatus = caseHeaderStatus({
+    leadStatus: caseData.lead.status,
+    locale: user.interfaceLanguage,
+    nextActionKind: caseData.nextAction.kind,
+  });
   const unresolvedQuestion = selectUnresolvedCustomerQuestion(
     caseData.messages,
   );
@@ -408,7 +430,13 @@ export default async function AdminCasePage({
         {copy.back}
       </Link>
 
-      <header className="rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(232,163,23,.13),rgba(23,28,38,.75)_42%)] p-5 sm:p-7">
+      <header
+        className={`rounded-3xl border p-5 sm:p-7 ${
+          declineFollowUp
+            ? "border-danger/40 bg-[linear-gradient(135deg,rgba(235,87,87,.16),rgba(23,28,38,.78)_42%)]"
+            : "border-white/10 bg-[linear-gradient(135deg,rgba(232,163,23,.13),rgba(23,28,38,.75)_42%)]"
+        }`}
+      >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-accent text-xs font-bold tracking-[.2em] uppercase">
@@ -418,10 +446,7 @@ export default async function AdminCasePage({
               {caseData.lead.name}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Status
-                locale={user.interfaceLanguage}
-                value={caseData.lead.status}
-              />
+              <Status label={headerStatus.label} tone={headerStatus.tone} />
               <span className="text-muted-foreground text-sm">
                 {serviceNames[caseData.lead.inquiryType || ""] ||
                   caseData.lead.inquiryType ||
@@ -433,7 +458,15 @@ export default async function AdminCasePage({
             <span className="text-muted-foreground">{copy.responsible}</span>
             <strong>{caseData.lead.assignedTo || copy.unassigned}</strong>
             <span className="text-muted-foreground mt-2">{copy.due}</span>
-            <strong className={due === copy.dueNow ? "text-accent" : undefined}>
+            <strong
+              className={
+                due === copy.dueNow
+                  ? declineFollowUp
+                    ? "text-danger"
+                    : "text-accent"
+                  : undefined
+              }
+            >
               {due}
             </strong>
           </div>
