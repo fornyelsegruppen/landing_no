@@ -343,6 +343,7 @@ export type AdminCase = {
   };
   quote?: CaseEntity & {
     declineComment?: string;
+    declinedAt?: string;
     declineReason?: string;
     maximumTotalIncVatOre?: number;
     optionGroup?: string;
@@ -1025,6 +1026,7 @@ export async function loadAdminCase(
         totalIncVatOre: numberValue(latestQuoteRaw.totalIncVatOre),
         declineReason: stringValue(latestQuoteRaw.declineReason),
         declineComment: stringValue(latestQuoteRaw.declineComment),
+        declinedAt: stringValue(latestQuoteRaw.declinedAt),
         maximumTotalIncVatOre: numberValue(
           latestQuoteRaw.maximumTotalIncVatOre,
         ),

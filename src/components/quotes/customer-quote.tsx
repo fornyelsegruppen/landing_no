@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import Image from "next/image";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, CircleX } from "lucide-react";
 import { norwayDateKey } from "@/lib/norway-time";
 
 type Display = {
@@ -160,6 +160,40 @@ function LegalDisclosure(props: {
   );
 }
 
+export function CustomerQuoteDeclinedNotice(props: { reference: string }) {
+  return (
+    <section
+      aria-live="polite"
+      className="border-danger/50 bg-danger/10 mb-8 rounded-2xl border p-5 sm:p-6"
+      id="quote-declined-status"
+      role="status"
+      tabIndex={-1}
+    >
+      <div className="flex items-start gap-3">
+        <CircleX
+          aria-hidden="true"
+          className="text-danger mt-0.5 size-7 shrink-0"
+        />
+        <div className="min-w-0">
+          <p className="text-danger text-xs font-bold tracking-[.16em] uppercase">
+            Tilbud avslått
+          </p>
+          <h2 className="mt-2 text-xl font-bold break-words sm:text-2xl">
+            Tilbudet {props.reference} er avslått
+          </h2>
+          <p className="mt-2 leading-6 text-white/85">
+            Tilbudet kan ikke lenger signeres. Vi har registrert valget ditt, og
+            du trenger ikke gjøre noe mer.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-white/70">
+            Ta kontakt dersom du ønsker en ny vurdering eller et nytt tilbud.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function CustomerQuote(props: {
   token: string;
   quoteStatus: string;
@@ -188,6 +222,7 @@ export function CustomerQuote(props: {
   questionState?: "none" | "pending" | "resolved";
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const focusDeclineAfterSubmit = useRef(false);
   const followUpDateRef = useRef<HTMLInputElement>(null);
   const questionSuccessRef = useRef<HTMLElement>(null);
   const questionCounterRef = useRef<HTMLOutputElement>(null);
@@ -233,6 +268,19 @@ export function CustomerQuote(props: {
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (!declined || !focusDeclineAfterSubmit.current) return;
+    focusDeclineAfterSubmit.current = false;
+    window.requestAnimationFrame(() => {
+      const declineStatus = document.getElementById("quote-declined-status");
+      declineStatus?.focus();
+      declineStatus?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }, [declined]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -470,11 +518,10 @@ export function CustomerQuote(props: {
         },
       );
       if (response.ok) {
+        focusDeclineAfterSubmit.current = true;
         setDeclined(true);
         setDeclineOpen(false);
-        setNotice(
-          "Takk for tilbakemeldingen. Vi har registrert avslaget og sendt deg en bekreftelse.",
-        );
+        setNotice("");
       } else {
         setNotice(
           "Kunne ikke registrere avslaget. Prøv igjen eller kontakt oss direkte.",
@@ -597,13 +644,7 @@ export function CustomerQuote(props: {
         </section>
       ) : null}
       {declined ? (
-        <section className="mb-8 rounded-2xl border border-white/15 bg-white/5 p-6">
-          <h2 className="text-xl font-bold">Tilbudet er avslått</h2>
-          <p className="mt-2">
-            Takk for tilbakemeldingen. Ta kontakt dersom du ønsker en ny
-            vurdering.
-          </p>
-        </section>
+        <CustomerQuoteDeclinedNotice reference={d.reference} />
       ) : null}
 
       <section className="grid gap-6 rounded-2xl border border-white/10 bg-[#12151c] p-5 sm:grid-cols-2 sm:p-7">

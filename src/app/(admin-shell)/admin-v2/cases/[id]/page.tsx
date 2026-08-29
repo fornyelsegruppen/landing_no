@@ -20,7 +20,12 @@ import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-revi
 import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
 import { CaseVersionHistory } from "@/components/admin-v2/case-version-history";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
+import {
+  QuoteDeclineWorkbench,
+  quoteDeclineReasonLabel,
+} from "@/components/admin-v2/quote-decline-workbench";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
+import { selectPrimaryCustomerQuestion } from "@/lib/admin-v2/case-primary-question";
 import {
   metadataLabel,
   statusLabel,
@@ -257,11 +262,18 @@ export default async function AdminCasePage({
     }),
   ]);
   if (!caseData) notFound();
+  const declineFollowUp = caseData.nextAction.kind === "follow_up_decline";
   const unresolvedQuestion = selectUnresolvedCustomerQuestion(
     caseData.messages,
   );
-  const displayedQuestion =
-    unresolvedQuestion || selectLatestCustomerQuestion(caseData.messages);
+  const displayedQuestion = selectPrimaryCustomerQuestion({
+    latest: selectLatestCustomerQuestion(caseData.messages),
+    nextActionKind: caseData.nextAction.kind,
+    unresolved: unresolvedQuestion,
+  });
+  const primaryUnresolvedQuestion = displayedQuestion
+    ? unresolvedQuestion
+    : null;
   const displayedReply = displayedQuestion?.reply || null;
   const questionStage = customerQuestionReplyStage(displayedReply);
   const detectedQuestionRecovery = displayedReply
@@ -351,7 +363,7 @@ export default async function AdminCasePage({
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
-  const nextActionBase = unresolvedQuestion
+  const nextActionBase = primaryUnresolvedQuestion
     ? qCopy.action[questionDisplayState]
     : copy.actionLabels[caseData.nextAction.kind];
   const quoteActionKinds = new Set([
@@ -374,7 +386,7 @@ export default async function AdminCasePage({
           (item) => item.id === caseData.nextAction.targetId,
         ) || workingQuote
       : workingCommercial;
-  const nextActionText = unresolvedQuestion
+  const nextActionText = primaryUnresolvedQuestion
     ? nextActionBase
     : actionDocument
       ? `${nextActionBase} ${actionDocument.reference}`
@@ -476,20 +488,21 @@ export default async function AdminCasePage({
         effectiveReference={effectiveReference}
         nextActionLabel={copy.nextAction}
         status={
-          unresolvedQuestion
+          primaryUnresolvedQuestion
             ? qCopy.status[questionDisplayState]
             : workingStatus
         }
+        tone={declineFollowUp ? "danger" : "default"}
         workingLabel={copy.workingVersion}
         workingReference={workingReference}
       />
 
       <section
         aria-labelledby="next-action-title"
-        className={`scroll-mt-36 rounded-3xl border p-5 sm:p-6 ${caseData.nextAction.kind === "send_closure_confirmation" ? "border-danger/50 bg-danger/10" : "border-accent/35 bg-accent/8"}`}
+        className={`scroll-mt-36 rounded-3xl border p-5 sm:p-6 ${caseData.nextAction.kind === "send_closure_confirmation" || declineFollowUp ? "border-danger/50 bg-danger/10" : "border-accent/35 bg-accent/8"}`}
       >
         <p
-          className={`${caseData.nextAction.kind === "send_closure_confirmation" ? "text-danger" : "text-accent"} text-xs font-bold tracking-[.18em] uppercase`}
+          className={`${caseData.nextAction.kind === "send_closure_confirmation" || declineFollowUp ? "text-danger" : "text-accent"} text-xs font-bold tracking-[.18em] uppercase`}
           id="next-action-title"
         >
           {copy.nextAction}
@@ -541,7 +554,19 @@ export default async function AdminCasePage({
             }
           />
         ) : null}
-        {!unresolvedQuestion ? (
+        {declineFollowUp && caseData.quote ? (
+          <QuoteDeclineWorkbench
+            comment={caseData.quote.declineComment}
+            declinedAt={formatDate(
+              caseData.quote.declinedAt || caseData.quote.updatedAt,
+            )}
+            email={caseData.lead.communicationEmail || caseData.lead.email}
+            locale={user.interfaceLanguage}
+            phone={caseData.lead.phone}
+            reason={caseData.quote.declineReason}
+            reference={caseData.quote.reference}
+          />
+        ) : !primaryUnresolvedQuestion ? (
           <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
             <div className="min-w-0">
               <h2 className="text-xl font-bold">{nextActionText}</h2>
@@ -953,8 +978,10 @@ export default async function AdminCasePage({
                 caseData.quote.declineComment ? (
                   <div className="border-warning/25 bg-warning/5 mt-3 rounded-xl border p-3 text-sm">
                     <strong>
-                      {caseData.quote.declineReason ||
-                        metadataLabel(user.interfaceLanguage, "declined")}
+                      {quoteDeclineReasonLabel(
+                        user.interfaceLanguage,
+                        caseData.quote.declineReason,
+                      ) || metadataLabel(user.interfaceLanguage, "declined")}
                     </strong>
                     {caseData.quote.declineComment ? (
                       <p className="mt-1 whitespace-pre-wrap text-white/75">
@@ -1498,7 +1525,10 @@ export default async function AdminCasePage({
         </aside>
       </div>
       <CaseLifecyclePanel
-        classification={caseData.lead.archiveClassification}
+        classification={
+          caseData.lead.archiveClassification ||
+          (declineFollowUp ? "declined" : undefined)
+        }
         leadId={caseData.lead.id}
         locale={user.interfaceLanguage}
         purgeAfter={caseData.lead.purgeAfter}
