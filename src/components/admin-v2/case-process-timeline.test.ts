@@ -1,9 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CaseProcessTimeline,
   resolveCaseProcessInspectorContent,
+  restoreInspectorTriggerFocus,
 } from "./case-process-timeline";
 
 const stageContent = {
@@ -47,6 +48,16 @@ const stageContent = {
 };
 
 describe("case process timeline", () => {
+  it("returns focus to the inspector trigger without scrolling the workspace", () => {
+    const focus = vi.fn();
+    const schedule = vi.fn((callback: () => void) => callback());
+
+    restoreInspectorTriggerFocus({ focus }, schedule);
+
+    expect(schedule).toHaveBeenCalledOnce();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
   it("renders six localized stages and marks the current step accessibly", () => {
     const html = renderToStaticMarkup(
       createElement(CaseProcessTimeline, {

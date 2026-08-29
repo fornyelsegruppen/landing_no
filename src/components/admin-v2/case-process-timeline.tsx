@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
@@ -70,6 +70,15 @@ export function resolveCaseProcessInspectorContent(
   return selection.kind === "history"
     ? (selection.content ?? historyFallback)
     : registryContent;
+}
+
+export function restoreInspectorTriggerFocus(
+  trigger: Pick<HTMLElement, "focus"> | null,
+  schedule: (callback: () => void) => unknown = (callback) =>
+    window.requestAnimationFrame(callback),
+) {
+  if (!trigger) return;
+  schedule(() => trigger.focus({ preventScroll: true }));
 }
 
 export type CaseProcessTimelineProps = {
@@ -162,6 +171,18 @@ export function CaseProcessTimeline({
   );
   const [inspectorSelection, setInspectorSelection] =
     useState<CaseProcessInspectorSelection | null>(null);
+  const inspectorTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openInspector = (
+    selection: CaseProcessInspectorSelection,
+    trigger: HTMLButtonElement,
+  ) => {
+    inspectorTriggerRef.current = trigger;
+    setInspectorSelection(selection);
+  };
+  const closeInspector = () => {
+    setInspectorSelection(null);
+    restoreInspectorTriggerFocus(inspectorTriggerRef.current);
+  };
   const historyFallback =
     inspectorSelection?.kind === "history" ? (
       <p className="text-muted-foreground text-sm">
@@ -288,12 +309,15 @@ export function CaseProcessTimeline({
                   {canInspect ? (
                     <button
                       className="focus-visible:outline-accent mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-current/25 bg-black/15 px-4 text-sm font-bold hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-auto"
-                      onClick={() =>
-                        setInspectorSelection({
-                          kind: "stage",
-                          targetId: content!.inspectorTargetId!,
-                          title: stageLabel,
-                        })
+                      onClick={(event) =>
+                        openInspector(
+                          {
+                            kind: "stage",
+                            targetId: content!.inspectorTargetId!,
+                            title: stageLabel,
+                          },
+                          event.currentTarget,
+                        )
                       }
                       type="button"
                     >
@@ -329,14 +353,17 @@ export function CaseProcessTimeline({
                 <button
                   aria-label={`${labels.openInspector}: ${item.title}`}
                   className="focus-visible:outline-accent block min-h-12 w-full rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
-                  onClick={() =>
-                    setInspectorSelection({
-                      content: item.content,
-                      description: item.description,
-                      kind: "history",
-                      targetId: item.inspectorTargetId,
-                      title: item.title,
-                    })
+                  onClick={(event) =>
+                    openInspector(
+                      {
+                        content: item.content,
+                        description: item.description,
+                        kind: "history",
+                        targetId: item.inspectorTargetId,
+                        title: item.title,
+                      },
+                      event.currentTarget,
+                    )
                   }
                   type="button"
                 >
@@ -370,7 +397,7 @@ export function CaseProcessTimeline({
           }
           initialTargetId={inspectorSelection.targetId}
           discardChangesMessage={labels.discardChanges}
-          onClose={() => setInspectorSelection(null)}
+          onClose={closeInspector}
           open
           title={inspectorSelection.title}
         >
