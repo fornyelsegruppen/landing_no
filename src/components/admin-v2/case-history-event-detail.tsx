@@ -1,4 +1,4 @@
-import { ExternalLink, FileText } from "lucide-react";
+import { ChevronDown, ExternalLink, FileText } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 export type CaseHistoryEventFact = {
@@ -26,9 +26,10 @@ export type CaseHistoryEventDetailProps = {
 
 const copy = {
   lt: {
-    documentation: "Šio įvykio dokumentacija",
+    documentation: "Šio įvykio informacija",
+    documents: "Susiję dokumentai",
     empty:
-      "Šiam įvykiui atskiro failo nėra. Audito pagrindas yra žemiau nurodytas šaltinio įrašas.",
+      "Šis įvykis neturi atskiro failo. Visa jo informacija parodyta šioje kortelėje.",
     eventId: "Audito įvykio ID",
     eventType: "Įvykio tipas",
     occurredAt: "Užregistruota",
@@ -37,11 +38,15 @@ const copy = {
     reference: "Nuoroda",
     status: "Būsena",
     summary: "Įvykio turinys",
+    technical: "Techninė informacija",
+    technicalHelp:
+      "Šaltinio įrašas skirtas sistemos administravimui, o ne dokumento peržiūrai.",
   },
   en: {
-    documentation: "Documentation for this event",
+    documentation: "Information for this event",
+    documents: "Related documents",
     empty:
-      "This event has no separate file. Its audit evidence is the source record listed below.",
+      "This event has no separate file. All of its information is shown in this card.",
     eventId: "Audit event ID",
     eventType: "Event type",
     occurredAt: "Recorded",
@@ -50,11 +55,15 @@ const copy = {
     reference: "Reference",
     status: "Status",
     summary: "Event content",
+    technical: "Technical information",
+    technicalHelp:
+      "The source record is for system administration, not document viewing.",
   },
   nb: {
-    documentation: "Dokumentasjon for denne hendelsen",
+    documentation: "Informasjon om denne hendelsen",
+    documents: "Tilknyttede dokumenter",
     empty:
-      "Denne hendelsen har ingen separat fil. Revisjonsgrunnlaget er kildeposten nedenfor.",
+      "Denne hendelsen har ingen separat fil. All informasjon vises i dette kortet.",
     eventId: "Revisjonshendelse-ID",
     eventType: "Hendelsestype",
     occurredAt: "Registrert",
@@ -63,6 +72,9 @@ const copy = {
     reference: "Referanse",
     status: "Status",
     summary: "Innhold i hendelsen",
+    technical: "Teknisk informasjon",
+    technicalHelp:
+      "Kildeposten er for systemadministrasjon, ikke dokumentvisning.",
   },
 } as const;
 
@@ -130,40 +142,61 @@ export function CaseHistoryEventDetail({
         </section>
       ) : null}
 
-      <section aria-label={labels.documentation} className="grid gap-2">
-        {documentLinks.map((link) => (
-          <a
-            className="focus-visible:outline-accent border-accent/30 bg-accent/8 hover:bg-accent/12 flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 font-bold break-words focus-visible:outline-2 focus-visible:outline-offset-2"
-            href={link.href}
-            key={`${link.kind}:${link.href}`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <FileText aria-hidden="true" className="size-5 shrink-0" />
-            <span className="min-w-0 flex-1">{link.label}</span>
-            <span className="sr-only">{labels.openDocument}</span>
-            <ExternalLink aria-hidden="true" className="size-4 shrink-0" />
-          </a>
-        ))}
-        {sourceLinks.map((link) => (
-          <a
-            className="focus-visible:outline-accent flex min-h-12 items-center gap-3 rounded-xl border border-white/15 bg-white/[.035] px-4 py-3 font-bold break-words hover:bg-white/[.07] focus-visible:outline-2 focus-visible:outline-offset-2"
-            href={link.href}
-            key={`${link.kind || "source"}:${link.href}`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <ExternalLink aria-hidden="true" className="size-5 shrink-0" />
-            <span className="min-w-0 flex-1">{link.label}</span>
-            <span className="sr-only">{labels.openSource}</span>
-          </a>
-        ))}
-        {!links.length ? (
+      <section aria-label={labels.documents} className="grid gap-2">
+        {documentLinks.length ? (
+          <>
+            <h3 className="text-sm font-bold">{labels.documents}</h3>
+            {documentLinks.map((link) => (
+              <a
+                className="focus-visible:outline-accent border-accent/30 bg-accent/8 hover:bg-accent/12 flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 font-bold break-words focus-visible:outline-2 focus-visible:outline-offset-2"
+                href={link.href}
+                key={`${link.kind}:${link.href}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <FileText aria-hidden="true" className="size-5 shrink-0" />
+                <span className="min-w-0 flex-1">{link.label}</span>
+                <span className="sr-only">{labels.openDocument}</span>
+                <ExternalLink aria-hidden="true" className="size-4 shrink-0" />
+              </a>
+            ))}
+          </>
+        ) : (
           <p className="text-muted-foreground rounded-xl border border-dashed border-white/15 p-4 text-sm">
             {labels.empty}
           </p>
-        ) : null}
+        )}
       </section>
+
+      {sourceLinks.length ? (
+        <details className="group rounded-xl border border-white/10 bg-black/10">
+          <summary className="focus-visible:outline-accent flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 font-bold focus-visible:outline-2 focus-visible:outline-offset-2">
+            <span className="min-w-0 flex-1">{labels.technical}</span>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+            />
+          </summary>
+          <div className="grid gap-3 border-t border-white/10 p-4">
+            <p className="text-muted-foreground text-sm">
+              {labels.technicalHelp}
+            </p>
+            {sourceLinks.map((link) => (
+              <a
+                className="focus-visible:outline-accent flex min-h-12 items-center gap-3 rounded-xl border border-white/15 bg-white/[.035] px-4 py-3 font-bold break-words hover:bg-white/[.07] focus-visible:outline-2 focus-visible:outline-offset-2"
+                href={link.href}
+                key={`${link.kind || "source"}:${link.href}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <ExternalLink aria-hidden="true" className="size-5 shrink-0" />
+                <span className="min-w-0 flex-1">{link.label}</span>
+                <span className="sr-only">{labels.openSource}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </article>
   );
 }

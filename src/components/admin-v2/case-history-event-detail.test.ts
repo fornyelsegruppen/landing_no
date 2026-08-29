@@ -31,18 +31,23 @@ describe("case history event detail", () => {
     );
 
     expect(html).toContain('data-case-history-event="quote-17"');
-    expect(html).toContain("Šio įvykio dokumentacija");
+    expect(html).toContain("Šio įvykio informacija");
+    expect(html).toContain("Susiję dokumentai");
     expect(html).toContain("Užregistruota");
     expect(html).toContain("Išsiųsta");
     expect(html).toContain("Pasiūlymas išsiųstas klientui.");
     expect(html).toContain('href="/api/admin/quotes/17/pdf"');
     expect(html).toContain('href="/admin/collections/quotes/17"');
+    expect(html).toContain("Techninė informacija");
+    expect(html).toContain(
+      "Šaltinio įrašas skirtas sistemos administravimui, o ne dokumento peržiūrai.",
+    );
     expect(html.match(/target="_blank"/g)).toHaveLength(2);
   });
 
   it.each([
-    ["en", "Documentation for this event"],
-    ["nb", "Dokumentasjon for denne hendelsen"],
+    ["en", "Information for this event"],
+    ["nb", "Informasjon om denne hendelsen"],
   ] as const)("localizes event documentation for %s", (locale, label) => {
     const html = renderToStaticMarkup(
       createElement(CaseHistoryEventDetail, {
@@ -56,5 +61,10 @@ describe("case history event detail", () => {
     );
 
     expect(html).toContain(label);
+    expect(html).toContain(
+      locale === "en"
+        ? "This event has no separate file. All of its information is shown in this card."
+        : "Denne hendelsen har ingen separat fil. All informasjon vises i dette kortet.",
+    );
   });
 });
