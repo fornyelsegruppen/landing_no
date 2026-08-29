@@ -8,25 +8,29 @@ const props = {
   amount: "12 660 NOK",
   caseLabel: "Kliento byla",
   caseNumber: 17,
+  children: createElement("div", null, "Veiksmo informacija"),
+  closeDetailsLabel: "Slėpti informaciją",
   customer: "UAT Question Flow 2026-08-28",
   effectiveLabel: "Galiojanti sutartis",
   effectiveReference: "Dar nėra",
   nextActionLabel: "Kitas veiksmas",
+  openDetailsLabel: "Rodyti informaciją",
   status: "Atmesta",
   workingLabel: "Vykdoma versija",
   workingReference: "K-17-V1",
 };
 
 describe("case command bar", () => {
-  it("uses the danger tone for a declined offer while remaining a shortcut", () => {
+  it("uses the danger tone for a declined offer while remaining an inline disclosure", () => {
     const html = renderToStaticMarkup(
       createElement(CaseCommandBar, { ...props, tone: "danger" }),
     );
 
     expect(html).toContain("border-danger/45");
     expect(html).toContain("text-danger");
-    expect(html).toContain('href="#next-action-title"');
-    expect(html).not.toContain("<button");
+    expect(html).toContain('aria-controls="case-primary-action-panel"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('href="#next-action-title"');
   });
 
   it.each([
@@ -56,6 +60,11 @@ describe("case command bar", () => {
     expect(html.match(/data-case-primary-shortcut=/g)).toHaveLength(2);
     expect(html).toContain('data-case-primary-shortcut="desktop"');
     expect(html).toContain('data-case-primary-shortcut="mobile"');
-    expect(html.match(/href="#next-action-title"/g)).toHaveLength(2);
+    expect(
+      html.match(/aria-controls="case-primary-action-panel"/g),
+    ).toHaveLength(2);
+    expect(html).toContain('id="case-primary-action-panel"');
+    expect(html).toContain("Rodyti informaciją");
+    expect(html).not.toContain('href="#next-action-title"');
   });
 });

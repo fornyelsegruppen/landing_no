@@ -918,213 +918,214 @@ export default async function AdminCasePage({
         amount={commercialAmount}
         caseLabel={copy.case}
         caseNumber={caseData.lead.id}
+        closeDetailsLabel={workspaceCopy.process.closeStage}
         customer={caseData.lead.name}
         effectiveLabel={copy.effectiveContract}
         effectiveReference={effectiveReference}
         nextActionLabel={copy.nextAction}
+        openDetailsLabel={workspaceCopy.process.openStage}
         status={workspaceStatus}
         tone={primaryState.tone}
         workingLabel={copy.workingVersion}
         workingReference={workingReference}
-      />
-
-      <section
-        aria-labelledby="next-action-title"
-        className={`scroll-mt-36 rounded-3xl border p-5 sm:p-6 ${primaryPanelClasses}`}
-        data-case-primary-action={primaryState.key}
-        tabIndex={-1}
       >
-        <p
-          className={`${primaryEmphasisClass} text-xs font-bold tracking-[.18em] uppercase`}
+        <section
+          aria-labelledby="next-action-title"
+          className={`rounded-2xl border p-4 sm:p-5 ${primaryPanelClasses}`}
+          data-case-primary-action={primaryState.key}
         >
-          {copy.nextAction}
-        </p>
-        <h2
-          className="mt-2 text-xl font-bold sm:text-2xl"
-          id="next-action-title"
-          tabIndex={-1}
-        >
-          {nextActionText}
-        </h2>
-        {workspaceHelp ? (
-          <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
-            {workspaceHelp}
-          </p>
-        ) : null}
-        {primaryQuestionActive && displayedQuestion ? (
-          <div
-            className="scroll-mt-36"
-            id={displayedReply ? `message-${displayedReply.id}` : undefined}
+          <p
+            className={`${primaryEmphasisClass} text-xs font-bold tracking-[.18em] uppercase`}
           >
-            <CustomerQuestionWorkbench
-              key={displayedQuestion.question.id}
-              documentReferences={customerQuestionDocumentReferences(
-                displayedQuestion.question,
+            {copy.nextAction}
+          </p>
+          <h2
+            className="mt-2 text-xl font-bold sm:text-2xl"
+            id="next-action-title"
+            tabIndex={-1}
+          >
+            {nextActionText}
+          </h2>
+          {workspaceHelp ? (
+            <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
+              {workspaceHelp}
+            </p>
+          ) : null}
+          {primaryQuestionActive && displayedQuestion ? (
+            <div
+              className="scroll-mt-36"
+              id={displayedReply ? `message-${displayedReply.id}` : undefined}
+            >
+              <CustomerQuestionWorkbench
+                key={displayedQuestion.question.id}
+                documentReferences={customerQuestionDocumentReferences(
+                  displayedQuestion.question,
+                )}
+                leadId={caseData.lead.id}
+                leadRevision={caseData.lead.revision}
+                locale={user.interfaceLanguage}
+                recovery={questionRecovery}
+                question={{
+                  bodyText: displayedQuestion.question.bodyText || "",
+                  id: displayedQuestion.question.id,
+                  receivedAt: formatDate(displayedQuestion.question.createdAt),
+                  subject: displayedQuestion.question.subject || "",
+                }}
+                reply={
+                  displayedReply
+                    ? {
+                        aiAssisted: displayedReply.aiAssisted,
+                        bodyText: displayedReply.bodyText || "",
+                        channel: displayedReply.channel,
+                        deliveredAt: displayedReply.deliveredAt
+                          ? formatDate(displayedReply.deliveredAt)
+                          : undefined,
+                        deliveryRecipient:
+                          deliveryRecipient(displayedReply.aiAnalysis) ||
+                          caseData.lead.communicationEmail ||
+                          caseData.lead.email,
+                        factWarnings: factWarnings(displayedReply.aiAnalysis),
+                        failureCode: displayedReply.failureCode,
+                        failureMessage: displayedReply.failureMessage,
+                        id: displayedReply.id,
+                        manualReplyRequiresEditing: manualReplyRequiresEditing(
+                          displayedReply.aiAnalysis,
+                        ),
+                        status: displayedReply.status,
+                        subject: displayedReply.subject || "",
+                        updatedAt:
+                          displayedReply.updatedAt ||
+                          displayedReply.createdAt ||
+                          "",
+                      }
+                    : null
+                }
+              />
+            </div>
+          ) : null}
+          {primaryState.key === "stop.follow_up_decline" && caseData.quote ? (
+            <QuoteDeclineWorkbench
+              comment={caseData.quote.declineComment}
+              declinedAt={formatDate(
+                caseData.quote.declinedAt || caseData.quote.updatedAt,
               )}
-              leadId={caseData.lead.id}
-              leadRevision={caseData.lead.revision}
+              email={caseData.lead.communicationEmail || caseData.lead.email}
               locale={user.interfaceLanguage}
-              recovery={questionRecovery}
-              question={{
-                bodyText: displayedQuestion.question.bodyText || "",
-                id: displayedQuestion.question.id,
-                receivedAt: formatDate(displayedQuestion.question.createdAt),
-                subject: displayedQuestion.question.subject || "",
-              }}
-              reply={
-                displayedReply
-                  ? {
-                      aiAssisted: displayedReply.aiAssisted,
-                      bodyText: displayedReply.bodyText || "",
-                      channel: displayedReply.channel,
-                      deliveredAt: displayedReply.deliveredAt
-                        ? formatDate(displayedReply.deliveredAt)
-                        : undefined,
-                      deliveryRecipient:
-                        deliveryRecipient(displayedReply.aiAnalysis) ||
-                        caseData.lead.communicationEmail ||
-                        caseData.lead.email,
-                      factWarnings: factWarnings(displayedReply.aiAnalysis),
-                      failureCode: displayedReply.failureCode,
-                      failureMessage: displayedReply.failureMessage,
-                      id: displayedReply.id,
-                      manualReplyRequiresEditing: manualReplyRequiresEditing(
-                        displayedReply.aiAnalysis,
-                      ),
-                      status: displayedReply.status,
-                      subject: displayedReply.subject || "",
-                      updatedAt:
-                        displayedReply.updatedAt ||
-                        displayedReply.createdAt ||
-                        "",
-                    }
-                  : null
-              }
+              phone={caseData.lead.phone}
+              reason={caseData.quote.declineReason}
+              reference={caseData.quote.reference}
             />
-          </div>
-        ) : null}
-        {primaryState.key === "stop.follow_up_decline" && caseData.quote ? (
-          <QuoteDeclineWorkbench
-            comment={caseData.quote.declineComment}
-            declinedAt={formatDate(
-              caseData.quote.declinedAt || caseData.quote.updatedAt,
-            )}
-            email={caseData.lead.communicationEmail || caseData.lead.email}
-            locale={user.interfaceLanguage}
-            phone={caseData.lead.phone}
-            reason={caseData.quote.declineReason}
-            reference={caseData.quote.reference}
-          />
-        ) : !primaryQuestionActive ? (
-          <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
-            <div className="min-w-0">
-              <dl className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-2 xl:grid-cols-3">
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.customer}
-                  </dt>
-                  <dd className="mt-1 truncate text-sm font-bold">
-                    {caseData.lead.name}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.service}
-                  </dt>
-                  <dd className="mt-1 text-sm font-bold">
-                    {actionQuote?.serviceDescription ||
-                      serviceNames[caseData.lead.inquiryType || ""] ||
-                      "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.document}
-                  </dt>
-                  <dd className="text-accent mt-1 text-sm font-bold">
-                    {actionDocument?.reference || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.priceIncVat}
-                  </dt>
-                  <dd className="mt-1 text-sm font-bold">
-                    {nok(actionQuote?.totalIncVatOre)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.maximum}
-                  </dt>
-                  <dd className="mt-1 text-sm font-bold">
-                    {nok(actionQuote?.maximumTotalIncVatOre)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground text-xs">
-                    {copy.deposit}
-                  </dt>
-                  <dd className="mt-1 text-sm font-bold">
-                    {nok(actionQuote?.depositAmountIncVatOre || 0)}
-                  </dd>
-                </div>
-                {actionDocument?.supersedesReference ? (
-                  <div className="sm:col-span-2 xl:col-span-3">
+          ) : !primaryQuestionActive ? (
+            <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)] lg:items-start">
+              <div className="min-w-0">
+                <dl className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <div>
                     <dt className="text-muted-foreground text-xs">
-                      {copy.replaces}
+                      {copy.customer}
                     </dt>
-                    <dd className="mt-1 text-sm font-bold">
-                      {actionDocument.supersedesReference}
+                    <dd className="mt-1 truncate text-sm font-bold">
+                      {caseData.lead.name}
                     </dd>
                   </div>
-                ) : null}
-              </dl>
-            </div>
-            {primaryMutationAction ? (
-              <CaseActionPanel
-                key={`${primaryMutationAction.kind}:${primaryMutationAction.targetId || "none"}:${caseData.lead.revision}`}
-                action={primaryMutationAction}
-                actionLabel={nextActionText}
-                actionReference={actionDocument?.reference}
-                contractDocumentHash={
-                  actionDocument?.kind === "contract"
-                    ? actionDocument.documentHash
-                    : caseData.contract?.documentHash
-                }
-                defaultSigner={user.displayName || user.email}
-                leadId={caseData.lead.id}
-                locale={user.interfaceLanguage}
-                versionContext={{
-                  contractReference:
-                    actionDocument?.kind === "contract"
-                      ? actionDocument.reference
-                      : caseData.commercial.workingContract?.reference,
-                  contractVersion:
-                    actionDocument?.kind === "contract"
-                      ? actionDocument.version
-                      : caseData.commercial.workingContract?.version,
-                  leadRevision: caseData.lead.revision,
-                  quoteDocumentHash: actionQuote?.documentHash,
-                  quoteReference: actionQuote?.reference,
-                  quoteVersion: actionQuote?.version,
-                }}
-              />
-            ) : primaryState.action.mode === "navigate" ? (
-              <a
-                className={`inline-flex min-h-12 items-center justify-center rounded-xl border px-5 text-center font-bold ${primaryPanelClasses}`}
-                href={primaryState.action.href}
-              >
-                {nextActionText}
-              </a>
-            ) : (
-              <div className="flex min-h-12 items-center rounded-xl border border-white/10 bg-black/15 px-4 text-sm font-semibold">
-                {workspaceStatus}
+                  <div>
+                    <dt className="text-muted-foreground text-xs">
+                      {copy.service}
+                    </dt>
+                    <dd className="mt-1 text-sm font-bold">
+                      {actionQuote?.serviceDescription ||
+                        serviceNames[caseData.lead.inquiryType || ""] ||
+                        "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">
+                      {copy.document}
+                    </dt>
+                    <dd className="text-accent mt-1 text-sm font-bold">
+                      {actionDocument?.reference || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">
+                      {copy.priceIncVat}
+                    </dt>
+                    <dd className="mt-1 text-sm font-bold">
+                      {nok(actionQuote?.totalIncVatOre)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">
+                      {copy.maximum}
+                    </dt>
+                    <dd className="mt-1 text-sm font-bold">
+                      {nok(actionQuote?.maximumTotalIncVatOre)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">
+                      {copy.deposit}
+                    </dt>
+                    <dd className="mt-1 text-sm font-bold">
+                      {nok(actionQuote?.depositAmountIncVatOre || 0)}
+                    </dd>
+                  </div>
+                  {actionDocument?.supersedesReference ? (
+                    <div className="sm:col-span-2 xl:col-span-3">
+                      <dt className="text-muted-foreground text-xs">
+                        {copy.replaces}
+                      </dt>
+                      <dd className="mt-1 text-sm font-bold">
+                        {actionDocument.supersedesReference}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
               </div>
-            )}
-          </div>
-        ) : null}
-      </section>
+              {primaryMutationAction ? (
+                <CaseActionPanel
+                  key={`${primaryMutationAction.kind}:${primaryMutationAction.targetId || "none"}:${caseData.lead.revision}`}
+                  action={primaryMutationAction}
+                  actionLabel={nextActionText}
+                  actionReference={actionDocument?.reference}
+                  contractDocumentHash={
+                    actionDocument?.kind === "contract"
+                      ? actionDocument.documentHash
+                      : caseData.contract?.documentHash
+                  }
+                  defaultSigner={user.displayName || user.email}
+                  leadId={caseData.lead.id}
+                  locale={user.interfaceLanguage}
+                  versionContext={{
+                    contractReference:
+                      actionDocument?.kind === "contract"
+                        ? actionDocument.reference
+                        : caseData.commercial.workingContract?.reference,
+                    contractVersion:
+                      actionDocument?.kind === "contract"
+                        ? actionDocument.version
+                        : caseData.commercial.workingContract?.version,
+                    leadRevision: caseData.lead.revision,
+                    quoteDocumentHash: actionQuote?.documentHash,
+                    quoteReference: actionQuote?.reference,
+                    quoteVersion: actionQuote?.version,
+                  }}
+                />
+              ) : primaryState.action.mode === "navigate" ? (
+                <a
+                  className={`inline-flex min-h-12 items-center justify-center rounded-xl border px-5 text-center font-bold ${primaryPanelClasses}`}
+                  href={primaryState.action.href}
+                >
+                  {nextActionText}
+                </a>
+              ) : (
+                <div className="flex min-h-12 items-center rounded-xl border border-white/10 bg-black/15 px-4 text-sm font-semibold">
+                  {workspaceStatus}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </section>
+      </CaseCommandBar>
 
       <div className="bg-background-elevated/75 min-w-0 rounded-3xl border border-white/10 p-5 sm:p-6">
         <CaseProcessTimeline

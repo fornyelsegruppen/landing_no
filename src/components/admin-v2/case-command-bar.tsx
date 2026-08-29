@@ -1,4 +1,7 @@
+"use client";
+
 import { ChevronDown } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import type { CaseWorkspaceTone } from "@/lib/admin-v2/case-workspace-view-model";
 
 type CaseCommandBarProps = {
@@ -6,10 +9,13 @@ type CaseCommandBarProps = {
   amount: string;
   caseLabel: string;
   caseNumber: number;
+  children: ReactNode;
+  closeDetailsLabel: string;
   customer: string;
   effectiveLabel: string;
   effectiveReference: string;
   nextActionLabel: string;
+  openDetailsLabel: string;
   status: string;
   tone?: CaseWorkspaceTone | "default" | "danger";
   workingLabel: string;
@@ -82,16 +88,21 @@ export function CaseCommandBar({
   amount,
   caseLabel,
   caseNumber,
+  children,
+  closeDetailsLabel,
   customer,
   effectiveLabel,
   effectiveReference,
   nextActionLabel,
+  openDetailsLabel,
   status,
   tone = "default",
   workingLabel,
   workingReference,
 }: CaseCommandBarProps) {
   const styles = toneStyles[normalizedTone(tone)];
+  const [panelOpen, setPanelOpen] = useState(false);
+  const disclosureLabel = panelOpen ? closeDetailsLabel : openDetailsLabel;
 
   return (
     <aside
@@ -122,22 +133,32 @@ export function CaseCommandBar({
           <p className="truncate text-sm font-bold">{effectiveReference}</p>
           <p className="text-muted-foreground truncate text-xs">{amount}</p>
         </div>
-        <a
-          className={`group min-w-0 rounded-xl border px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 ${styles.actionCard}`}
+        <button
+          aria-controls="case-primary-action-panel"
+          aria-expanded={panelOpen}
+          aria-label={`${disclosureLabel}: ${action}`}
+          className={`group flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 ${styles.actionCard}`}
           data-case-primary-shortcut="desktop"
-          href="#next-action-title"
+          onClick={() => setPanelOpen((current) => !current)}
+          type="button"
         >
-          <span
-            className={`block text-[.68rem] font-bold tracking-wider uppercase ${styles.emphasis}`}
-          >
-            {nextActionLabel}
+          <span className="min-w-0 flex-1">
+            <span
+              className={`block text-[.68rem] font-bold tracking-wider uppercase ${styles.emphasis}`}
+            >
+              {nextActionLabel}
+            </span>
+            <span
+              className={`block truncate text-sm font-bold group-hover:underline ${styles.emphasis}`}
+            >
+              {action}
+            </span>
           </span>
-          <span
-            className={`block truncate text-sm font-bold group-hover:underline ${styles.emphasis}`}
-          >
-            {action}
-          </span>
-        </a>
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-5 shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""} ${styles.emphasis}`}
+          />
+        </button>
       </div>
 
       <details className="group md:hidden">
@@ -167,15 +188,31 @@ export function CaseCommandBar({
               {effectiveLabel}: {effectiveReference} · {amount}
             </p>
           </div>
-          <a
-            className={`rounded-xl px-3 py-2.5 text-center font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${styles.mobileAction}`}
+          <button
+            aria-controls="case-primary-action-panel"
+            aria-expanded={panelOpen}
+            aria-label={`${disclosureLabel}: ${action}`}
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-center font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${styles.mobileAction}`}
             data-case-primary-shortcut="mobile"
-            href="#next-action-title"
+            onClick={() => setPanelOpen((current) => !current)}
+            type="button"
           >
-            {action}
-          </a>
+            <span>{action}</span>
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-5 shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
       </details>
+
+      <div
+        className="max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain border-t border-white/10 p-3 sm:p-4"
+        hidden={!panelOpen}
+        id="case-primary-action-panel"
+      >
+        {children}
+      </div>
     </aside>
   );
 }
