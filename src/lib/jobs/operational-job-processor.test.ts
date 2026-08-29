@@ -295,4 +295,45 @@ describe("operational job processor", () => {
     expect(state.job).toMatchObject({ status: "pending", attempts: 0 });
     expect(state.message).toMatchObject({ status: "queued" });
   });
+
+  it("keeps no-send UAT markers outside the processor selection", async () => {
+    const requestedWheres: unknown[] = [];
+    const payload = {
+      find: async ({
+        collection,
+        where,
+      }: {
+        collection: string;
+        where?: unknown;
+      }) => {
+        expect(collection).toBe("operational-jobs");
+        requestedWheres.push(where);
+        return { docs: [] };
+      },
+      update: async () => {
+        throw new Error("no job should be claimed");
+      },
+    } as unknown as Payload;
+
+    const result = await processOperationalJobs(payload, {
+      now: new Date("2026-08-29T20:00:00.000Z"),
+      rescueStale: false,
+    });
+    const serializedWhere =
+      requestedWheres
+        .map((where) => JSON.stringify(where))
+        .find((where) => where.includes("message.delivery")) || "";
+
+    expect(serializedWhere).not.toBe("");
+    expect(serializedWhere).toContain("message.delivery");
+    expect(serializedWhere).toContain("work-order.communication");
+    expect(serializedWhere).not.toContain("uat.no-send");
+    expect(result).toMatchObject({
+      completed: [],
+      attention: [],
+      retried: [],
+      cancelled: [],
+      paused: [],
+    });
+  });
 });
