@@ -29,6 +29,7 @@ describe("customer question delivery success", () => {
     expect(html).toContain("Rodyti pristatymo informaciją");
     expect(html).toContain("Slėpti pristatymo informaciją");
     expect(html).toContain("fornyelsegruppen+uat-question@gmail.com");
+    expect(html).toContain("Pristatyta (Norvegijos laiku)");
     expect(html).toContain("2026-08-29 15:26");
     expect(html).toContain("Pristatytas atsakymas");
   });
