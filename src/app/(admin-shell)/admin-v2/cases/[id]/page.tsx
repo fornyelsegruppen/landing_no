@@ -23,6 +23,10 @@ import {
   type CaseProcessStageContent,
 } from "@/components/admin-v2/case-process-timeline";
 import { CaseVersionHistory } from "@/components/admin-v2/case-version-history";
+import {
+  CaseHistoryEventDetail,
+  type CaseHistoryEventLink,
+} from "@/components/admin-v2/case-history-event-detail";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
   QuoteDeclineWorkbench,
@@ -49,6 +53,7 @@ import {
 } from "@/lib/admin-v2/labels";
 import {
   loadAdminCaseWorkspace,
+  type AdminCaseWorkspace,
   type CaseEntity,
   type CaseTimelineItem,
 } from "@/lib/admin-v2/case-read-model";
@@ -103,40 +108,161 @@ function processEntityLink(
   };
 }
 
-function timelineInspectorTarget(
+const timelineSourceCollections = {
+  change: "change-agreements",
+  contract: "contracts",
+  contract_request: "customer-contract-requests",
+  invoice: "invoice-records",
+  lead: "leads",
+  measurement: "roof-measurements",
+  message: "messages",
+  price: "price-calculations",
+  quote: "quotes",
+  warranty: "warranties",
+  work: "work-orders",
+} as const satisfies Record<CaseTimelineItem["type"], string>;
+
+function timelineEntityId(item: CaseTimelineItem) {
+  const value = Number.parseInt(item.id.slice(item.type.length + 1), 10);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+function timelineSourceCollection(
   item: CaseTimelineItem,
-  excludedMessageId?: number,
+  caseData: AdminCaseWorkspace,
 ) {
-  const messageTarget = item.href?.match(/^#message-(\d+)$/);
-  if (messageTarget) {
-    return Number(messageTarget[1]) === excludedMessageId
-      ? caseWorkspaceSectionByKey.messages.id
-      : `message-${messageTarget[1]}`;
+  const entityId = timelineEntityId(item);
+  if (
+    item.type === "invoice" &&
+    entityId &&
+    caseData.officialInvoices.some((invoice) => invoice.id === entityId)
+  ) {
+    return "official-invoices";
   }
-  if (item.href?.match(/^#(?:invoice|warranty)-\d+$/)) {
-    return item.href.slice(1);
-  }
-  if (item.href === "#contract-request-section") {
-    return caseWorkspaceSectionByKey.contract.id;
-  }
-  const commercialTarget = item.id.match(/^(quote|contract)-(\d+)/);
-  if (commercialTarget) {
-    return `commercial-${commercialTarget[1]}-${commercialTarget[2]}`;
+  return timelineSourceCollections[item.type];
+}
+
+function timelineHistoryLinks(
+  item: CaseTimelineItem,
+  caseData: AdminCaseWorkspace,
+): CaseHistoryEventLink[] {
+  const entityId = timelineEntityId(item);
+  if (!entityId) return [];
+  const collection = timelineSourceCollection(item, caseData);
+  const links: CaseHistoryEventLink[] = [];
+
+  if (item.type === "quote" || item.type === "contract") {
+    const version = [
+      ...caseData.commercial.quoteVersions,
+      ...caseData.commercial.contractVersions,
+    ].find(
+      (candidate) => candidate.kind === item.type && candidate.id === entityId,
+    );
+    if (version?.pdfHref) {
+      links.push({
+        href: version.pdfHref,
+        kind: "document",
+        label: `${version.reference} PDF`,
+      });
+    }
   }
 
-  return {
-    change: caseWorkspaceSectionByKey.changes.id,
-    contract: caseWorkspaceSectionByKey.contract.id,
-    contract_request: caseWorkspaceSectionByKey.contract.id,
-    invoice: caseWorkspaceSectionByKey.documents.id,
-    lead: caseWorkspaceSectionByKey.customer.id,
-    measurement: caseWorkspaceSectionByKey.measurement.id,
-    message: caseWorkspaceSectionByKey.messages.id,
-    price: caseWorkspaceSectionByKey.commercial.id,
-    quote: caseWorkspaceSectionByKey.commercial.id,
-    warranty: caseWorkspaceSectionByKey.documents.id,
-    work: caseWorkspaceSectionByKey.work.id,
-  }[item.type];
+  if (item.type === "change") {
+    const change = caseData.changes.find(
+      (candidate) => candidate.id === entityId,
+    );
+    if (change) {
+      links.push({
+        href: `/api/admin/change-agreements/${change.id}/pdf`,
+        kind: "document",
+        label: `${change.reference} PDF`,
+      });
+    }
+  }
+
+  if (item.type === "measurement" && caseData.measurement?.id === entityId) {
+    if (caseData.measurement.evidenceHref) {
+      links.push({
+        href: caseData.measurement.evidenceHref,
+        kind: "document",
+        label: `${caseData.measurement.reference} evidence`,
+      });
+    }
+  }
+
+  const documentId =
+    item.type === "invoice"
+      ? caseData.officialInvoices.find((invoice) => invoice.id === entityId)
+          ?.originalDocumentId ||
+        (caseData.invoice?.id === entityId
+          ? caseData.invoice.documentId
+          : undefined)
+      : item.type === "warranty" && caseData.warranty?.id === entityId
+        ? caseData.warranty.documentId
+        : undefined;
+  const document = documentId
+    ? caseData.documents.find((candidate) => candidate.id === documentId)
+    : undefined;
+  if (document) {
+    links.push({
+      href: document.href,
+      kind: "document",
+      label: document.filename,
+    });
+  }
+
+  links.push({
+    href: `/admin/collections/${collection}/${entityId}`,
+    kind: "source",
+    label: `${item.title} · #${entityId}`,
+  });
+  return links;
+}
+
+function timelineHistorySummary(
+  item: CaseTimelineItem,
+  caseData: AdminCaseWorkspace,
+) {
+  const entityId = timelineEntityId(item);
+  if (!entityId) return undefined;
+  if (item.type === "lead") return caseData.lead.message;
+  if (item.type === "message") {
+    return caseData.messages.find((message) => message.id === entityId)
+      ?.bodyText;
+  }
+  if (item.type === "measurement" && caseData.measurement?.id === entityId) {
+    return caseData.measurement.confidenceReasoning;
+  }
+  if (item.type === "price" && caseData.price?.id === entityId) {
+    return caseData.price.adjustmentReason;
+  }
+  if (item.type === "quote") {
+    return caseData.commercial.quoteVersions.find(
+      (version) => version.id === entityId,
+    )?.serviceDescription;
+  }
+  if (item.type === "contract_request") {
+    const request = caseData.contractRequests.find(
+      (candidate) => candidate.id === entityId,
+    );
+    return request?.reasonText || request?.aiSummary;
+  }
+  if (item.type === "work" && caseData.workOrder?.id === entityId) {
+    return caseData.workOrder.workSummary || caseData.workOrder.adminNote;
+  }
+  if (item.type === "change") {
+    return caseData.changes.find((change) => change.id === entityId)
+      ?.reasonCode;
+  }
+  if (item.type === "invoice") {
+    return caseData.invoice?.id === entityId
+      ? caseData.invoice.adminNote
+      : undefined;
+  }
+  if (item.type === "warranty" && caseData.warranty?.id === entityId) {
+    return caseData.warranty.scope;
+  }
+  return undefined;
 }
 
 function Status({
@@ -1270,18 +1396,34 @@ export default async function AdminCasePage({
         <CaseProcessTimeline
           activeStageId={processActiveStage}
           activeStageState={primaryState.blocker ? "blocked" : "current"}
-          historyItems={caseData.timeline.map((item) => ({
-            description: `${formatDate(item.at)} · ${timelineTypeLabel(user.interfaceLanguage, item.type)}`,
-            id: item.id,
-            inspectorTargetId: timelineInspectorTarget(
-              item,
-              primaryQuestionActive ? displayedReply?.id : undefined,
-            ),
-            status: item.status
+          historyItems={caseData.timeline.map((item) => {
+            const eventType = timelineTypeLabel(
+              user.interfaceLanguage,
+              item.type,
+            );
+            const eventStatus = item.status
               ? statusLabel(user.interfaceLanguage, item.status)
-              : undefined,
-            title: item.title,
-          }))}
+              : undefined;
+            return {
+              content: (
+                <CaseHistoryEventDetail
+                  eventId={item.id}
+                  eventType={eventType}
+                  links={timelineHistoryLinks(item, caseData)}
+                  locale={user.interfaceLanguage}
+                  occurredAt={formatDate(item.at)}
+                  reference={item.title}
+                  status={eventStatus}
+                  summary={timelineHistorySummary(item, caseData)}
+                />
+              ),
+              description: `${formatDate(item.at)} · ${eventType}`,
+              id: item.id,
+              inspectorTargetId: `case-history-event-${item.id}`,
+              status: eventStatus,
+              title: item.title,
+            };
+          })}
           historyId="case-audit-history"
           key={processActiveStage}
           locale={user.interfaceLanguage}

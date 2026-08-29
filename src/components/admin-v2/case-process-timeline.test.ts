@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { CaseProcessTimeline } from "./case-process-timeline";
+import {
+  CaseProcessTimeline,
+  resolveCaseProcessInspectorContent,
+} from "./case-process-timeline";
 
 const stageContent = {
   contact: {
@@ -128,6 +131,11 @@ describe("case process timeline", () => {
         activeStageId: "completion",
         historyItems: [
           {
+            content: createElement(
+              "article",
+              { id: "messages-section" },
+              "Konkretaus audito įrašo detalės",
+            ),
             description: "2026-08-29 12:54 · Žinutė",
             id: "message-17",
             inspectorTargetId: "messages-section",
@@ -148,6 +156,77 @@ describe("case process timeline", () => {
     expect(html).not.toContain('href="#messages-section"');
     expect(html).toContain("min-h-12");
     expect(html).toContain("motion-reduce:transition-none");
+  });
+
+  it("selects history-specific content while stage selection keeps the common registry", () => {
+    const registry = createElement(
+      "div",
+      { id: "case-registry" },
+      "Bendras detalių registras",
+    );
+    const historyContent = createElement(
+      "article",
+      { id: "message-17-details" },
+      "Tik pasirinkto istorijos įrašo detalės",
+    );
+    const fallback = createElement("p", null, "Istorijos santrauka");
+
+    const selectedHistory = renderToStaticMarkup(
+      createElement(
+        "div",
+        null,
+        resolveCaseProcessInspectorContent(
+          {
+            content: historyContent,
+            description: "Pristatyta 12:54",
+            kind: "history",
+            targetId: "message-17-details",
+            title: "Senas audito įvykis",
+          },
+          registry,
+          fallback,
+        ),
+      ),
+    );
+    const selectedStage = renderToStaticMarkup(
+      createElement(
+        "div",
+        null,
+        resolveCaseProcessInspectorContent(
+          {
+            kind: "stage",
+            targetId: "price-quote-section",
+            title: "Kaina ir pasiūlymas",
+          },
+          registry,
+          fallback,
+        ),
+      ),
+    );
+    const missingHistoryContent = renderToStaticMarkup(
+      createElement(
+        "div",
+        null,
+        resolveCaseProcessInspectorContent(
+          {
+            content: undefined,
+            description: "Pristatyta 12:54",
+            kind: "history",
+            targetId: "message-17-details",
+            title: "Senas audito įvykis",
+          },
+          registry,
+          fallback,
+        ),
+      ),
+    );
+
+    expect(selectedHistory).toContain("Tik pasirinkto istorijos įrašo detalės");
+    expect(selectedHistory).not.toContain("Bendras detalių registras");
+    expect(selectedHistory).not.toContain('href="#message-17-details"');
+    expect(selectedStage).toContain("Bendras detalių registras");
+    expect(missingHistoryContent).toContain("Istorijos santrauka");
+    expect(missingHistoryContent).not.toContain("Bendras detalių registras");
   });
 
   it("renders the active stage as an inline disclosure without a scroll link", () => {

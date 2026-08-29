@@ -39,12 +39,38 @@ export type CaseProcessStageContent = {
 };
 
 export type CaseProcessHistoryItem = {
+  content?: ReactNode;
   description: string;
   id: string;
   inspectorTargetId: string;
   status?: string;
   title: string;
 };
+
+export type CaseProcessInspectorSelection =
+  | {
+      kind: "stage";
+      targetId: string;
+      title: string;
+    }
+  | {
+      content: ReactNode;
+      description: string;
+      kind: "history";
+      targetId: string;
+      title: string;
+    };
+
+export function resolveCaseProcessInspectorContent(
+  selection: CaseProcessInspectorSelection | null,
+  registryContent: ReactNode,
+  historyFallback: ReactNode,
+) {
+  if (!selection) return null;
+  return selection.kind === "history"
+    ? (selection.content ?? historyFallback)
+    : registryContent;
+}
 
 export type CaseProcessTimelineProps = {
   activeStageId: CaseProcessStageId;
@@ -134,11 +160,19 @@ export function CaseProcessTimeline({
   const [openStageId, setOpenStageId] = useState<CaseProcessStageId | null>(
     stagePanels[activeStageId] ? activeStageId : null,
   );
-  const [inspectorSelection, setInspectorSelection] = useState<{
-    description?: string;
-    targetId: string;
-    title: string;
-  } | null>(null);
+  const [inspectorSelection, setInspectorSelection] =
+    useState<CaseProcessInspectorSelection | null>(null);
+  const historyFallback =
+    inspectorSelection?.kind === "history" ? (
+      <p className="text-muted-foreground text-sm">
+        {inspectorSelection.description}
+      </p>
+    ) : null;
+  const selectedInspectorContent = resolveCaseProcessInspectorContent(
+    inspectorSelection,
+    inspectorContent,
+    historyFallback,
+  );
   return (
     <section aria-labelledby={sectionId}>
       <div>
@@ -256,6 +290,7 @@ export function CaseProcessTimeline({
                       className="focus-visible:outline-accent mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-current/25 bg-black/15 px-4 text-sm font-bold hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-auto"
                       onClick={() =>
                         setInspectorSelection({
+                          kind: "stage",
                           targetId: content!.inspectorTargetId!,
                           title: stageLabel,
                         })
@@ -296,7 +331,9 @@ export function CaseProcessTimeline({
                   className="focus-visible:outline-accent block min-h-12 w-full rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
                   onClick={() =>
                     setInspectorSelection({
+                      content: item.content,
                       description: item.description,
+                      kind: "history",
                       targetId: item.inspectorTargetId,
                       title: item.title,
                     })
@@ -321,18 +358,23 @@ export function CaseProcessTimeline({
         </details>
       ) : null}
 
-      {inspectorContent ? (
+      {inspectorSelection &&
+      (inspectorSelection.kind === "history" || inspectorContent) ? (
         <CaseInspector
           busyCloseMessage={labels.waitForAction}
           closeLabel={labels.closeInspector}
-          description={inspectorSelection?.description || labels.inspectorHelp}
-          initialTargetId={inspectorSelection?.targetId}
+          description={
+            inspectorSelection.kind === "history"
+              ? inspectorSelection.description
+              : labels.inspectorHelp
+          }
+          initialTargetId={inspectorSelection.targetId}
           discardChangesMessage={labels.discardChanges}
           onClose={() => setInspectorSelection(null)}
-          open={Boolean(inspectorSelection)}
-          title={inspectorSelection?.title || labels.details}
+          open
+          title={inspectorSelection.title}
         >
-          {inspectorContent}
+          {selectedInspectorContent}
         </CaseInspector>
       ) : null}
     </section>
