@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   customerQuestionActionVisibility,
+  customerQuestionDisplayState,
   customerReplyEditorActionVisibility,
 } from "./customer-question-action-visibility";
 
 describe("customer question action visibility", () => {
+  it("promotes a source change above the ordinary review state", () => {
+    expect(customerQuestionDisplayState("review", "source_changed")).toBe(
+      "source_changed",
+    );
+    expect(customerQuestionDisplayState("review", null)).toBe("review");
+  });
+
   it.each(["safety_rejected", "source_changed"] as const)(
     "shows only replacement actions after %s while preparing",
     (recovery) => {

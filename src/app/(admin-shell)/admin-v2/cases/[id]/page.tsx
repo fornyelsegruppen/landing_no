@@ -14,6 +14,7 @@ import { InformationRequestButton } from "@/components/admin-v2/information-requ
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
+import { customerQuestionDisplayState } from "@/components/admin-v2/customer-question-action-visibility";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
 import { CaseCommandBar } from "@/components/admin-v2/case-command-bar";
@@ -39,6 +40,7 @@ import {
   selectLatestCustomerQuestion,
   selectUnresolvedCustomerQuestion,
 } from "@/lib/messages/customer-question-state";
+import { customerReplyRecoveryKind } from "@/lib/messages/customer-reply-recovery";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,7 @@ const questionCopy = {
     action: {
       prepare: "Velg hvordan du vil svare på kundens spørsmål",
       review: "Kontroller og svar på kundens spørsmål",
+      source_changed: "Lag et nytt svarutkast med oppdaterte kilder",
       queued: "Følg leveringen av svaret til kunden",
       sent: "Vent på bekreftet levering av kundesvaret",
       delivered: "Svaret er bekreftet levert til kunden",
@@ -64,6 +67,7 @@ const questionCopy = {
     status: {
       prepare: "Kunden venter på svar",
       review: "Svarutkast klart",
+      source_changed: "Sending blokkert – nytt utkast kreves",
       queued: "Svar venter på levering",
       sent: "Sendt – venter på leveringsbekreftelse",
       delivered: "Svar bekreftet levert",
@@ -74,6 +78,7 @@ const questionCopy = {
     action: {
       prepare: "Pasirinkti, kaip atsakyti į kliento klausimą",
       review: "Patikrinti ir atsakyti į kliento klausimą",
+      source_changed: "Sukurti naują juodraštį pagal atnaujintus duomenis",
       queued: "Stebėti atsakymo pristatymą klientui",
       sent: "Laukti patvirtinto atsakymo pristatymo",
       delivered: "Patvirtinta, kad atsakymas pristatytas klientui",
@@ -82,6 +87,7 @@ const questionCopy = {
     status: {
       prepare: "Klientas laukia atsakymo",
       review: "Atsakymo juodraštis parengtas",
+      source_changed: "Siuntimas užblokuotas – būtinas naujas juodraštis",
       queued: "Atsakymas laukia pristatymo",
       sent: "Išsiųsta – laukiama pristatymo patvirtinimo",
       delivered: "Patvirtinta, kad atsakymas pristatytas",
@@ -92,6 +98,7 @@ const questionCopy = {
     action: {
       prepare: "Choose how to answer the customer's question",
       review: "Review and answer the customer's question",
+      source_changed: "Create a new reply draft from the updated sources",
       queued: "Monitor delivery of the customer reply",
       sent: "Wait for confirmed delivery of the customer reply",
       delivered: "The reply was confirmed delivered to the customer",
@@ -100,6 +107,7 @@ const questionCopy = {
     status: {
       prepare: "Customer is waiting for a reply",
       review: "Reply draft ready",
+      source_changed: "Sending blocked – a new draft is required",
       queued: "Reply awaiting delivery",
       sent: "Sent – awaiting delivery confirmation",
       delivered: "Reply confirmed delivered",
@@ -248,6 +256,17 @@ export default async function AdminCasePage({
     unresolvedQuestion || selectLatestCustomerQuestion(caseData.messages);
   const displayedReply = displayedQuestion?.reply || null;
   const questionStage = customerQuestionReplyStage(displayedReply);
+  const detectedQuestionRecovery = displayedReply
+    ? customerReplyRecoveryKind({ code: displayedReply.failureCode })
+    : null;
+  const questionRecovery =
+    detectedQuestionRecovery === "source_changed"
+      ? detectedQuestionRecovery
+      : null;
+  const questionDisplayState = customerQuestionDisplayState(
+    questionStage,
+    questionRecovery,
+  );
   const qCopy = questionCopy[user.interfaceLanguage];
   const workers = workersResult.docs
     .filter(
@@ -325,7 +344,7 @@ export default async function AdminCasePage({
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
   const nextActionBase = unresolvedQuestion
-    ? qCopy.action[questionStage]
+    ? qCopy.action[questionDisplayState]
     : copy.actionLabels[caseData.nextAction.kind];
   const quoteActionKinds = new Set([
     "approve_package",
@@ -449,7 +468,9 @@ export default async function AdminCasePage({
         effectiveReference={effectiveReference}
         nextActionLabel={copy.nextAction}
         status={
-          unresolvedQuestion ? qCopy.status[questionStage] : workingStatus
+          unresolvedQuestion
+            ? qCopy.status[questionDisplayState]
+            : workingStatus
         }
         workingLabel={copy.workingVersion}
         workingReference={workingReference}
@@ -467,13 +488,14 @@ export default async function AdminCasePage({
         </p>
         {displayedQuestion ? (
           <CustomerQuestionWorkbench
-            key={`${displayedQuestion.question.id}:${displayedReply?.id || "none"}:${displayedReply?.status || "prepare"}:${displayedReply?.updatedAt || ""}`}
+            key={`${displayedQuestion.question.id}:${displayedReply?.id || "none"}:${displayedReply?.status || "prepare"}:${displayedReply?.updatedAt || ""}:${questionRecovery || "none"}`}
             documentReferences={customerQuestionDocumentReferences(
               displayedQuestion.question,
             )}
             leadId={caseData.lead.id}
             leadRevision={caseData.lead.revision}
             locale={user.interfaceLanguage}
+            recovery={questionRecovery}
             question={{
               bodyText: displayedQuestion.question.bodyText || "",
               id: displayedQuestion.question.id,

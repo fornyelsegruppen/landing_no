@@ -147,6 +147,46 @@ function relationId(value: unknown) {
   return null;
 }
 
+async function assertCustomerReplySourcesForAction(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  message: {
+    aiAnalysis?: unknown;
+    id: number;
+    lead?: unknown;
+    replyToMessage?: unknown;
+  },
+  correlationId: string,
+) {
+  try {
+    return await assertCustomerReplySourcesCurrent(payload, message);
+  } catch (error) {
+    const code = customerReplyRecoveryCode({
+      error: error instanceof Error ? error.message : undefined,
+    });
+    if (code === "CUSTOMER_REPLY_SOURCE_CHANGED") {
+      try {
+        await payload.update({
+          collection: "messages",
+          id: message.id,
+          overrideAccess: true,
+          data: {
+            failureCode: code,
+            failureMessage:
+              "Reply sources changed after this draft was created. Create a new draft before sending.",
+          },
+        });
+      } catch (persistenceError) {
+        captureException(persistenceError, {
+          route: "POST /api/admin/leads/[id]",
+          operation: "persist-source-changed-recovery",
+          correlationId,
+        });
+      }
+    }
+    throw error;
+  }
+}
+
 async function assertQuestionReplyCanBePrepared(
   payload: Awaited<ReturnType<typeof getPayload>>,
   leadId: number,
@@ -467,9 +507,10 @@ export async function POST(
         message.category !== "ai_reply"
       )
         throw new TypeError("Only an active AI reply draft can be polished");
-      const currentSources = await assertCustomerReplySourcesCurrent(
+      const currentSources = await assertCustomerReplySourcesForAction(
         payload,
         message,
+        correlationId,
       );
       if (!currentSources)
         throw new TypeError("The reply draft has no verified source context");
@@ -558,9 +599,10 @@ export async function POST(
             "Write and save a customer-specific answer before sending",
           );
         }
-        const currentSources = await assertCustomerReplySourcesCurrent(
+        const currentSources = await assertCustomerReplySourcesForAction(
           payload,
           message,
+          correlationId,
         );
         if (currentSources) {
           assertCustomerReplyTextSafe(
@@ -585,9 +627,10 @@ export async function POST(
         );
       }
       if (parsed.data.action === "retry_send") {
-        const currentSources = await assertCustomerReplySourcesCurrent(
+        const currentSources = await assertCustomerReplySourcesForAction(
           payload,
           message,
+          correlationId,
         );
         replyPurpose = currentSources?.context.purpose;
       }

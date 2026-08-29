@@ -488,7 +488,7 @@ describe("admin lead review marker", () => {
     expect(mocks.polishReply).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses a stale customer reply before retrying delivery", async () => {
+  it("refuses and persistently marks a stale customer reply before retrying delivery", async () => {
     mocks.findByID
       .mockReset()
       .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
@@ -514,7 +514,71 @@ describe("admin lead review marker", () => {
       code: "CUSTOMER_REPLY_SOURCE_CHANGED",
       error: "The bound source changed",
     });
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.update).toHaveBeenCalledWith({
+      collection: "messages",
+      id: 44,
+      overrideAccess: true,
+      data: {
+        failureCode: "CUSTOMER_REPLY_SOURCE_CHANGED",
+        failureMessage:
+          "Reply sources changed after this draft was created. Create a new draft before sending.",
+      },
+    });
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("refuses and persistently marks a stale customer reply before approval", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        status: "draft",
+        subject: "Svar på spørsmålet ditt",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.assertSources.mockRejectedValue(
+      new TypeError("The bound source changed"),
+    );
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Svar på spørsmålet ditt",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a stale approval response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "CUSTOMER_REPLY_SOURCE_CHANGED",
+      error: "The bound source changed",
+    });
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.update).toHaveBeenCalledWith({
+      collection: "messages",
+      id: 44,
+      overrideAccess: true,
+      data: {
+        failureCode: "CUSTOMER_REPLY_SOURCE_CHANGED",
+        failureMessage:
+          "Reply sources changed after this draft was created. Create a new draft before sending.",
+      },
+    });
+    expect(mocks.replyEmailText).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
   });
 
   it("does not approve an untouched manual-reply placeholder", async () => {

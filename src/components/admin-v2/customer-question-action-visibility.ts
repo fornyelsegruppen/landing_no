@@ -1,6 +1,16 @@
 import type { CustomerQuestionReplyStage } from "@/lib/messages/customer-question-state";
 import type { CustomerReplyRecoveryKind } from "@/lib/messages/customer-reply-recovery";
 
+export type CustomerQuestionDisplayState =
+  CustomerQuestionReplyStage | "source_changed";
+
+export function customerQuestionDisplayState(
+  stage: CustomerQuestionReplyStage,
+  recovery?: CustomerReplyRecoveryKind | null,
+): CustomerQuestionDisplayState {
+  return recovery === "source_changed" ? "source_changed" : stage;
+}
+
 export function customerQuestionActionVisibility(
   stage: CustomerQuestionReplyStage,
   recovery?: CustomerReplyRecoveryKind | null,

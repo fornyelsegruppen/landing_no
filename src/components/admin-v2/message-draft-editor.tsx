@@ -40,6 +40,8 @@ const copy = {
     stale: "Saken eller utkastet er endret. Oppdater siden før du fortsetter.",
     sourcesChanged:
       "Dokumenter, priser eller vilkår er endret. Lag et nytt utkast med oppdatert grunnlag før du sender.",
+    sourcesChangedTitle: "Sending blokkert",
+    regenerateAfterSourceChange: "Lag nytt AI-utkast med oppdatert grunnlag",
     safetyRejected:
       "Den automatiske faktakontrollen avviste teksten. Rett svaret manuelt, eller lag et nytt AI-utkast.",
     regenerateManual: "Start nytt manuelt svar",
@@ -77,6 +79,9 @@ const copy = {
       "Byla arba juodraštis pasikeitė. Prieš tęsdami atnaujinkite puslapį.",
     sourcesChanged:
       "Dokumentai, kainos arba sąlygos pasikeitė. Prieš siųsdami sukurkite naują juodraštį.",
+    sourcesChangedTitle: "Siuntimas užblokuotas",
+    regenerateAfterSourceChange:
+      "Sukurti naują DI juodraštį pagal atnaujintus duomenis",
     safetyRejected:
       "Automatinė faktų patikra atmetė tekstą. Pataisykite atsakymą rankiniu būdu arba sukurkite naują DI juodraštį.",
     regenerateManual: "Pradėti naują rankinį atsakymą",
@@ -113,6 +118,9 @@ const copy = {
     stale: "The case or draft changed. Refresh before continuing.",
     sourcesChanged:
       "Documents, prices, or terms changed. Create a new draft before sending.",
+    sourcesChangedTitle: "Sending blocked",
+    regenerateAfterSourceChange:
+      "Create a new AI draft from the updated sources",
     safetyRejected:
       "The automated fact check rejected the text. Correct the reply manually or create a new AI draft.",
     regenerateManual: "Start a new manual reply",
@@ -139,6 +147,7 @@ export function MessageDraftEditor(props: {
   aiAssisted?: boolean;
   bodyText: string;
   factWarnings?: string[];
+  initialRecovery?: CustomerReplyRecoveryKind | null;
   caseRevision: number;
   leadId: number;
   locale: PanelLocale;
@@ -153,6 +162,7 @@ export function MessageDraftEditor(props: {
   const labels = copy[props.locale];
   const router = useRouter();
   const activeMessageId = useRef(props.messageId);
+  const sourceChangedAlert = useRef<HTMLDivElement>(null);
   const expectedMessageUpdatedAt = useRef(props.messageUpdatedAt);
   const [subject, setSubject] = useState(props.subject);
   const [bodyText, setBodyText] = useState(props.bodyText);
@@ -161,7 +171,7 @@ export function MessageDraftEditor(props: {
   >(null);
   const [notice, setNotice] = useState("");
   const [recovery, setRecovery] = useState<CustomerReplyRecoveryKind | null>(
-    null,
+    props.initialRecovery || null,
   );
   const [beforePolish, setBeforePolish] = useState<{
     bodyText: string;
@@ -172,6 +182,7 @@ export function MessageDraftEditor(props: {
     Boolean(props.sourceBody) || Boolean(props.sourceContextAvailable);
   const manualReplyNeedsEditing =
     Boolean(props.manualReplyRequiresEditing) && !dirty;
+  const sourceChanged = recovery === "source_changed";
   const actionVisibility = customerReplyEditorActionVisibility({
     aiAssisted: Boolean(props.aiAssisted),
     hasSourceContext,
@@ -185,8 +196,20 @@ export function MessageDraftEditor(props: {
     setBodyText(props.bodyText);
     setBeforePolish(null);
     setNotice("");
-    setRecovery(null);
-  }, [props.bodyText, props.messageId, props.subject]);
+    setRecovery(props.initialRecovery || null);
+  }, [props.bodyText, props.initialRecovery, props.messageId, props.subject]);
+
+  useEffect(() => {
+    if (!sourceChanged) return;
+    const frame = window.requestAnimationFrame(() => {
+      sourceChangedAlert.current?.focus();
+      sourceChangedAlert.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [sourceChanged]);
 
   useEffect(() => {
     expectedMessageUpdatedAt.current = props.messageUpdatedAt;
@@ -300,11 +323,12 @@ export function MessageDraftEditor(props: {
       }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : labels.failed);
-      setRecovery(
+      const nextRecovery =
         error instanceof CustomerReplyDraftActionError
           ? error.recovery
-          : "unknown",
-      );
+          : "unknown";
+      setRecovery(nextRecovery);
+      if (nextRecovery === "source_changed") router.refresh();
     } finally {
       setBusy(null);
     }
@@ -345,6 +369,20 @@ export function MessageDraftEditor(props: {
           </ul>
         </div>
       ) : null}
+      {sourceChanged ? (
+        <div
+          aria-live="assertive"
+          className="mt-4 rounded-2xl border-2 border-red-400/70 bg-red-500/15 p-4 text-red-50 shadow-[0_0_0_1px_rgba(248,113,113,.12),0_16px_40px_rgba(0,0,0,.28)]"
+          ref={sourceChangedAlert}
+          role="alert"
+          tabIndex={-1}
+        >
+          <p className="text-sm font-black tracking-[.12em] text-red-200 uppercase">
+            {labels.sourcesChangedTitle}
+          </p>
+          <p className="mt-2 text-base leading-7">{labels.sourcesChanged}</p>
+        </div>
+      ) : null}
       <label className="mt-4 grid gap-1.5">
         <span className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
           {labels.subject}
@@ -354,6 +392,7 @@ export function MessageDraftEditor(props: {
           maxLength={160}
           minLength={5}
           onChange={(event) => setSubject(event.target.value)}
+          readOnly={sourceChanged}
           value={subject}
         />
       </label>
@@ -366,6 +405,7 @@ export function MessageDraftEditor(props: {
           maxLength={3_000}
           minLength={20}
           onChange={(event) => setBodyText(event.target.value)}
+          readOnly={sourceChanged}
           value={bodyText}
         />
       </label>
@@ -430,9 +470,11 @@ export function MessageDraftEditor(props: {
           >
             {busy === "regenerate"
               ? labels.processing
-              : props.aiAssisted
-                ? labels.regenerate
-                : labels.regenerateManual}
+              : sourceChanged
+                ? labels.regenerateAfterSourceChange
+                : props.aiAssisted
+                  ? labels.regenerate
+                  : labels.regenerateManual}
           </button>
         ) : null}
         {actionVisibility.showDraftActions ? (
@@ -459,7 +501,7 @@ export function MessageDraftEditor(props: {
           {busy === "cancel" ? labels.processing : labels.cancel}
         </button>
       </div>
-      {notice ? (
+      {notice && !sourceChanged ? (
         <p
           aria-live="polite"
           className="text-muted-foreground mt-3 text-sm"

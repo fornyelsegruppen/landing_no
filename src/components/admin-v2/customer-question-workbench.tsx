@@ -8,7 +8,10 @@ import {
   customerReplyRecoveryKind,
   type CustomerReplyRecoveryKind,
 } from "@/lib/messages/customer-reply-recovery";
-import { customerQuestionActionVisibility } from "./customer-question-action-visibility";
+import {
+  customerQuestionActionVisibility,
+  customerQuestionDisplayState,
+} from "./customer-question-action-visibility";
 import { MessageDraftEditor } from "./message-draft-editor";
 
 const copy = {
@@ -29,6 +32,7 @@ const copy = {
     manualReady: "Et manuelt svarutkast er klart. Redaktøren åpnes nå.",
     openingEditor: "Åpner redaktøren …",
     reviewStatus: "Svarutkast klart",
+    sourceChangedStatus: "Sending blokkert – nytt utkast kreves",
     queuedStatus: "Svar venter på levering",
     queuedHelp:
       "Svaret er godkjent og ligger i sendekø. Kunden kan ikke signere før leveringen er fullført.",
@@ -86,6 +90,7 @@ const copy = {
       "Rankinis atsakymo juodraštis parengtas. Dabar atveriamas redaktorius.",
     openingEditor: "Atveriamas redaktorius …",
     reviewStatus: "Atsakymo juodraštis parengtas",
+    sourceChangedStatus: "Siuntimas užblokuotas – būtinas naujas juodraštis",
     queuedStatus: "Atsakymas laukia pristatymo",
     queuedHelp:
       "Atsakymas patvirtintas ir laukia siuntimo. Klientas negali pasirašyti, kol pristatymas nebaigtas.",
@@ -144,6 +149,7 @@ const copy = {
     manualReady: "A manual reply draft is ready. Opening the editor now.",
     openingEditor: "Opening the editor …",
     reviewStatus: "Reply draft ready",
+    sourceChangedStatus: "Sending blocked – a new draft is required",
     queuedStatus: "Reply awaiting delivery",
     queuedHelp:
       "The reply is approved and queued. The customer cannot sign until delivery is complete.",
@@ -257,6 +263,7 @@ function localizedFailure(
 
 export function CustomerQuestionWorkbench(props: {
   documentReferences: string[];
+  recovery?: CustomerReplyRecoveryKind | null;
   leadId: number;
   leadRevision: number;
   locale: PanelLocale;
@@ -281,9 +288,12 @@ export function CustomerQuestionWorkbench(props: {
     null,
   );
   const stage = customerQuestionReplyStage(props.reply);
+  const effectiveRecovery =
+    feedback?.kind === "error" ? feedback.recovery : props.recovery;
+  const displayState = customerQuestionDisplayState(stage, effectiveRecovery);
   const actionVisibility = customerQuestionActionVisibility(
     stage,
-    feedback?.kind === "error" ? feedback.recovery : null,
+    effectiveRecovery,
   );
 
   useEffect(
@@ -422,17 +432,19 @@ export function CustomerQuestionWorkbench(props: {
   }
 
   const statusLabel =
-    stage === "prepare"
-      ? labels.prepareStatus
-      : stage === "review"
-        ? labels.reviewStatus
-        : stage === "delivery_failed"
-          ? labels.failedStatus
-          : stage === "sent"
-            ? labels.sentStatus
-            : stage === "delivered"
-              ? labels.deliveredStatus
-              : labels.queuedStatus;
+    displayState === "source_changed"
+      ? labels.sourceChangedStatus
+      : stage === "prepare"
+        ? labels.prepareStatus
+        : stage === "review"
+          ? labels.reviewStatus
+          : stage === "delivery_failed"
+            ? labels.failedStatus
+            : stage === "sent"
+              ? labels.sentStatus
+              : stage === "delivered"
+                ? labels.deliveredStatus
+                : labels.queuedStatus;
 
   return (
     <div className="border-warning/35 bg-warning/5 mt-4 rounded-2xl border p-4 sm:p-5">
@@ -445,7 +457,9 @@ export function CustomerQuestionWorkbench(props: {
             {props.question.subject}
           </h2>
         </div>
-        <span className="border-warning/35 bg-warning/10 text-warning w-fit rounded-full border px-3 py-1 text-xs font-bold">
+        <span
+          className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${displayState === "source_changed" ? "border-red-400/50 bg-red-500/15 text-red-100" : "border-warning/35 bg-warning/10 text-warning"}`}
+        >
           {statusLabel}
         </span>
       </div>
@@ -514,6 +528,7 @@ export function CustomerQuestionWorkbench(props: {
             bodyText={props.reply.bodyText}
             caseRevision={props.leadRevision}
             factWarnings={props.reply.factWarnings}
+            initialRecovery={effectiveRecovery}
             leadId={props.leadId}
             locale={props.locale}
             manualReplyRequiresEditing={props.reply.manualReplyRequiresEditing}
