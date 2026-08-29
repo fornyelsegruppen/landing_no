@@ -1,11 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
   customerQuestionActionVisibility,
+  customerQuestionDeliveryFailureMessage,
   customerQuestionDisplayState,
   customerReplyEditorActionVisibility,
 } from "./customer-question-action-visibility";
 
 describe("customer question action visibility", () => {
+  it("localizes provider and generic delivery failures for the administrator", () => {
+    expect(customerQuestionDeliveryFailureMessage("lt", "EMAIL_BOUNCED")).toBe(
+      "El. pašto paslaugų teikėjas atmetė arba sustabdė laišką. Prieš bandydami dar kartą patikrinkite gavėjo adresą ir pristatymo žurnalą.",
+    );
+    expect(customerQuestionDeliveryFailureMessage("nb", "Error")).toBe(
+      "Leveringen kunne ikke fullføres. Kontroller mottakeradressen og leveringsloggen før du prøver igjen.",
+    );
+    expect(customerQuestionDeliveryFailureMessage("en", null)).toBe(
+      "Delivery could not be completed. Check the recipient address and delivery log before trying again.",
+    );
+  });
+
   it("promotes a source change above the ordinary review state", () => {
     expect(customerQuestionDisplayState("review", "source_changed")).toBe(
       "source_changed",

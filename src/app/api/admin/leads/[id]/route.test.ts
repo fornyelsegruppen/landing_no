@@ -529,6 +529,73 @@ describe("admin lead review marker", () => {
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
 
+  it("clears the previous provider attempt before retrying delivery", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        approvedAt: "2026-08-28T09:00:00.000Z",
+        approvedBy: 3,
+        category: "ai_reply",
+        failureCode: "EMAIL_BOUNCED",
+        failureMessage: "Previous delivery failed.",
+        id: 44,
+        lead: 10,
+        provider: "resend",
+        providerMessageId: "old-provider-message",
+        replyToMessage: 33,
+        status: "attention",
+      });
+    mocks.update.mockResolvedValueOnce({
+      id: 44,
+      status: "queued",
+      updatedAt: "2026-08-28T09:10:00.000Z",
+    });
+
+    const response = await POST(
+      request({ action: "retry_send", messageId: 44 }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a retry response");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      messageId: 44,
+      sent: true,
+    });
+    expect(mocks.update).toHaveBeenCalledWith({
+      collection: "messages",
+      id: 44,
+      overrideAccess: true,
+      data: {
+        status: "queued",
+        approvedBy: 3,
+        approvedAt: "2026-08-28T09:00:00.000Z",
+        queuedAt: expect.any(String),
+        aiAnalysis: {
+          purpose: "question",
+          deliveryAttempt: 1,
+        },
+        sentAt: null,
+        deliveredAt: null,
+        provider: null,
+        providerMessageId: null,
+      },
+    });
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.anything(),
+      44,
+      expect.any(String),
+    );
+    expect(mocks.deliver).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      44,
+      expect.any(String),
+    );
+  });
+
   it("refuses and persistently marks a stale customer reply before approval", async () => {
     mocks.findByID
       .mockReset()

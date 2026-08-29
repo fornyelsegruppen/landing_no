@@ -287,6 +287,63 @@ describe("message engine", () => {
     expect(state.jobs[0]).toMatchObject({ status: "pending", attempts: 0 });
   });
 
+  it("reopens a completed delivery job for an explicit retry", async () => {
+    const state = repository();
+    await createReceiptMessage(state.payload, 1, "receipt-completed-retry");
+    Object.assign(state.jobs[0]!, {
+      status: "completed",
+      attempts: 1,
+      startedAt: "2026-08-28T12:01:00.000Z",
+      completedAt: "2026-08-28T12:02:00.000Z",
+      result: { processed: true },
+    });
+
+    await enqueueMessageJob(state.payload, 1, "receipt-completed-retry-again");
+
+    expect(state.jobs).toHaveLength(1);
+    expect(state.jobs[0]).toMatchObject({
+      status: "pending",
+      attempts: 0,
+      startedAt: null,
+      completedAt: null,
+      result: null,
+    });
+  });
+
+  it("uses a new provider idempotency key for each explicit delivery attempt", async () => {
+    const state = repository();
+    await createReceiptMessage(state.payload, 1, "receipt-attempt-key");
+    const message = state.messages[0]!;
+    const providerKeys: string[] = [];
+    const provider = {
+      health: () => ({ status: "ready" as const, provider: "test" }),
+      send: async (delivery: { idempotencyKey: string }) => {
+        providerKeys.push(delivery.idempotencyKey);
+        return {
+          acceptedAt: new Date().toISOString(),
+          provider: "test",
+          providerMessageId: `delivery-${providerKeys.length}`,
+        };
+      },
+    };
+
+    const originalMessageKey = String(message.idempotencyKey);
+    await deliverMessage(state.payload, provider, 1, "attempt-one");
+    Object.assign(message, {
+      aiAnalysis: { deliveryAttempt: 1 },
+      status: "queued",
+      queuedAt: "2026-08-28T12:20:00.000Z",
+      sentAt: null,
+      provider: null,
+      providerMessageId: null,
+    });
+    await deliverMessage(state.payload, provider, 1, "attempt-two");
+
+    expect(providerKeys).toHaveLength(2);
+    expect(providerKeys[0]).toBe(originalMessageKey);
+    expect(providerKeys[1]).not.toBe(providerKeys[0]);
+  });
+
   it("does not regress a converted lead when sending a signed contract copy", async () => {
     const state = repository();
     state.leads[0]!.status = "converted";

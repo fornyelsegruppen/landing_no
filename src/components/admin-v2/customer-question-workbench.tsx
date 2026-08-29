@@ -10,6 +10,7 @@ import {
 } from "@/lib/messages/customer-reply-recovery";
 import {
   customerQuestionActionVisibility,
+  customerQuestionDeliveryFailureMessage,
   customerQuestionDisplayState,
 } from "./customer-question-action-visibility";
 import { MessageDraftEditor } from "./message-draft-editor";
@@ -195,6 +196,7 @@ type QuestionReply = {
   aiAssisted?: boolean;
   bodyText: string;
   factWarnings?: string[];
+  failureCode?: string;
   failureMessage?: string;
   id: number;
   manualReplyRequiresEditing?: boolean;
@@ -551,9 +553,12 @@ export function CustomerQuestionWorkbench(props: {
               <p className="mt-2 text-sm whitespace-pre-wrap text-white/80">
                 {props.reply.bodyText}
               </p>
-              {props.reply.failureMessage ? (
+              {props.reply.failureCode || props.reply.failureMessage ? (
                 <p className="mt-3 text-sm text-red-200" role="alert">
-                  {props.reply.failureMessage}
+                  {customerQuestionDeliveryFailureMessage(
+                    props.locale,
+                    props.reply.failureCode,
+                  )}
                 </p>
               ) : null}
             </div>

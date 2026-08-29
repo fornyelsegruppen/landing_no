@@ -508,6 +508,7 @@ export default async function AdminCasePage({
                     aiAssisted: displayedReply.aiAssisted,
                     bodyText: displayedReply.bodyText || "",
                     factWarnings: factWarnings(displayedReply.aiAnalysis),
+                    failureCode: displayedReply.failureCode,
                     failureMessage: displayedReply.failureMessage,
                     id: displayedReply.id,
                     manualReplyRequiresEditing: manualReplyRequiresEditing(

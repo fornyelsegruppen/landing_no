@@ -680,6 +680,17 @@ export async function POST(
           throw new MessageRevisionConflictError();
         }
       } else {
+        const retryAnalysis =
+          message.aiAnalysis && typeof message.aiAnalysis === "object"
+            ? (message.aiAnalysis as Record<string, unknown>)
+            : {};
+        const previousDeliveryAttempt = retryAnalysis.deliveryAttempt;
+        const deliveryAttempt =
+          typeof previousDeliveryAttempt === "number" &&
+          Number.isSafeInteger(previousDeliveryAttempt) &&
+          previousDeliveryAttempt >= 1
+            ? previousDeliveryAttempt + 1
+            : 1;
         queued = await payload.update({
           collection: "messages",
           id: message.id,
@@ -689,6 +700,14 @@ export async function POST(
             approvedBy: message.approvedBy,
             approvedAt: message.approvedAt,
             queuedAt: now,
+            aiAnalysis: {
+              ...retryAnalysis,
+              deliveryAttempt,
+            },
+            sentAt: null,
+            deliveredAt: null,
+            provider: null,
+            providerMessageId: null,
           },
         });
       }

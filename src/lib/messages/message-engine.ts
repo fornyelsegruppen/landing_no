@@ -27,6 +27,28 @@ import { reserveCustomerReplyAiRequest } from "@/lib/ai/payload-usage-limit";
 export const manualQuestionReplyPlaceholder =
   "Skriv et kontrollert svar til kunden her før utsending.";
 
+function providerDeliveryIdempotencyKey(message: {
+  aiAnalysis?: unknown;
+  idempotencyKey: string;
+}) {
+  const analysis =
+    message.aiAnalysis && typeof message.aiAnalysis === "object"
+      ? (message.aiAnalysis as Record<string, unknown>)
+      : {};
+  const deliveryAttempt = analysis.deliveryAttempt;
+  if (
+    typeof deliveryAttempt !== "number" ||
+    !Number.isSafeInteger(deliveryAttempt) ||
+    deliveryAttempt < 1
+  ) {
+    return message.idempotencyKey;
+  }
+  return makeIdempotencyKey("message.delivery-attempt", {
+    attempt: deliveryAttempt,
+    messageKey: message.idempotencyKey,
+  });
+}
+
 export function assertCustomerReplyDeliveryTrackingReady(
   provider: EmailProvider,
   purpose: CustomerReplyPurpose | null | undefined,
@@ -98,7 +120,9 @@ export async function enqueueMessageJob(
   });
   if (existing.docs[0]) {
     const job = existing.docs[0];
-    if (["attention", "failed", "cancelled"].includes(job.status)) {
+    if (
+      ["attention", "failed", "cancelled", "completed"].includes(job.status)
+    ) {
       return payload.update({
         collection: "operational-jobs",
         id: job.id,
@@ -107,6 +131,9 @@ export async function enqueueMessageJob(
           status: "pending",
           attempts: 0,
           availableAt: new Date().toISOString(),
+          startedAt: null,
+          completedAt: null,
+          result: null,
           lastErrorCode: null,
           lastErrorMessage: null,
         },
@@ -664,7 +691,7 @@ export async function deliverMessage(
           : null) ||
         process.env.LEAD_TO_EMAIL ||
         "post@takfornyelse.as",
-      idempotencyKey: message.idempotencyKey,
+      idempotencyKey: providerDeliveryIdempotencyKey(message),
       correlationId,
       ...(attachments.length ? { attachments } : {}),
     });

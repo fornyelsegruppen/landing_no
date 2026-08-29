@@ -6,6 +6,7 @@ type MessageLike = {
   category?: string | null;
   createdAt?: string | null;
   direction?: string | null;
+  failureCode?: string | null;
   id: number;
   replyToMessage?: number | { id?: number | null } | null;
   replyToMessageId?: number | null;
@@ -59,11 +60,14 @@ function repliesForQuestion<T extends MessageLike>(
 }
 
 export function customerQuestionReplyStage(
-  reply?: Pick<MessageLike, "status"> | null,
+  reply?: Pick<MessageLike, "failureCode" | "status"> | null,
 ): CustomerQuestionReplyStage {
   if (!reply || reply.status === "cancelled") return "prepare";
   if (reply.status === "draft") return "review";
   if (["failed", "attention"].includes(reply.status || "")) {
+    return "delivery_failed";
+  }
+  if (reply.status === "queued" && reply.failureCode) {
     return "delivery_failed";
   }
   if (reply.status === "sent") return "sent";

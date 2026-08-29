@@ -237,6 +237,15 @@ describe("customer question state", () => {
     );
   });
 
+  it("surfaces a queued delivery attempt with a recorded failure as failed", () => {
+    expect(
+      customerQuestionReplyStage({
+        failureCode: "Error",
+        status: "queued",
+      }),
+    ).toBe("delivery_failed");
+  });
+
   it("uses the immutable references captured on the customer question", () => {
     expect(
       customerQuestionDocumentReferences({
