@@ -162,6 +162,38 @@ describe("customer reply safety", () => {
     ).toBe(true);
   });
 
+  it("rejects internal AI and implementation language in customer-facing text", () => {
+    const internalPhrases = [
+      "Vi kan ikke love dette uten kildegrunnlag.",
+      "Svaret er kontrollert mot faktakonteksten.",
+      "Denne regelen er hentet fra systemprompten.",
+      "Opplysningen ligger i JSON-konteksten.",
+      "Prisen ble funnet i databasen.",
+      "Opplysningen er hentet fra det interne systemet.",
+      "Opplysningen ligger i JSON konteksten.",
+      "Dette er kontrollert av KI-modellen.",
+    ];
+
+    for (const phrase of internalPhrases) {
+      expect(() => assertCustomerReplyTextSafe(phrase, context)).toThrow(
+        /internal technical wording/,
+      );
+    }
+
+    expect(
+      assertCustomerReplyTextSafe(
+        "Et mulig tillegg må avklares særskilt gjennom et revidert eller separat tilbud. Ta gjerne kontakt dersom du ønsker et slikt tilbud.",
+        context,
+      ),
+    ).toBe(true);
+    expect(
+      assertCustomerReplyTextSafe(
+        "Vi har registrert spørsmålet i systemet vårt.",
+        context,
+      ),
+    ).toBe(true);
+  });
+
   it("requires an explicit answer when the customer asks about adding impregnation", () => {
     const multiPartContext: CustomerReplyContext = {
       ...context,
@@ -353,6 +385,26 @@ describe("customer reply safety", () => {
     });
   });
 
+  it("retries when the first AI draft exposes internal technical wording", async () => {
+    const provider = new SequentialAiProvider([
+      {
+        ...valid,
+        replyDraft:
+          "Et senere tillegg kan ikke loves uten kildegrunnlag. Kontakt oss for et revidert tilbud.",
+      },
+      valid,
+    ]);
+
+    await expect(
+      generateCustomerReplyDraft({
+        provider,
+        context,
+        correlationId: "reply-internal-language-retry",
+      }),
+    ).resolves.toMatchObject({ result: valid });
+    expect(provider.calls).toBe(2);
+  });
+
   it("enforces quota before the bounded safety retry calls the provider", async () => {
     const provider = new SequentialAiProvider([
       {
@@ -394,5 +446,23 @@ describe("customer reply safety", () => {
 
     expect(result.result.subject).toContain("maksimalprisen");
     expect(result.result.replyDraft).toContain("20 293,76 kr");
+  });
+
+  it("rejects polished text that exposes internal technical wording", async () => {
+    const provider = new DeterministicAiProvider({
+      subject: "Svar om tilbud T-8-V1",
+      replyDraft:
+        "Et senere tillegg kan ikke bekreftes uten kildegrunnlag. Kontakt oss for et revidert tilbud.",
+    });
+
+    await expect(
+      polishCustomerReplyDraft({
+        bodyText: "Kan impregnering legges til senere?",
+        context,
+        correlationId: "polish-internal-language",
+        provider,
+        subject: "Svar om tilbud T-8-V1",
+      }),
+    ).rejects.toThrow(/internal technical wording/);
   });
 });

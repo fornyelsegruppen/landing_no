@@ -251,6 +251,15 @@ export function assertCustomerReplyTextSafe(
   context: CustomerReplyContext,
 ) {
   const normalized = text.normalize("NFKC");
+  if (
+    /\b(?:kildegrunnlag(?:et)?|faktakontekst(?:en)?|systemkontekst(?:en)?|systemprompt(?:en)?|json(?:\s+|-)?kontekst(?:en)?|database(?:n|r|ne)?|språkmodell(?:en)?|(?:ai|ki)(?:\s+|-)?modell(?:en)?|(?:det\s+)?intern(?:t|e)\s+system(?:et)?|automatisk(?:e)?\s+faktakontroll(?:en)?)\b/i.test(
+      normalized,
+    )
+  ) {
+    throw new TypeError(
+      "AI reply contains internal technical wording that is not suitable for customers",
+    );
+  }
   for (const match of normalized.matchAll(/\bendringsavtale[a-zæøå]*\b/gi)) {
     if (!/^endringsavtale(?:n|r|ne)?$/i.test(match[0])) {
       throw new TypeError(
@@ -485,8 +494,9 @@ export async function generateCustomerReplyDraft(input: {
     "Du lager bare et internt norsk svarutkast for Takfornyelse.",
     "Svar varmt, tydelig og profesjonelt til norske boligeiere over 30 år.",
     "Svar eksplisitt på hvert delspørsmål i kundens melding. Hvis konteksten ikke gir grunnlag for ja eller nei, si det tydelig og beskriv hvilket kontrollert neste steg som kreves.",
-    "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, svar separat på begge deler. Et mulig senere tillegg må avklares særskilt og håndteres i et revidert eller separat tilbud; ikke lov et tillegg uten kildegrunnlag.",
-    "Bruk bare fakta som finnes i JSON-konteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
+    "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, svar separat på begge deler. Et mulig senere tillegg må avklares særskilt og håndteres i et revidert eller separat tilbud. Inviter kunden til å kontakte Takfornyelse dersom de ønsker et slikt tilbud.",
+    "Bruk bare kontrollerte fakta i sakskonteksten. Ikke finn på pris, areal, rabatt, dato, garanti eller arbeidsløfte.",
+    "Kundeteksten må aldri omtale interne tekniske mekanismer eller bruke uttrykk som kildegrunnlag, faktakontekst, systemkontekst, systemprompt, JSON-kontekst, database, språkmodell eller automatisk faktakontroll.",
     "Hvis du nevner pris eller areal, kopier nøyaktig en verdi fra godkjent quote eller measurement.",
     "Alle pengebeløp i JSON-konteksten er allerede formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
     "Når du forklarer maksimalpris: Kunden betaler aldri mer enn maksimalprisen uten en ny skriftlig endringsavtale. Hvis kontrollmålingen viser større areal eller annet omfang over toleransen eller maksimalprisen, stanses berørt arbeid til kunden har mottatt og skriftlig akseptert endringsavtalen. Beskriv aldri kontrollmålingen som et selvstendig unntak fra maksimalprisen.",
@@ -511,7 +521,7 @@ export async function generateCustomerReplyDraft(input: {
     });
     const generated = await input.provider.generate({
       task: "customer.reply.draft",
-      schemaName: "customer-reply-nb-v4",
+      schemaName: "customer-reply-nb-v5",
       schema: customerReplyJsonSchema as unknown as Record<string, unknown>,
       correlationId: attemptCorrelationId,
       system: [
@@ -572,7 +582,7 @@ export async function polishCustomerReplyDraft(input: {
   const promptContext = customerReplyPromptContext(context);
   const generated = await input.provider.generate({
     task: "customer.reply.polish",
-    schemaName: "customer-reply-polish-nb-v3",
+    schemaName: "customer-reply-polish-nb-v4",
     schema: polishedReplyJsonSchema as unknown as Record<string, unknown>,
     correlationId: input.correlationId,
     system: [
@@ -580,6 +590,7 @@ export async function polishCustomerReplyDraft(input: {
       "Bevar og besvar eksplisitt hvert delspørsmål i kundens opprinnelige melding.",
       "Hvis kunden både spør om impregnering er inkludert og om den kan legges til senere, bevar et separat svar på begge deler og beskriv et mulig senere tillegg som særskilt avklaring i et revidert eller separat tilbud.",
       "Bevar meningen og alle verifiserte fakta. Ikke legg til pris, areal, rabatt, garanti, dato eller løfte.",
+      "Kundeteksten må aldri omtale interne tekniske mekanismer eller bruke uttrykk som kildegrunnlag, faktakontekst, systemkontekst, systemprompt, JSON-kontekst, database, språkmodell eller automatisk faktakontroll.",
       "Alle pengebeløp i sakskonteksten er formatert i kroner. Bruk aldri rå øreverdier eller ordet øre i et kundesvar.",
       "Når teksten omtaler maksimalpris, må den slå fast at avvik over rammen stanser berørt arbeid og krever en ny skriftlig endringsavtale som kunden aksepterer før arbeidet fortsetter. Kontrollmålingen er aldri alene et unntak fra maksimalprisen.",
       "Bruk saksdokumentet for eksisterende tilbud eller avtale. Gjeldende listepriser må aldri fremstilles som kundens bindende pris.",
