@@ -59,6 +59,7 @@ function makeCase(
     messages: [],
     nextAction: { kind },
     officialInvoices: [],
+    priceCalculations: [],
     quoteOptions: [],
     timeline: [],
   };

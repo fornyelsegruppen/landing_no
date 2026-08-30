@@ -39,6 +39,8 @@ export type CaseProcessStageContent = {
 };
 
 export type CaseProcessHistoryItem = {
+  artifactCount?: number;
+  category: "communication" | "decision" | "document";
   content?: ReactNode;
   description: string;
   id: string;
@@ -46,6 +48,18 @@ export type CaseProcessHistoryItem = {
   status?: string;
   title: string;
 };
+
+export type CaseProcessHistoryFilter =
+  "all" | CaseProcessHistoryItem["category"];
+
+export function filterCaseProcessHistoryItems(
+  items: readonly CaseProcessHistoryItem[],
+  filter: CaseProcessHistoryFilter,
+) {
+  return filter === "all"
+    ? items
+    : items.filter((item) => item.category === filter);
+}
 
 export type CaseProcessInspectorSelection =
   | {
@@ -169,6 +183,8 @@ export function CaseProcessTimeline({
   const [openStageId, setOpenStageId] = useState<CaseProcessStageId | null>(
     null,
   );
+  const [historyFilter, setHistoryFilter] =
+    useState<CaseProcessHistoryFilter>("all");
   const [inspectorSelection, setInspectorSelection] =
     useState<CaseProcessInspectorSelection | null>(null);
   const inspectorTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -194,6 +210,19 @@ export function CaseProcessTimeline({
     inspectorContent,
     historyFallback,
   );
+  const filteredHistoryItems = filterCaseProcessHistoryItems(
+    historyItems,
+    historyFilter,
+  );
+  const historyFilters: Array<{
+    id: CaseProcessHistoryFilter;
+    label: string;
+  }> = [
+    { id: "all", label: labels.historyAll },
+    { id: "document", label: labels.historyArtifacts },
+    { id: "decision", label: labels.historyDecisions },
+    { id: "communication", label: labels.historyCommunication },
+  ];
   return (
     <section aria-labelledby={sectionId}>
       <div>
@@ -212,39 +241,47 @@ export function CaseProcessTimeline({
           const content = stageContent[stage.id];
           const stageLabel = workspaceLabels.stages[stage.id];
           const stateLabel = labels.states[stage.state];
-          const canExpand =
-            stage.state !== "not_started" && Boolean(stagePanels[stage.id]);
           const canInspect =
             stage.state !== "not_started" &&
             Boolean(inspectorContent && content?.inspectorTargetId);
-          const isExpanded = canExpand && openStageId === stage.id;
           const relatedLinks =
             stage.state === "not_started"
               ? []
               : (content?.relatedLinks ?? []).filter(
                   (link) => !link.href.startsWith("#"),
                 );
+          const canExpand =
+            stage.state !== "not_started" &&
+            Boolean(stagePanels[stage.id] || relatedLinks.length || canInspect);
+          const isExpanded = canExpand && openStageId === stage.id;
           const stageHeader = (
             <>
-              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-current/20">
+              <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-current/20">
                 <StateIcon state={stage.state} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-bold tracking-wider uppercase">
-                  {stateLabel}
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[.68rem] font-bold tracking-wider uppercase">
+                  <span>{stateLabel}</span>
+                  {content?.timestamp && stage.state !== "not_started" ? (
+                    <time className="text-muted-foreground normal-case">
+                      {content.timestamp}
+                    </time>
+                  ) : null}
+                  {relatedLinks.length ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 normal-case">
+                      <FileText aria-hidden="true" className="size-3" />
+                      {relatedLinks.length}
+                      <span className="sr-only">{labels.historyArtifacts}</span>
+                    </span>
+                  ) : null}
                 </span>
-                <span className="mt-1 flex min-h-12 items-center text-base font-bold [overflow-wrap:anywhere] break-words">
+                <span className="mt-1 block text-[.95rem] leading-snug font-bold [overflow-wrap:anywhere] break-words sm:text-base">
                   {stageLabel}
                 </span>
                 {content?.statusText && stage.state !== "not_started" ? (
-                  <span className="mt-1 block text-sm [overflow-wrap:anywhere] break-words">
+                  <span className="mt-1 line-clamp-2 block text-xs leading-snug [overflow-wrap:anywhere] break-words text-white/75 sm:text-sm">
                     {content.statusText}
                   </span>
-                ) : null}
-                {content?.timestamp && stage.state !== "not_started" ? (
-                  <time className="text-muted-foreground mt-1 block text-xs">
-                    {content.timestamp}
-                  </time>
                 ) : null}
               </span>
               {canExpand ? (
@@ -268,7 +305,7 @@ export function CaseProcessTimeline({
             <li
               key={stage.id}
               aria-current={stage.isCurrent ? "step" : undefined}
-              className={`rounded-xl border p-3 ${stateStyles[stage.state]}`}
+              className={`rounded-xl border p-2.5 sm:p-3 ${stateStyles[stage.state]}`}
               data-process-stage={stage.id}
               data-process-state={stage.state}
             >
@@ -277,7 +314,7 @@ export function CaseProcessTimeline({
                   aria-controls={`case-process-panel-${stage.id}`}
                   aria-expanded={isExpanded}
                   aria-label={`${isExpanded ? labels.closeStage : labels.openStage}: ${stageLabel}`}
-                  className="focus-visible:outline-accent flex min-h-12 w-full items-start gap-3 rounded-lg p-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="focus-visible:outline-accent flex min-h-11 w-full items-start gap-2.5 rounded-lg p-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:gap-3"
                   onClick={() =>
                     setOpenStageId((current) =>
                       current === stage.id ? null : stage.id,
@@ -291,24 +328,23 @@ export function CaseProcessTimeline({
                 <div className="flex items-start gap-3">{stageHeader}</div>
               )}
 
-              {relatedLinks.length > 0 ? (
-                <div className="mt-3 grid gap-2">
-                  {relatedLinks.map((link) => (
-                    <RelatedLink
-                      key={`${link.kind}:${link.href}`}
-                      link={link}
-                    />
-                  ))}
-                </div>
-              ) : null}
-
               {canExpand ? (
                 <div
-                  className="mt-3 border-t border-current/15 pt-4"
+                  className="mt-2.5 border-t border-current/15 pt-3"
                   hidden={!isExpanded}
                   id={`case-process-panel-${stage.id}`}
                 >
                   {stagePanels[stage.id]}
+                  {relatedLinks.length > 0 ? (
+                    <div className="mt-3 grid gap-2">
+                      {relatedLinks.map((link) => (
+                        <RelatedLink
+                          key={`${link.kind}:${link.href}`}
+                          link={link}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                   {canInspect ? (
                     <button
                       className="focus-visible:outline-accent mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-current/25 bg-black/15 px-4 text-sm font-bold hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-auto"
@@ -349,42 +385,78 @@ export function CaseProcessTimeline({
               className="size-5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
             />
           </summary>
-          <ol className="relative ml-6 border-l border-white/10 p-4 pl-5">
-            {historyItems.map((item) => (
-              <li className="relative pb-3 last:pb-0" key={item.id}>
-                <span className="bg-accent ring-background-elevated absolute top-4 -left-[1.57rem] size-2.5 rounded-full ring-4" />
-                <button
-                  aria-label={`${labels.openInspector}: ${item.title}`}
-                  className="focus-visible:outline-accent block min-h-12 w-full rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
-                  onClick={(event) =>
-                    openInspector(
-                      {
-                        content: item.content,
-                        description: item.description,
-                        kind: "history",
-                        targetId: item.inspectorTargetId,
-                        title: item.title,
-                      },
-                      event.currentTarget,
-                    )
-                  }
-                  type="button"
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <strong className="text-sm">{item.title}</strong>
-                    {item.status ? (
-                      <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[.68rem] font-bold tracking-wider text-white/75 uppercase">
-                        {item.status}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="text-muted-foreground mt-1 block text-xs">
-                    {item.description}
-                  </span>
-                </button>
-              </li>
+          <div
+            aria-label={labels.historyFilters}
+            className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3"
+            role="group"
+          >
+            {historyFilters.map((filter) => (
+              <button
+                aria-pressed={historyFilter === filter.id}
+                className={`focus-visible:outline-accent min-h-11 shrink-0 rounded-full border px-3 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  historyFilter === filter.id
+                    ? "border-accent/50 bg-accent/15 text-accent"
+                    : "border-white/10 bg-white/[.025] text-white/70 hover:bg-white/5"
+                }`}
+                key={filter.id}
+                onClick={() => setHistoryFilter(filter.id)}
+                type="button"
+              >
+                {filter.label}
+              </button>
             ))}
-          </ol>
+          </div>
+          {filteredHistoryItems.length ? (
+            <ol className="relative ml-5 border-l border-white/10 p-3 pl-4 sm:ml-6 sm:p-4 sm:pl-5">
+              {filteredHistoryItems.map((item) => (
+                <li className="relative pb-3 last:pb-0" key={item.id}>
+                  <span className="bg-accent ring-background-elevated absolute top-4 -left-[1.57rem] size-2.5 rounded-full ring-4" />
+                  <button
+                    aria-label={`${labels.openInspector}: ${item.title}`}
+                    className="focus-visible:outline-accent block min-h-12 w-full rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                    onClick={(event) =>
+                      openInspector(
+                        {
+                          content: item.content,
+                          description: item.description,
+                          kind: "history",
+                          targetId: item.inspectorTargetId,
+                          title: item.title,
+                        },
+                        event.currentTarget,
+                      )
+                    }
+                    type="button"
+                  >
+                    <span className="flex flex-wrap items-center gap-2">
+                      <strong className="text-sm">{item.title}</strong>
+                      {item.status ? (
+                        <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[.68rem] font-bold tracking-wider text-white/75 uppercase">
+                          {item.status}
+                        </span>
+                      ) : null}
+                      {item.artifactCount ? (
+                        <span className="border-accent/25 bg-accent/8 text-accent inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[.68rem] font-bold">
+                          <FileText aria-hidden="true" className="size-3" />
+                          {item.artifactCount}
+                          <span className="sr-only">
+                            {labels.historyArtifacts}
+                          </span>
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-muted-foreground mt-1 block text-xs">
+                      {item.description}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-muted-foreground border-t border-white/10 p-4 text-sm">
+              {labels.historyEmpty}
+            </p>
+          )}
         </details>
       ) : null}
 

@@ -9,6 +9,7 @@ export type CaseCommercialVersion = {
   role: CaseCommercialRole;
   supersedesId?: number;
   supersedesReference?: string;
+  priceCalculationId?: number;
   quoteId?: number;
   pdfHref?: string;
   technicalHref: string;
@@ -37,6 +38,7 @@ export type CaseCommercialQuoteInput = {
   version?: number;
   status?: string;
   supersedesId?: number;
+  priceCalculationId?: number;
   serviceDescription?: string;
   totalIncVatOre?: number;
   maximumTotalIncVatOre?: number;
@@ -121,6 +123,7 @@ export function deriveCaseCommercialContext(
     supersedesReference: item.supersedesId
       ? quoteById.get(item.supersedesId)?.reference
       : undefined,
+    priceCalculationId: item.priceCalculationId,
     quoteId: item.id,
     pdfHref: `/api/admin/quotes/${item.id}/pdf`,
     technicalHref: `/admin/collections/quotes/${item.id}`,

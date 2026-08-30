@@ -326,7 +326,33 @@ describe("admin case read model", () => {
             id: 3,
             reference: "PB-1-RAW-TIMESTAMP",
             status: "superseded",
+            measurement: 2,
+            priceRule: 9,
+            inputHash: "a".repeat(64),
+            inputSnapshot: {
+              measurementVersion: 1,
+              rule: {
+                id: 9,
+                version: 3,
+                serviceKey: "takvask",
+              },
+            },
+            outputSnapshot: {
+              quantityTenths: 1200,
+              toleranceBasisPoints: 1000,
+              lineItems: [
+                {
+                  code: "takvask",
+                  quantityTenths: 1200,
+                  unitPriceExVatOre: 8333,
+                  totalExVatOre: 1000000,
+                },
+              ],
+            },
+            subtotalExVatOre: 1000000,
+            vatOre: 250000,
             totalIncVatOre: 1250000,
+            maximumTotalIncVatOre: 1375000,
             createdAt: "2026-08-24T10:00:00.000Z",
           },
         ],
@@ -390,6 +416,9 @@ describe("admin case read model", () => {
             filename: "tilbud.pdf",
             classification: "contract",
             mimeType: "application/pdf",
+            ownerType: "quote",
+            ownerId: "4",
+            createdAt: "2026-08-24T11:02:00.000Z",
             url: "https://safe.blob.vercel-storage.com/private/file.pdf",
           },
         ],
@@ -404,6 +433,15 @@ describe("admin case read model", () => {
     expect(result?.lead.address).toBe("Testveien 1 0001 Oslo");
     expect(result?.quote?.reference).toBe("T-1-V1");
     expect(result?.price?.reference).toBe("PB-1-V1");
+    expect(result?.priceCalculations[0]).toMatchObject({
+      reference: "PB-1-V1",
+      measurementId: 2,
+      priceRuleId: 9,
+      priceRuleVersion: 3,
+      quantityTenths: 1200,
+      serviceKey: "takvask",
+      totalIncVatOre: 1250000,
+    });
     expect(result?.contractRequests[0]?.reference).toBe("END-1-V1");
     expect(result?.timeline.map((item) => item.title)).toEqual(
       expect.arrayContaining(["PB-1-V1", "END-1-V1"]),
@@ -419,21 +457,20 @@ describe("admin case read model", () => {
         "price",
         "quote",
         "contract",
+        "document",
       ]),
     );
   });
 
   it("does not offer an obsolete draft after a newer equivalent was sent", async () => {
-    const findByID = vi
-      .fn()
-      .mockResolvedValue({
-        id: 1,
-        name: "Test",
-        address: "Testveien",
-        postal: "0001",
-        status: "waiting_customer",
-        createdAt: "2026-08-24T08:00:00.000Z",
-      });
+    const findByID = vi.fn().mockResolvedValue({
+      id: 1,
+      name: "Test",
+      address: "Testveien",
+      postal: "0001",
+      status: "waiting_customer",
+      createdAt: "2026-08-24T08:00:00.000Z",
+    });
     const responses = [
       {
         docs: [
@@ -517,17 +554,15 @@ describe("admin case read model", () => {
   });
 
   it("hides a superseded AI draft instead of presenting it as a cancelled customer message", async () => {
-    const findByID = vi
-      .fn()
-      .mockResolvedValue({
-        id: 8,
-        name: "Test",
-        address: "Testveien",
-        postal: "0001",
-        inquiryType: "takvask",
-        status: "measuring",
-        createdAt: "2026-08-25T08:00:00.000Z",
-      });
+    const findByID = vi.fn().mockResolvedValue({
+      id: 8,
+      name: "Test",
+      address: "Testveien",
+      postal: "0001",
+      inquiryType: "takvask",
+      status: "measuring",
+      createdAt: "2026-08-25T08:00:00.000Z",
+    });
     const responses = [
       {
         docs: [
@@ -617,17 +652,15 @@ describe("admin case read model", () => {
   });
 
   it("ignores an obsolete intake AI draft after the commercial journey has started", async () => {
-    const findByID = vi
-      .fn()
-      .mockResolvedValue({
-        id: 9,
-        name: "Test",
-        address: "Testveien",
-        postal: "0001",
-        inquiryType: "takvask",
-        status: "converted",
-        createdAt: "2026-08-25T08:00:00.000Z",
-      });
+    const findByID = vi.fn().mockResolvedValue({
+      id: 9,
+      name: "Test",
+      address: "Testveien",
+      postal: "0001",
+      inquiryType: "takvask",
+      status: "converted",
+      createdAt: "2026-08-25T08:00:00.000Z",
+    });
     const responses = [
       {
         docs: [

@@ -11,6 +11,7 @@ describe("case commercial context", () => {
           version: 2,
           status: "accepted",
           supersedesId: 10,
+          priceCalculationId: 102,
           totalIncVatOre: 1764675,
         },
         {
@@ -54,6 +55,7 @@ describe("case commercial context", () => {
       role: "effective",
     });
     expect(context.workingContract?.supersedesReference).toBe("K-15-V1");
+    expect(context.workingQuote?.priceCalculationId).toBe(102);
     expect(context.workingContract?.pdfHref).toBe("/api/admin/media/92");
   });
 

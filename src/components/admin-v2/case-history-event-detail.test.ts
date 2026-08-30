@@ -34,6 +34,7 @@ describe("case history event detail", () => {
     expect(html).toContain("Šio įvykio informacija");
     expect(html).toContain("Susiję dokumentai");
     expect(html).toContain("Užregistruota");
+    expect(html).toContain("Įrašo numeris");
     expect(html).toContain("Išsiųsta");
     expect(html).toContain("Pasiūlymas išsiųstas klientui.");
     expect(html).toContain('href="/api/admin/quotes/17/pdf"');

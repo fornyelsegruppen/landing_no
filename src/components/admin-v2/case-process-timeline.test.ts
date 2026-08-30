@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   CaseProcessTimeline,
+  filterCaseProcessHistoryItems,
   resolveCaseProcessInspectorContent,
   restoreInspectorTriggerFocus,
 } from "./case-process-timeline";
@@ -48,6 +49,31 @@ const stageContent = {
 };
 
 describe("case process timeline", () => {
+  it("filters one chronological stream without creating a second document timeline", () => {
+    const items = [
+      {
+        category: "document" as const,
+        description: "Dokumentas",
+        id: "document-1",
+        inspectorTargetId: "document-1",
+        title: "T-17-V1.pdf",
+      },
+      {
+        category: "communication" as const,
+        description: "Žinutė",
+        id: "message-1",
+        inspectorTargetId: "message-1",
+        title: "Atsakymas",
+      },
+    ];
+
+    expect(filterCaseProcessHistoryItems(items, "all")).toHaveLength(2);
+    expect(filterCaseProcessHistoryItems(items, "document")).toEqual([
+      items[0],
+    ]);
+    expect(filterCaseProcessHistoryItems(items, "decision")).toEqual([]);
+  });
+
   it("returns focus to the inspector trigger without scrolling the workspace", () => {
     const focus = vi.fn();
     const schedule = vi.fn((callback: () => void) => callback());
@@ -142,6 +168,7 @@ describe("case process timeline", () => {
         activeStageId: "completion",
         historyItems: [
           {
+            category: "communication",
             content: createElement(
               "article",
               { id: "messages-section" },
@@ -162,6 +189,8 @@ describe("case process timeline", () => {
 
     expect(html).toContain('<details id="timeline-section"');
     expect(html).toContain("Visa istorija");
+    expect(html).toContain("Dokumentai");
+    expect(html).toContain("Komunikacija");
     expect(html).toContain("Senas audito įvykis");
     expect(html).toContain("Pristatyta");
     expect(html).not.toContain('href="#messages-section"');

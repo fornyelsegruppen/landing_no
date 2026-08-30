@@ -25,8 +25,10 @@ import {
 import { CaseVersionHistory } from "@/components/admin-v2/case-version-history";
 import {
   CaseHistoryEventDetail,
+  type CaseHistoryEventFact,
   type CaseHistoryEventLink,
 } from "@/components/admin-v2/case-history-event-detail";
+import { CasePriceCalculationDetail } from "@/components/admin-v2/case-price-calculation-detail";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
   QuoteDeclineWorkbench,
@@ -46,6 +48,7 @@ import {
   type CaseWorkspaceTone,
 } from "@/lib/admin-v2/case-workspace-view-model";
 import { caseWorkspaceSectionByKey } from "@/lib/admin-v2/case-workspace-sections";
+import type { CaseProcessStageId } from "@/lib/admin-v2/case-process-stages";
 import {
   metadataLabel,
   statusLabel,
@@ -55,10 +58,11 @@ import {
   loadAdminCaseWorkspace,
   type AdminCaseWorkspace,
   type CaseEntity,
+  type CasePriceCalculation,
   type CaseTimelineItem,
 } from "@/lib/admin-v2/case-read-model";
 import { requireAdminUser } from "@/lib/auth/internal-session";
-import { panelDateLocale } from "@/lib/panel-i18n";
+import { panelDateLocale, type PanelLocale } from "@/lib/panel-i18n";
 import {
   formatNorwayDateTime,
   formatNorwayDateTimeInput,
@@ -94,10 +98,12 @@ function processEntityLink(
   options?: {
     href?: string;
     kind?: CaseProcessRelatedLink["kind"];
+    status?: string;
   },
 ): CaseProcessRelatedLink {
-  const accessibleName = entity.status
-    ? `${entity.reference} · ${entity.status}`
+  const displayStatus = options?.status || entity.status;
+  const accessibleName = displayStatus
+    ? `${entity.reference} · ${displayStatus}`
     : entity.reference;
   return {
     accessibleName,
@@ -112,6 +118,7 @@ const timelineSourceCollections = {
   change: "change-agreements",
   contract: "contracts",
   contract_request: "customer-contract-requests",
+  document: "private-media",
   invoice: "invoice-records",
   lead: "leads",
   measurement: "roof-measurements",
@@ -150,6 +157,44 @@ function timelineHistoryLinks(
   if (!entityId) return [];
   const collection = timelineSourceCollection(item, caseData);
   const links: CaseHistoryEventLink[] = [];
+
+  if (item.type === "document") {
+    const file = caseData.documents.find(
+      (candidate) => candidate.id === entityId,
+    );
+    return file
+      ? [{ href: file.href, kind: "document", label: file.filename }]
+      : [];
+  }
+
+  if (item.type === "price") {
+    const quoteVersions = caseData.commercial.quoteVersions.filter(
+      (version) => version.priceCalculationId === entityId,
+    );
+    for (const version of quoteVersions) {
+      if (!version.pdfHref) continue;
+      links.push({
+        href: version.pdfHref,
+        kind: "document",
+        label: `${version.reference} PDF`,
+      });
+    }
+    const calculation = caseData.priceCalculations.find(
+      (candidate) => candidate.id === entityId,
+    );
+    const measurement = caseData.measurement;
+    if (
+      measurement &&
+      calculation?.measurementId === measurement.id &&
+      measurement.evidenceHref
+    ) {
+      links.push({
+        href: measurement.evidenceHref,
+        kind: "document",
+        label: `${measurement.reference} evidence`,
+      });
+    }
+  }
 
   if (item.type === "quote" || item.type === "contract") {
     const version = [
@@ -211,12 +256,121 @@ function timelineHistoryLinks(
     });
   }
 
+  const ownerTypesByTimelineType: Partial<
+    Record<CaseTimelineItem["type"], readonly string[]>
+  > = {
+    change: ["change-agreement"],
+    contract: ["contract"],
+    invoice: ["invoice-record"],
+    lead: ["lead"],
+    measurement: ["roof-measurement"],
+    quote: ["quote"],
+    warranty: ["warranty"],
+    work: ["work", "work-order"],
+  };
+  const ownerTypes = ownerTypesByTimelineType[item.type] || [];
+  for (const relatedDocument of caseData.documents.filter(
+    (candidate) =>
+      candidate.ownerId === String(entityId) &&
+      ownerTypes.includes(candidate.ownerType || ""),
+  )) {
+    links.push({
+      href: relatedDocument.href,
+      kind: "document",
+      label: relatedDocument.filename,
+    });
+  }
+
   links.push({
     href: `/admin/collections/${collection}/${entityId}`,
     kind: "source",
     label: `${item.title} · #${entityId}`,
   });
-  return links;
+  return Array.from(
+    new Map(links.map((link) => [`${link.kind}:${link.href}`, link])).values(),
+  );
+}
+
+function priceLineage(
+  calculationId: number,
+  caseData: AdminCaseWorkspace,
+): {
+  calculation?: CasePriceCalculation;
+  comparison?: { from: CasePriceCalculation; to: CasePriceCalculation };
+  quoteReferences: string[];
+} {
+  const calculation = caseData.priceCalculations.find(
+    (candidate) => candidate.id === calculationId,
+  );
+  const quote = caseData.commercial.quoteVersions.find(
+    (candidate) => candidate.priceCalculationId === calculationId,
+  );
+  const previousQuote = quote?.supersedesId
+    ? caseData.commercial.quoteVersions.find(
+        (candidate) => candidate.id === quote.supersedesId,
+      )
+    : undefined;
+  const nextQuote = quote
+    ? caseData.commercial.quoteVersions.find(
+        (candidate) => candidate.supersedesId === quote.id,
+      )
+    : undefined;
+  const previous = previousQuote?.priceCalculationId
+    ? caseData.priceCalculations.find(
+        (candidate) => candidate.id === previousQuote.priceCalculationId,
+      )
+    : undefined;
+  const next = nextQuote?.priceCalculationId
+    ? caseData.priceCalculations.find(
+        (candidate) => candidate.id === nextQuote.priceCalculationId,
+      )
+    : undefined;
+  const comparison =
+    calculation && next
+      ? { from: calculation, to: next }
+      : calculation && previous
+        ? { from: previous, to: calculation }
+        : undefined;
+  return {
+    calculation,
+    comparison,
+    quoteReferences: caseData.commercial.quoteVersions
+      .filter((candidate) => candidate.priceCalculationId === calculationId)
+      .map((candidate) => candidate.reference),
+  };
+}
+
+function timelineHistoryCategory(
+  type: CaseTimelineItem["type"],
+): "communication" | "decision" | "document" {
+  if (type === "lead" || type === "message") return "communication";
+  if (type === "contract_request" || type === "work") return "decision";
+  return "document";
+}
+
+const timelineStageByType: Record<
+  CaseTimelineItem["type"],
+  CaseProcessStageId
+> = {
+  change: "work",
+  contract: "agreement",
+  contract_request: "agreement",
+  document: "completion",
+  invoice: "completion",
+  lead: "contact",
+  measurement: "measurement",
+  message: "contact",
+  price: "commercial",
+  quote: "commercial",
+  warranty: "completion",
+  work: "work",
+};
+
+function latestStageTimestamp(
+  stage: CaseProcessStageId,
+  timeline: readonly CaseTimelineItem[],
+) {
+  return timeline.find((item) => timelineStageByType[item.type] === stage)?.at;
 }
 
 function timelineHistorySummary(
@@ -233,8 +387,10 @@ function timelineHistorySummary(
   if (item.type === "measurement" && caseData.measurement?.id === entityId) {
     return caseData.measurement.confidenceReasoning;
   }
-  if (item.type === "price" && caseData.price?.id === entityId) {
-    return caseData.price.adjustmentReason;
+  if (item.type === "price") {
+    return caseData.priceCalculations.find(
+      (calculation) => calculation.id === entityId,
+    )?.adjustmentReason;
   }
   if (item.type === "quote") {
     return caseData.commercial.quoteVersions.find(
@@ -263,6 +419,142 @@ function timelineHistorySummary(
     return caseData.warranty.scope;
   }
   return undefined;
+}
+
+const historyFactCopy = {
+  lt: {
+    classification: "Dokumento tipas",
+    createdOutputs: "Sukurti pasiūlymai",
+    owner: "Susieta su",
+    source: "Matavimo šaltinis",
+    versionChange: "Versijų pakeitimas",
+  },
+  en: {
+    classification: "Document type",
+    createdOutputs: "Quotes created",
+    owner: "Linked to",
+    source: "Measurement source",
+    versionChange: "Version change",
+  },
+  nb: {
+    classification: "Dokumenttype",
+    createdOutputs: "Opprettede tilbud",
+    owner: "Tilknyttet",
+    source: "Målegrunnlag",
+    versionChange: "Versjonsendring",
+  },
+} as const;
+
+function timelineHistoryFacts(
+  item: CaseTimelineItem,
+  caseData: AdminCaseWorkspace,
+  locale: PanelLocale,
+): CaseHistoryEventFact[] {
+  const entityId = timelineEntityId(item);
+  if (!entityId) return [];
+  const labels = historyFactCopy[locale];
+
+  if (item.type === "price") {
+    const lineage = priceLineage(entityId, caseData);
+    const measurement = caseData.measurement;
+    return [
+      {
+        label: labels.versionChange,
+        value: lineage.comparison
+          ? `${lineage.comparison.from.reference} → ${lineage.comparison.to.reference}`
+          : undefined,
+      },
+      {
+        label: labels.source,
+        value:
+          measurement && lineage.calculation?.measurementId === measurement.id
+            ? measurement.reference
+            : lineage.calculation?.measurementVersion
+              ? `V${lineage.calculation.measurementVersion}`
+              : undefined,
+      },
+      {
+        label: labels.createdOutputs,
+        value: lineage.quoteReferences.join(", ") || undefined,
+      },
+    ];
+  }
+
+  if (item.type === "quote" || item.type === "contract") {
+    const version = [
+      ...caseData.commercial.quoteVersions,
+      ...caseData.commercial.contractVersions,
+    ].find(
+      (candidate) => candidate.kind === item.type && candidate.id === entityId,
+    );
+    return version?.supersedesReference
+      ? [
+          {
+            label: labels.versionChange,
+            value: `${version.supersedesReference} → ${version.reference}`,
+          },
+        ]
+      : [];
+  }
+
+  if (item.type === "document") {
+    const document = caseData.documents.find(
+      (candidate) => candidate.id === entityId,
+    );
+    return document
+      ? [
+          {
+            label: labels.classification,
+            value: document.classification
+              ? metadataLabel(locale, document.classification)
+              : undefined,
+          },
+          {
+            label: labels.owner,
+            value: documentOwnerReference(document, caseData),
+          },
+        ]
+      : [];
+  }
+
+  return [];
+}
+
+function documentOwnerReference(
+  document: AdminCaseWorkspace["documents"][number],
+  caseData: AdminCaseWorkspace,
+) {
+  const ownerId = Number(document.ownerId);
+  if (!Number.isSafeInteger(ownerId) || ownerId <= 0) return undefined;
+  if (document.ownerType === "lead") return `#${caseData.lead.id}`;
+  if (
+    document.ownerType === "roof-measurement" &&
+    caseData.measurement?.id === ownerId
+  )
+    return caseData.measurement.reference;
+  if (document.ownerType === "quote")
+    return caseData.commercial.quoteVersions.find((item) => item.id === ownerId)
+      ?.reference;
+  if (document.ownerType === "contract")
+    return caseData.commercial.contractVersions.find(
+      (item) => item.id === ownerId,
+    )?.reference;
+  if (document.ownerType === "change-agreement")
+    return caseData.changes.find((item) => item.id === ownerId)?.reference;
+  if (["work", "work-order"].includes(document.ownerType || ""))
+    return caseData.workOrder?.id === ownerId
+      ? caseData.workOrder.reference
+      : undefined;
+  if (document.ownerType === "invoice-record")
+    return caseData.invoice?.id === ownerId
+      ? caseData.invoice.reference
+      : caseData.officialInvoices.find((item) => item.id === ownerId)
+          ?.reference;
+  if (document.ownerType === "warranty")
+    return caseData.warranty?.id === ownerId
+      ? caseData.warranty.reference
+      : undefined;
+  return document.ownerType ? `${document.ownerType} · #${ownerId}` : undefined;
 }
 
 function Status({
@@ -621,22 +913,32 @@ export default async function AdminCasePage({
     success: "text-success",
     neutral: "text-white/70",
   }[primaryState.tone];
+  const processTimestamp = (stage: CaseProcessStageId) => {
+    const value = latestStageTimestamp(stage, caseData.timeline);
+    return value ? formatDate(value) : undefined;
+  };
   const processStageContent: Partial<
-    Record<typeof primaryState.processStage, CaseProcessStageContent>
+    Record<CaseProcessStageId, CaseProcessStageContent>
   > = {
-    contact: { inspectorTargetId: caseWorkspaceSectionByKey.customer.id },
+    contact: {
+      inspectorTargetId: caseWorkspaceSectionByKey.customer.id,
+      timestamp: processTimestamp("contact"),
+    },
     measurement: {
       relatedLinks: [],
       inspectorTargetId: caseWorkspaceSectionByKey.measurement.id,
+      timestamp: processTimestamp("measurement"),
     },
     commercial: {
       relatedLinks: caseData.commercial.quoteVersions.map((entity) =>
         processEntityLink(entity, {
           href: `/api/admin/quotes/${entity.id}/pdf`,
           kind: "document",
+          status: statusLabel(user.interfaceLanguage, entity.status),
         }),
       ),
       inspectorTargetId: caseWorkspaceSectionByKey.commercial.id,
+      timestamp: processTimestamp("commercial"),
     },
     agreement: {
       relatedLinks: [
@@ -646,12 +948,17 @@ export default async function AdminCasePage({
                 processEntityLink(entity, {
                   href: entity.pdfHref,
                   kind: "document",
+                  status: statusLabel(user.interfaceLanguage, entity.status, {
+                    companySignedAt: entity.companySignedAt,
+                    contract: true,
+                  }),
                 }),
               ]
             : [],
         ),
       ],
       inspectorTargetId: caseWorkspaceSectionByKey.contract.id,
+      timestamp: processTimestamp("agreement"),
     },
     work: {
       relatedLinks: [
@@ -659,10 +966,12 @@ export default async function AdminCasePage({
           processEntityLink(entity, {
             href: `/api/admin/change-agreements/${entity.id}/pdf`,
             kind: "document",
+            status: statusLabel(user.interfaceLanguage, entity.status),
           }),
         ),
       ],
       inspectorTargetId: caseWorkspaceSectionByKey.work.id,
+      timestamp: processTimestamp("work"),
     },
     completion: {
       relatedLinks: [
@@ -675,6 +984,7 @@ export default async function AdminCasePage({
         })),
       ],
       inspectorTargetId: caseWorkspaceSectionByKey.documents.id,
+      timestamp: processTimestamp("completion"),
     },
   };
   const primaryEvidenceLinks = primaryState.evidence
@@ -1393,19 +1703,54 @@ export default async function AdminCasePage({
           activeStageId={processActiveStage}
           activeStageState={primaryState.blocker ? "blocked" : "current"}
           historyItems={caseData.timeline.map((item) => {
+            const entityId = timelineEntityId(item);
             const eventType = timelineTypeLabel(
               user.interfaceLanguage,
               item.type,
             );
             const eventStatus = item.status
-              ? statusLabel(user.interfaceLanguage, item.status)
+              ? item.type === "document"
+                ? metadataLabel(user.interfaceLanguage, item.status)
+                : statusLabel(user.interfaceLanguage, item.status)
               : undefined;
+            const links = timelineHistoryLinks(item, caseData);
+            const lineage =
+              item.type === "price" && entityId
+                ? priceLineage(entityId, caseData)
+                : undefined;
             return {
+              artifactCount: links.filter((link) => link.kind !== "source")
+                .length,
+              category: timelineHistoryCategory(item.type),
               content: (
                 <CaseHistoryEventDetail
+                  detail={
+                    lineage?.calculation ? (
+                      <CasePriceCalculationDetail
+                        calculation={lineage.calculation}
+                        comparison={lineage.comparison}
+                        formatMoney={nok}
+                        locale={user.interfaceLanguage}
+                        measurementReference={
+                          lineage.calculation.measurementId ===
+                          caseData.measurement?.id
+                            ? caseData.measurement?.reference
+                            : lineage.calculation.measurementVersion
+                              ? `V${lineage.calculation.measurementVersion}`
+                              : undefined
+                        }
+                        quoteReferences={lineage.quoteReferences}
+                      />
+                    ) : undefined
+                  }
                   eventId={item.id}
                   eventType={eventType}
-                  links={timelineHistoryLinks(item, caseData)}
+                  facts={timelineHistoryFacts(
+                    item,
+                    caseData,
+                    user.interfaceLanguage,
+                  )}
+                  links={links}
                   locale={user.interfaceLanguage}
                   occurredAt={formatDate(item.at)}
                   reference={item.title}

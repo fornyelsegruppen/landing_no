@@ -63,7 +63,13 @@ type CaseWorkspaceProcessCopy = {
   discardChanges: string;
   help: string;
   history: string;
+  historyArtifacts: string;
+  historyCommunication: string;
+  historyDecisions: string;
+  historyEmpty: string;
+  historyFilters: string;
   historyHelp: string;
+  historyAll: string;
   inspectorHelp: string;
   openInspector: string;
   openStage: string;
@@ -126,7 +132,13 @@ const nb = {
     details: "Saksdetaljer",
     discardChanges: "Du har ulagrede endringer. Vil du lukke og forkaste dem?",
     history: "Hele historikken",
+    historyArtifacts: "Dokumenter",
+    historyCommunication: "Kommunikasjon",
+    historyDecisions: "Beslutninger",
+    historyEmpty: "Ingen hendelser passer til dette filteret.",
+    historyFilters: "Filtrer historikken",
     historyHelp: "Vis kronologisk handlings- og hendelseshistorikk",
+    historyAll: "Alle",
     inspectorHelp:
       "Detaljene åpnes uten at du mister plasseringen din i saken.",
     openInspector: "Vis alle detaljer",
@@ -262,7 +274,13 @@ const lt = {
     details: "Bylos informacija",
     discardChanges: "Yra neišsaugotų pakeitimų. Uždaryti ir juos prarasti?",
     history: "Visa istorija",
+    historyArtifacts: "Dokumentai",
+    historyCommunication: "Komunikacija",
+    historyDecisions: "Sprendimai",
+    historyEmpty: "Šiam filtrui įvykių nėra.",
+    historyFilters: "Filtruoti istoriją",
     historyHelp: "Rodyti chronologinę veiksmų ir įvykių istoriją",
+    historyAll: "Visi",
     inspectorHelp:
       "Informacija atidaroma neprarandant dabartinės vietos byloje.",
     openInspector: "Rodyti visą informaciją",
@@ -399,7 +417,13 @@ const en = {
     details: "Case details",
     discardChanges: "You have unsaved changes. Close and discard them?",
     history: "Full history",
+    historyArtifacts: "Documents",
+    historyCommunication: "Communication",
+    historyDecisions: "Decisions",
+    historyEmpty: "No events match this filter.",
+    historyFilters: "Filter history",
     historyHelp: "Show the chronological action and event history",
+    historyAll: "All",
     inspectorHelp:
       "Details open without losing your current position in the case.",
     openInspector: "Show all details",

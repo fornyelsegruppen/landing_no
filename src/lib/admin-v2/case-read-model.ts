@@ -221,10 +221,37 @@ export type CaseMessage = CaseEntity & {
 
 export type CaseDocument = {
   classification?: string;
+  createdAt?: string;
   filename: string;
   href: string;
   id: number;
   mimeType?: string;
+  ownerId?: string;
+  ownerType?: string;
+};
+
+export type CasePriceCalculation = CaseEntity & {
+  adjustmentReason?: string;
+  discountOre?: number;
+  inputHash?: string;
+  lineItems: Array<{
+    code: string;
+    quantityTenths?: number;
+    totalExVatOre?: number;
+    unitPriceExVatOre?: number;
+  }>;
+  maximumTotalIncVatOre?: number;
+  measurementId?: number;
+  measurementVersion?: number;
+  priceRuleId?: number;
+  priceRuleVersion?: number;
+  quantityTenths?: number;
+  serviceKey?: string;
+  standardSubtotalExVatOre?: number;
+  subtotalExVatOre?: number;
+  toleranceBasisPoints?: number;
+  totalIncVatOre?: number;
+  vatOre?: number;
 };
 
 export type CaseTimelineItem = {
@@ -237,6 +264,7 @@ export type CaseTimelineItem = {
     | "change"
     | "contract"
     | "contract_request"
+    | "document"
     | "invoice"
     | "lead"
     | "measurement"
@@ -345,6 +373,7 @@ export type AdminCase = {
     unitPriceExVatOre?: number;
     vatOre?: number;
   };
+  priceCalculations: CasePriceCalculation[];
   quote?: CaseEntity & {
     declineComment?: string;
     declinedAt?: string;
@@ -563,6 +592,61 @@ function canonicalPriceReferences(
     usedVersions.add(fallbackVersion);
   }
   return references;
+}
+
+function mapPriceCalculation(
+  raw: Record<string, unknown>,
+  reference: string,
+): CasePriceCalculation {
+  const input =
+    raw.inputSnapshot && typeof raw.inputSnapshot === "object"
+      ? asRecord(raw.inputSnapshot)
+      : {};
+  const output =
+    raw.outputSnapshot && typeof raw.outputSnapshot === "object"
+      ? asRecord(raw.outputSnapshot)
+      : {};
+  const rule =
+    input.rule && typeof input.rule === "object" ? asRecord(input.rule) : {};
+  const adjustmentValue = output.adjustment || input.commercialAdjustment;
+  const adjustment =
+    adjustmentValue && typeof adjustmentValue === "object"
+      ? asRecord(adjustmentValue)
+      : {};
+  const lineItems = Array.isArray(output.lineItems)
+    ? output.lineItems
+        .filter((item): item is Record<string, unknown> =>
+          Boolean(item && typeof item === "object" && !Array.isArray(item)),
+        )
+        .map((item) => ({
+          code: stringValue(item.code) || stringValue(rule.serviceKey) || "—",
+          quantityTenths: numberValue(item.quantityTenths),
+          totalExVatOre: numberValue(item.totalExVatOre),
+          unitPriceExVatOre: numberValue(item.unitPriceExVatOre),
+        }))
+    : [];
+
+  return {
+    ...entity("price-calculations", raw),
+    reference,
+    adjustmentReason: stringValue(adjustment.reason),
+    discountOre: numberValue(adjustment.discountOre),
+    inputHash: stringValue(raw.inputHash),
+    lineItems,
+    maximumTotalIncVatOre: numberValue(raw.maximumTotalIncVatOre),
+    measurementId: relationId(raw.measurement),
+    measurementVersion: numberValue(input.measurementVersion),
+    priceRuleId: relationId(raw.priceRule) || numberValue(rule.id),
+    priceRuleVersion: numberValue(rule.version),
+    quantityTenths:
+      numberValue(output.quantityTenths) || lineItems[0]?.quantityTenths,
+    serviceKey: stringValue(rule.serviceKey) || lineItems[0]?.code,
+    standardSubtotalExVatOre: numberValue(output.standardSubtotalExVatOre),
+    subtotalExVatOre: numberValue(raw.subtotalExVatOre),
+    toleranceBasisPoints: numberValue(output.toleranceBasisPoints),
+    totalIncVatOre: numberValue(raw.totalIncVatOre),
+    vatOre: numberValue(raw.vatOre),
+  };
 }
 
 function canonicalContractRequestReferences(
@@ -838,6 +922,7 @@ export async function loadAdminCase(
         version: numberValue(item.version),
         status: stringValue(item.status),
         supersedesId: relationId(item.supersedes),
+        priceCalculationId: relationId(item.priceCalculation),
         serviceDescription: stringValue(item.serviceDescription),
         totalIncVatOre: numberValue(item.totalIncVatOre),
         maximumTotalIncVatOre: numberValue(item.maximumTotalIncVatOre),
@@ -1171,6 +1256,28 @@ export async function loadAdminCase(
     aiAnalysis: message.aiAnalysis,
     replyToMessageId: relationId(message.replyToMessage) || undefined,
   }));
+  const mappedPriceCalculations = prices.map((item) =>
+    mapPriceCalculation(
+      item,
+      priceReferences.get(numericId(item.id)) ||
+        stringValue(item.reference) ||
+        `PB-${leadId}-V1`,
+    ),
+  );
+  const mappedDocuments: CaseDocument[] = mediaResult.docs.map((raw) => {
+    const item = asRecord(raw);
+    const id = numericId(item.id);
+    return {
+      id,
+      filename: stringValue(item.filename) || `#${id}`,
+      classification: stringValue(item.classification),
+      createdAt: stringValue(item.createdAt),
+      mimeType: stringValue(item.mimeType),
+      ownerId: stringValue(item.ownerId),
+      ownerType: stringValue(item.ownerType),
+      href: `/api/admin/media/${id}`,
+    };
+  });
 
   const nextAction = deriveCaseNextAction({
     aiRecommendedNextAction:
@@ -1351,6 +1458,14 @@ export async function loadAdminCase(
         stringValue(item.reference) || "Garanti",
       ),
     ),
+    ...mappedDocuments.map((document) => ({
+      at: document.createdAt || new Date(0).toISOString(),
+      href: document.href,
+      id: `document-${document.id}`,
+      status: document.classification,
+      title: document.filename,
+      type: "document" as const,
+    })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return {
@@ -1403,6 +1518,7 @@ export async function loadAdminCase(
     },
     measurement,
     price,
+    priceCalculations: mappedPriceCalculations,
     quote,
     quoteOptions,
     contract,
@@ -1473,17 +1589,7 @@ export async function loadAdminCase(
       workStatusAtReceipt: stringValue(item.workStatusAtReceipt),
     })),
     messages: mappedMessages,
-    documents: mediaResult.docs.map((raw) => {
-      const item = asRecord(raw);
-      const id = numericId(item.id);
-      return {
-        id,
-        filename: stringValue(item.filename) || `#${id}`,
-        classification: stringValue(item.classification),
-        mimeType: stringValue(item.mimeType),
-        href: `/api/admin/media/${id}`,
-      };
-    }),
+    documents: mappedDocuments,
     timeline,
     nextAction,
   };
