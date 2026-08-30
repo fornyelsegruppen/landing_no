@@ -29,15 +29,15 @@ export function CaseStatusStamp({
   tone = "accent",
 }: CaseStatusStampProps) {
   return (
-    <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <span
-        className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs leading-tight font-bold tracking-wider [overflow-wrap:anywhere] uppercase ${toneClasses[tone]}`}
-      >
+    <span
+      className={`inline-flex max-w-full min-w-0 flex-col items-start rounded-2xl border px-3 py-1.5 ${toneClasses[tone]}`}
+    >
+      <span className="max-w-full text-xs leading-tight font-bold tracking-wider [overflow-wrap:anywhere] uppercase">
         {label}
       </span>
       {timestamp ? (
         <time
-          className="text-muted-foreground text-[.7rem] leading-tight font-semibold whitespace-nowrap"
+          className="mt-1 text-[.68rem] leading-none font-semibold tracking-normal whitespace-nowrap normal-case opacity-85"
           dateTime={dateTime}
         >
           {timestamp}
