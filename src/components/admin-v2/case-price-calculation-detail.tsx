@@ -121,7 +121,7 @@ export function CasePriceCalculationDetail({
   return (
     <section
       aria-labelledby={`price-calculation-${calculation.id}-title`}
-      className="border-accent/30 bg-accent/[.055] grid gap-4 rounded-2xl border p-4"
+      className="border-accent/30 bg-accent/[.055] grid max-w-full min-w-0 gap-4 overflow-hidden rounded-2xl border p-4"
       data-price-calculation-detail={calculation.id}
     >
       <div className="flex items-center gap-3">
@@ -146,15 +146,17 @@ export function CasePriceCalculationDetail({
           <p className="text-muted-foreground text-xs font-bold tracking-wide uppercase">
             {labels.versionChange}
           </p>
-          <div className="mt-2 flex min-w-0 items-center gap-2 font-bold">
-            <span className="min-w-0 break-all">
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 font-bold">
+            <span className="min-w-0 [overflow-wrap:anywhere]">
               {comparison.from.reference}
             </span>
             <ArrowRight
               aria-hidden="true"
               className="text-accent size-4 shrink-0"
             />
-            <span className="min-w-0 break-all">{comparison.to.reference}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              {comparison.to.reference}
+            </span>
           </div>
           {changes.length ? (
             <div className="mt-3 grid gap-2" aria-label={labels.changed}>
@@ -164,7 +166,7 @@ export function CasePriceCalculationDetail({
                   key={label}
                 >
                   <span className="text-muted-foreground">{label}</span>
-                  <span className="flex items-center gap-1.5 text-right font-semibold">
+                  <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 text-right font-semibold [overflow-wrap:anywhere]">
                     <span>{formatMoney(from)}</span>
                     <ArrowRight
                       aria-hidden="true"
@@ -214,11 +216,13 @@ export function CasePriceCalculationDetail({
           .filter(([, value]) => value && value !== "—")
           .map(([label, value]) => (
             <div
-              className="grid grid-cols-[minmax(6.5rem,.75fr)_minmax(0,1.25fr)] gap-3 py-2.5 text-sm"
+              className="grid min-w-0 gap-1 py-2.5 text-sm sm:grid-cols-[minmax(6.5rem,.75fr)_minmax(0,1.25fr)] sm:gap-3"
               key={label}
             >
               <dt className="text-muted-foreground">{label}</dt>
-              <dd className="text-right font-semibold break-words">{value}</dd>
+              <dd className="min-w-0 font-semibold [overflow-wrap:anywhere] sm:text-right">
+                {value}
+              </dd>
             </div>
           ))}
       </dl>
@@ -267,7 +271,7 @@ export function CasePriceCalculationDetail({
           <div className="mt-2 flex flex-wrap gap-2">
             {quoteReferences.map((reference) => (
               <span
-                className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-bold"
+                className="max-w-full rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-bold [overflow-wrap:anywhere]"
                 key={reference}
               >
                 {reference}

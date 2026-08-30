@@ -154,7 +154,7 @@ export function CaseInspector({
           <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 sm:px-6 sm:pt-5">
             <div className="min-w-0 flex-1">
               <Dialog.Title
-                className="text-xl font-bold break-words sm:text-2xl"
+                className="text-xl font-bold [overflow-wrap:anywhere] sm:text-2xl"
                 id={titleId}
               >
                 {title}
@@ -180,7 +180,7 @@ export function CaseInspector({
           </header>
 
           <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6"
+            className="min-h-0 max-w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6"
             data-case-inspector-body=""
             data-case-inspector-scroll=""
             ref={scrollContainerRef}

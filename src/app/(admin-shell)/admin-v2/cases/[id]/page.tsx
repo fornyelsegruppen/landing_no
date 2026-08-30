@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ExternalLink,
+  Mail,
+  MapPin,
+  Phone,
+} from "lucide-react";
 import { CaseActionPanel } from "@/components/admin-v2/case-action-panel";
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
@@ -29,6 +36,7 @@ import {
   type CaseHistoryEventLink,
 } from "@/components/admin-v2/case-history-event-detail";
 import { CasePriceCalculationDetail } from "@/components/admin-v2/case-price-calculation-detail";
+import { CaseStatusStamp } from "@/components/admin-v2/case-status-stamp";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
   QuoteDeclineWorkbench,
@@ -560,15 +568,19 @@ function documentOwnerReference(
 function Status({
   companySignedAt,
   contract,
+  dateTime,
   label,
   locale,
+  timestamp,
   tone,
   value,
 }: {
   companySignedAt?: string;
   contract?: boolean;
+  dateTime?: string;
   label?: string;
   locale?: "nb" | "lt" | "en";
+  timestamp?: string;
   tone?: CaseWorkspaceTone | "accent" | "danger";
   value?: string;
 }) {
@@ -578,25 +590,13 @@ function Status({
       ? statusLabel(locale, value, { contract, companySignedAt })
       : "");
 
-  const toneClass =
-    tone === "danger" || tone === "critical"
-      ? "border-danger/45 bg-danger/15 text-danger"
-      : tone === "success"
-        ? "border-success/45 bg-success/15 text-success"
-        : tone === "warning"
-          ? "border-warning/45 bg-warning/15 text-warning"
-          : tone === "waiting"
-            ? "border-white/25 bg-white/10 text-white/85"
-            : tone === "neutral"
-              ? "border-white/20 bg-white/5 text-white/75"
-              : "border-accent/25 bg-accent/10 text-accent";
-
   return displayedLabel ? (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold tracking-wider uppercase ${toneClass}`}
-    >
-      {displayedLabel}
-    </span>
+    <CaseStatusStamp
+      dateTime={dateTime}
+      label={displayedLabel}
+      timestamp={timestamp}
+      tone={tone}
+    />
   ) : null;
 }
 
@@ -812,6 +812,12 @@ export default async function AdminCasePage({
     value
       ? formatNorwayDateTime(value, panelDateLocale(user.interfaceLanguage))
       : "—";
+  const statusStamp = (...values: Array<string | undefined>) => {
+    const value = values.find(Boolean);
+    return value
+      ? { dateTime: value, timestamp: formatDate(value) }
+      : ({} as const);
+  };
   const nok = (ore?: number) =>
     typeof ore === "number"
       ? new Intl.NumberFormat(panelDateLocale(user.interfaceLanguage), {
@@ -858,6 +864,21 @@ export default async function AdminCasePage({
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
+  const caseHeaderMetrics = [
+    {
+      help: workingStatus,
+      label: copy.workingVersion,
+      value: workingReference,
+    },
+    {
+      help: effectiveCommercial ? copy.signedByBoth : copy.noneEffectiveHelp,
+      label: copy.effectiveContract,
+      value: effectiveReference,
+    },
+    { label: copy.priceIncVat, value: commercialAmount },
+    { label: copy.maximum, value: commercialMaximum },
+    { label: copy.deposit, value: commercialDeposit },
+  ];
   const primaryMutationAction =
     primaryState.action.mode === "mutation"
       ? {
@@ -1065,6 +1086,12 @@ export default async function AdminCasePage({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <strong className="break-words">{latestMessage.subject}</strong>
               <Status
+                {...statusStamp(
+                  latestMessage.deliveredAt,
+                  latestMessage.sentAt,
+                  latestMessage.updatedAt,
+                  latestMessage.createdAt,
+                )}
                 locale={user.interfaceLanguage}
                 value={latestMessage.status}
               />
@@ -1086,6 +1113,10 @@ export default async function AdminCasePage({
             </p>
           </div>
           <Status
+            {...statusStamp(
+              caseData.measurement.updatedAt,
+              caseData.measurement.createdAt,
+            )}
             locale={user.interfaceLanguage}
             value={caseData.measurement.status}
           />
@@ -1157,6 +1188,11 @@ export default async function AdminCasePage({
               </p>
             </div>
             <Status
+              {...statusStamp(
+                caseData.quote.declinedAt,
+                caseData.quote.updatedAt,
+                caseData.quote.createdAt,
+              )}
               locale={user.interfaceLanguage}
               value={caseData.quote.status}
             />
@@ -1171,6 +1207,12 @@ export default async function AdminCasePage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <strong>{caseData.contract.reference}</strong>
               <Status
+                {...statusStamp(
+                  caseData.contract.companySignedAt,
+                  caseData.contract.signedAt,
+                  caseData.contract.updatedAt,
+                  caseData.contract.createdAt,
+                )}
                 companySignedAt={caseData.contract.companySignedAt}
                 contract
                 locale={user.interfaceLanguage}
@@ -1198,6 +1240,11 @@ export default async function AdminCasePage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <strong>{activeContractRequest.reference}</strong>
               <Status
+                {...statusStamp(
+                  activeContractRequest.closedAt,
+                  activeContractRequest.reviewedAt,
+                  activeContractRequest.receivedAt,
+                )}
                 locale={user.interfaceLanguage}
                 value={activeContractRequest.status}
               />
@@ -1211,6 +1258,12 @@ export default async function AdminCasePage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <strong>{caseData.workOrder.reference}</strong>
           <Status
+            {...statusStamp(
+              caseData.workOrder.completedAt,
+              caseData.workOrder.documentationSubmittedAt,
+              caseData.workOrder.updatedAt,
+              caseData.workOrder.createdAt,
+            )}
             locale={user.interfaceLanguage}
             value={caseData.workOrder.status}
           />
@@ -1258,6 +1311,10 @@ export default async function AdminCasePage({
             <strong>{caseData.invoice?.reference || "—"}</strong>
             {caseData.invoice ? (
               <Status
+                {...statusStamp(
+                  caseData.invoice.updatedAt,
+                  caseData.invoice.createdAt,
+                )}
                 locale={user.interfaceLanguage}
                 value={caseData.invoice.status}
               />
@@ -1272,6 +1329,10 @@ export default async function AdminCasePage({
             <strong>{caseData.warranty?.reference || "—"}</strong>
             {caseData.warranty ? (
               <Status
+                {...statusStamp(
+                  caseData.warranty.updatedAt,
+                  caseData.warranty.createdAt,
+                )}
                 locale={user.interfaceLanguage}
                 value={caseData.warranty.status}
               />
@@ -1396,7 +1457,7 @@ export default async function AdminCasePage({
       </Link>
 
       <header
-        className={`rounded-3xl border p-5 sm:p-7 ${
+        className={`rounded-3xl border p-4 sm:p-5 lg:p-7 ${
           primaryState.tone === "critical"
             ? "border-danger/40 bg-[linear-gradient(135deg,rgba(235,87,87,.16),rgba(23,28,38,.78)_42%)]"
             : primaryState.tone === "success"
@@ -1404,16 +1465,25 @@ export default async function AdminCasePage({
               : "border-white/10 bg-[linear-gradient(135deg,rgba(232,163,23,.13),rgba(23,28,38,.75)_42%)]"
         }`}
       >
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-5">
           <div className="min-w-0">
             <p className="text-accent text-xs font-bold tracking-[.2em] uppercase">
               {copy.case} #{caseData.lead.id}
             </p>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight break-words sm:text-4xl">
+            <h1 className="mt-1.5 line-clamp-2 text-xl leading-tight font-bold tracking-tight [overflow-wrap:anywhere] sm:text-2xl lg:mt-2 lg:text-4xl">
               {caseData.lead.name}
             </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Status label={workspaceStatus} tone={primaryState.tone} />
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 lg:mt-3 lg:gap-3">
+              <Status
+                {...statusStamp(
+                  latestStageTimestamp(
+                    primaryState.processStage,
+                    caseData.timeline,
+                  ),
+                )}
+                label={workspaceStatus}
+                tone={primaryState.tone}
+              />
               <span className="text-muted-foreground text-sm">
                 {serviceNames[caseData.lead.inquiryType || ""] ||
                   caseData.lead.inquiryType ||
@@ -1421,60 +1491,91 @@ export default async function AdminCasePage({
               </span>
             </div>
           </div>
-          <div className="grid gap-1 text-sm lg:text-right">
-            <span className="text-muted-foreground">{copy.responsible}</span>
-            <strong>{caseData.lead.assignedTo || copy.unassigned}</strong>
-            <span className="text-muted-foreground mt-2">{copy.due}</span>
-            <strong
-              className={
-                due === copy.dueNow
-                  ? primaryState.tone === "critical"
-                    ? "text-danger"
-                    : "text-accent"
-                  : undefined
-              }
-            >
-              {due}
-            </strong>
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/8 bg-black/10 p-3 text-sm lg:block lg:border-0 lg:bg-transparent lg:p-0 lg:text-right">
+            <div className="min-w-0">
+              <span className="text-muted-foreground block text-xs">
+                {copy.responsible}
+              </span>
+              <strong className="mt-0.5 block truncate">
+                {caseData.lead.assignedTo || copy.unassigned}
+              </strong>
+            </div>
+            <div className="min-w-0 lg:mt-2">
+              <span className="text-muted-foreground block text-xs">
+                {copy.due}
+              </span>
+              <strong
+                className={`mt-0.5 block truncate ${
+                  due === copy.dueNow
+                    ? primaryState.tone === "critical"
+                      ? "text-danger"
+                      : "text-accent"
+                    : ""
+                }`}
+              >
+                {due}
+              </strong>
+            </div>
           </div>
         </div>
-        <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-5 xl:grid-cols-5">
-          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
-            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              {copy.workingVersion}
-            </dt>
-            <dd className="mt-1 font-bold break-words">{workingReference}</dd>
-            <dd className="text-muted-foreground mt-1 text-xs">
-              {workingStatus}
-            </dd>
-          </div>
-          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
-            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              {copy.effectiveContract}
-            </dt>
-            <dd className="mt-1 font-bold break-words">{effectiveReference}</dd>
-            <dd className="text-muted-foreground mt-1 text-xs">
-              {effectiveCommercial ? copy.signedByBoth : copy.noneEffectiveHelp}
-            </dd>
-          </div>
-          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
-            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              {copy.priceIncVat}
-            </dt>
-            <dd className="mt-1 font-bold break-words">{commercialAmount}</dd>
-          </div>
-          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
-            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              {copy.maximum}
-            </dt>
-            <dd className="mt-1 font-bold break-words">{commercialMaximum}</dd>
-          </div>
-          <div className="col-span-2 min-w-0 rounded-2xl bg-black/15 p-3 xl:col-span-1">
-            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              {copy.deposit}
-            </dt>
-            <dd className="mt-1 font-bold break-words">{commercialDeposit}</dd>
-          </div>
+        <details className="group mt-3 border-t border-white/10 pt-3 lg:hidden">
+          <summary className="focus-visible:outline-accent flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-xl bg-black/10 px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2">
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold group-open:hidden">
+                {workspaceCopy.process.openStage}
+              </span>
+              <span className="hidden text-sm font-bold group-open:block">
+                {workspaceCopy.process.closeStage}
+              </span>
+              <span className="text-muted-foreground mt-0.5 block truncate text-xs">
+                {workingReference} · {effectiveReference} · {commercialAmount}
+              </span>
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+            />
+          </summary>
+          <dl className="mt-3 grid grid-cols-2 gap-2">
+            {caseHeaderMetrics.map((item, index) => (
+              <div
+                className={`min-w-0 rounded-xl bg-black/15 p-3 ${index === caseHeaderMetrics.length - 1 ? "col-span-2" : ""}`}
+                key={item.label}
+              >
+                <dt className="text-muted-foreground text-[.68rem] font-bold tracking-wider uppercase">
+                  {item.label}
+                </dt>
+                <dd className="mt-1 text-sm font-bold [overflow-wrap:anywhere]">
+                  {item.value}
+                </dd>
+                {item.help ? (
+                  <dd className="text-muted-foreground mt-1 text-xs [overflow-wrap:anywhere]">
+                    {item.help}
+                  </dd>
+                ) : null}
+              </div>
+            ))}
+          </dl>
+        </details>
+        <dl className="mt-6 hidden grid-cols-5 gap-3 border-t border-white/10 pt-5 lg:grid">
+          {caseHeaderMetrics.map((item) => (
+            <div
+              className="min-w-0 rounded-2xl bg-black/15 p-3"
+              key={item.label}
+            >
+              <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                {item.label}
+              </dt>
+              <dd className="mt-1 font-bold [overflow-wrap:anywhere]">
+                {item.value}
+              </dd>
+              {item.help ? (
+                <dd className="text-muted-foreground mt-1 text-xs [overflow-wrap:anywhere]">
+                  {item.help}
+                </dd>
+              ) : null}
+            </div>
+          ))}
         </dl>
       </header>
 
@@ -1921,6 +2022,10 @@ export default async function AdminCasePage({
                             ) : null}
                           </div>
                           <Status
+                            {...statusStamp(
+                              caseData.measurement.updatedAt,
+                              caseData.measurement.createdAt,
+                            )}
                             locale={user.interfaceLanguage}
                             value={caseData.measurement.status}
                           />
@@ -2072,6 +2177,11 @@ export default async function AdminCasePage({
                             </p>
                           </div>
                           <Status
+                            {...statusStamp(
+                              caseData.quote.declinedAt,
+                              caseData.quote.updatedAt,
+                              caseData.quote.createdAt,
+                            )}
                             locale={user.interfaceLanguage}
                             value={caseData.quote.status}
                           />
@@ -2136,6 +2246,10 @@ export default async function AdminCasePage({
                             </p>
                             <div className="mt-3 flex items-center justify-between">
                               <Status
+                                {...statusStamp(
+                                  option.updatedAt,
+                                  option.createdAt,
+                                )}
                                 locale={user.interfaceLanguage}
                                 value={option.status}
                               />
@@ -2264,6 +2378,12 @@ export default async function AdminCasePage({
                                     </p>
                                   </div>
                                   <Status
+                                    {...statusStamp(
+                                      message.deliveredAt,
+                                      message.sentAt,
+                                      message.updatedAt,
+                                      message.createdAt,
+                                    )}
                                     locale={user.interfaceLanguage}
                                     value={message.status}
                                   />
@@ -2331,6 +2451,12 @@ export default async function AdminCasePage({
                         <div className="flex flex-wrap justify-between gap-3">
                           <strong>{caseData.contract.reference}</strong>
                           <Status
+                            {...statusStamp(
+                              caseData.contract.companySignedAt,
+                              caseData.contract.signedAt,
+                              caseData.contract.updatedAt,
+                              caseData.contract.createdAt,
+                            )}
                             companySignedAt={caseData.contract.companySignedAt}
                             contract
                             locale={user.interfaceLanguage}
@@ -2369,6 +2495,12 @@ export default async function AdminCasePage({
                         <div className="flex flex-wrap justify-between gap-3">
                           <strong>{caseData.workOrder.reference}</strong>
                           <Status
+                            {...statusStamp(
+                              caseData.workOrder.completedAt,
+                              caseData.workOrder.documentationSubmittedAt,
+                              caseData.workOrder.updatedAt,
+                              caseData.workOrder.createdAt,
+                            )}
                             locale={user.interfaceLanguage}
                             value={caseData.workOrder.status}
                           />
@@ -2505,6 +2637,10 @@ export default async function AdminCasePage({
                             <div className="flex justify-between gap-2">
                               <strong>{change.reference}</strong>
                               <Status
+                                {...statusStamp(
+                                  change.updatedAt,
+                                  change.createdAt,
+                                )}
                                 locale={user.interfaceLanguage}
                                 value={change.status}
                               />
@@ -2548,6 +2684,10 @@ export default async function AdminCasePage({
                                 <strong>{caseData.invoice.reference}</strong>
                               </div>
                               <Status
+                                {...statusStamp(
+                                  caseData.invoice.updatedAt,
+                                  caseData.invoice.createdAt,
+                                )}
                                 locale={user.interfaceLanguage}
                                 value={caseData.invoice.status}
                               />
@@ -2605,6 +2745,10 @@ export default async function AdminCasePage({
                                 <strong>{caseData.warranty.reference}</strong>
                               </div>
                               <Status
+                                {...statusStamp(
+                                  caseData.warranty.updatedAt,
+                                  caseData.warranty.createdAt,
+                                )}
                                 locale={user.interfaceLanguage}
                                 value={caseData.warranty.status}
                               />

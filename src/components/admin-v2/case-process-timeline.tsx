@@ -429,7 +429,9 @@ export function CaseProcessTimeline({
                     type="button"
                   >
                     <span className="flex flex-wrap items-center gap-2">
-                      <strong className="text-sm">{item.title}</strong>
+                      <strong className="min-w-0 text-sm [overflow-wrap:anywhere]">
+                        {item.title}
+                      </strong>
                       {item.status ? (
                         <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[.68rem] font-bold tracking-wider text-white/75 uppercase">
                           {item.status}
@@ -445,7 +447,7 @@ export function CaseProcessTimeline({
                         </span>
                       ) : null}
                     </span>
-                    <span className="text-muted-foreground mt-1 block text-xs">
+                    <span className="text-muted-foreground mt-1 block text-xs [overflow-wrap:anywhere]">
                       {item.description}
                     </span>
                   </button>

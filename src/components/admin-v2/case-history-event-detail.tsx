@@ -107,7 +107,7 @@ export function CaseHistoryEventDetail({
 
   return (
     <article
-      className="grid min-w-0 gap-5 rounded-2xl border border-white/12 bg-black/15 p-4 sm:p-5"
+      className="grid max-w-full min-w-0 gap-5 overflow-hidden rounded-2xl border border-white/12 bg-black/15 p-4 sm:p-5"
       data-case-history-event={eventId}
       id={`case-history-event-${eventId}`}
     >
@@ -115,7 +115,7 @@ export function CaseHistoryEventDetail({
         <p className="text-accent text-xs font-bold tracking-wider uppercase">
           {labels.documentation}
         </p>
-        <p className="text-muted-foreground mt-2 text-xs break-all">
+        <p className="text-muted-foreground mt-2 text-xs [overflow-wrap:anywhere]">
           {labels.eventId}: <span className="text-white/85">{eventId}</span>
         </p>
       </div>
@@ -124,13 +124,13 @@ export function CaseHistoryEventDetail({
         <dl className="divide-y divide-white/10 rounded-xl border border-white/10 bg-white/[.025] px-3 sm:grid sm:grid-cols-2 sm:gap-3 sm:divide-y-0 sm:border-0 sm:bg-transparent sm:px-0">
           {visibleFacts.map((fact) => (
             <div
-              className="grid min-w-0 grid-cols-[minmax(6.25rem,.7fr)_minmax(0,1.3fr)] gap-3 py-2.5 sm:block sm:rounded-xl sm:border sm:border-white/10 sm:bg-white/[.025] sm:p-3"
+              className="min-w-0 py-2.5 sm:block sm:rounded-xl sm:border sm:border-white/10 sm:bg-white/[.025] sm:p-3"
               key={`${fact.label}:${fact.value}`}
             >
               <dt className="text-muted-foreground text-xs font-bold tracking-wide uppercase">
                 {fact.label}
               </dt>
-              <dd className="text-right text-sm font-semibold break-words sm:mt-1 sm:text-left">
+              <dd className="mt-1 min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">
                 {fact.value}
               </dd>
             </div>
@@ -159,14 +159,16 @@ export function CaseHistoryEventDetail({
               ...links.filter((link) => link.kind === "artifact"),
             ].map((link) => (
               <a
-                className="focus-visible:outline-accent border-accent/30 bg-accent/8 hover:bg-accent/12 flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 font-bold break-words focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="focus-visible:outline-accent border-accent/30 bg-accent/8 hover:bg-accent/12 flex min-h-12 max-w-full min-w-0 items-center gap-3 rounded-xl border px-4 py-3 font-bold focus-visible:outline-2 focus-visible:outline-offset-2"
                 href={link.href}
                 key={`${link.kind}:${link.href}`}
                 rel="noreferrer"
                 target="_blank"
               >
                 <FileText aria-hidden="true" className="size-5 shrink-0" />
-                <span className="min-w-0 flex-1">{link.label}</span>
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                  {link.label}
+                </span>
                 <span className="sr-only">{labels.openDocument}</span>
                 <ExternalLink aria-hidden="true" className="size-4 shrink-0" />
               </a>
@@ -194,14 +196,16 @@ export function CaseHistoryEventDetail({
             </p>
             {sourceLinks.map((link) => (
               <a
-                className="focus-visible:outline-accent flex min-h-12 items-center gap-3 rounded-xl border border-white/15 bg-white/[.035] px-4 py-3 font-bold break-words hover:bg-white/[.07] focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="focus-visible:outline-accent flex min-h-12 max-w-full min-w-0 items-center gap-3 rounded-xl border border-white/15 bg-white/[.035] px-4 py-3 font-bold hover:bg-white/[.07] focus-visible:outline-2 focus-visible:outline-offset-2"
                 href={link.href}
                 key={`${link.kind || "source"}:${link.href}`}
                 rel="noreferrer"
                 target="_blank"
               >
                 <ExternalLink aria-hidden="true" className="size-5 shrink-0" />
-                <span className="min-w-0 flex-1">{link.label}</span>
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                  {link.label}
+                </span>
                 <span className="sr-only">{labels.openSource}</span>
               </a>
             ))}

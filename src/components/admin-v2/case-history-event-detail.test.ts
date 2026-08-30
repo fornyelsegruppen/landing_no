@@ -40,6 +40,8 @@ describe("case history event detail", () => {
     expect(html).toContain('href="/api/admin/quotes/17/pdf"');
     expect(html).toContain('href="/admin/collections/quotes/17"');
     expect(html).toContain("Techninė informacija");
+    expect(html).toContain("overflow-wrap:anywhere");
+    expect(html).toContain("overflow-hidden");
     expect(html).toContain(
       "Šaltinio įrašas skirtas sistemos administravimui, o ne dokumento peržiūrai.",
     );

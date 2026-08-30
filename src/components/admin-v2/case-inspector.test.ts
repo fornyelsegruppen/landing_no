@@ -66,7 +66,10 @@ describe("case inspector", () => {
     expect(html).toContain('data-case-inspector-scroll=""');
     expect(html).toContain("flex h-[100dvh]");
     expect(html).toContain("shrink-0");
-    expect(html).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
+    expect(html).toContain("min-h-0");
+    expect(html).toContain("min-w-0");
+    expect(html).toContain("max-w-full");
+    expect(html).toContain("overflow-x-hidden overflow-y-auto");
     expect(html).toContain("size-12");
   });
 
