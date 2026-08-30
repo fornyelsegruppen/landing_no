@@ -83,7 +83,9 @@ function VersionCard({
       </div>
 
       {version.serviceDescription ? (
-        <p className="mt-3 text-sm font-semibold">{version.serviceDescription}</p>
+        <p className="mt-3 text-sm font-semibold">
+          {version.serviceDescription}
+        </p>
       ) : null}
       {typeof version.totalIncVatOre === "number" ? (
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -136,7 +138,7 @@ function VersionCard({
               sharedQuoteReference,
             )}
           </p>
-        ) : (
+        ) : version.pdfHref ? (
           <a
             aria-label={`${copy.openDocument} ${version.reference}`}
             className="hover:border-accent/50 hover:text-accent inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-bold"
@@ -149,7 +151,7 @@ function VersionCard({
               : copy.openDocument}
             <ExternalLink aria-hidden="true" className="size-3.5" />
           </a>
-        )}
+        ) : null}
         <details className="basis-full text-xs">
           <summary className="text-muted-foreground hover:text-accent cursor-pointer py-2 font-semibold">
             {copy.technicalInformation}
@@ -192,11 +194,11 @@ function Chain({
   );
   return (
     <div className="min-w-0">
-      <h3 className="text-sm font-bold tracking-wider uppercase text-white/80">
+      <h3 className="text-sm font-bold tracking-wider text-white/80 uppercase">
         {title}
       </h3>
       {ordered.length ? (
-        <div className="mt-3 flex min-w-0 max-w-full items-stretch gap-2 overflow-x-auto pb-2">
+        <div className="mt-3 flex max-w-full min-w-0 items-stretch gap-2 overflow-x-auto pb-2">
           {ordered.map((version, index) => (
             <div className="contents" key={`${version.kind}-${version.id}`}>
               {index ? (
@@ -252,7 +254,7 @@ export function CaseVersionHistory({
   return (
     <section
       aria-labelledby="version-history-title"
-      className="scroll-mt-36 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 sm:p-6"
+      className="bg-background-elevated/75 scroll-mt-36 rounded-3xl border border-white/10 p-5 sm:p-6"
       id="version-history-section"
     >
       <h2 className="text-xl font-bold" id="version-history-title">

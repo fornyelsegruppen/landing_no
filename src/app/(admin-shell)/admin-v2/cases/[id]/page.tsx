@@ -626,9 +626,7 @@ export default async function AdminCasePage({
   > = {
     contact: { inspectorTargetId: caseWorkspaceSectionByKey.customer.id },
     measurement: {
-      relatedLinks: caseData.measurement
-        ? [processEntityLink(caseData.measurement)]
-        : [],
+      relatedLinks: [],
       inspectorTargetId: caseWorkspaceSectionByKey.measurement.id,
     },
     commercial: {
@@ -642,21 +640,21 @@ export default async function AdminCasePage({
     },
     agreement: {
       relatedLinks: [
-        ...caseData.commercial.contractVersions.map((entity) =>
-          processEntityLink(entity, {
-            href: `/admin/collections/contracts/${entity.id}`,
-            kind: "document",
-          }),
-        ),
-        ...caseData.contractRequests.map((entity) =>
-          processEntityLink(entity, { kind: "evidence" }),
+        ...caseData.commercial.contractVersions.flatMap((entity) =>
+          entity.pdfHref
+            ? [
+                processEntityLink(entity, {
+                  href: entity.pdfHref,
+                  kind: "document",
+                }),
+              ]
+            : [],
         ),
       ],
       inspectorTargetId: caseWorkspaceSectionByKey.contract.id,
     },
     work: {
       relatedLinks: [
-        ...(caseData.workOrder ? [processEntityLink(caseData.workOrder)] : []),
         ...caseData.changes.map((entity) =>
           processEntityLink(entity, {
             href: `/api/admin/change-agreements/${entity.id}/pdf`,
@@ -668,12 +666,6 @@ export default async function AdminCasePage({
     },
     completion: {
       relatedLinks: [
-        ...(caseData.invoice
-          ? [processEntityLink(caseData.invoice, { kind: "document" })]
-          : []),
-        ...(caseData.warranty
-          ? [processEntityLink(caseData.warranty, { kind: "document" })]
-          : []),
         ...caseData.documents.map((document) => ({
           accessibleName: document.filename,
           href: document.href,
@@ -687,7 +679,11 @@ export default async function AdminCasePage({
   };
   const primaryEvidenceLinks = primaryState.evidence
     .filter((item): item is typeof item & { href: string } =>
-      Boolean(item.href),
+      Boolean(
+        item.href &&
+        (item.href.startsWith("/api/admin/media/") ||
+          /\/api\/admin\/[^?#]+\/pdf(?:[?#]|$)/.test(item.href)),
+      ),
     )
     .map((item) => {
       const label = `${caseWorkspaceText(user.interfaceLanguage, item.labelKey)}: ${item.value}`;
@@ -1132,42 +1128,42 @@ export default async function AdminCasePage({
             </strong>
           </div>
         </div>
-        <dl className="mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-2xl bg-black/15 p-3">
+        <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-5 xl:grid-cols-5">
+          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
               {copy.workingVersion}
             </dt>
-            <dd className="mt-1 font-bold">{workingReference}</dd>
+            <dd className="mt-1 font-bold break-words">{workingReference}</dd>
             <dd className="text-muted-foreground mt-1 text-xs">
               {workingStatus}
             </dd>
           </div>
-          <div className="rounded-2xl bg-black/15 p-3">
+          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
               {copy.effectiveContract}
             </dt>
-            <dd className="mt-1 font-bold">{effectiveReference}</dd>
+            <dd className="mt-1 font-bold break-words">{effectiveReference}</dd>
             <dd className="text-muted-foreground mt-1 text-xs">
               {effectiveCommercial ? copy.signedByBoth : copy.noneEffectiveHelp}
             </dd>
           </div>
-          <div className="rounded-2xl bg-black/15 p-3">
+          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
               {copy.priceIncVat}
             </dt>
-            <dd className="mt-1 font-bold">{commercialAmount}</dd>
+            <dd className="mt-1 font-bold break-words">{commercialAmount}</dd>
           </div>
-          <div className="rounded-2xl bg-black/15 p-3">
+          <div className="min-w-0 rounded-2xl bg-black/15 p-3">
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
               {copy.maximum}
             </dt>
-            <dd className="mt-1 font-bold">{commercialMaximum}</dd>
+            <dd className="mt-1 font-bold break-words">{commercialMaximum}</dd>
           </div>
-          <div className="rounded-2xl bg-black/15 p-3">
+          <div className="col-span-2 min-w-0 rounded-2xl bg-black/15 p-3 xl:col-span-1">
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
               {copy.deposit}
             </dt>
-            <dd className="mt-1 font-bold">{commercialDeposit}</dd>
+            <dd className="mt-1 font-bold break-words">{commercialDeposit}</dd>
           </div>
         </dl>
       </header>
@@ -1392,7 +1388,7 @@ export default async function AdminCasePage({
         </section>
       </CaseCommandBar>
 
-      <div className="bg-background-elevated/75 min-w-0 rounded-3xl border border-white/10 p-5 sm:p-6">
+      <div className="bg-background-elevated/75 min-w-0 rounded-3xl border border-white/10 p-4 sm:p-6">
         <CaseProcessTimeline
           activeStageId={processActiveStage}
           activeStageState={primaryState.blocker ? "blocked" : "current"}

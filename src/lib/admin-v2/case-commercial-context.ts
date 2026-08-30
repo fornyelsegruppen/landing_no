@@ -10,7 +10,7 @@ export type CaseCommercialVersion = {
   supersedesId?: number;
   supersedesReference?: string;
   quoteId?: number;
-  pdfHref: string;
+  pdfHref?: string;
   technicalHref: string;
   serviceDescription?: string;
   totalIncVatOre?: number;
@@ -101,8 +101,8 @@ export function deriveCaseCommercialContext(
           !closedContractStatuses.has(item.status || ""),
       )
     : sortedContracts.find(
-          (item) => !closedContractStatuses.has(item.status || ""),
-        ) || sortedContracts[0];
+        (item) => !closedContractStatuses.has(item.status || ""),
+      ) || sortedContracts[0];
   const effectiveContractRaw = sortedContracts.find(
     (item) => item.status === "signed" && Boolean(item.companySignedAt),
   );
@@ -116,10 +116,7 @@ export function deriveCaseCommercialContext(
     reference: item.reference || `T-${item.id}`,
     version: item.version || 1,
     status: item.status || "draft",
-    role:
-      item.id === workingQuoteRaw?.id
-        ? "working"
-        : "historical",
+    role: item.id === workingQuoteRaw?.id ? "working" : "historical",
     supersedesId: item.supersedesId,
     supersedesReference: item.supersedesId
       ? quoteById.get(item.supersedesId)?.reference
@@ -136,44 +133,46 @@ export function deriveCaseCommercialContext(
     documentHash: item.documentHash,
   }));
 
-  const contractVersions = sortedContracts.map<CaseCommercialVersion>((item) => {
-    const quote = item.quoteId ? quoteById.get(item.quoteId) : undefined;
-    const isEffective = item.id === effectiveContractRaw?.id;
-    return {
-      id: item.id,
-      kind: "contract",
-      reference: item.reference || `K-${item.id}`,
-      version: item.version || quote?.version || 1,
-      status: item.status || "draft",
-      role: isEffective
-        ? "effective"
-        : item.id === workingContractRaw?.id
-          ? "working"
-          : "historical",
-      supersedesId: item.supersedesId,
-      supersedesReference: item.supersedesId
-        ? contractById.get(item.supersedesId)?.reference
-        : undefined,
-      quoteId: item.quoteId,
-      pdfHref: item.companySignedDocumentId
-        ? `/api/admin/media/${item.companySignedDocumentId}`
-        : item.signedDocumentId
-          ? `/api/admin/media/${item.signedDocumentId}`
-          : item.quoteId
-            ? `/api/admin/quotes/${item.quoteId}/pdf`
-            : `/admin/collections/contracts/${item.id}`,
-      technicalHref: `/admin/collections/contracts/${item.id}`,
-      serviceDescription: quote?.serviceDescription,
-      totalIncVatOre: quote?.totalIncVatOre,
-      maximumTotalIncVatOre: quote?.maximumTotalIncVatOre,
-      depositBasisPoints: quote?.depositBasisPoints,
-      depositAmountIncVatOre: quote?.depositAmountIncVatOre,
-      signedAt: item.signedAt,
-      companySignedAt: item.companySignedAt,
-      createdAt: item.createdAt,
-      documentHash: item.documentHash,
-    };
-  });
+  const contractVersions = sortedContracts.map<CaseCommercialVersion>(
+    (item) => {
+      const quote = item.quoteId ? quoteById.get(item.quoteId) : undefined;
+      const isEffective = item.id === effectiveContractRaw?.id;
+      return {
+        id: item.id,
+        kind: "contract",
+        reference: item.reference || `K-${item.id}`,
+        version: item.version || quote?.version || 1,
+        status: item.status || "draft",
+        role: isEffective
+          ? "effective"
+          : item.id === workingContractRaw?.id
+            ? "working"
+            : "historical",
+        supersedesId: item.supersedesId,
+        supersedesReference: item.supersedesId
+          ? contractById.get(item.supersedesId)?.reference
+          : undefined,
+        quoteId: item.quoteId,
+        pdfHref: item.companySignedDocumentId
+          ? `/api/admin/media/${item.companySignedDocumentId}`
+          : item.signedDocumentId
+            ? `/api/admin/media/${item.signedDocumentId}`
+            : item.quoteId
+              ? `/api/admin/quotes/${item.quoteId}/pdf`
+              : undefined,
+        technicalHref: `/admin/collections/contracts/${item.id}`,
+        serviceDescription: quote?.serviceDescription,
+        totalIncVatOre: quote?.totalIncVatOre,
+        maximumTotalIncVatOre: quote?.maximumTotalIncVatOre,
+        depositBasisPoints: quote?.depositBasisPoints,
+        depositAmountIncVatOre: quote?.depositAmountIncVatOre,
+        signedAt: item.signedAt,
+        companySignedAt: item.companySignedAt,
+        createdAt: item.createdAt,
+        documentHash: item.documentHash,
+      };
+    },
+  );
 
   return {
     workingQuote: quoteVersions.find((item) => item.id === workingQuoteRaw?.id),

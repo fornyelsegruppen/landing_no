@@ -103,11 +103,15 @@ export function CaseCommandBar({
   const styles = toneStyles[normalizedTone(tone)];
   const [panelOpen, setPanelOpen] = useState(false);
   const disclosureLabel = panelOpen ? closeDetailsLabel : openDetailsLabel;
+  const positionClass = panelOpen
+    ? "relative md:sticky md:top-16"
+    : "sticky top-16";
 
   return (
     <aside
       aria-label={`${caseLabel} #${caseNumber}`}
-      className={`sticky top-16 z-20 rounded-2xl border bg-[#0d1118]/95 shadow-[0_14px_45px_rgba(0,0,0,.38)] backdrop-blur-xl ${styles.border}`}
+      className={`${positionClass} z-20 rounded-2xl border bg-[#0d1118]/95 shadow-[0_14px_45px_rgba(0,0,0,.38)] backdrop-blur-xl ${styles.border}`}
+      data-case-command-bar-state={panelOpen ? "open" : "closed"}
     >
       <div className="hidden min-h-16 grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,.85fr)_minmax(0,1.25fr)] items-center gap-4 px-5 md:grid">
         <div className="min-w-0">
@@ -161,57 +165,73 @@ export function CaseCommandBar({
         </button>
       </div>
 
-      <details className="group md:hidden">
-        <summary className="focus-visible:outline-accent flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2">
-          <span className="min-w-0 flex-1">
-            <span
-              className={`block text-[.65rem] font-bold tracking-[.14em] uppercase ${styles.emphasis}`}
-            >
-              {caseLabel} #{caseNumber} · {workingReference}
-            </span>
-            <span className="block truncate text-sm font-bold">
-              {status} · {action}
-            </span>
-          </span>
-          <ChevronDown
-            aria-hidden="true"
-            className={`size-5 shrink-0 transition-transform group-open:rotate-180 ${styles.emphasis}`}
-          />
-        </summary>
-        <div className="grid gap-3 border-t border-white/10 px-4 py-3 text-sm">
-          <div>
-            <p className="text-muted-foreground text-xs">{customer}</p>
-            <p className="mt-1 font-semibold">
-              {workingLabel}: {workingReference}
-            </p>
-            <p className="text-muted-foreground mt-1">
-              {effectiveLabel}: {effectiveReference} · {amount}
-            </p>
-          </div>
-          <button
-            aria-controls="case-primary-action-panel"
-            aria-expanded={panelOpen}
-            aria-label={`${disclosureLabel}: ${action}`}
-            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-center font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${styles.mobileAction}`}
-            data-case-primary-shortcut="mobile"
-            onClick={() => setPanelOpen((current) => !current)}
-            type="button"
+      <button
+        aria-controls="case-primary-action-panel"
+        aria-expanded={panelOpen}
+        aria-label={`${disclosureLabel}: ${action}`}
+        className="focus-visible:outline-accent flex min-h-20 w-full items-center gap-3 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 md:hidden"
+        data-case-primary-shortcut="mobile"
+        onClick={() => setPanelOpen((current) => !current)}
+        type="button"
+      >
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block text-[.65rem] font-bold tracking-[.14em] uppercase ${styles.emphasis}`}
           >
-            <span>{action}</span>
-            <ChevronDown
-              aria-hidden="true"
-              className={`size-5 shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-        </div>
-      </details>
+            {caseLabel} #{caseNumber} · {workingReference}
+          </span>
+          <span className="mt-1 block truncate text-sm font-bold">
+            {action}
+          </span>
+          <span
+            className={`mt-1 block text-xs font-bold ${styles.emphasis}`}
+            data-case-primary-disclosure-label=""
+          >
+            {disclosureLabel}
+          </span>
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={`size-5 shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""} ${styles.emphasis}`}
+        />
+      </button>
 
       <div
-        className="max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain border-t border-white/10 p-3 sm:p-4"
+        aria-label={nextActionLabel}
+        className="border-t border-white/10 p-3 md:max-h-[calc(100dvh-8rem)] md:overflow-y-auto md:overscroll-contain md:p-4"
         hidden={!panelOpen}
         id="case-primary-action-panel"
+        role="region"
       >
+        <div
+          className="mb-3 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-black/15 p-3 text-xs md:hidden"
+          data-case-mobile-metadata=""
+        >
+          <div className="min-w-0">
+            <p className="text-muted-foreground">{customer}</p>
+            <p className="mt-1 font-semibold break-words">
+              {workingLabel}: {workingReference}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-muted-foreground">{status}</p>
+            <p className="mt-1 font-semibold break-words">
+              {effectiveLabel}: {effectiveReference}
+            </p>
+            <p className="text-muted-foreground mt-1 break-words">{amount}</p>
+          </div>
+        </div>
         {children}
+        <button
+          aria-controls="case-primary-action-panel"
+          aria-expanded="true"
+          className={`mt-4 min-h-12 w-full rounded-xl px-4 py-3 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 md:hidden ${styles.mobileAction}`}
+          data-case-primary-close="mobile"
+          onClick={() => setPanelOpen(false)}
+          type="button"
+        >
+          {closeDetailsLabel}
+        </button>
       </div>
     </aside>
   );

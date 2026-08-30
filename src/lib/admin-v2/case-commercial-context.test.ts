@@ -5,17 +5,54 @@ describe("case commercial context", () => {
   it("keeps V1 effective while V2 waits for the supplier signature", () => {
     const context = deriveCaseCommercialContext(
       [
-        { id: 12, reference: "T-15-V2", version: 2, status: "accepted", supersedesId: 10, totalIncVatOre: 1764675 },
-        { id: 10, reference: "T-15-V1", version: 1, status: "accepted", totalIncVatOre: 1265963 },
+        {
+          id: 12,
+          reference: "T-15-V2",
+          version: 2,
+          status: "accepted",
+          supersedesId: 10,
+          totalIncVatOre: 1764675,
+        },
+        {
+          id: 10,
+          reference: "T-15-V1",
+          version: 1,
+          status: "accepted",
+          totalIncVatOre: 1265963,
+        },
       ],
       [
-        { id: 22, quoteId: 12, reference: "K-15-V2", version: 2, status: "signed", supersedesId: 20, signedAt: "2026-08-26T14:00:00Z", signedDocumentId: 92 },
-        { id: 20, quoteId: 10, reference: "K-15-V1", version: 1, status: "signed", signedAt: "2026-08-26T10:00:00Z", companySignedAt: "2026-08-26T10:05:00Z", companySignedDocumentId: 90 },
+        {
+          id: 22,
+          quoteId: 12,
+          reference: "K-15-V2",
+          version: 2,
+          status: "signed",
+          supersedesId: 20,
+          signedAt: "2026-08-26T14:00:00Z",
+          signedDocumentId: 92,
+        },
+        {
+          id: 20,
+          quoteId: 10,
+          reference: "K-15-V1",
+          version: 1,
+          status: "signed",
+          signedAt: "2026-08-26T10:00:00Z",
+          companySignedAt: "2026-08-26T10:05:00Z",
+          companySignedDocumentId: 90,
+        },
       ],
     );
 
-    expect(context.workingContract).toMatchObject({ reference: "K-15-V2", role: "working" });
-    expect(context.effectiveContract).toMatchObject({ reference: "K-15-V1", role: "effective" });
+    expect(context.workingContract).toMatchObject({
+      reference: "K-15-V2",
+      role: "working",
+    });
+    expect(context.effectiveContract).toMatchObject({
+      reference: "K-15-V1",
+      role: "effective",
+    });
     expect(context.workingContract?.supersedesReference).toBe("K-15-V1");
     expect(context.workingContract?.pdfHref).toBe("/api/admin/media/92");
   });
@@ -23,24 +60,64 @@ describe("case commercial context", () => {
   it("makes V2 effective only after both parties have signed it", () => {
     const context = deriveCaseCommercialContext(
       [
-        { id: 12, reference: "T-15-V2", version: 2, status: "accepted", supersedesId: 10 },
+        {
+          id: 12,
+          reference: "T-15-V2",
+          version: 2,
+          status: "accepted",
+          supersedesId: 10,
+        },
         { id: 10, reference: "T-15-V1", version: 1, status: "accepted" },
       ],
       [
-        { id: 22, quoteId: 12, reference: "K-15-V2", version: 2, status: "signed", supersedesId: 20, signedAt: "2026-08-26T14:00:00Z", companySignedAt: "2026-08-26T14:05:00Z", companySignedDocumentId: 93 },
-        { id: 20, quoteId: 10, reference: "K-15-V1", version: 1, status: "signed", signedAt: "2026-08-26T10:00:00Z", companySignedAt: "2026-08-26T10:05:00Z", companySignedDocumentId: 90 },
+        {
+          id: 22,
+          quoteId: 12,
+          reference: "K-15-V2",
+          version: 2,
+          status: "signed",
+          supersedesId: 20,
+          signedAt: "2026-08-26T14:00:00Z",
+          companySignedAt: "2026-08-26T14:05:00Z",
+          companySignedDocumentId: 93,
+        },
+        {
+          id: 20,
+          quoteId: 10,
+          reference: "K-15-V1",
+          version: 1,
+          status: "signed",
+          signedAt: "2026-08-26T10:00:00Z",
+          companySignedAt: "2026-08-26T10:05:00Z",
+          companySignedDocumentId: 90,
+        },
       ],
     );
 
-    expect(context.workingContract).toMatchObject({ reference: "K-15-V2", role: "effective" });
-    expect(context.effectiveContract).toMatchObject({ reference: "K-15-V2", role: "effective" });
-    expect(context.contractVersions.find((item) => item.reference === "K-15-V1")?.role).toBe("historical");
+    expect(context.workingContract).toMatchObject({
+      reference: "K-15-V2",
+      role: "effective",
+    });
+    expect(context.effectiveContract).toMatchObject({
+      reference: "K-15-V2",
+      role: "effective",
+    });
+    expect(
+      context.contractVersions.find((item) => item.reference === "K-15-V1")
+        ?.role,
+    ).toBe("historical");
   });
 
   it("keeps the old signed contract effective but not working while a newer quote is prepared", () => {
     const context = deriveCaseCommercialContext(
       [
-        { id: 20, reference: "T-15-V2", version: 2, status: "draft", supersedesId: 10 },
+        {
+          id: 20,
+          reference: "T-15-V2",
+          version: 2,
+          status: "draft",
+          supersedesId: 10,
+        },
         { id: 10, reference: "T-15-V1", version: 1, status: "accepted" },
       ],
       [
@@ -68,7 +145,15 @@ describe("case commercial context", () => {
         { id: 13, reference: "T-7-V2-A", version: 2, status: "accepted" },
         { id: 10, reference: "T-7-V1", version: 1, status: "accepted" },
       ],
-      [{ id: 23, quoteId: 13, reference: "K-7-V2", version: 2, status: "signed" }],
+      [
+        {
+          id: 23,
+          quoteId: 13,
+          reference: "K-7-V2",
+          version: 2,
+          status: "signed",
+        },
+      ],
     );
 
     expect(context.workingQuote?.id).toBe(13);
@@ -82,12 +167,58 @@ describe("case commercial context", () => {
         { id: 10, reference: "T-15-V1", version: 1, status: "accepted" },
       ],
       [
-        { id: 22, quoteId: 12, reference: "K-15-V2", version: 2, status: "signed", signedDocumentId: 92, documentHash: "b".repeat(64) },
-        { id: 20, quoteId: 10, reference: "K-15-V1", version: 1, status: "signed", companySignedAt: "2026-08-26T10:05:00Z", companySignedDocumentId: 90, documentHash: "a".repeat(64) },
+        {
+          id: 22,
+          quoteId: 12,
+          reference: "K-15-V2",
+          version: 2,
+          status: "signed",
+          signedDocumentId: 92,
+          documentHash: "b".repeat(64),
+        },
+        {
+          id: 20,
+          quoteId: 10,
+          reference: "K-15-V1",
+          version: 1,
+          status: "signed",
+          companySignedAt: "2026-08-26T10:05:00Z",
+          companySignedDocumentId: 90,
+          documentHash: "a".repeat(64),
+        },
       ],
     );
 
-    expect(context.contractVersions.find((item) => item.reference === "K-15-V1")).toMatchObject({ pdfHref: "/api/admin/media/90", documentHash: "a".repeat(64) });
-    expect(context.contractVersions.find((item) => item.reference === "K-15-V2")).toMatchObject({ pdfHref: "/api/admin/media/92", documentHash: "b".repeat(64) });
+    expect(
+      context.contractVersions.find((item) => item.reference === "K-15-V1"),
+    ).toMatchObject({
+      pdfHref: "/api/admin/media/90",
+      documentHash: "a".repeat(64),
+    });
+    expect(
+      context.contractVersions.find((item) => item.reference === "K-15-V2"),
+    ).toMatchObject({
+      pdfHref: "/api/admin/media/92",
+      documentHash: "b".repeat(64),
+    });
+  });
+
+  it("never disguises a technical Payload record as a contract PDF", () => {
+    const context = deriveCaseCommercialContext(
+      [],
+      [
+        {
+          id: 31,
+          reference: "K-16-V1",
+          status: "issued",
+          version: 1,
+        },
+      ],
+    );
+
+    expect(context.contractVersions[0]).toMatchObject({
+      technicalHref: "/admin/collections/contracts/31",
+    });
+    expect(context.contractVersions[0]?.pdfHref).toBeUndefined();
   });
 });

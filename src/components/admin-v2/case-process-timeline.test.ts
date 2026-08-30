@@ -240,7 +240,7 @@ describe("case process timeline", () => {
     expect(missingHistoryContent).not.toContain("Bendras detalių registras");
   });
 
-  it("renders the active stage as an inline disclosure without a scroll link", () => {
+  it("renders the active stage as a compact, initially closed disclosure without a scroll link", () => {
     const html = renderToStaticMarkup(
       createElement(CaseProcessTimeline, {
         activeStageId: "measurement",
@@ -256,12 +256,16 @@ describe("case process timeline", () => {
       }),
     );
 
-    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-controls="case-process-panel-measurement"');
     expect(html).toContain("w-full items-start");
-    expect(html).toContain('id="case-process-panel-measurement"');
+    expect(html).toMatch(
+      /hidden="" id="case-process-panel-measurement"|id="case-process-panel-measurement" hidden=""/,
+    );
     expect(html).toContain("Matavimo turinys");
-    expect(html).toContain("Slėpti informaciją");
+    expect(html).toContain("Rodyti informaciją");
+    expect(html).toContain('data-process-disclosure-label=""');
+    expect(html).toContain("hidden sm:inline");
     expect(html).not.toContain('href="#measurement-section"');
   });
 

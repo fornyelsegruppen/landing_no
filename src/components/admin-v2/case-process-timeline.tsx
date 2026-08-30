@@ -167,7 +167,7 @@ export function CaseProcessTimeline({
     activeStageState,
   });
   const [openStageId, setOpenStageId] = useState<CaseProcessStageId | null>(
-    stagePanels[activeStageId] ? activeStageId : null,
+    null,
   );
   const [inspectorSelection, setInspectorSelection] =
     useState<CaseProcessInspectorSelection | null>(null);
@@ -233,11 +233,11 @@ export function CaseProcessTimeline({
                 <span className="block text-xs font-bold tracking-wider uppercase">
                   {stateLabel}
                 </span>
-                <span className="mt-1 flex min-h-12 items-center text-base font-bold">
+                <span className="mt-1 flex min-h-12 items-center text-base font-bold [overflow-wrap:anywhere] break-words">
                   {stageLabel}
                 </span>
                 {content?.statusText && stage.state !== "not_started" ? (
-                  <span className="mt-1 block text-sm">
+                  <span className="mt-1 block text-sm [overflow-wrap:anywhere] break-words">
                     {content.statusText}
                   </span>
                 ) : null}
@@ -249,7 +249,10 @@ export function CaseProcessTimeline({
               </span>
               {canExpand ? (
                 <span className="mt-3 flex shrink-0 items-center gap-2 text-xs font-bold">
-                  <span>
+                  <span
+                    className="hidden sm:inline"
+                    data-process-disclosure-label=""
+                  >
                     {isExpanded ? labels.closeStage : labels.openStage}
                   </span>
                   <ChevronDown

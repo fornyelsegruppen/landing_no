@@ -62,8 +62,16 @@ describe("case command bar", () => {
     expect(html).toContain('data-case-primary-shortcut="mobile"');
     expect(
       html.match(/aria-controls="case-primary-action-panel"/g),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(html).toContain('id="case-primary-action-panel"');
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Kitas veiksmas"');
+    expect(html).toContain('data-case-command-bar-state="closed"');
+    expect(html).toContain('data-case-mobile-metadata=""');
+    expect(html).toContain('data-case-primary-close="mobile"');
+    expect(html).toContain("md:max-h-[calc(100dvh-8rem)]");
+    expect(html).not.toContain("<details");
+    expect(html).not.toContain("<summary");
     expect(html).toContain("Rodyti informaciją");
     expect(html).not.toContain('href="#next-action-title"');
   });
