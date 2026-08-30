@@ -121,6 +121,8 @@ export function deriveCaseNextAction(input: CaseActionInput): CaseNextAction {
     return { kind: "wait_worker_precheck", targetId: input.workOrder?.id };
   if (input.workOrder?.status === "in_progress")
     return { kind: "wait_work_completion", targetId: input.workOrder.id };
+  if (["documented", "cancelled"].includes(input.workOrder?.status || ""))
+    return { kind: "none" };
   if (
     input.quote?.status === "accepted" &&
     input.contract?.status === "signed" &&

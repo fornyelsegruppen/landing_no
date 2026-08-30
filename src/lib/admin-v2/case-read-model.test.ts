@@ -236,6 +236,14 @@ describe("admin case next action", () => {
       "wait_worker_documentation",
     ],
     [
+      { leadStatus: "converted", workOrder: { id: 7, status: "documented" } },
+      "none",
+    ],
+    [
+      { leadStatus: "converted", workOrder: { id: 7, status: "cancelled" } },
+      "none",
+    ],
+    [
       {
         leadStatus: "converted",
         quote: { id: 5, status: "accepted" },
