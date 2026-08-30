@@ -187,6 +187,7 @@ export type CaseEntity = {
 };
 
 export type CaseChangeAgreement = CaseEntity & {
+  acceptedAt?: string;
   afterAreaTenths?: number;
   afterTotalIncVatOre?: number;
   beforeAreaTenths?: number;
@@ -424,6 +425,7 @@ export type AdminCase = {
     actualTotalIncVatOre?: number;
     actualSubtotalExVatOre?: number;
     actualVatOre?: number;
+    approvedChangeAgreementId?: number;
     blockingReasons: string[];
     beforePhotoCount: number;
     afterPhotoCount: number;
@@ -1189,6 +1191,8 @@ export async function loadAdminCase(
           latestWorkRaw.actualSubtotalExVatOre,
         ),
         actualVatOre: numberValue(latestWorkRaw.actualVatOre),
+        approvedChangeAgreementId:
+          relationId(latestWorkRaw.approvedChangeAgreement) || undefined,
         blockingReasons: Array.isArray(latestWorkRaw.blockingReasons)
           ? latestWorkRaw.blockingReasons.filter(
               (item): item is string => typeof item === "string",
@@ -1573,6 +1577,7 @@ export async function loadAdminCase(
           : undefined;
       return {
         ...entity("change-agreements", item),
+        acceptedAt: stringValue(item.acceptedAt),
         summary: stringValue(item.reasonDescription),
         reasonCode: stringValue(item.reasonCode),
         validUntil: stringValue(item.validUntil),

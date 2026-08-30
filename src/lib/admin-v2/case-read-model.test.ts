@@ -561,6 +561,83 @@ describe("admin case read model", () => {
     expect(result?.officialInvoices[0]?.originalDocumentId).toBe(71);
   });
 
+  it("preserves the accepted change that explains a historical maximum-price breach", async () => {
+    const findByID = vi.fn().mockResolvedValue({
+      id: 19,
+      name: "Maximum price UAT",
+      status: "converted",
+      createdAt: "2026-08-30T08:00:00.000Z",
+    });
+    const find = vi.fn().mockImplementation(
+      async ({ collection }: { collection: string }) => {
+        if (collection === "quotes") {
+          return {
+            docs: [
+              {
+                id: 4,
+                reference: "T-19-V1",
+                status: "accepted",
+                totalIncVatOre: 2_587_500,
+                maximumTotalIncVatOre: 2_975_600,
+                createdAt: "2026-08-30T08:10:00.000Z",
+              },
+            ],
+          };
+        }
+        if (collection === "work-orders") {
+          return {
+            docs: [
+              {
+                id: 6,
+                reference: "A-19-V1",
+                status: "documented",
+                approvedChangeAgreement: { id: 9 },
+                actualTotalIncVatOre: 3_400_000,
+                createdAt: "2026-08-30T08:20:00.000Z",
+              },
+            ],
+          };
+        }
+        if (collection === "change-agreements") {
+          return {
+            docs: [
+              {
+                id: 9,
+                reference: "E-6-V1",
+                status: "accepted",
+                reasonCode: "over_maximum",
+                beforeTotalIncVatOre: 2_587_500,
+                afterTotalIncVatOre: 3_400_000,
+                acceptedAt: "2026-08-30T08:30:00.000Z",
+                snapshot: {
+                  before: { maximumTotalIncVatOre: 2_975_600 },
+                  after: { totalIncVatOre: 3_400_000 },
+                },
+                createdAt: "2026-08-30T08:25:00.000Z",
+              },
+            ],
+          };
+        }
+        return { docs: [] };
+      },
+    );
+
+    const result = await loadAdminCase(
+      { findByID, find } as unknown as Payload,
+      19,
+    );
+
+    expect(result?.workOrder?.approvedChangeAgreementId).toBe(9);
+    expect(result?.changes[0]).toMatchObject({
+      id: 9,
+      acceptedAt: "2026-08-30T08:30:00.000Z",
+      afterTotalIncVatOre: 3_400_000,
+      beforeMaximumTotalIncVatOre: 2_975_600,
+      reasonCode: "over_maximum",
+      status: "accepted",
+    });
+  });
+
   it("does not offer an obsolete draft after a newer equivalent was sent", async () => {
     const findByID = vi.fn().mockResolvedValue({
       id: 1,

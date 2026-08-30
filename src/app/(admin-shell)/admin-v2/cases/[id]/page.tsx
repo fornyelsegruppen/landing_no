@@ -36,6 +36,7 @@ import {
   type CaseHistoryEventLink,
 } from "@/components/admin-v2/case-history-event-detail";
 import { CasePriceCalculationDetail } from "@/components/admin-v2/case-price-calculation-detail";
+import { CasePriceOutcomeSummary } from "@/components/admin-v2/case-price-outcome-summary";
 import { CaseStatusStamp } from "@/components/admin-v2/case-status-stamp";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
@@ -893,6 +894,23 @@ export default async function AdminCasePage({
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
+  const overMaximumChange =
+    caseData.changes.find(
+      (change) =>
+        change.reasonCode === "over_maximum" &&
+        change.id === caseData.workOrder?.approvedChangeAgreementId,
+    ) ||
+    caseData.changes.find(
+      (change) =>
+        change.reasonCode === "over_maximum" && change.status === "accepted",
+    ) ||
+    caseData.changes.find(
+      (change) => change.reasonCode === "over_maximum",
+    );
+  const overMaximumStatusAt =
+    overMaximumChange?.acceptedAt ||
+    overMaximumChange?.updatedAt ||
+    overMaximumChange?.createdAt;
   const caseHeaderMetrics = [
     {
       help: workingStatus,
@@ -1574,6 +1592,33 @@ export default async function AdminCasePage({
             </div>
           </div>
         </div>
+        {overMaximumChange ? (
+          <CasePriceOutcomeSummary
+            afterTotalIncVatOre={
+              overMaximumChange.afterTotalIncVatOre ??
+              caseData.workOrder?.actualTotalIncVatOre
+            }
+            beforeMaximumTotalIncVatOre={
+              overMaximumChange.beforeMaximumTotalIncVatOre ??
+              workingQuote?.maximumTotalIncVatOre
+            }
+            changeReference={overMaximumChange.reference}
+            changeStatus={overMaximumChange.status}
+            changeStatusAt={
+              overMaximumStatusAt
+                ? formatDate(overMaximumStatusAt)
+                : undefined
+            }
+            changeStatusLabel={statusLabel(
+              user.interfaceLanguage,
+              overMaximumChange.status,
+            )}
+            formatMoney={nok}
+            locale={user.interfaceLanguage}
+            reasonCode={overMaximumChange.reasonCode}
+            workOrderStatus={caseData.workOrder?.status}
+          />
+        ) : null}
         <details className="group mt-3 border-t border-white/10 pt-3 lg:hidden">
           <summary className="focus-visible:outline-accent flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-xl bg-black/10 px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2">
             <span className="min-w-0 flex-1">
