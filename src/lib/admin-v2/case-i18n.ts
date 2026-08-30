@@ -192,9 +192,9 @@ const copy = {
       "Systemet oppretter en arbeids- og ferdigbekreftelse, ikke en automatisk kommersiell garanti. Lovfestede reklamasjonsrettigheter gjelder fortsatt.",
     completeReview: "Godkjenn sluttkontroll og opprett dokumenter",
     completionConfirm:
-      "Bekreft sluttkontroll, garanti og opprettelse av fakturautkast. Kunden varsles etter godkjenning.",
+      "Bekreft sluttkontroll og opprettelse av fakturautkast og arbeids- og ferdigbekreftelse. Kunden varsles etter godkjenning.",
     completionDone:
-      "Sluttkontrollen er godkjent. Fakturautkast og garantidokument er opprettet.",
+      "Sluttkontrollen er godkjent. Fakturautkast og arbeids- og ferdigbekreftelse er opprettet.",
     lifecycle: "Arkiv og papirkurv",
     lifecycleActive: "Aktiv sak",
     lifecycleArchived: "Arkivert sak",
@@ -449,9 +449,9 @@ const copy = {
       "Sistema sukuria darbų ir užbaigimo patvirtinimą, o ne automatinę komercinę garantiją. Įstatyminės reklamacijos teisės lieka galioti.",
     completeReview: "Patvirtinti darbą ir sukurti dokumentus",
     completionConfirm:
-      "Patvirtinkite galutinę patikrą, garantiją ir sąskaitos juodraščio sukūrimą. Po patvirtinimo klientas bus informuotas.",
+      "Patvirtinkite galutinę patikrą ir sąskaitos juodraščio bei darbų ir užbaigimo patvirtinimo sukūrimą. Po patvirtinimo klientas bus informuotas.",
     completionDone:
-      "Galutinė patikra patvirtinta. Sąskaitos juodraštis ir garantijos dokumentas sukurti.",
+      "Galutinė patikra patvirtinta. Sąskaitos juodraštis bei darbų ir užbaigimo patvirtinimas sukurti.",
     lifecycle: "Archyvas ir šiukšlinė",
     lifecycleActive: "Aktyvi byla",
     lifecycleArchived: "Archyvuota byla",
@@ -706,9 +706,9 @@ const copy = {
       "The system creates a work and completion confirmation, not an automatic commercial warranty. Statutory complaint rights continue to apply.",
     completeReview: "Approve final review and create documents",
     completionConfirm:
-      "Confirm the final review, warranty and invoice-draft creation. The customer will be notified after approval.",
+      "Confirm the final review and creation of the invoice draft and work-completion confirmation. The customer will be notified after approval.",
     completionDone:
-      "The final review is approved. The invoice draft and warranty document were created.",
+      "The final review is approved. The invoice draft and work-completion confirmation were created.",
     lifecycle: "Archive and trash",
     lifecycleActive: "Active case",
     lifecycleArchived: "Archived case",
