@@ -1055,11 +1055,23 @@ export default async function AdminCasePage({
   const attentionMessage = caseData.messages.find((message) =>
     ["failed", "attention"].includes(message.status || ""),
   );
+  const questionStatusAt =
+    primaryState.key === "question.prepare"
+      ? displayedQuestion?.question.createdAt
+      : primaryState.key === "question.delivered"
+        ? displayedReply?.deliveredAt ||
+          displayedReply?.updatedAt ||
+          displayedReply?.createdAt
+        : [
+              "question.review",
+              "question.queued",
+              "question.sent",
+              "question.delivery_failed",
+            ].includes(primaryState.key)
+          ? displayedReply?.updatedAt || displayedReply?.createdAt
+          : undefined;
   const workspaceStatusAt = primaryState.key.startsWith("question.")
-    ? displayedReply?.deliveredAt ||
-      displayedReply?.updatedAt ||
-      displayedReply?.createdAt ||
-      displayedQuestion?.question.createdAt
+    ? questionStatusAt
     : primaryState.key === "stop.follow_up_decline"
       ? caseData.quote?.declinedAt
       : primaryState.key === "stop.review_cancellation"
