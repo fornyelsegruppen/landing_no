@@ -116,6 +116,30 @@ describe("case price outcome summary", () => {
     expect(html).not.toContain("Išspręsta");
   });
 
+  it.each([
+    ["ready", "Darbą galima tęsti"],
+    ["in_progress", "Darbas vykdomas"],
+    ["completed", "Liko galutinė dokumentų patikra"],
+    ["documented", "Dabar veiksmų nereikia"],
+  ] as const)(
+    "describes the resolved incident truthfully when work is %s",
+    (workOrderStatus, expected) => {
+      const html = render({ workOrderStatus });
+
+      expect(html).toContain("Išspręsta");
+      expect(html).toContain(expected);
+      expect(html).not.toContain("Reikia pakartotinės patikros");
+    },
+  );
+
+  it("does not request another inspection after the work was cancelled", () => {
+    const html = render({ workOrderStatus: "cancelled" });
+
+    expect(html).toContain("Darbas atšauktas");
+    expect(html).toContain("darbas buvo atšauktas");
+    expect(html).not.toContain("Reikia pakartotinės patikros");
+  });
+
   it("does not invent amounts when the historical snapshot is incomplete", () => {
     const html = render({
       afterTotalIncVatOre: undefined,

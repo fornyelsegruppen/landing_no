@@ -7,11 +7,18 @@ const copy = {
       "Kunden har godkjent den skriftlige endringsavtalen. Gjenta kontrollen før arbeidet fortsetter.",
     acceptedCompleted:
       "Kunden godkjente den skriftlige endringsavtalen. Arbeidet er ferdig og dokumentert. Ingen handling er nødvendig nå.",
+    acceptedInProgress:
+      "Kunden godkjente endringsavtalen og den nye kontrollen er fullført. Arbeidet pågår.",
+    acceptedReady:
+      "Kunden godkjente endringsavtalen og den nye kontrollen er fullført. Arbeidet kan fortsette.",
+    acceptedWorkCompleted:
+      "Kunden godkjente endringsavtalen og arbeidet er ferdig. Den avsluttende dokumentkontrollen gjenstår.",
     blocked:
       "Berørt arbeid må stå på vent til kunden har godkjent endringen skriftlig.",
     cancelled:
       "Kunden godkjente endringsavtalen, men arbeidet ble senere kansellert.",
     changeAgreement: "Endringsavtale",
+    cancelledStatus: "Arbeidet er kansellert",
     contractMaximum: "Avtalt maksimalpris",
     declined:
       "Kunden avslo endringsavtalen. Arbeidet kan ikke fortsette etter endringen.",
@@ -29,11 +36,18 @@ const copy = {
       "Klientas priėmė rašytinį pakeitimo susitarimą. Prieš tęsiant darbą būtina pakartotinė patikra.",
     acceptedCompleted:
       "Klientas priėmė rašytinį pakeitimo susitarimą. Darbas užbaigtas ir dokumentuotas. Dabar veiksmų nereikia.",
+    acceptedInProgress:
+      "Klientas priėmė pakeitimo susitarimą, o pakartotinė patikra atlikta. Darbas vykdomas.",
+    acceptedReady:
+      "Klientas priėmė pakeitimo susitarimą, o pakartotinė patikra atlikta. Darbą galima tęsti.",
+    acceptedWorkCompleted:
+      "Klientas priėmė pakeitimo susitarimą ir darbas baigtas. Liko galutinė dokumentų patikra.",
     blocked:
       "Susiję darbai turi būti sustabdyti, kol klientas raštu priims pakeitimą.",
     cancelled:
       "Klientas priėmė pakeitimo susitarimą, tačiau vėliau darbas buvo atšauktas.",
     changeAgreement: "Pakeitimo susitarimas",
+    cancelledStatus: "Darbas atšauktas",
     contractMaximum: "Sutarta maksimali kaina",
     declined:
       "Klientas atmetė pakeitimo susitarimą. Darbo pagal pakeitimą tęsti negalima.",
@@ -51,11 +65,18 @@ const copy = {
       "The customer accepted the written change agreement. Repeat the inspection before work continues.",
     acceptedCompleted:
       "The customer accepted the written change agreement. The work is complete and documented. No action is required now.",
+    acceptedInProgress:
+      "The customer accepted the change agreement and the repeat inspection is complete. Work is in progress.",
+    acceptedReady:
+      "The customer accepted the change agreement and the repeat inspection is complete. Work may continue.",
+    acceptedWorkCompleted:
+      "The customer accepted the change agreement and the work is complete. The final document review remains.",
     blocked:
       "Affected work must remain stopped until the customer accepts the change in writing.",
     cancelled:
       "The customer accepted the change agreement, but the work was later cancelled.",
     changeAgreement: "Change agreement",
+    cancelledStatus: "Work cancelled",
     contractMaximum: "Agreed maximum price",
     declined:
       "The customer declined the change agreement. Work cannot continue under the change.",
@@ -145,8 +166,14 @@ export function CasePriceOutcomeSummary({
     ? cancelled
       ? labels.cancelled
       : workOrderStatus === "documented"
-      ? labels.acceptedCompleted
-      : labels.accepted
+        ? labels.acceptedCompleted
+        : workOrderStatus === "completed"
+          ? labels.acceptedWorkCompleted
+          : workOrderStatus === "in_progress"
+            ? labels.acceptedInProgress
+            : workOrderStatus === "ready"
+              ? labels.acceptedReady
+              : labels.accepted
     : declined
       ? labels.declined
       : superseded
@@ -184,6 +211,8 @@ export function CasePriceOutcomeSummary({
         >
           {resolved
             ? labels.resolved
+            : cancelled
+              ? labels.cancelledStatus
             : accepted
               ? labels.recheck
               : labels.review} · {changeStatusLabel}
