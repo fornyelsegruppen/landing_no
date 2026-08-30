@@ -287,7 +287,7 @@ describe("case process timeline", () => {
 
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-controls="case-process-panel-measurement"');
-    expect(html).toContain("w-full items-start");
+    expect(html).toContain("w-full max-w-full min-w-0 items-start");
     expect(html).toMatch(
       /hidden="" id="case-process-panel-measurement"|id="case-process-panel-measurement" hidden=""/,
     );
@@ -323,8 +323,61 @@ describe("case process timeline", () => {
       }),
     );
 
-    expect(html).toContain("grid gap-3 sm:grid-cols-2 xl:grid-cols-1");
+    expect(html).toContain(
+      "grid max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-1",
+    );
     expect(html).toContain("min-h-12");
     expect(html).toContain("break-words");
+  });
+
+  it("contains long document names inside a zero-minimum grid track", () => {
+    const html = renderToStaticMarkup(
+      createElement(CaseProcessTimeline, {
+        activeStageId: "completion",
+        locale: "lt",
+        stageContent: {
+          ...stageContent,
+          completion: {
+            inspectorTargetId: "documents-section",
+            relatedLinks: [
+              {
+                accessibleName: "Atidaryti priimtą pakeitimų susitarimą",
+                href: "/api/admin/change-agreements/6/pdf",
+                kind: "document" as const,
+                label: "E-6-V1-akseptert-74GwYqaGsRx4Gkfl52DcuOPJCDVMYS.pdf",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain(
+      "grid max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2",
+    );
+    expect(html).toContain("flex min-h-12 max-w-full min-w-0 items-center");
+    expect(html).toContain("[overflow-wrap:anywhere] break-words");
+  });
+
+  it("wraps history filters on phones without a horizontal scroller", () => {
+    const html = renderToStaticMarkup(
+      createElement(CaseProcessTimeline, {
+        activeStageId: "completion",
+        historyItems: [
+          {
+            category: "document",
+            description: "Dokumentas",
+            id: "document-1",
+            inspectorTargetId: "document-1",
+            title: "E-6-V1.pdf",
+          },
+        ],
+        locale: "lt",
+        stageContent,
+      }),
+    );
+
+    expect(html).toContain("flex flex-wrap gap-2 overflow-x-hidden border-t");
+    expect(html).toContain("sm:flex-nowrap sm:overflow-x-auto");
   });
 });

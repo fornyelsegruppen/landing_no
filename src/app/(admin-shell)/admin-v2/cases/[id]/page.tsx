@@ -40,6 +40,11 @@ import {
   CasePriceOutcomeSummary,
   selectMaximumPriceChange,
 } from "@/components/admin-v2/case-price-outcome-summary";
+import {
+  caseChangeDocumentHref,
+  caseContractDocumentHref,
+  CaseSigningEvidenceSummary,
+} from "@/components/admin-v2/case-signing-evidence-summary";
 import { CaseStatusStamp } from "@/components/admin-v2/case-status-stamp";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
@@ -223,9 +228,13 @@ function timelineHistoryLinks(
     ].find(
       (candidate) => candidate.kind === item.type && candidate.id === entityId,
     );
-    if (version?.pdfHref) {
+    const versionHref =
+      version?.kind === "contract"
+        ? caseContractDocumentHref(version, caseData.documents)
+        : version?.pdfHref;
+    if (version && versionHref) {
       links.push({
-        href: version.pdfHref,
+        href: versionHref,
         kind: "document",
         label: `${version.reference} PDF`,
       });
@@ -236,9 +245,12 @@ function timelineHistoryLinks(
     const change = caseData.changes.find(
       (candidate) => candidate.id === entityId,
     );
-    if (change) {
+    const changeHref = change
+      ? caseChangeDocumentHref(change, caseData.documents)
+      : undefined;
+    if (change && changeHref) {
       links.push({
-        href: `/api/admin/change-agreements/${change.id}/pdf`,
+        href: changeHref,
         kind: "document",
         label: `${change.reference} PDF`,
       });
@@ -898,8 +910,7 @@ export default async function AdminCasePage({
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
   const overMaximumChange = selectMaximumPriceChange({
-    approvedChangeAgreementId:
-      caseData.workOrder?.approvedChangeAgreementId,
+    approvedChangeAgreementId: caseData.workOrder?.approvedChangeAgreementId,
     changes: caseData.changes,
     workOrderId: caseData.workOrder?.id,
   });
@@ -1006,11 +1017,12 @@ export default async function AdminCasePage({
     },
     agreement: {
       relatedLinks: [
-        ...caseData.commercial.contractVersions.flatMap((entity) =>
-          entity.pdfHref
+        ...caseData.commercial.contractVersions.flatMap((entity) => {
+          const href = caseContractDocumentHref(entity, caseData.documents);
+          return href
             ? [
                 processEntityLink(entity, {
-                  href: entity.pdfHref,
+                  href,
                   kind: "document",
                   status: statusLabel(user.interfaceLanguage, entity.status, {
                     companySignedAt: entity.companySignedAt,
@@ -1018,21 +1030,26 @@ export default async function AdminCasePage({
                   }),
                 }),
               ]
-            : [],
-        ),
+            : [];
+        }),
       ],
       inspectorTargetId: caseWorkspaceSectionByKey.contract.id,
       timestamp: processTimestamp("agreement"),
     },
     work: {
       relatedLinks: [
-        ...caseData.changes.map((entity) =>
-          processEntityLink(entity, {
-            href: `/api/admin/change-agreements/${entity.id}/pdf`,
-            kind: "document",
-            status: statusLabel(user.interfaceLanguage, entity.status),
-          }),
-        ),
+        ...caseData.changes.flatMap((entity) => {
+          const href = caseChangeDocumentHref(entity, caseData.documents);
+          return href
+            ? [
+                processEntityLink(entity, {
+                  href,
+                  kind: "document",
+                  status: statusLabel(user.interfaceLanguage, entity.status),
+                }),
+              ]
+            : [];
+        }),
       ],
       inspectorTargetId: caseWorkspaceSectionByKey.work.id,
       timestamp: processTimestamp("work"),
@@ -1597,9 +1614,7 @@ export default async function AdminCasePage({
             changeReference={overMaximumChange.reference}
             changeStatus={overMaximumChange.status}
             changeStatusAt={
-              overMaximumStatusAt
-                ? formatDate(overMaximumStatusAt)
-                : undefined
+              overMaximumStatusAt ? formatDate(overMaximumStatusAt) : undefined
             }
             changeStatusLabel={statusLabel(
               user.interfaceLanguage,
@@ -1611,6 +1626,13 @@ export default async function AdminCasePage({
             workOrderStatus={caseData.workOrder?.status}
           />
         ) : null}
+        <CaseSigningEvidenceSummary
+          change={overMaximumChange}
+          documents={caseData.documents}
+          effectiveContract={effectiveCommercial}
+          formatDate={formatDate}
+          locale={user.interfaceLanguage}
+        />
         <details className="group mt-3 border-t border-white/10 pt-3 lg:hidden">
           <summary className="focus-visible:outline-accent flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-xl bg-black/10 px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2">
             <span className="min-w-0 flex-1">

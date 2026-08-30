@@ -152,13 +152,15 @@ function RelatedLink({ link }: { link: CaseProcessRelatedLink }) {
   return (
     <a
       aria-label={link.accessibleName}
-      className="focus-visible:outline-accent flex min-h-12 items-center gap-2 rounded-lg border border-white/10 bg-black/15 px-3 py-2 text-sm font-semibold break-words hover:border-white/25 focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="focus-visible:outline-accent flex min-h-12 max-w-full min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-black/15 px-3 py-2 text-sm font-semibold hover:border-white/25 focus-visible:outline-2 focus-visible:outline-offset-2"
       href={link.href}
       rel={link.openInNewTab ? "noreferrer" : undefined}
       target={link.openInNewTab ? "_blank" : undefined}
     >
       <Icon aria-hidden="true" className="size-4 shrink-0" />
-      <span className="min-w-0">{link.label}</span>
+      <span className="min-w-0 [overflow-wrap:anywhere] break-words">
+        {link.label}
+      </span>
     </a>
   );
 }
@@ -224,7 +226,7 @@ export function CaseProcessTimeline({
     { id: "communication", label: labels.historyCommunication },
   ];
   return (
-    <section aria-labelledby={sectionId}>
+    <section className="max-w-full min-w-0" aria-labelledby={sectionId}>
       <div>
         <h2
           id={sectionId}
@@ -236,7 +238,7 @@ export function CaseProcessTimeline({
         <p className="text-muted-foreground mt-1 text-sm">{labels.help}</p>
       </div>
 
-      <ol className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+      <ol className="mt-5 grid max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-1">
         {stages.map((stage) => {
           const content = stageContent[stage.id];
           const stageLabel = workspaceLabels.stages[stage.id];
@@ -305,7 +307,7 @@ export function CaseProcessTimeline({
             <li
               key={stage.id}
               aria-current={stage.isCurrent ? "step" : undefined}
-              className={`rounded-xl border p-2.5 sm:p-3 ${stateStyles[stage.state]}`}
+              className={`max-w-full min-w-0 rounded-xl border p-2.5 sm:p-3 ${stateStyles[stage.state]}`}
               data-process-stage={stage.id}
               data-process-state={stage.state}
             >
@@ -314,7 +316,7 @@ export function CaseProcessTimeline({
                   aria-controls={`case-process-panel-${stage.id}`}
                   aria-expanded={isExpanded}
                   aria-label={`${isExpanded ? labels.closeStage : labels.openStage}: ${stageLabel}`}
-                  className="focus-visible:outline-accent flex min-h-11 w-full items-start gap-2.5 rounded-lg p-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:gap-3"
+                  className="focus-visible:outline-accent flex min-h-11 w-full max-w-full min-w-0 items-start gap-2.5 rounded-lg p-1 text-left hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:gap-3"
                   onClick={() =>
                     setOpenStageId((current) =>
                       current === stage.id ? null : stage.id,
@@ -325,18 +327,20 @@ export function CaseProcessTimeline({
                   {stageHeader}
                 </button>
               ) : (
-                <div className="flex items-start gap-3">{stageHeader}</div>
+                <div className="flex max-w-full min-w-0 items-start gap-3">
+                  {stageHeader}
+                </div>
               )}
 
               {canExpand ? (
                 <div
-                  className="mt-2.5 border-t border-current/15 pt-3"
+                  className="mt-2.5 max-w-full min-w-0 border-t border-current/15 pt-3"
                   hidden={!isExpanded}
                   id={`case-process-panel-${stage.id}`}
                 >
                   {stagePanels[stage.id]}
                   {relatedLinks.length > 0 ? (
-                    <div className="mt-3 grid gap-2">
+                    <div className="mt-3 grid max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
                       {relatedLinks.map((link) => (
                         <RelatedLink
                           key={`${link.kind}:${link.href}`}
@@ -373,7 +377,7 @@ export function CaseProcessTimeline({
       {historyItems.length ? (
         <details
           id={historyId}
-          className="group mt-5 rounded-xl border border-white/10 bg-black/10"
+          className="group mt-5 max-w-full min-w-0 rounded-xl border border-white/10 bg-black/10"
         >
           <summary
             aria-label={labels.historyHelp}
@@ -387,7 +391,7 @@ export function CaseProcessTimeline({
           </summary>
           <div
             aria-label={labels.historyFilters}
-            className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3"
+            className="flex flex-wrap gap-2 overflow-x-hidden border-t border-white/10 px-3 py-3 sm:flex-nowrap sm:overflow-x-auto"
             role="group"
           >
             {historyFilters.map((filter) => (
@@ -407,13 +411,16 @@ export function CaseProcessTimeline({
             ))}
           </div>
           {filteredHistoryItems.length ? (
-            <ol className="relative ml-5 border-l border-white/10 p-3 pl-4 sm:ml-6 sm:p-4 sm:pl-5">
+            <ol className="relative ml-5 max-w-full min-w-0 border-l border-white/10 p-3 pl-4 sm:ml-6 sm:p-4 sm:pl-5">
               {filteredHistoryItems.map((item) => (
-                <li className="relative pb-3 last:pb-0" key={item.id}>
+                <li
+                  className="relative max-w-full min-w-0 pb-3 last:pb-0"
+                  key={item.id}
+                >
                   <span className="bg-accent ring-background-elevated absolute top-4 -left-[1.57rem] size-2.5 rounded-full ring-4" />
                   <button
                     aria-label={`${labels.openInspector}: ${item.title}`}
-                    className="focus-visible:outline-accent block min-h-12 w-full rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                    className="focus-visible:outline-accent block min-h-12 w-full max-w-full min-w-0 rounded-xl p-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2"
                     onClick={(event) =>
                       openInspector(
                         {
@@ -429,7 +436,7 @@ export function CaseProcessTimeline({
                     type="button"
                   >
                     <span className="flex flex-wrap items-center gap-2">
-                      <strong className="min-w-0 text-sm [overflow-wrap:anywhere]">
+                      <strong className="max-w-full min-w-0 text-sm [overflow-wrap:anywhere]">
                         {item.title}
                       </strong>
                       {item.status ? (
