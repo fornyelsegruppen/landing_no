@@ -848,6 +848,19 @@ export default async function AdminCasePage({
     (item) =>
       !["closed", "recovered", "do_not_contact"].includes(item.status || ""),
   );
+  const workOrderStatusAt = caseData.workOrder
+    ? caseData.workOrder.status === "documented"
+      ? caseData.workOrder.completionReviewedAt ||
+        caseData.workOrder.documentationSubmittedAt ||
+        caseData.workOrder.completedAt ||
+        caseData.workOrder.updatedAt ||
+        caseData.workOrder.createdAt
+      : caseData.workOrder.status === "completed"
+        ? caseData.workOrder.completedAt ||
+          caseData.workOrder.updatedAt ||
+          caseData.workOrder.createdAt
+        : caseData.workOrder.updatedAt || caseData.workOrder.createdAt
+    : undefined;
   const workingCommercial =
     caseData.commercial.workingContract || caseData.commercial.workingQuote;
   const effectiveCommercial = caseData.commercial.effectiveContract;
@@ -1039,6 +1052,31 @@ export default async function AdminCasePage({
     statusText: workspaceStatus,
   };
   const latestMessage = caseData.messages[0];
+  const attentionMessage = caseData.messages.find((message) =>
+    ["failed", "attention"].includes(message.status || ""),
+  );
+  const workspaceStatusAt = primaryState.key.startsWith("question.")
+    ? displayedReply?.deliveredAt ||
+      displayedReply?.updatedAt ||
+      displayedReply?.createdAt ||
+      displayedQuestion?.question.createdAt
+    : primaryState.key === "stop.follow_up_decline"
+      ? caseData.quote?.declinedAt
+      : primaryState.key === "stop.review_cancellation"
+        ? activeContractRequest?.receivedAt || cancellationSource?.createdAt
+        : primaryState.key === "stop.send_closure_confirmation"
+          ? activeContractRequest?.closedAt ||
+            activeContractRequest?.reviewedAt ||
+            activeContractRequest?.receivedAt
+          : primaryState.key === "stop.resolve_work_block"
+            ? workOrderStatusAt
+            : primaryState.key === "communication.delivery_failed"
+              ? attentionMessage?.updatedAt || attentionMessage?.createdAt
+              : primaryState.key === "lifecycle.archived"
+                ? caseData.lead.archivedAt
+                : primaryState.key === "lifecycle.trashed"
+                  ? caseData.lead.trashedAt
+                  : undefined;
   const processStagePanels = {
     contact: (
       <div className="grid gap-4">
@@ -1258,12 +1296,7 @@ export default async function AdminCasePage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <strong>{caseData.workOrder.reference}</strong>
           <Status
-            {...statusStamp(
-              caseData.workOrder.completedAt,
-              caseData.workOrder.documentationSubmittedAt,
-              caseData.workOrder.updatedAt,
-              caseData.workOrder.createdAt,
-            )}
+            {...statusStamp(workOrderStatusAt)}
             locale={user.interfaceLanguage}
             value={caseData.workOrder.status}
           />
@@ -1475,12 +1508,7 @@ export default async function AdminCasePage({
             </h1>
             <div className="mt-2.5 flex flex-wrap items-center gap-2 lg:mt-3 lg:gap-3">
               <Status
-                {...statusStamp(
-                  latestStageTimestamp(
-                    primaryState.processStage,
-                    caseData.timeline,
-                  ),
-                )}
+                {...statusStamp(workspaceStatusAt)}
                 label={workspaceStatus}
                 tone={primaryState.tone}
               />
@@ -1496,7 +1524,7 @@ export default async function AdminCasePage({
               <span className="text-muted-foreground block text-xs">
                 {copy.responsible}
               </span>
-              <strong className="mt-0.5 block truncate">
+              <strong className="mt-0.5 block [overflow-wrap:anywhere]">
                 {caseData.lead.assignedTo || copy.unassigned}
               </strong>
             </div>
@@ -1505,7 +1533,7 @@ export default async function AdminCasePage({
                 {copy.due}
               </span>
               <strong
-                className={`mt-0.5 block truncate ${
+                className={`mt-0.5 block [overflow-wrap:anywhere] ${
                   due === copy.dueNow
                     ? primaryState.tone === "critical"
                       ? "text-danger"
@@ -2495,12 +2523,7 @@ export default async function AdminCasePage({
                         <div className="flex flex-wrap justify-between gap-3">
                           <strong>{caseData.workOrder.reference}</strong>
                           <Status
-                            {...statusStamp(
-                              caseData.workOrder.completedAt,
-                              caseData.workOrder.documentationSubmittedAt,
-                              caseData.workOrder.updatedAt,
-                              caseData.workOrder.createdAt,
-                            )}
+                            {...statusStamp(workOrderStatusAt)}
                             locale={user.interfaceLanguage}
                             value={caseData.workOrder.status}
                           />
