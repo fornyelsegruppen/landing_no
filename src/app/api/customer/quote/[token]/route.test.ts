@@ -135,6 +135,21 @@ const baseView = {
 };
 const signatureData =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl7nWQAAAAASUVORK5CYII=";
+const signedAt = "2026-08-30T10:00:00.000Z";
+const signatureEvidence = {
+  documentHash: documentHash(contract),
+  signatureHash: "a".repeat(64),
+  signerName: "Test Kunde",
+  signedAt,
+  method: "drawn-and-typed",
+  paymentObligationAccepted: true,
+  termsAccepted: true,
+  withdrawalInformationReceived: true,
+  earlyStartRequested: false,
+  earlyStartLossAcknowledged: false,
+  ipEvidenceHash: "b".repeat(64),
+  userAgentEvidenceHash: "c".repeat(64),
+};
 
 function request(body: Record<string, unknown>) {
   return new Request("http://localhost/api/customer/quote/token", {
@@ -242,6 +257,7 @@ describe("customer quote signing route", () => {
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
         collection: "contracts",
+        context: { trustedCustomerSignature: true },
         data: expect.objectContaining({
           signatureEvidence: expect.objectContaining({
             signerName: "Test Kunde",
@@ -282,6 +298,9 @@ describe("customer quote signing route", () => {
       ...baseView,
       quoteStatus: "accepted",
       contractStatus: "signed",
+      signedAt,
+      signedDocumentId: 77,
+      signatureEvidence,
     });
     const response = await POST(
       request({
@@ -299,6 +318,33 @@ describe("customer quote signing route", () => {
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ idempotent: true });
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("does not report idempotent success for an incomplete historical signature", async () => {
+    mocks.load.mockResolvedValue({
+      ...baseView,
+      quoteStatus: "accepted",
+      contractStatus: "signed",
+    });
+    const response = await POST(
+      request({
+        action: "sign",
+        signerName: "Test Kunde",
+        signatureData,
+        expectedDocumentHash: documentHash(contract),
+        paymentObligationAccepted: true,
+        termsAccepted: true,
+        withdrawalInformationReceived: true,
+        earlyStartRequested: false,
+        earlyStartLossAcknowledged: false,
+      }),
+      { params: Promise.resolve({ token: "t".repeat(43) }) },
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/signature evidence is incomplete/i),
+    });
     expect(mocks.create).not.toHaveBeenCalled();
   });
 

@@ -87,8 +87,8 @@ Dokumentuose pardavėjo eilutė turi būti rašoma kaip `Fornyelse Gruppen AS, o
 3. Atskiras ankstyvos darbų pradžios prašymas — neprivalomas, neužžymėtas iš anksto, fiksuojamas tik jei darbas pradedamas per 14 dienų.
 4. `Endringsavtale` — pradinė ir nauja apimtis, plotas, priežastis, sena/nauja kaina, PVM, rašytinis kliento patvirtinimas prieš tęsiant darbus.
 5. `Ordrebekreftelse / signert kontrakt` — abi šalys, datos, dokumento versija ir hash vienoje kopijoje.
-6. `Ferdigdokumentasjon` — atlikti darbai, prieš/po nuotraukos, faktinis plotas, nukrypimai ir garantijos ribos.
-7. `Garantibevis` — aiški apimtis, pradžia, pabaiga, išimtys ir kreipimosi būdas; negali sumažinti įstatyminių kliento teisių.
+6. `Ferdigdokumentasjon` — visada išduodamas atliktų darbų patvirtinimas su prieš/po nuotraukomis, faktiniu plotu ir nukrypimais; jis nėra automatinė komercinė garantija.
+7. `Garantibevis` — tik kai paslaugai atskirai patvirtintas savininko / teisinės kontrolės paketas ir administratorius jį pasirenka. Dokumente turi būti konkreti apimtis, pradžia, pabaiga, išimtys ir kreipimosi būdas; bendrinė garantija automatiškai nekuriama ir garantija negali sumažinti įstatyminių kliento teisių.
 8. `Fakturagrunnlag` — iki apskaitos integracijos aiškiai žymimas kaip juodraštis, ne oficiali faktūra.
 9. `Personvernerklæring` — tikslai, teisiniai pagrindai, saugojimas, AI/kartografijos/el. pašto/hostingo tiekėjai, perdavimai, teisės ir kontaktas.
 10. `Databehandleroversikt` — Vercel, duomenų bazė, Blob, Resend, Gemini, Upstash, analytics/ads ir jų DPA / regionai.
@@ -150,7 +150,7 @@ Visi scenarijai atliekami staging aplinkoje. Naudojami sintetiniai duomenys ir k
 | UAT-11 | Faktinis plotas tolerancijoje | precheck ir kainos patvirtinimas | leidžiama pradėti tik po patikros; galutinė suma atitinka sutartį |
 | UAT-12 | Faktinis plotas virš maksimumo | STOP ir endringsavtale | darbo pradžia blokuojama, kol admin ir klientas nepatvirtina naujo dokumento |
 | UAT-13 | HMS / prieigos problema | darbuotojo saugos STOP | būsena blokuota, admin mato priežastį, klientas negauna klaidinančio „darbas pradėtas“ |
-| UAT-14 | Darbo užbaigimas | prieš/po nuotraukos, užbaigimas, garantija | be privalomų įrodymų užbaigti negalima; dokumentai matomi vienoje kliento byloje |
+| UAT-14 | Darbo užbaigimas | prieš/po nuotraukos, užbaigimo patvirtinimas, sąskaitos juodraštis ir sąlyginė garantija | be privalomų įrodymų užbaigti negalima; užbaigimo patvirtinimas visada matomas byloje; garantija rodoma tik pagal atskirai patvirtintą paslaugos paketą ir aiškų administratoriaus pasirinkimą, o be jo automatiškai nekuriama |
 | UAT-15 | El. pašto laikinas sutrikimas | retry ir idempotency | klaida matoma dėmesio eilėje; pakartojus siunčiama vieną kartą, ne dublikatas |
 | UAT-16 | Rolės ir privatūs failai | admin/worker/customer/anon prieigos | kiekvienas mato tik leistiną turinį; tiesioginės svetimos nuorodos atmetamos |
 | UAT-17 | Blogo AI juodraštis | generavimas, redagavimas, preview, publish | AI pats nepublikuoja; tik norvegiškas administratoriaus patvirtintas straipsnis patenka į sitemap |

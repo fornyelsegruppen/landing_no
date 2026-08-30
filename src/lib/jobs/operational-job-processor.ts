@@ -69,9 +69,10 @@ async function automaticCommunicationJobIsPaused(
 ) {
   if (!automaticCommunicationIsPaused()) return false;
   if (job.type === "work-order.communication") {
-    const data = job.payload && typeof job.payload === "object"
-      ? job.payload as Record<string, unknown>
-      : {};
+    const data =
+      job.payload && typeof job.payload === "object"
+        ? (job.payload as Record<string, unknown>)
+        : {};
     return data.adminApprovedTransactional !== true;
   }
   if (job.type === "quote.follow-up") return true;
@@ -87,6 +88,7 @@ async function automaticCommunicationJobIsPaused(
     })
     .catch(() => null);
   if (!message) return false;
+  if (["sent", "delivered"].includes(message.status)) return false;
   const analysis =
     message.aiAnalysis && typeof message.aiAnalysis === "object"
       ? (message.aiAnalysis as Record<string, unknown>)
@@ -262,10 +264,48 @@ export async function processOperationalJobs(
         const messageId = numericPayloadId(job.payload, "messageId");
         if (!messageId)
           throw new TypeError("Delivery job has no message reference");
-        const provider = createEmailProvider();
-        if (provider.health().status !== "ready")
-          throw new Error("Email provider requires configuration");
-        await deliverMessage(payload, provider, messageId, job.correlationId);
+        const message = await payload.findByID({
+          collection: "messages",
+          id: messageId,
+          depth: 0,
+          overrideAccess: true,
+        });
+        if (["sent", "delivered"].includes(message.status)) {
+          jobResult = {
+            processed: true,
+            duplicate: true,
+            noSend: true,
+            reason: "message-already-terminal",
+            messageId,
+            messageStatus: message.status,
+          };
+        } else {
+          const provider = createEmailProvider();
+          const guardedProvider = {
+            health: () => provider.health(),
+            send: async (...args: Parameters<typeof provider.send>) => {
+              if (provider.health().status !== "ready")
+                throw new Error("Email provider requires configuration");
+              return provider.send(...args);
+            },
+          };
+          const delivery = await deliverMessage(
+            payload,
+            guardedProvider,
+            messageId,
+            job.correlationId,
+          );
+          if (delivery.duplicate) {
+            jobResult = {
+              processed: true,
+              duplicate: true,
+              noSend: true,
+              reason: "message-already-terminal",
+              messageId,
+              messageStatus: delivery.message.status,
+            };
+          }
+        }
       } else if (job.type === "customer.reply.draft") {
         const leadId = numericPayloadId(job.payload, "leadId");
         const sourceMessageId = numericPayloadId(
@@ -293,7 +333,8 @@ export async function processOperationalJobs(
           overrideAccess: true,
         });
         if (!["new", "draft_ready"].includes(lead.status || "")) {
-          const terminal = lead.status === "converted" || lead.status === "closed";
+          const terminal =
+            lead.status === "converted" || lead.status === "closed";
           await payload.update({
             collection: "operational-jobs",
             id: job.id,

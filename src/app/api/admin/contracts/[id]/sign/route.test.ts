@@ -37,7 +37,7 @@ describe("supplier contract signing", () => {
     process.env.PAYLOAD_SECRET = "test-secret-at-least-32-characters-long";
     mocks.auth.mockReset().mockResolvedValue({ user: { id: 9, role: "admin" } });
     mocks.findByID.mockReset().mockImplementation(async ({ collection }: { collection: string }) => collection === "contracts"
-      ? { id: 3, reference: "K-1-V1", quote: 2, status: "signed", documentHash: documentHash(contractSnapshot), snapshot: contractSnapshot, signatureEvidence: customerEvidence, customerSignatureImage: 30, signedAt: customerEvidence.signedAt }
+      ? { id: 3, reference: "K-1-V1", quote: 2, status: "signed", documentHash: documentHash(contractSnapshot), snapshot: contractSnapshot, signatureEvidence: customerEvidence, customerSignatureImage: 30, signedDocument: 29, signedAt: customerEvidence.signedAt }
       : collection === "private-media" ? { id: 30 } : { id: 2, lead: 1, status: "accepted" });
     mocks.readMedia.mockReset().mockResolvedValue({ data: Buffer.from(signatureData.split(",")[1], "base64"), filename: "signature.png", contentType: "image/png" });
     mocks.createMedia.mockReset().mockResolvedValueOnce({ id: 31 }).mockResolvedValueOnce({ id: 32 });
@@ -51,8 +51,19 @@ describe("supplier contract signing", () => {
     const request = new Request("http://localhost/api/admin/contracts/3/sign", { method: "POST", headers: { "Content-Type": "application/json", "user-agent": "test" }, body: JSON.stringify({ signerName: "Kari Administrator", signatureData, expectedDocumentHash: documentHash(contractSnapshot) }) });
     const response = await POST(request, { params: Promise.resolve({ id: "3" }) });
     expect(response.status).toBe(200);
-    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "contracts", data: expect.objectContaining({ companySignedDocument: 32, companySignedBy: 9 }) }));
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ collection: "contracts", context: { trustedCompanyCountersignature: true }, data: expect.objectContaining({ companySignedDocument: 32, companySignedBy: 9 }) }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ collection: "messages", data: expect.objectContaining({ attachments: [32], idempotencyKey: "contract-counter-signed:3" }) }));
     expect(mocks.deliver).toHaveBeenCalled();
+  });
+
+  it("does not treat a historical companySignedAt without the final proof package as idempotently complete", async () => {
+    mocks.findByID.mockImplementation(async ({ collection }: { collection: string }) => collection === "contracts"
+      ? { id: 3, reference: "K-1-V1", quote: 2, status: "signed", documentHash: documentHash(contractSnapshot), snapshot: contractSnapshot, signatureEvidence: customerEvidence, customerSignatureImage: 30, signedDocument: 29, signedAt: customerEvidence.signedAt, companySignedAt: "2026-08-30T06:00:00.000Z" }
+      : { id: 2, lead: 1, status: "accepted" });
+    const request = new Request("http://localhost/api/admin/contracts/3/sign", { method: "POST", headers: { "Content-Type": "application/json", "user-agent": "test" }, body: JSON.stringify({ signerName: "Kari Administrator", signatureData, expectedDocumentHash: documentHash(contractSnapshot) }) });
+    const response = await POST(request, { params: Promise.resolve({ id: "3" }) });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringMatching(/final contract PDF/i) });
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

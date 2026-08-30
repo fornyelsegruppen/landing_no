@@ -40,6 +40,10 @@ import {
   recordCustomerContractRequest,
   type CustomerContractRequestInput,
 } from "@/lib/contracts/customer-contract-request";
+import {
+  assertCustomerSignatureProof,
+  ContractSigningInvariantError,
+} from "@/lib/contracts/signing-invariants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -483,12 +487,20 @@ export async function POST(
         { status: 409 },
       );
     }
-    if (view.contractStatus === "signed" && view.quoteStatus === "accepted")
+    if (view.contractStatus === "signed" && view.quoteStatus === "accepted") {
+      assertCustomerSignatureProof({
+        status: view.contractStatus,
+        documentHash: view.documentHash,
+        signedAt: view.signedAt,
+        signatureEvidence: view.signatureEvidence,
+        signedDocument: view.signedDocumentId,
+      });
       return NextResponse.json({
         ok: true,
         status: "signed",
         idempotent: true,
       });
+    }
     if (
       view.contractStatus !== "issued" ||
       !["sent", "viewed"].includes(view.quoteStatus)
@@ -553,6 +565,7 @@ export async function POST(
     const updated = await payload.update({
       collection: "contracts",
       overrideAccess: true,
+      context: { trustedCustomerSignature: true },
       where: {
         and: [
           { id: { equals: view.contractId } },
@@ -576,12 +589,14 @@ export async function POST(
         depth: 0,
         overrideAccess: true,
       });
-      if (latest.status === "signed")
+      if (latest.status === "signed") {
+        assertCustomerSignatureProof(latest);
         return NextResponse.json({
           ok: true,
           status: "signed",
           idempotent: true,
         });
+      }
       throw new CustomerActionConflictError("Contract signing conflict");
     }
     await payload.update({
@@ -706,6 +721,15 @@ export async function POST(
       return NextResponse.json(
         { error: error.reason, missing: error.unavailable },
         { status: 503 },
+      );
+    if (error instanceof ContractSigningInvariantError)
+      return NextResponse.json(
+        {
+          error:
+            "The stored contract signature evidence is incomplete. Contact Takfornyelse before continuing.",
+          correlationId,
+        },
+        { status: 409 },
       );
     if (
       error instanceof CustomerActionConflictError ||

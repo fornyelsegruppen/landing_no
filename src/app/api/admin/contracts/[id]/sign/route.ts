@@ -13,6 +13,7 @@ import { extractSignaturePngFromPdf } from "@/lib/pdf/extract-signature";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { clientIp } from "@/lib/rate-limit";
 import { createCompanySignatureEvidence, type ContractSnapshot, type SignatureEvidenceRecord } from "@/lib/quotes/document";
+import { assertCustomerSignatureProof, assertFullySignedContractProof } from "@/lib/contracts/signing-invariants";
 import { buildQuoteContractPdf } from "@/lib/quotes/quote-pdf";
 import { loadPdfMeasurementEvidence } from "@/lib/quotes/measurement-evidence";
 import { userIsAdmin } from "@/payload/access/roles";
@@ -73,10 +74,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       currentDocumentHash: typeof contract.documentHash === "string" ? contract.documentHash : undefined,
       currentReference: contract.reference,
     });
-    if (contract.companySignedAt) return NextResponse.json({ ok: true, status: "fully_signed", idempotent: true });
+    if (contract.companySignedAt) {
+      assertFullySignedContractProof(contract);
+      return NextResponse.json({ ok: true, status: "fully_signed", idempotent: true });
+    }
     if (quote.status !== "accepted") throw new TypeError("The customer has not accepted the quote");
     const snapshot = contract.snapshot as unknown as ContractSnapshot;
     const customerEvidence = contract.signatureEvidence as unknown as SignatureEvidenceRecord | null;
+    assertCustomerSignatureProof(contract);
     if (!customerEvidence) throw new TypeError("Customer signature evidence is missing");
 
     const evidence = createCompanySignatureEvidence({
@@ -143,6 +148,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       collection: "contracts",
       id: contract.id,
       overrideAccess: true,
+      context: { trustedCompanyCountersignature: true },
       data: {
         companySignatureEvidence: evidence,
         companySignatureImage: companySignatureMedia.id,

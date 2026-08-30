@@ -4,9 +4,32 @@ import {
   scheduleWorkOrderCommunications,
 } from "./WorkOrders";
 
-function request() {
+const documentHash = "8".repeat(64);
+const signedAt = "2026-08-25T11:55:00Z";
+const companySignedAt = "2026-08-25T12:00:00Z";
+
+function fullySignedContract(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 4, status: "signed", quote: 3, documentHash, signedAt, signedDocument: 30,
+    signatureEvidence: {
+      documentHash, signatureHash: "a".repeat(64), signerName: "Test Kunde", signedAt,
+      method: "drawn-and-typed", paymentObligationAccepted: true, termsAccepted: true,
+      withdrawalInformationReceived: true, earlyStartRequested: false, earlyStartLossAcknowledged: false,
+      ipEvidenceHash: "b".repeat(64), userAgentEvidenceHash: "c".repeat(64),
+    },
+    companySignedAt, companySignedBy: 9, companySignatureImage: 31, companySignedDocument: 32,
+    companySignatureEvidence: {
+      documentHash, signatureHash: "d".repeat(64), signerName: "Kari Administrator", signerUserId: 9,
+      signedAt: companySignedAt, method: "drawn-and-typed", ipEvidenceHash: "e".repeat(64), userAgentEvidenceHash: "f".repeat(64),
+    },
+    ...overrides,
+  };
+}
+
+function request(contract = fullySignedContract()) {
   return { payload: { findByID: vi.fn()
-    .mockResolvedValueOnce({ id: 4, status: "signed", quote: 3, documentHash: "h".repeat(64) })
+    .mockResolvedValueOnce(contract)
+    .mockResolvedValueOnce({ id: 32, mimeType: "application/pdf", classification: "contract", ownerType: "contract", ownerId: "4" })
     .mockResolvedValueOnce({ id: 3, status: "accepted", lead: 2 })
     .mockResolvedValueOnce({ id: 8, role: "worker", active: true }) } };
 }
@@ -14,7 +37,11 @@ function request() {
 describe("work-order collection invariants", () => {
   it("creates work only from a signed accepted contract and active worker", async () => {
     const result = await protectWorkOrder({ operation: "create", req: request(), data: { contract: 4, assignedWorker: 8, scheduledAt: "2026-09-01T08:00:00Z" }, originalDoc: { status: "unassigned" } } as never) as Record<string, unknown>;
-    expect(result).toMatchObject({ quote: 3, lead: 2, contractDocumentHash: "h".repeat(64), status: "scheduled" });
+    expect(result).toMatchObject({ quote: 3, lead: 2, contractDocumentHash: documentHash, status: "scheduled" });
+  });
+
+  it("blocks direct collection creation from an incomplete historical signed contract", async () => {
+    await expect(protectWorkOrder({ operation: "create", req: request(fullySignedContract({ companySignatureEvidence: null })), data: { contract: 4 }, originalDoc: { status: "unassigned" } } as never)).rejects.toThrow(/counter-signature evidence/i);
   });
 
   it("blocks status jumps and work start without a completed precheck", async () => {

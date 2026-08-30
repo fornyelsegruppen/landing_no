@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
 import {
   automaticPreparationScope,
   processOperationalJobs,
 } from "./operational-job-processor";
 import { loadCustomerReplySourceBundle } from "@/lib/messages/customer-reply-sources";
+import { ResendEmailProvider } from "@/lib/providers/resend-email-provider";
+import { LogEmailProvider } from "@/lib/providers/safe-providers";
 
 type Row = Record<string, unknown> & { id: number };
 
@@ -123,6 +125,7 @@ describe("operational job processor", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalEnvironment.VERCEL_ENV === undefined)
       delete process.env.VERCEL_ENV;
     else process.env.VERCEL_ENV = originalEnvironment.VERCEL_ENV;
@@ -163,6 +166,96 @@ describe("operational job processor", () => {
     expect(JSON.stringify(state.job.payload)).not.toContain(
       "kunde@example.test",
     );
+  });
+
+  it.each(["sent", "delivered"])(
+    "reconciles an already %s message without invoking the provider",
+    async (messageStatus) => {
+      process.env.VERCEL_ENV = "production";
+      delete process.env.RESEND_API_KEY;
+      const providerHealth = vi.spyOn(ResendEmailProvider.prototype, "health");
+      const providerSend = vi.spyOn(ResendEmailProvider.prototype, "send");
+      const state = repository({
+        message: {
+          status: messageStatus,
+          aiAnalysis: { workOrderId: 7, reminder: true },
+        },
+      });
+
+      const result = await processOperationalJobs(state.payload, {
+        jobIds: [3],
+        now: new Date("2026-08-24T20:00:00.000Z"),
+        rescueStale: false,
+      });
+
+      expect(result).toMatchObject({
+        completed: [3],
+        attention: [],
+        retried: [],
+        paused: [],
+      });
+      expect(state.job).toMatchObject({
+        status: "completed",
+        result: {
+          processed: true,
+          duplicate: true,
+          noSend: true,
+          reason: "message-already-terminal",
+          messageId: 2,
+          messageStatus,
+        },
+      });
+      expect(state.message.status).toBe(messageStatus);
+      expect(providerHealth).not.toHaveBeenCalled();
+      expect(providerSend).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps a concurrent duplicate no-send when the message becomes sent after the job claim", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.ALLOW_PREVIEW_EMAIL_LOG = "true";
+    delete process.env.RESEND_API_KEY;
+    const providerHealth = vi.spyOn(LogEmailProvider.prototype, "health");
+    const providerSend = vi.spyOn(LogEmailProvider.prototype, "send");
+    const state = repository();
+    const originalFindByID = (
+      state.payload as unknown as {
+        findByID: (args: { collection: string; id: number }) => Promise<Row>;
+      }
+    ).findByID.bind(state.payload);
+    let messageReads = 0;
+    (
+      state.payload as unknown as {
+        findByID: (args: { collection: string; id: number }) => Promise<Row>;
+      }
+    ).findByID = async (args) => {
+      if (args.collection === "messages" && ++messageReads === 2)
+        state.message.status = "sent";
+      return originalFindByID(args);
+    };
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({
+      completed: [3],
+      attention: [],
+      retried: [],
+    });
+    expect(state.job).toMatchObject({
+      status: "completed",
+      result: {
+        duplicate: true,
+        noSend: true,
+        reason: "message-already-terminal",
+        messageStatus: "sent",
+      },
+    });
+    expect(providerHealth).not.toHaveBeenCalled();
+    expect(providerSend).not.toHaveBeenCalled();
   });
 
   it("rechecks a queued reply source and refuses stale delivery", async () => {

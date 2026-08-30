@@ -222,7 +222,7 @@ Išjungti keturis šios bangos flagus ir redeployinti. Jau pasirašyti dokumenta
 6. Pereiti būsenas: priskirtas → suplanuotas → vyksta → atvyko → patikra/matavimas → darbai pradėti → užbaigta.
 7. Patikrinti kliento komunikaciją kiekviename numatytame taške, ETA ir dublikatų nebuvimą.
 8. Patikrinti galutinį matavimą, tolerancijos ribą, pakeitimo susitarimą, kliento parašą ir administratoriaus užbaigimo peržiūrą.
-9. Patikrinti užbaigimo dokumentus, garantijos informaciją, laiko juostą ir audito įrašus.
+9. Patikrinti visada sukuriamą užbaigimo patvirtinimą, sąskaitos juodraštį, laiko juostą ir audito įrašus. Garantiją tikrinti tik tada, kai paslaugai yra atskirai savininko / teisinės kontrolės patvirtintas konkretus paketas ir administratorius jį aiškiai pasirenka; bendrinė garantija automatiškai nekuriama.
 
 ### PASS
 
@@ -231,6 +231,7 @@ Išjungti keturis šios bangos flagus ir redeployinti. Jau pasirašyti dokumenta
 - kiekviena suplanuota kliento žinutė sukurta ir pristatyta tik vieną kartą;
 - statusai juda tik leistina seka, o pakartotinis paspaudimas nėra žalingas;
 - pakeitimo susitarimas ir užbaigimo dokumentai susieti su ta pačia byla;
+- užbaigimo patvirtinimas sukuriamas visada; garantija išduodama tik pagal atskirai patvirtintą paslaugos paketą ir aiškų administratoriaus pasirinkimą, o be jo automatinės garantijos nėra;
 - nėra P0/P1, autorizacijos pažeidimų, dublikatų ar nepaaiškintų 5xx.
 
 ### Rollback

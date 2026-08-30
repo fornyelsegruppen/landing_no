@@ -1,16 +1,24 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
+import { assertCustomerSignatureProof, assertFullySignedContractProof } from "@/lib/contracts/signing-invariants";
 import { assertContractTransition, type ContractStatus } from "@/lib/quotes/workflow";
 import { adminOnly } from "../access/roles";
 
 const immutableFields = ["quote", "version", "snapshot", "documentHash", "termsVersion"] as const;
 
-export const protectContractVersion: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
+export const protectContractVersion: CollectionBeforeChangeHook = ({ data, originalDoc, operation, context }) => {
   if (operation === "create") {
     if (data.status && data.status !== "draft") throw new Error("New contracts must start as drafts");
     return data;
   }
   if (!originalDoc) return data;
-  if (data.status && data.status !== originalDoc.status) assertContractTransition(originalDoc.status as ContractStatus, data.status as ContractStatus);
+  const nextDoc = { ...originalDoc, ...data };
+  if (data.status && data.status !== originalDoc.status) {
+    assertContractTransition(originalDoc.status as ContractStatus, data.status as ContractStatus);
+    if (data.status === "signed" && context?.trustedCustomerSignature !== true) {
+      throw new Error("A contract may only be marked signed by the verified customer-signature workflow");
+    }
+  }
+  if (nextDoc.status === "signed") assertCustomerSignatureProof(nextDoc);
   if (originalDoc.status !== "draft") {
     const changed = immutableFields.some((field) => field in data && JSON.stringify(data[field]) !== JSON.stringify(originalDoc[field]));
     if (changed) throw new Error("An issued or signed contract is immutable. Create a new version.");
@@ -29,6 +37,19 @@ export const protectContractVersion: CollectionBeforeChangeHook = ({ data, origi
     );
     if (originalDoc.companySignedAt && changedFields.length > 0) throw new Error("A contract signed by both parties cannot be changed");
     if (changedFields.some((key) => !counterSignatureFields.has(key))) throw new Error("Only the supplier counter-signature may be added after the customer has signed");
+    const companyFields = new Set([
+      "companySignatureEvidence",
+      "companySignatureImage",
+      "companySignedDocument",
+      "companySignedAt",
+      "companySignedBy",
+    ]);
+    if (changedFields.some((key) => companyFields.has(key))) {
+      if (context?.trustedCompanyCountersignature !== true) {
+        throw new Error("The supplier counter-signature may only be added by the verified counter-signature workflow");
+      }
+      assertFullySignedContractProof(nextDoc);
+    }
   }
   return data;
 };

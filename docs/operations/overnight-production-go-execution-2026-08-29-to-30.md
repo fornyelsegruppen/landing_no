@@ -39,7 +39,10 @@ removed. Every integration commit must stage explicit paths only.
 1. PROD-8.2 withdrawal/change and invalid-token negative paths are auditable and
    disclose no wrong-case data.
 2. PROD-8.3 worker sequence, authorization, idempotency, tolerance/max-price,
-   evidence, completion, invoice and warranty paths pass in synthetic scope.
+   evidence, completion confirmation and invoice paths pass in synthetic scope.
+   Warranty is tested only when the service has a separately owner/legal-approved
+   service-specific package and the administrator explicitly selects it; no
+   generic warranty is created automatically.
 3. PROD-8.4 dependencies and controlled no-send behavior are verified. Any
    missing owner secret or provider access is recorded as an explicit GO blocker,
    not silently bypassed.
@@ -210,7 +213,10 @@ The packet remains **NO-GO** until each item below has direct evidence:
    retests.
 3. Two synthetic Preview PROD-8.3 worker paths: happy completion and
    maximum-price/change-agreement recovery, including authorization,
-   idempotency, media, invoice and warranty evidence.
+   idempotency, media, invoice and completion-confirmation evidence. Conditional
+   warranty evidence is required only for a service with an owner/legal-approved
+   package selected by the administrator; without that approved package, verify
+   that no warranty is issued automatically.
 4. Authenticated Preview PROD-8.4 no-send/idempotency UAT and 5/15/30 minute
    monitoring evidence.
 5. Production `CRON_SECRET`, Production `PEXELS_API_KEY` and GitHub

@@ -40,7 +40,7 @@ Principas: žmogaus nepatikrintas rezultatas nėra `PASS`.
 | ETA ir kliento operaciniai pranešimai               | REIKIA SAVININKO UAT           | Tikrinti kontroliuojamoje sintetinėje eigoje, ne realiam klientui.                                                                         |
 | Galutinis matavimas ir tolerancija                  | REIKIA SAVININKO UAT           | Patikrinti darbuotojo portale.                                                                                                             |
 | Pakeitimo susitarimas virš maksimumo                | REIKIA SAVININKO UAT           | Naudoti atskirą sintetinę bylą.                                                                                                            |
-| Užbaigimo dokumentai ir garantija                   | REIKIA SAVININKO UAT           | Reikia pilno darbo užbaigimo scenarijaus.                                                                                                  |
+| Užbaigimo patvirtinimas, sąskaitos juodraštis ir sąlyginė garantija | REIKIA SAVININKO UAT | Visada tikrinti užbaigimo patvirtinimą ir sąskaitos juodraštį. Garantiją tikrinti tik tai paslaugai, kuriai savininkas / teisinė kontrolė atskirai patvirtino paslaugos paketą ir administratorius jį pasirinko; bendrinė garantija automatiškai nekuriama. |
 
 ## PROD-8.4 — priminimai ir tinklaraščio automatika
 

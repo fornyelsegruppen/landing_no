@@ -85,7 +85,8 @@ Worker portal: `https://www.takfornyelse.as/user`
 4. At every configured customer-notification step, check one email arrives and the timeline entry is clickable.
 5. Verify a second click/reload does not duplicate the state change or email.
 6. Submit completion documentation. In admin review and approve it.
-7. Confirm invoice draft and warranty/completion documents appear under the same customer case.
+7. Confirm the invoice draft and completion confirmation appear under the same customer case.
+8. If, and only if, the service has a separately owner/legal-approved warranty package, select that package as administrator and confirm the exact warranty record and document appear under the case. Otherwise confirm that completion does not create a generic warranty automatically.
 
 Expected: valid state order, Europe/Oslo dates, one communication per event, no access to another worker’s job, and all documents grouped under case #10.
 
@@ -95,4 +96,4 @@ STOP: wrong worker access, skipped mandatory precheck, duplicate email, missing 
 
 ## Completion rule
 
-PROD-8.2 and PROD-8.3 can be marked fully `PASS` only after all applicable sections above are completed and evidence is recorded. A code test or read-only database check does not replace these human-visible steps.
+PROD-8.2 and PROD-8.3 can be marked fully `PASS` only after all applicable sections above are completed and evidence is recorded. A warranty is not an unconditional PROD-8.3 artifact: the completion confirmation is always required, while warranty issuance requires a separately approved service-specific package and explicit administrator selection. Approval of the service matrix and legal terms remains a separate owner/legal decision before any warranty can be issued. A code test or read-only database check does not replace these human-visible steps.

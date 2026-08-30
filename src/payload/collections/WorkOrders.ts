@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionConfig } from "payload";
+import { assertContractReadyForWorkOrder } from "@/lib/contracts/signing-invariants";
 import { assertWorkOrderTransition, type WorkOrderStatus } from "@/lib/work-orders/workflow";
 import { enqueueCompletionCommunication, enqueueWorkOrderStatusCommunication, syncWorkOrderCommunicationJobs } from "@/lib/work-orders/communications";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
@@ -22,7 +23,7 @@ export const protectWorkOrder: CollectionBeforeChangeHook = async ({ data, origi
     const contractId = relationId(data.contract);
     if (!contractId) throw new Error("A signed contract is required");
     const contract = await req.payload.findByID({ collection: "contracts", id: contractId, depth: 0, overrideAccess: true, req });
-    if (contract.status !== "signed") throw new Error("Only a signed contract can become a work order");
+    await assertContractReadyForWorkOrder(req.payload, contract);
     const quoteId = relationId(contract.quote);
     if (!quoteId) throw new Error("The signed contract has no quote");
     const quote = await req.payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true, req });
