@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireInternalUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { getWorkerCopy, panelDateLocale } from "@/lib/panel-i18n";
 import { formatNorwayDateTime, norwayDateKey } from "@/lib/norway-time";
+import { workerPortalAvailable } from "@/lib/worker-portal/gate";
 
 function relationId(value: number | { id: number } | null | undefined) {
   return typeof value === "object" && value ? value.id : value;
 }
 
 export default async function WorkerHomePage() {
+  if (!workerPortalAvailable()) notFound();
   const user = await requireInternalUser();
   const copy = getWorkerCopy(user.interfaceLanguage);
   const dateLocale = panelDateLocale(user.interfaceLanguage);

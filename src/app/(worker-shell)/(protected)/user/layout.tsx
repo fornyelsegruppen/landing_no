@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { LogoutButton } from "@/components/worker/logout-button";
 import { PanelLanguageSwitcher } from "@/components/worker/panel-language-switcher";
 import { requireInternalUser } from "@/lib/auth/internal-session";
 import { getWorkerCopy } from "@/lib/panel-i18n";
+import { workerPortalAvailable } from "@/lib/worker-portal/gate";
 
 export const dynamic = "force-dynamic";
 
 export default async function WorkerLayout({ children }: { children: React.ReactNode }) {
+  if (!workerPortalAvailable()) notFound();
   const user = await requireInternalUser();
   const copy = getWorkerCopy(user.interfaceLanguage);
 

@@ -12,6 +12,10 @@ import {
   type PanelLocale,
 } from "@/lib/panel-i18n";
 import { prepareWorkerPhoto } from "@/lib/images/worker-upload";
+import {
+  workerDraftStatusLabel,
+  type WorkerDraftState,
+} from "@/lib/worker-portal/draft-status";
 
 type Props = {
   locale: PanelLocale;
@@ -47,9 +51,7 @@ export function WorkerOrderActions(props: Props) {
   const [documentationSubmitted, setDocumentationSubmitted] = useState(
     Boolean(props.initialDocumentationSubmittedAt),
   );
-  const [draftState, setDraftState] = useState<
-    "unsent" | "saved" | "sending" | "sent" | "error"
-  >("sent");
+  const [draftState, setDraftState] = useState<WorkerDraftState | null>(null);
   const precheckFormRef = useRef<HTMLFormElement>(null);
   const completionFormRef = useRef<HTMLFormElement>(null);
   const draftKey = `takfornyelse:worker:${props.orderId}`;
@@ -291,40 +293,14 @@ export function WorkerOrderActions(props: Props) {
           </p>
         ) : null}
       </div>
-      <p
-        className={`mt-3 text-xs font-semibold ${draftState === "error" ? "text-red-300" : "text-muted-foreground"}`}
-        role="status"
-      >
-        {draftState === "unsent"
-          ? props.locale === "lt"
-            ? "Neišsiųsta"
-            : props.locale === "en"
-              ? "Not sent"
-              : "Ikke sendt"
-          : draftState === "saved"
-            ? props.locale === "lt"
-              ? "Juodraštis saugomas šiame telefone"
-              : props.locale === "en"
-                ? "Draft saved on this phone"
-                : "Utkast lagret på denne telefonen"
-            : draftState === "sending"
-              ? props.locale === "lt"
-                ? "Siunčiama …"
-                : props.locale === "en"
-                  ? "Sending …"
-                  : "Sender …"
-              : draftState === "error"
-                ? props.locale === "lt"
-                  ? "Klaida – duomenys liko telefone"
-                  : props.locale === "en"
-                    ? "Error – data remains on this phone"
-                    : "Feil – dataene er fortsatt på telefonen"
-                : props.locale === "lt"
-                  ? "Išsiųsta"
-                  : props.locale === "en"
-                    ? "Sent"
-                    : "Sendt"}
-      </p>
+      {draftState ? (
+        <p
+          className={`mt-3 text-xs font-semibold ${draftState === "error" ? "text-red-300" : "text-muted-foreground"}`}
+          role="status"
+        >
+          {workerDraftStatusLabel(draftState, props.locale)}
+        </p>
+      ) : null}
 
       {status === "scheduled" ? (
         <ActionButton

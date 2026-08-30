@@ -7,6 +7,7 @@ import { getPayload } from "@/lib/payload";
 import { documentHash, quoteDisplayModel, type ContractSnapshot } from "@/lib/quotes/document";
 import { getWorkerCopy, panelDateLocale } from "@/lib/panel-i18n";
 import { formatNorwayDateTime } from "@/lib/norway-time";
+import { workerPortalAvailable } from "@/lib/worker-portal/gate";
 
 function relationId(value: unknown) {
   if (typeof value === "number") return value;
@@ -19,6 +20,7 @@ function relationIds(value: unknown) {
 }
 
 export default async function WorkerOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  if (!workerPortalAvailable()) notFound();
   const user = await requireInternalUser();
   const copy = getWorkerCopy(user.interfaceLanguage);
   const dateLocale = panelDateLocale(user.interfaceLanguage);
