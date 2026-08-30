@@ -10,7 +10,9 @@ describe("worker draft status", () => {
     expect(workerDraftStatusLabel("saved", "lt")).toBe(
       "Juodraštis saugomas šiame telefone",
     );
-    expect(workerDraftStatusLabel("sent", "lt")).toBe("Išsiųsta");
+    expect(workerDraftStatusLabel("registered", "lt")).toBe("Užregistruota");
+    expect(workerDraftStatusLabel("registered", "nb")).toBe("Registrert");
+    expect(workerDraftStatusLabel("registered", "en")).toBe("Registered");
     expect(workerDraftStatusLabel("error", "en")).toBe(
       "Error – data remains on this phone",
     );

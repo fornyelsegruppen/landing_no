@@ -30,8 +30,15 @@ describe("operational scheduler configuration", () => {
     ).toEqual([]);
 
     expect(
-      operationalWorkflow.match(/cron: "\*\/15 \* \* \* \*"/g),
+      operationalWorkflow.match(/cron: "7,22,37,52 \* \* \* \*"/g),
     ).toHaveLength(1);
+    const minuteOffsets = [7, 22, 37, 52];
+    expect(
+      minuteOffsets.map((minute, index) => {
+        const nextMinute = minuteOffsets[(index + 1) % minuteOffsets.length]!;
+        return (nextMinute - minute + 60) % 60;
+      }),
+    ).toEqual([15, 15, 15, 15]);
     expect(operationalWorkflow).toContain("takfornyelse-operational-jobs");
     expect(operationalWorkflow).toContain("cancel-in-progress: false");
     expect(operationalWorkflow).toContain("permissions:\n  contents: read");

@@ -1,7 +1,7 @@
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 export type WorkerDraftState =
-  "saved" | "sending" | "sent" | "error" | "unsent";
+  "saved" | "sending" | "registered" | "error" | "unsent";
 
 export function workerDraftStatusLabel(
   state: WorkerDraftState | null,
@@ -32,5 +32,9 @@ export function workerDraftStatusLabel(
       : locale === "en"
         ? "Error – data remains on this phone"
         : "Feil – dataene er fortsatt på telefonen";
-  return locale === "lt" ? "Išsiųsta" : locale === "en" ? "Sent" : "Sendt";
+  return locale === "lt"
+    ? "Užregistruota"
+    : locale === "en"
+      ? "Registered"
+      : "Registrert";
 }

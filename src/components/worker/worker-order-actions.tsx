@@ -111,7 +111,7 @@ export function WorkerOrderActions(props: Props) {
 
   function clearLocalDraft() {
     window.localStorage.removeItem(draftKey);
-    setDraftState("sent");
+    setDraftState("registered");
   }
 
   async function send(body: Record<string, unknown>) {
@@ -168,7 +168,7 @@ export function WorkerOrderActions(props: Props) {
             : copy.registered,
       );
       router.refresh();
-      setDraftState("sent");
+      setDraftState("registered");
       return true;
     } catch (error) {
       setNotice(
