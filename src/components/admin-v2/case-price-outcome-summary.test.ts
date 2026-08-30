@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { CasePriceOutcomeSummary } from "./case-price-outcome-summary";
+import {
+  CasePriceOutcomeSummary,
+  selectMaximumPriceChange,
+} from "./case-price-outcome-summary";
 
 const formatMoney = (value?: number) =>
   typeof value === "number" ? `${Math.round(value / 100)} NOK` : "—";
@@ -27,6 +30,53 @@ function render(
 }
 
 describe("case price outcome summary", () => {
+  it("selects only a proven breach from the current work order", () => {
+    const selected = selectMaximumPriceChange({
+      approvedChangeAgreementId: 12,
+      workOrderId: 6,
+      changes: [
+        {
+          id: 11,
+          href: "/other",
+          reference: "E-OTHER-V1",
+          status: "accepted",
+          workOrderId: 5,
+          beforeMaximumTotalIncVatOre: 2_000_000,
+          afterTotalIncVatOre: 3_000_000,
+        },
+        {
+          id: 12,
+          href: "/current",
+          reference: "E-6-V1",
+          status: "accepted",
+          workOrderId: 6,
+          beforeMaximumTotalIncVatOre: 2_975_600,
+          afterTotalIncVatOre: 3_400_000,
+        },
+      ],
+    });
+
+    expect(selected?.reference).toBe("E-6-V1");
+  });
+
+  it("does not infer a breach from incomplete or non-exceeding snapshots", () => {
+    expect(
+      selectMaximumPriceChange({
+        workOrderId: 6,
+        changes: [
+          {
+            id: 12,
+            href: "/current",
+            reference: "E-6-V1",
+            status: "accepted",
+            workOrderId: 6,
+            beforeMaximumTotalIncVatOre: 2_975_600,
+          },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
   it("renders nothing for work that did not exceed the maximum", () => {
     expect(render({ reasonCode: "within_contract" })).toBe("");
   });
@@ -57,6 +107,15 @@ describe("case price outcome summary", () => {
     expect(html).not.toContain("Darbą buvo galima tęsti");
   });
 
+  it("keeps an accepted agreement in warning state until the repeat inspection", () => {
+    const html = render({ workOrderStatus: "blocked" });
+
+    expect(html).toContain("Reikia pakartotinės patikros");
+    expect(html).toContain("būtina pakartotinė patikra");
+    expect(html).toContain("text-warning");
+    expect(html).not.toContain("Išspręsta");
+  });
+
   it("does not invent amounts when the historical snapshot is incomplete", () => {
     const html = render({
       afterTotalIncVatOre: undefined,
@@ -83,5 +142,8 @@ describe("case price outcome summary", () => {
     expect(html).toContain("sm:grid-cols-3");
     expect(html).toContain("min-w-0");
     expect(html).toContain("overflow-wrap:anywhere");
+    expect(html).toContain("max-w-full");
+    expect(html).toContain("break-words");
+    expect(html).toContain("whitespace-normal");
   });
 });

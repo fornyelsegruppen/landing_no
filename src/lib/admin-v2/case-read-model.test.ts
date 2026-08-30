@@ -604,6 +604,7 @@ describe("admin case read model", () => {
               {
                 id: 9,
                 reference: "E-6-V1",
+                workOrder: 6,
                 status: "accepted",
                 reasonCode: "over_maximum",
                 beforeTotalIncVatOre: 2_587_500,
@@ -635,6 +636,7 @@ describe("admin case read model", () => {
       beforeMaximumTotalIncVatOre: 2_975_600,
       reasonCode: "over_maximum",
       status: "accepted",
+      workOrderId: 6,
     });
   });
 

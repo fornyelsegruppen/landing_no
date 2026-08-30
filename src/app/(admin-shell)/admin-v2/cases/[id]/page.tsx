@@ -36,7 +36,10 @@ import {
   type CaseHistoryEventLink,
 } from "@/components/admin-v2/case-history-event-detail";
 import { CasePriceCalculationDetail } from "@/components/admin-v2/case-price-calculation-detail";
-import { CasePriceOutcomeSummary } from "@/components/admin-v2/case-price-outcome-summary";
+import {
+  CasePriceOutcomeSummary,
+  selectMaximumPriceChange,
+} from "@/components/admin-v2/case-price-outcome-summary";
 import { CaseStatusStamp } from "@/components/admin-v2/case-status-stamp";
 import { ContractRequestReviewPanel } from "@/components/admin-v2/contract-request-review-panel";
 import {
@@ -894,19 +897,12 @@ export default async function AdminCasePage({
   const commercialAmount = nok(workingQuote?.totalIncVatOre);
   const commercialMaximum = nok(workingQuote?.maximumTotalIncVatOre);
   const commercialDeposit = nok(workingQuote?.depositAmountIncVatOre || 0);
-  const overMaximumChange =
-    caseData.changes.find(
-      (change) =>
-        change.reasonCode === "over_maximum" &&
-        change.id === caseData.workOrder?.approvedChangeAgreementId,
-    ) ||
-    caseData.changes.find(
-      (change) =>
-        change.reasonCode === "over_maximum" && change.status === "accepted",
-    ) ||
-    caseData.changes.find(
-      (change) => change.reasonCode === "over_maximum",
-    );
+  const overMaximumChange = selectMaximumPriceChange({
+    approvedChangeAgreementId:
+      caseData.workOrder?.approvedChangeAgreementId,
+    changes: caseData.changes,
+    workOrderId: caseData.workOrder?.id,
+  });
   const overMaximumStatusAt =
     overMaximumChange?.acceptedAt ||
     overMaximumChange?.updatedAt ||
@@ -1594,13 +1590,9 @@ export default async function AdminCasePage({
         </div>
         {overMaximumChange ? (
           <CasePriceOutcomeSummary
-            afterTotalIncVatOre={
-              overMaximumChange.afterTotalIncVatOre ??
-              caseData.workOrder?.actualTotalIncVatOre
-            }
+            afterTotalIncVatOre={overMaximumChange.afterTotalIncVatOre}
             beforeMaximumTotalIncVatOre={
-              overMaximumChange.beforeMaximumTotalIncVatOre ??
-              workingQuote?.maximumTotalIncVatOre
+              overMaximumChange.beforeMaximumTotalIncVatOre
             }
             changeReference={overMaximumChange.reference}
             changeStatus={overMaximumChange.status}
@@ -1615,7 +1607,7 @@ export default async function AdminCasePage({
             )}
             formatMoney={nok}
             locale={user.interfaceLanguage}
-            reasonCode={overMaximumChange.reasonCode}
+            reasonCode="over_maximum"
             workOrderStatus={caseData.workOrder?.status}
           />
         ) : null}

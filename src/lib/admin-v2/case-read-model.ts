@@ -195,6 +195,7 @@ export type CaseChangeAgreement = CaseEntity & {
   beforeTotalIncVatOre?: number;
   reasonCode?: string;
   validUntil?: string;
+  workOrderId?: number;
 };
 
 export type CaseMessage = CaseEntity & {
@@ -1581,6 +1582,7 @@ export async function loadAdminCase(
         summary: stringValue(item.reasonDescription),
         reasonCode: stringValue(item.reasonCode),
         validUntil: stringValue(item.validUntil),
+        workOrderId: relationId(item.workOrder) || undefined,
         beforeAreaTenths: numberValue(before?.areaTenths),
         beforeTotalIncVatOre:
           numberValue(item.beforeTotalIncVatOre) ??
