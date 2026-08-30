@@ -37,8 +37,9 @@ export function CaseStatusStamp({
       </span>
       {timestamp ? (
         <time
-          className="mt-1 text-[.68rem] leading-none font-semibold tracking-normal whitespace-nowrap text-white/85 normal-case"
+          className="mt-1 text-[.68rem] leading-none font-semibold tracking-normal whitespace-nowrap normal-case"
           dateTime={dateTime}
+          style={{ color: "color-mix(in oklab, currentColor 78%, white)" }}
         >
           {timestamp}
         </time>

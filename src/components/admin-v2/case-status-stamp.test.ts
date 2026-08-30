@@ -18,7 +18,10 @@ describe("case status stamp", () => {
     expect(html).toContain("2026-08-28 14:35");
     expect(html).toContain('dateTime="2026-08-28T12:35:00.000Z"');
     expect(html).toContain("border-success/45");
-    expect(html).toContain("text-white/85");
+    expect(html).not.toContain("text-white/85");
+    expect(html).toContain(
+      "color:color-mix(in oklab, currentColor 78%, white)",
+    );
     expect(html).toMatch(
       /border-success\/45[^>]*><span[^>]*>Pristatyta<\/span><time/,
     );
