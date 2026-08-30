@@ -193,6 +193,7 @@ describe("customer manual contact recovery", () => {
       expect.anything(),
       33,
       expect.any(String),
+      "customer_initiated",
     );
   });
 });

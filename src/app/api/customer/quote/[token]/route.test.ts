@@ -284,12 +284,14 @@ describe("customer quote signing route", () => {
       expect.anything(),
       88,
       expect.any(String),
+      "customer_initiated",
     );
     expect(mocks.deliver).toHaveBeenCalledWith(
       expect.anything(),
       mocks.provider,
       88,
       expect.any(String),
+      "customer_initiated",
     );
   });
 
@@ -730,6 +732,7 @@ describe("customer quote signing route", () => {
       mocks.provider,
       11,
       expect.any(String),
+      "customer_initiated",
     );
   });
 });

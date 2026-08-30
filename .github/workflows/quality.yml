@@ -46,6 +46,7 @@ jobs:
       FEATURE_WORKER_PORTAL: "false"
       FEATURE_AUTOMATED_REMINDERS: "false"
       FEATURE_SEO_SCHEDULER: "false"
+      FEATURE_SEO_AUTO_PUBLISH: "false"
       E2E_SEED_ALLOWED: "true"
       E2E_ADMIN_EMAIL: qa-admin@example.invalid
       E2E_ADMIN_PASSWORD: ci-only-admin-password-2026

@@ -178,10 +178,16 @@ export async function POST(
       createEmailProvider(),
       resend.id,
       correlationId,
+      "customer_initiated",
     );
   } catch {
     delivery = "queued";
-    await enqueueMessageJob(payload, resend.id, correlationId);
+    await enqueueMessageJob(
+      payload,
+      resend.id,
+      correlationId,
+      "customer_initiated",
+    );
   }
 
   await payload.update({

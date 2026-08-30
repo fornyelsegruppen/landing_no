@@ -378,7 +378,12 @@ export async function POST(
           queuedAt: now,
         },
       });
-      await enqueueMessageJob(payload, acknowledgement.id, correlationId);
+      await enqueueMessageJob(
+        payload,
+        acknowledgement.id,
+        correlationId,
+        "customer_initiated",
+      );
       const provider = createEmailProvider();
       if (provider.health().status === "ready") {
         try {
@@ -387,6 +392,7 @@ export async function POST(
             provider,
             acknowledgement.id,
             correlationId,
+            "customer_initiated",
           );
           await updateCaseState(payload, {
             leadId,
@@ -453,6 +459,7 @@ export async function POST(
               provider,
               recorded.acknowledgementMessage.id,
               correlationId,
+              "customer_initiated",
             );
           } catch (error) {
             captureException(error, {
@@ -695,11 +702,22 @@ export async function POST(
           queuedAt: evidence.signedAt,
         },
       });
-      await enqueueMessageJob(payload, message.id, correlationId);
+      await enqueueMessageJob(
+        payload,
+        message.id,
+        correlationId,
+        "customer_initiated",
+      );
       const provider = createEmailProvider();
       if (provider.health().status === "ready") {
         try {
-          await deliverMessage(payload, provider, message.id, correlationId);
+          await deliverMessage(
+            payload,
+            provider,
+            message.id,
+            correlationId,
+            "customer_initiated",
+          );
         } catch (error) {
           // Contract signing is durable even when delivery is temporarily down;
           // the queued outbox job remains available for a later retry.

@@ -22,19 +22,31 @@ vi.mock("@/lib/payload", () => ({
   })),
 }));
 vi.mock("@/payload/access/roles", () => ({ userIsAdmin: mocks.userIsAdmin }));
-vi.mock("@/lib/audit/payload-audit-writer", () => ({ createPayloadAuditWriter: vi.fn(() => vi.fn()) }));
-vi.mock("@/lib/audit/audit-event", () => ({ recordAuditEvent: mocks.recordAudit }));
-vi.mock("@/lib/messages/message-engine", () => ({ deliverMessage: mocks.deliver, enqueueMessageJob: mocks.enqueue }));
-vi.mock("@/lib/providers/email-provider", () => ({ createEmailProvider: vi.fn(() => ({ health: () => ({ status: "ready" }) })) }));
+vi.mock("@/lib/audit/payload-audit-writer", () => ({
+  createPayloadAuditWriter: vi.fn(() => vi.fn()),
+}));
+vi.mock("@/lib/audit/audit-event", () => ({
+  recordAuditEvent: mocks.recordAudit,
+}));
+vi.mock("@/lib/messages/message-engine", () => ({
+  deliverMessage: mocks.deliver,
+  enqueueMessageJob: mocks.enqueue,
+}));
+vi.mock("@/lib/providers/email-provider", () => ({
+  createEmailProvider: vi.fn(() => ({ health: () => ({ status: "ready" }) })),
+}));
 
 import { PATCH } from "./route";
 
 function request(action: Record<string, unknown>) {
-  return new Request("https://www.takfornyelse.as/api/admin/official-invoices/4", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(action),
-  });
+  return new Request(
+    "https://www.takfornyelse.as/api/admin/official-invoices/4",
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(action),
+    },
+  );
 }
 
 function invoice(overrides: Record<string, unknown> = {}) {
@@ -53,9 +65,14 @@ function invoice(overrides: Record<string, unknown> = {}) {
 
 describe("official invoice reminders", () => {
   beforeEach(() => {
-    mocks.auth.mockReset().mockResolvedValue({ user: { id: 9, role: "admin" } });
+    mocks.auth
+      .mockReset()
+      .mockResolvedValue({ user: { id: 9, role: "admin" } });
     mocks.userIsAdmin.mockReset().mockReturnValue(true);
-    mocks.findByID.mockReset().mockResolvedValueOnce(invoice()).mockResolvedValueOnce({ id: 2, status: "sent" });
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce(invoice())
+      .mockResolvedValueOnce({ id: 2, status: "sent" });
     mocks.find.mockReset().mockResolvedValue({ docs: [] });
     mocks.create.mockReset().mockResolvedValue({ id: 7, status: "draft" });
     mocks.update.mockReset().mockResolvedValue({ id: 4, status: "overdue" });
@@ -65,24 +82,64 @@ describe("official invoice reminders", () => {
   });
 
   it("refuses to prepare a reminder without a bank check from today", async () => {
-    mocks.findByID.mockReset().mockResolvedValueOnce(invoice({ bankCheckedAt: null }));
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce(invoice({ bankCheckedAt: null }));
 
-    const response = await PATCH(request({ action: "draft_reminder" }), { params: Promise.resolve({ id: "4" }) });
+    const response = await PATCH(request({ action: "draft_reminder" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
 
     expect(response.status).toBe(409);
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.deliver).not.toHaveBeenCalled();
   });
 
+  it("rechecks invoice status inside the payment-operation lock", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce(invoice({ status: "overdue" }))
+      .mockResolvedValueOnce(invoice({ status: "paid" }));
+
+    const response = await PATCH(
+      request({
+        action: "record_payment",
+        paidAt: "2026-08-30",
+        paidAmountOre: 125_000,
+      }),
+      { params: Promise.resolve({ id: "4" }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/sent invoice/i),
+    });
+    expect(mocks.findByID).toHaveBeenCalledTimes(2);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
   it("creates a draft only and never sends it automatically", async () => {
-    const response = await PATCH(request({ action: "draft_reminder" }), { params: Promise.resolve({ id: "4" }) });
+    const response = await PATCH(request({ action: "draft_reminder" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, status: "draft", messageId: 7, duplicate: false });
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
-      collection: "messages",
-      data: expect.objectContaining({ status: "draft", category: "reminder", aiAssisted: false }),
-    }));
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      status: "draft",
+      messageId: 7,
+      duplicate: false,
+    });
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "messages",
+        data: expect.objectContaining({
+          status: "draft",
+          category: "reminder",
+          aiAssisted: false,
+        }),
+      }),
+    );
     expect(mocks.deliver).not.toHaveBeenCalled();
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
@@ -90,11 +147,65 @@ describe("official invoice reminders", () => {
   it("reuses the same daily reminder draft", async () => {
     mocks.find.mockResolvedValue({ docs: [{ id: 8, status: "draft" }] });
 
-    const response = await PATCH(request({ action: "draft_reminder" }), { params: Promise.resolve({ id: "4" }) });
+    const response = await PATCH(request({ action: "draft_reminder" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ duplicate: true, messageId: 8 });
+    expect(await response.json()).toMatchObject({
+      duplicate: true,
+      messageId: 8,
+    });
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.deliver).not.toHaveBeenCalled();
+  });
+
+  it("blocks a new reminder inside the default seven-day cooldown", async () => {
+    mocks.find
+      .mockReset()
+      .mockResolvedValueOnce({ docs: [] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            createdAt: new Date(
+              Date.now() - 6 * 24 * 60 * 60_000,
+            ).toISOString(),
+          },
+        ],
+      });
+
+    const response = await PATCH(request({ action: "draft_reminder" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+  });
+
+  it("allows a new reminder after the default seven-day cooldown", async () => {
+    mocks.find
+      .mockReset()
+      .mockResolvedValueOnce({ docs: [] })
+      .mockResolvedValueOnce({
+        docs: [
+          {
+            createdAt: new Date(
+              Date.now() - 8 * 24 * 60 * 60_000,
+            ).toISOString(),
+          },
+        ],
+      });
+
+    const response = await PATCH(request({ action: "draft_reminder" }), {
+      params: Promise.resolve({ id: "4" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      duplicate: false,
+      messageId: 7,
+    });
+    expect(mocks.create).toHaveBeenCalledTimes(1);
   });
 });

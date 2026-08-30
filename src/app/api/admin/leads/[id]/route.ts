@@ -49,6 +49,11 @@ import {
   CustomerSecureLinkUnavailableError,
   customerQuestionReplyEmailText,
 } from "@/lib/messages/customer-reply-link";
+import {
+  assertPaymentReminderCooldown,
+  assertPaymentReminderInvoiceReady,
+  paymentReminderPrefix,
+} from "@/lib/invoices/payment-reminder-policy";
 
 export const maxDuration = 60;
 
@@ -634,6 +639,54 @@ export async function POST(
         );
         replyPurpose = currentSources?.context.purpose;
       }
+      const paymentAnalysis =
+        message.aiAnalysis &&
+        typeof message.aiAnalysis === "object" &&
+        !Array.isArray(message.aiAnalysis)
+          ? (message.aiAnalysis as Record<string, unknown>)
+          : {};
+      if (paymentAnalysis.financeAction === "payment_reminder") {
+        const officialInvoiceId = paymentAnalysis.officialInvoiceId;
+        if (
+          typeof officialInvoiceId !== "number" ||
+          !Number.isSafeInteger(officialInvoiceId)
+        ) {
+          throw new TypeError(
+            "Payment reminder has no valid invoice reference",
+          );
+        }
+        const invoice = await payload.findByID({
+          collection: "official-invoices",
+          id: officialInvoiceId,
+          depth: 0,
+          overrideAccess: true,
+        });
+        if (relationId(invoice.lead) !== leadId) {
+          throw new TypeError(
+            "Payment reminder does not match this customer case",
+          );
+        }
+        const paymentReminderNow = new Date();
+        assertPaymentReminderInvoiceReady(invoice, paymentReminderNow);
+        const history = await payload.find({
+          collection: "messages",
+          depth: 0,
+          limit: 20,
+          overrideAccess: true,
+          sort: "-createdAt",
+          where: {
+            and: [
+              {
+                idempotencyKey: {
+                  contains: paymentReminderPrefix(officialInvoiceId),
+                },
+              },
+              { id: { not_equals: message.id } },
+            ],
+          },
+        });
+        assertPaymentReminderCooldown(history.docs, paymentReminderNow);
+      }
       const provider = createEmailProvider();
       assertCustomerReplyDeliveryTrackingReady(provider, replyPurpose);
       const now = new Date().toISOString();
@@ -711,7 +764,12 @@ export async function POST(
           },
         });
       }
-      const job = await enqueueMessageJob(payload, queued.id, correlationId);
+      const job = await enqueueMessageJob(
+        payload,
+        queued.id,
+        correlationId,
+        "admin_approved",
+      );
       const queueResult = {
         caseRevision: currentRevision,
         jobId: job.id,
@@ -720,7 +778,13 @@ export async function POST(
       };
       if (provider.health().status === "ready") {
         try {
-          await deliverMessage(payload, provider, queued.id, correlationId);
+          await deliverMessage(
+            payload,
+            provider,
+            queued.id,
+            correlationId,
+            "admin_approved",
+          );
           result = { ...queueResult, sent: true };
         } catch (error) {
           captureException(error, {

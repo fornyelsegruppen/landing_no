@@ -15,6 +15,11 @@ import {
   manualQuestionReplyPlaceholder,
 } from "./message-engine";
 import { loadCustomerReplySourceBundle } from "./customer-reply-sources";
+import { PaymentOperationInProgressError } from "@/lib/invoices/payment-operation-lock";
+import {
+  assertAutomaticMessageRecipientAllowed,
+  AutomaticRecipientBlockedError,
+} from "./automation-recipient-policy";
 
 it("recovers the single durable customer-reply job when concurrent submission loses the unique insert", async () => {
   let requestedKey = "";
@@ -91,6 +96,7 @@ function repository(
       messages: TestDocument[],
       nextTimestamp: () => string,
     ) => void | Promise<void>;
+    initialCollections?: Record<string, TestDocument[]>;
   } = {},
 ) {
   let revision = 0;
@@ -121,6 +127,7 @@ function repository(
     messages,
     "operational-jobs": jobs,
     "audit-events": auditEvents,
+    ...options.initialCollections,
   };
   const payload = {
     async count({ collection }: { collection: string }) {
@@ -131,10 +138,32 @@ function repository(
       where,
     }: {
       collection: string;
-      where?: { idempotencyKey?: { equals?: string } };
+      where?: {
+        and?: Array<
+          Record<string, { contains?: string; not_equals?: unknown }>
+        >;
+        idempotencyKey?: { equals?: string };
+      };
     }) {
-      const docs = collections[collection] || [];
+      let docs = collections[collection] || [];
       const key = where?.idempotencyKey?.equals;
+      if (where?.and) {
+        docs = docs.filter((document) =>
+          where.and?.every((condition) =>
+            Object.entries(condition).every(([field, comparison]) => {
+              if (comparison.contains !== undefined) {
+                return String(document[field] || "").includes(
+                  comparison.contains,
+                );
+              }
+              if (comparison.not_equals !== undefined) {
+                return document[field] !== comparison.not_equals;
+              }
+              return true;
+            }),
+          ),
+        );
+      }
       return {
         docs: key ? docs.filter((item) => item.idempotencyKey === key) : docs,
         totalDocs: docs.length,
@@ -218,6 +247,182 @@ const validCustomerQuestionReply = {
 };
 
 describe("message engine", () => {
+  it("rechecks unpaid status under the invoice lock immediately before sending", async () => {
+    const state = repository({
+      initialCollections: {
+        "official-invoices": [
+          {
+            id: 4,
+            lead: 1,
+            status: "paid",
+            dueAt: "2026-01-01T12:00:00.000Z",
+            bankCheckedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+    state.messages.push({
+      id: 1,
+      lead: 1,
+      direction: "outbound",
+      category: "reminder",
+      channel: "email",
+      subject: "Påminnelse",
+      bodyText: "Kontrollert betalingspåminnelse.",
+      status: "queued",
+      idempotencyKey: "official-invoice-reminder:4:2026-08-20",
+      approvedAt: new Date(Date.now() - 10 * 24 * 60 * 60_000).toISOString(),
+      attachments: [],
+      aiAnalysis: {
+        financeAction: "payment_reminder",
+        officialInvoiceId: 4,
+      },
+    });
+    const provider = new LogEmailProvider();
+
+    await expect(
+      deliverMessage(
+        state.payload,
+        provider,
+        1,
+        "payment-paid",
+        "admin_approved",
+      ),
+    ).rejects.toThrow(/unpaid/i);
+
+    expect(provider.deliveries).toHaveLength(0);
+    expect(state.messages[0]?.aiAnalysis).not.toMatchObject({
+      paymentReminderSendClaimedAt: expect.any(String),
+    });
+  });
+
+  it("allows only one of two old payment-reminder drafts to send", async () => {
+    const invoice = {
+      id: 4,
+      lead: 1,
+      status: "overdue",
+      dueAt: "2026-01-01T12:00:00.000Z",
+      bankCheckedAt: new Date().toISOString(),
+    };
+    const state = repository({
+      initialCollections: { "official-invoices": [invoice] },
+    });
+    const oldTimestamp = new Date(
+      Date.now() - 10 * 24 * 60 * 60_000,
+    ).toISOString();
+    for (const id of [1, 2]) {
+      state.messages.push({
+        id,
+        lead: 1,
+        direction: "outbound",
+        category: "reminder",
+        channel: "email",
+        subject: `Påminnelse ${id}`,
+        bodyText: "Kontrollert betalingspåminnelse.",
+        status: "queued",
+        idempotencyKey: `official-invoice-reminder:4:2026-08-${10 + id}`,
+        approvedAt: oldTimestamp,
+        createdAt: oldTimestamp,
+        attachments: [],
+        aiAnalysis: {
+          financeAction: "payment_reminder",
+          officialInvoiceId: 4,
+        },
+      });
+    }
+    const provider = new LogEmailProvider();
+
+    const results = await Promise.allSettled([
+      deliverMessage(
+        state.payload,
+        provider,
+        1,
+        "payment-race-1",
+        "admin_approved",
+      ),
+      deliverMessage(
+        state.payload,
+        provider,
+        2,
+        "payment-race-2",
+        "admin_approved",
+      ),
+    ]);
+
+    expect(provider.deliveries).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toMatchObject({
+      reason: expect.any(PaymentOperationInProgressError),
+    });
+    const sent = state.messages.filter((message) => message.status === "sent");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.aiAnalysis).toMatchObject({
+      paymentReminderSendClaimedAt: expect.any(String),
+    });
+  });
+
+  it("uses the durable invoice claim to block a second old reminder", async () => {
+    const state = repository({
+      initialCollections: {
+        "official-invoices": [
+          {
+            id: 4,
+            lead: 1,
+            status: "overdue",
+            dueAt: "2026-01-01T12:00:00.000Z",
+            bankCheckedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+    const oldTimestamp = new Date(
+      Date.now() - 10 * 24 * 60 * 60_000,
+    ).toISOString();
+    state.messages.push(
+      ...[1, 2].map((id) => ({
+        id,
+        lead: 1,
+        direction: "outbound",
+        category: "reminder",
+        channel: "email",
+        subject: `Påminnelse ${id}`,
+        bodyText: "Kontrollert betalingspåminnelse.",
+        status: "queued",
+        idempotencyKey: `official-invoice-reminder:4:2026-08-${10 + id}`,
+        approvedAt: oldTimestamp,
+        createdAt: oldTimestamp,
+        attachments: [],
+        aiAnalysis: {
+          financeAction: "payment_reminder",
+          officialInvoiceId: 4,
+        },
+      })),
+    );
+    const provider = new LogEmailProvider();
+
+    await deliverMessage(
+      state.payload,
+      provider,
+      1,
+      "payment-first",
+      "admin_approved",
+    );
+    await expect(
+      deliverMessage(
+        state.payload,
+        provider,
+        2,
+        "payment-second",
+        "admin_approved",
+      ),
+    ).rejects.toThrow(/7 days/i);
+
+    expect(provider.deliveries).toHaveLength(1);
+  });
+
   it("creates and delivers the receipt exactly once", async () => {
     const state = repository();
     const first = await createReceiptMessage(state.payload, 1, "receipt-test");
@@ -235,8 +440,20 @@ describe("message engine", () => {
     );
 
     const provider = new LogEmailProvider();
-    await deliverMessage(state.payload, provider, 1, "receipt-test");
-    await deliverMessage(state.payload, provider, 1, "receipt-test-repeat");
+    await deliverMessage(
+      state.payload,
+      provider,
+      1,
+      "receipt-test",
+      "customer_initiated",
+    );
+    await deliverMessage(
+      state.payload,
+      provider,
+      1,
+      "receipt-test-repeat",
+      "customer_initiated",
+    );
     expect(provider.deliveries).toHaveLength(1);
     expect(state.messages[0]?.status).toBe("sent");
   });
@@ -261,8 +478,65 @@ describe("message engine", () => {
       },
       1,
       "communication-email",
+      "customer_initiated",
     );
     expect(recipients).toEqual(["confirmed@example.no"]);
+  });
+
+  it("rechecks the current automation recipient immediately before provider send", async () => {
+    const state = repository();
+    state.leads[0]!.communicationEmail = "pilot@example.no";
+    await createReceiptMessage(state.payload, 1, "recipient-toctou");
+    await expect(
+      assertAutomaticMessageRecipientAllowed(
+        state.payload,
+        { lead: state.messages[0]!.lead },
+        "automation",
+        { AUTOMATION_RECIPIENT_ALLOWLIST: "pilot@example.no" },
+      ),
+    ).resolves.toBeUndefined();
+
+    state.leads[0]!.communicationEmail = "changed@example.no";
+    const send = vi.fn();
+    const previous = {
+      mode: process.env.PLATFORM_OPERATING_MODE,
+      leadReference: process.env.LEAD_INBOX_PILOT_REFERENCE,
+      roofReference: process.env.ROOF_VALIDATION_REFERENCE,
+      allowlist: process.env.AUTOMATION_RECIPIENT_ALLOWLIST,
+    };
+    process.env.PLATFORM_OPERATING_MODE = "controlled_pilot";
+    delete process.env.LEAD_INBOX_PILOT_REFERENCE;
+    delete process.env.ROOF_VALIDATION_REFERENCE;
+    process.env.AUTOMATION_RECIPIENT_ALLOWLIST = "pilot@example.no";
+    try {
+      await expect(
+        deliverMessage(
+          state.payload,
+          {
+            health: () => ({ status: "ready", provider: "test" }),
+            send,
+          },
+          1,
+          "recipient-toctou-delivery",
+          "automation",
+        ),
+      ).rejects.toBeInstanceOf(AutomaticRecipientBlockedError);
+      expect(send).not.toHaveBeenCalled();
+      expect(state.messages[0]?.status).toBe("queued");
+    } finally {
+      if (previous.mode === undefined)
+        delete process.env.PLATFORM_OPERATING_MODE;
+      else process.env.PLATFORM_OPERATING_MODE = previous.mode;
+      if (previous.leadReference === undefined)
+        delete process.env.LEAD_INBOX_PILOT_REFERENCE;
+      else process.env.LEAD_INBOX_PILOT_REFERENCE = previous.leadReference;
+      if (previous.roofReference === undefined)
+        delete process.env.ROOF_VALIDATION_REFERENCE;
+      else process.env.ROOF_VALIDATION_REFERENCE = previous.roofReference;
+      if (previous.allowlist === undefined)
+        delete process.env.AUTOMATION_RECIPIENT_ALLOWLIST;
+      else process.env.AUTOMATION_RECIPIENT_ALLOWLIST = previous.allowlist;
+    }
   });
 
   it("stores a validated AI reply as a draft and never sends it", async () => {
@@ -282,9 +556,53 @@ describe("message engine", () => {
     const state = repository();
     await createReceiptMessage(state.payload, 1, "receipt-retry");
     Object.assign(state.jobs[0]!, { status: "attention", attempts: 3 });
-    await enqueueMessageJob(state.payload, 1, "receipt-retry-again");
+    await enqueueMessageJob(
+      state.payload,
+      1,
+      "receipt-retry-again",
+      "customer_initiated",
+    );
     expect(state.jobs).toHaveLength(1);
     expect(state.jobs[0]).toMatchObject({ status: "pending", attempts: 0 });
+  });
+
+  it("refuses to silently upgrade a pending legacy job without a delivery class", async () => {
+    const state = repository();
+    await createReceiptMessage(state.payload, 1, "receipt-legacy-pending");
+    state.jobs[0]!.payload = { messageId: 1 };
+
+    await expect(
+      enqueueMessageJob(
+        state.payload,
+        1,
+        "receipt-legacy-pending-retry",
+        "customer_initiated",
+      ),
+    ).rejects.toMatchObject({
+      name: "MessageDeliveryClassRequiredError",
+    });
+
+    expect(state.jobs).toHaveLength(1);
+    expect(state.jobs[0]?.status).toBe("pending");
+    expect(state.jobs[0]?.payload).toEqual({ messageId: 1 });
+  });
+
+  it("refuses to reclassify an existing nonterminal delivery job", async () => {
+    const state = repository();
+    await createReceiptMessage(state.payload, 1, "receipt-class-conflict");
+
+    await expect(
+      enqueueMessageJob(
+        state.payload,
+        1,
+        "receipt-class-conflict-retry",
+        "admin_approved",
+      ),
+    ).rejects.toMatchObject({ name: "MessageDeliveryClassConflictError" });
+    expect(state.jobs[0]?.payload).toEqual({
+      messageId: 1,
+      deliveryClass: "customer_initiated",
+    });
   });
 
   it("reopens a completed delivery job for an explicit retry", async () => {
@@ -298,7 +616,12 @@ describe("message engine", () => {
       result: { processed: true },
     });
 
-    await enqueueMessageJob(state.payload, 1, "receipt-completed-retry-again");
+    await enqueueMessageJob(
+      state.payload,
+      1,
+      "receipt-completed-retry-again",
+      "customer_initiated",
+    );
 
     expect(state.jobs).toHaveLength(1);
     expect(state.jobs[0]).toMatchObject({
@@ -328,7 +651,13 @@ describe("message engine", () => {
     };
 
     const originalMessageKey = String(message.idempotencyKey);
-    await deliverMessage(state.payload, provider, 1, "attempt-one");
+    await deliverMessage(
+      state.payload,
+      provider,
+      1,
+      "attempt-one",
+      "admin_approved",
+    );
     Object.assign(message, {
       aiAnalysis: { deliveryAttempt: 1 },
       status: "queued",
@@ -337,7 +666,13 @@ describe("message engine", () => {
       provider: null,
       providerMessageId: null,
     });
-    await deliverMessage(state.payload, provider, 1, "attempt-two");
+    await deliverMessage(
+      state.payload,
+      provider,
+      1,
+      "attempt-two",
+      "admin_approved",
+    );
 
     expect(providerKeys).toHaveLength(2);
     expect(providerKeys[0]).toBe(originalMessageKey);
@@ -370,6 +705,7 @@ describe("message engine", () => {
       new LogEmailProvider(),
       1,
       "contract-confirmation",
+      "admin_approved",
     );
 
     expect(state.messages[0]?.status).toBe("sent");
@@ -402,6 +738,7 @@ describe("message engine", () => {
       new LogEmailProvider(),
       1,
       "completion-message",
+      "admin_approved",
     );
 
     expect(state.messages[0]?.status).toBe("sent");
@@ -445,6 +782,7 @@ describe("message engine", () => {
       new LogEmailProvider(),
       1,
       "customer-reply",
+      "admin_approved",
     );
     expect(state.leads[0]).toMatchObject({ status: "customer_waiting" });
   });
@@ -507,6 +845,7 @@ describe("message engine", () => {
           },
           reply.id,
           "customer-reply-without-webhook",
+          "admin_approved",
         ),
       ).rejects.toThrow(/delivery webhook/i);
     } finally {
@@ -597,6 +936,7 @@ describe("message engine", () => {
       new LogEmailProvider(),
       draft.message.id,
       "manual-question-recipient-delivery",
+      "admin_approved",
     );
 
     expect(state.messages[1]?.aiAnalysis).toMatchObject({
@@ -1033,6 +1373,7 @@ describe("message engine", () => {
       new LogEmailProvider(),
       1,
       "cancellation-resolution",
+      "admin_approved",
     );
     expect(state.leads[0]?.status).toBe("closed");
   });

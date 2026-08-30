@@ -3,14 +3,30 @@ import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
 import { cronRequestAuthorized } from "@/lib/security/cron-auth";
 import { assertBlogAction } from "@/lib/blog/transitions";
-import { assertFeatureReady, FeatureUnavailableError } from "@/lib/platform/features";
+import {
+  assertFeatureReady,
+  FeatureUnavailableError,
+} from "@/lib/platform/features";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+function seoAutoPublishEnabled(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const value = environment.FEATURE_SEO_AUTO_PUBLISH;
+  return value === "1" || value?.toLowerCase() === "true";
+}
+
 export async function GET(request: Request) {
   if (!cronRequestAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!seoAutoPublishEnabled()) {
+    return NextResponse.json(
+      { error: "disabled", feature: "seoAutoPublish" },
+      { status: 503 },
+    );
   }
   try {
     assertFeatureReady("seoScheduler");
@@ -57,9 +73,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, published, attention });
   } catch (error) {
     if (error instanceof FeatureUnavailableError) {
-      return NextResponse.json({ error: error.reason, missing: error.unavailable }, { status: 503 });
+      return NextResponse.json(
+        { error: error.reason, missing: error.unavailable },
+        { status: 503 },
+      );
     }
     captureException(error, { route: "GET /api/cron/publish-posts" });
-    return NextResponse.json({ error: "Publishing job failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Publishing job failed" },
+      { status: 500 },
+    );
   }
 }

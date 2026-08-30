@@ -46,7 +46,7 @@ function repository(
     maxAttempts: 3,
     availableAt: "2026-08-24T19:00:00.000Z",
     correlationId: "correlation-123",
-    payload: { messageId: 2 },
+    payload: { messageId: 2, deliveryClass: "admin_approved" },
   };
   Object.assign(lead, overrides.lead);
   Object.assign(message, overrides.message);
@@ -116,6 +116,8 @@ describe("operational job processor", () => {
     VERCEL_ENV: process.env.VERCEL_ENV,
     ALLOW_PREVIEW_EMAIL_LOG: process.env.ALLOW_PREVIEW_EMAIL_LOG,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    AUTOMATION_EMERGENCY_PAUSE: process.env.AUTOMATION_EMERGENCY_PAUSE,
+    AUTOMATION_RECIPIENT_ALLOWLIST: process.env.AUTOMATION_RECIPIENT_ALLOWLIST,
   };
 
   it("keeps the first Production wave measurement-only until quote readiness is enabled", () => {
@@ -137,6 +139,16 @@ describe("operational job processor", () => {
     if (originalEnvironment.RESEND_API_KEY === undefined)
       delete process.env.RESEND_API_KEY;
     else process.env.RESEND_API_KEY = originalEnvironment.RESEND_API_KEY;
+    if (originalEnvironment.AUTOMATION_EMERGENCY_PAUSE === undefined)
+      delete process.env.AUTOMATION_EMERGENCY_PAUSE;
+    else
+      process.env.AUTOMATION_EMERGENCY_PAUSE =
+        originalEnvironment.AUTOMATION_EMERGENCY_PAUSE;
+    if (originalEnvironment.AUTOMATION_RECIPIENT_ALLOWLIST === undefined)
+      delete process.env.AUTOMATION_RECIPIENT_ALLOWLIST;
+    else
+      process.env.AUTOMATION_RECIPIENT_ALLOWLIST =
+        originalEnvironment.AUTOMATION_RECIPIENT_ALLOWLIST;
   });
 
   it("delivers a referenced message immediately and completes its durable job", async () => {
@@ -162,7 +174,10 @@ describe("operational job processor", () => {
     expect(state.job.status).toBe("completed");
     expect(state.message.status).toBe("sent");
     expect(state.lead.lastContactAt).toBeTruthy();
-    expect(state.job.payload).toEqual({ messageId: 2 });
+    expect(state.job.payload).toEqual({
+      messageId: 2,
+      deliveryClass: "admin_approved",
+    });
     expect(JSON.stringify(state.job.payload)).not.toContain(
       "kunde@example.test",
     );
@@ -176,6 +191,7 @@ describe("operational job processor", () => {
       const providerHealth = vi.spyOn(ResendEmailProvider.prototype, "health");
       const providerSend = vi.spyOn(ResendEmailProvider.prototype, "send");
       const state = repository({
+        job: { payload: { messageId: 2 } },
         message: {
           status: messageStatus,
           aiAnalysis: { workOrderId: 7, reminder: true },
@@ -210,6 +226,40 @@ describe("operational job processor", () => {
       expect(providerSend).not.toHaveBeenCalled();
     },
   );
+
+  it("moves a nonterminal legacy delivery without a class to attention without sending", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.ALLOW_PREVIEW_EMAIL_LOG = "true";
+    delete process.env.RESEND_API_KEY;
+    const providerHealth = vi.spyOn(LogEmailProvider.prototype, "health");
+    const providerSend = vi.spyOn(LogEmailProvider.prototype, "send");
+    const state = repository({
+      job: { payload: { messageId: 2 } },
+      message: { status: "queued" },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({
+      completed: [],
+      attention: [3],
+      retried: [],
+    });
+    expect(state.job).toMatchObject({
+      status: "attention",
+      lastErrorCode: "MessageDeliveryClassRequiredError",
+    });
+    expect(state.message).toMatchObject({
+      status: "attention",
+      failureCode: "MessageDeliveryClassRequiredError",
+    });
+    expect(providerHealth).not.toHaveBeenCalled();
+    expect(providerSend).not.toHaveBeenCalled();
+  });
 
   it("keeps a concurrent duplicate no-send when the message becomes sent after the job claim", async () => {
     process.env.VERCEL_ENV = "preview";
@@ -321,6 +371,7 @@ describe("operational job processor", () => {
     process.env.VERCEL_ENV = "production";
     process.env.RESEND_API_KEY = "configured-for-test";
     const state = repository({
+      job: { payload: { messageId: 2, deliveryClass: "automation" } },
       message: {
         category: "reminder",
         aiAnalysis: { workOrderId: 7, communicationKind: "on_way" },
@@ -336,6 +387,73 @@ describe("operational job processor", () => {
     expect(result).toMatchObject({ paused: [3], completed: [], attention: [] });
     expect(state.job).toMatchObject({ status: "pending", attempts: 0 });
     expect(state.message).toMatchObject({ status: "queued" });
+  });
+
+  it("moves a non-allowlisted automatic delivery to attention without invoking Resend", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.AUTOMATION_EMERGENCY_PAUSE = "false";
+    process.env.RESEND_API_KEY = "configured-for-test";
+    delete process.env.AUTOMATION_RECIPIENT_ALLOWLIST;
+    const providerHealth = vi.spyOn(ResendEmailProvider.prototype, "health");
+    const providerSend = vi.spyOn(ResendEmailProvider.prototype, "send");
+    const state = repository({
+      job: { payload: { messageId: 2, deliveryClass: "automation" } },
+      message: {
+        category: "reminder",
+        aiAnalysis: { workOrderId: 7, communicationKind: "same_day" },
+      },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({
+      attention: [3],
+      completed: [],
+      retried: [],
+    });
+    expect(state.job).toMatchObject({
+      status: "attention",
+      lastErrorCode: "AutomaticRecipientBlockedError",
+      lastErrorMessage:
+        "The operation failed. Review provider and correlation logs.",
+    });
+    expect(state.message).toMatchObject({
+      status: "attention",
+      failureCode: "AutomaticRecipientBlockedError",
+    });
+    expect(JSON.stringify(state.job)).not.toContain("kunde@example.test");
+    expect(providerHealth).not.toHaveBeenCalled();
+    expect(providerSend).not.toHaveBeenCalled();
+  });
+
+  it("keeps administrator-approved operational delivery outside the pilot allowlist", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.ALLOW_PREVIEW_EMAIL_LOG = "true";
+    delete process.env.RESEND_API_KEY;
+    delete process.env.AUTOMATION_RECIPIENT_ALLOWLIST;
+    const state = repository({
+      job: { payload: { messageId: 2, deliveryClass: "admin_approved" } },
+      message: {
+        aiAnalysis: {
+          workOrderId: 7,
+          communicationKind: "schedule_confirmation",
+          adminApprovedTransactional: true,
+        },
+      },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-08-24T20:00:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({ completed: [3], attention: [] });
+    expect(state.message.status).toBe("sent");
   });
 
   it("cancels a stale intake AI retry after the commercial journey has started", async () => {

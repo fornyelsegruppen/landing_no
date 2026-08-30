@@ -50,14 +50,22 @@ export const Posts: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      ({ data, originalDoc, req }) =>
+      ({ context, data, originalDoc, req }) =>
         (data._status === "published" && userIsAdmin(req.user)
           ? prepareAdminPublication(
               originalDoc,
               data,
               reviewerNameForUser(req.user),
+              undefined,
+              {
+                qualityRevalidated:
+                  context?.trustedBlogQualityRevalidation === true,
+              },
             )
-          : prepareEditorialPost(originalDoc, data)) as typeof data,
+          : prepareEditorialPost(originalDoc, data, undefined, {
+              qualityRevalidated:
+                context?.trustedBlogQualityRevalidation === true,
+            })) as typeof data,
     ],
   },
   fields: [

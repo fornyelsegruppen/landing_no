@@ -13,6 +13,12 @@ import {
   customerReplyPurposes,
   type CustomerReplyPurpose,
 } from "@/lib/messages/customer-reply";
+import {
+  assertAutomaticMessageRecipientAllowed,
+  AutomaticRecipientBlockedError,
+  messageDeliveryClass,
+  MessageDeliveryClassRequiredError,
+} from "@/lib/messages/automation-recipient-policy";
 import { featureReadiness } from "@/lib/platform/features";
 import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
@@ -280,6 +286,13 @@ export async function processOperationalJobs(
             messageStatus: message.status,
           };
         } else {
+          const deliveryClass = messageDeliveryClass(job.payload);
+          if (!deliveryClass) throw new MessageDeliveryClassRequiredError();
+          await assertAutomaticMessageRecipientAllowed(
+            payload,
+            message,
+            deliveryClass,
+          );
           const provider = createEmailProvider();
           const guardedProvider = {
             health: () => provider.health(),
@@ -294,6 +307,7 @@ export async function processOperationalJobs(
             guardedProvider,
             messageId,
             job.correlationId,
+            deliveryClass,
           );
           if (delivery.duplicate) {
             jobResult = {
@@ -452,6 +466,8 @@ export async function processOperationalJobs(
       const sanitized = sanitizeJobError(error);
       const exhausted =
         error instanceof ChannelUnavailableError ||
+        error instanceof AutomaticRecipientBlockedError ||
+        error instanceof MessageDeliveryClassRequiredError ||
         attempts >= (job.maxAttempts || 3) ||
         /requires configuration|daily request limit/i.test(
           error instanceof Error ? error.message : "",

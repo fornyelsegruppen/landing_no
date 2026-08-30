@@ -1,9 +1,14 @@
 name: Process operational jobs
 
+# Scheduled workflows run from the default branch, so this file must be part of
+# the release pull request merged into main.
 on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: takfornyelse-operational-jobs

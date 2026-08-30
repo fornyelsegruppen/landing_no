@@ -459,6 +459,7 @@ export async function regeneratePayloadBlogPost(input: {
       id: post.id,
       draft: true,
       overrideAccess: true,
+      context: { trustedBlogQualityRevalidation: true },
       data: {
         titleNo: generated.article.title,
         excerptNo: generated.article.excerpt,

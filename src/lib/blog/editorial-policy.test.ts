@@ -104,6 +104,41 @@ describe("blog editorial policy", () => {
     ).toThrow(/kvalitetskontrollen/);
   });
 
+  it("invalidates stale QA when the technical editor changes content and publishes in one request", () => {
+    expect(
+      prepareAdminPublication(
+        {
+          _status: "draft",
+          editorialStatus: "approved",
+          titleNo: "Kontrollert tittel",
+          contentNo: "Tidligere kontrollert innhold",
+          authorName: "Takfornyelse",
+          aiAssisted: true,
+          qualityScore: 94,
+          qualityChecks: { passed: true },
+          reviewerName: "Tidligere kontrollør",
+          reviewedAt: "2026-08-29T10:00:00.000Z",
+          scheduledAt: "2026-09-01T08:00:00.000Z",
+        },
+        {
+          _status: "published",
+          aiAssisted: false,
+          contentNo: "Nytt innhold som ennå ikke er kvalitetskontrollert",
+        },
+        "Administrator",
+      ),
+    ).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      qualityScore: null,
+      qualityChecks: null,
+      aiAssisted: true,
+      reviewerName: null,
+      reviewedAt: null,
+      scheduledAt: null,
+    });
+  });
+
   it("preserves the first publication timestamp during later edits", () => {
     expect(
       prepareEditorialPost(

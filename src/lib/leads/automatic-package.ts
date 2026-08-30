@@ -1003,13 +1003,19 @@ export async function approveAndSendPreparedLeadPackage(
       queuedAt: now,
     },
   });
-  await enqueueMessageJob(payload, queued.id, correlationId);
+  await enqueueMessageJob(payload, queued.id, correlationId, "admin_approved");
 
   let sent = false;
   const provider = createEmailProvider();
   if (provider.health().status === "ready") {
     try {
-      await deliverMessage(payload, provider, queued.id, correlationId);
+      await deliverMessage(
+        payload,
+        provider,
+        queued.id,
+        correlationId,
+        "admin_approved",
+      );
       sent = true;
     } catch {
       // The durable outbox job remains queued and the administrator sees its

@@ -587,12 +587,14 @@ describe("admin lead review marker", () => {
       expect.anything(),
       44,
       expect.any(String),
+      "admin_approved",
     );
     expect(mocks.deliver).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
       44,
       expect.any(String),
+      "admin_approved",
     );
   });
 
@@ -813,7 +815,201 @@ describe("admin lead review marker", () => {
       expect.anything(),
       44,
       expect.any(String),
+      "admin_approved",
     );
+  });
+
+  it("rechecks unpaid status and today's Oslo bank check before approving a payment reminder", async () => {
+    mocks.assertSources.mockResolvedValue(null);
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: {
+          financeAction: "payment_reminder",
+          officialInvoiceId: 4,
+        },
+        bodyText: "Kontrollert betalingspåminnelse med nødvendig informasjon.",
+        category: "reminder",
+        id: 44,
+        lead: 10,
+        status: "draft",
+        subject: "Påminnelse om faktura 1004",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        id: 4,
+        lead: 10,
+        status: "overdue",
+        dueAt: "2026-01-01T12:00:00.000Z",
+        bankCheckedAt: new Date().toISOString(),
+      });
+    mocks.update.mockResolvedValue({
+      docs: [
+        {
+          id: 44,
+          status: "queued",
+          updatedAt: "2026-08-30T16:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "Kontrollert betalingspåminnelse med nødvendig informasjon.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Påminnelse om faktura 1004",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a payment reminder response");
+    expect(response.status).toBe(200);
+    expect(mocks.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "messages",
+        where: { and: expect.any(Array) },
+      }),
+    );
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.anything(),
+      44,
+      expect.any(String),
+      "admin_approved",
+    );
+    expect(mocks.deliver).toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: "the invoice was paid after drafting",
+      invoice: {
+        id: 4,
+        lead: 10,
+        status: "paid",
+        dueAt: "2026-01-01T12:00:00.000Z",
+        bankCheckedAt: new Date().toISOString(),
+      },
+      error: "unpaid",
+    },
+    {
+      label: "the bank check is no longer from today in Oslo",
+      invoice: {
+        id: 4,
+        lead: 10,
+        status: "overdue",
+        dueAt: "2026-01-01T12:00:00.000Z",
+        bankCheckedAt: new Date(
+          Date.now() - 2 * 24 * 60 * 60_000,
+        ).toISOString(),
+      },
+      error: "bank today",
+    },
+  ])(
+    "blocks payment reminder approval when $label",
+    async ({ invoice, error }) => {
+      mocks.assertSources.mockResolvedValue(null);
+      mocks.findByID
+        .mockReset()
+        .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+        .mockResolvedValueOnce({
+          aiAnalysis: {
+            financeAction: "payment_reminder",
+            officialInvoiceId: 4,
+          },
+          bodyText:
+            "Kontrollert betalingspåminnelse med nødvendig informasjon.",
+          category: "reminder",
+          id: 44,
+          lead: 10,
+          status: "draft",
+          subject: "Påminnelse om faktura 1004",
+          updatedAt: "2026-08-28T09:00:00.000Z",
+        })
+        .mockResolvedValueOnce(invoice);
+
+      const response = await POST(
+        request({
+          action: "approve_send",
+          bodyText:
+            "Kontrollert betalingspåminnelse med nødvendig informasjon.",
+          expectedCaseRevision: 12,
+          expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+          messageId: 44,
+          subject: "Påminnelse om faktura 1004",
+        }),
+        { params: Promise.resolve({ id: "10" }) },
+      );
+
+      if (!response)
+        throw new Error("Expected a blocked payment reminder response");
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: expect.stringMatching(new RegExp(error, "i")),
+      });
+      expect(mocks.update).not.toHaveBeenCalled();
+      expect(mocks.enqueue).not.toHaveBeenCalled();
+      expect(mocks.deliver).not.toHaveBeenCalled();
+    },
+  );
+
+  it("blocks payment reminder approval during the configured cooldown", async () => {
+    mocks.assertSources.mockResolvedValue(null);
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: {
+          financeAction: "payment_reminder",
+          officialInvoiceId: 4,
+        },
+        bodyText: "Kontrollert betalingspåminnelse med nødvendig informasjon.",
+        category: "reminder",
+        id: 44,
+        lead: 10,
+        status: "draft",
+        subject: "Påminnelse om faktura 1004",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        id: 4,
+        lead: 10,
+        status: "overdue",
+        dueAt: "2026-01-01T12:00:00.000Z",
+        bankCheckedAt: new Date().toISOString(),
+      });
+    mocks.find.mockResolvedValue({
+      docs: [
+        {
+          id: 43,
+          sentAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString(),
+        },
+      ],
+    });
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "Kontrollert betalingspåminnelse med nødvendig informasjon.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Påminnelse om faktura 1004",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a cooldown response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining("7 days"),
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
   });
 
   it("persists the current secure quote CTA before queueing a customer-question reply", async () => {

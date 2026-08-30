@@ -15,7 +15,11 @@ import { verifyTurnstile } from "@/lib/turnstile";
 import { captureException } from "@/lib/monitoring";
 import { contactMethodSchema } from "@/lib/lead-contact-validation";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
-import { createReceiptMessage, deliverMessage, enqueueLeadAiJob } from "@/lib/messages/message-engine";
+import {
+  createReceiptMessage,
+  deliverMessage,
+  enqueueLeadAiJob,
+} from "@/lib/messages/message-engine";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { readFeatureFlags } from "@/lib/platform/features";
 import { processOperationalJobs } from "@/lib/jobs/operational-job-processor";
@@ -256,40 +260,73 @@ export async function POST(request: Request) {
         nextAction: email
           ? "Kontroller henvendelsen og eventuelt svarutkast."
           : "Ring kunden. Automatisk e-postløp er ikke tilgjengelig uten e-postadresse.",
-        nextActionAt: new Date(email ? Date.now() + 2 * 60 * 60_000 : Date.now()).toISOString(),
+        nextActionAt: new Date(
+          email ? Date.now() + 2 * 60 * 60_000 : Date.now(),
+        ).toISOString(),
       },
       overrideAccess: true,
     });
 
     const immediateJobIds: number[] = [];
     try {
-      const receipt = await createReceiptMessage(payload, created.id, correlationId);
+      const receipt = await createReceiptMessage(
+        payload,
+        created.id,
+        correlationId,
+      );
       if (!receipt.skipped && !receipt.duplicate) {
         const provider = createEmailProvider();
         if (provider.health().status === "ready") {
-          await deliverMessage(payload, provider, receipt.message.id, correlationId);
+          await deliverMessage(
+            payload,
+            provider,
+            receipt.message.id,
+            correlationId,
+            "customer_initiated",
+          );
         }
-        if (typeof receipt.job?.id === "number") immediateJobIds.push(receipt.job.id);
+        if (typeof receipt.job?.id === "number")
+          immediateJobIds.push(receipt.job.id);
       }
     } catch (error) {
-      captureException(error, { route: "POST /api/lead", operation: "receipt-outbox", correlationId });
+      captureException(error, {
+        route: "POST /api/lead",
+        operation: "receipt-outbox",
+        correlationId,
+      });
     }
 
     if (readFeatureFlags().aiDrafts && email) {
       try {
-        const aiJob = await enqueueLeadAiJob(payload, created.id, correlationId);
+        const aiJob = await enqueueLeadAiJob(
+          payload,
+          created.id,
+          correlationId,
+        );
         if (typeof aiJob?.id === "number") immediateJobIds.push(aiJob.id);
       } catch (error) {
-        captureException(error, { route: "POST /api/lead", operation: "ai-draft-outbox", correlationId });
+        captureException(error, {
+          route: "POST /api/lead",
+          operation: "ai-draft-outbox",
+          correlationId,
+        });
       }
     }
 
     if (immediateJobIds.length) {
       after(async () => {
         try {
-          await processOperationalJobs(payload, { jobIds: immediateJobIds, limit: immediateJobIds.length, rescueStale: false });
+          await processOperationalJobs(payload, {
+            jobIds: immediateJobIds,
+            limit: immediateJobIds.length,
+            rescueStale: false,
+          });
         } catch (error) {
-          captureException(error, { route: "POST /api/lead", operation: "immediate-operational-jobs", correlationId });
+          captureException(error, {
+            route: "POST /api/lead",
+            operation: "immediate-operational-jobs",
+            correlationId,
+          });
         }
       });
     }

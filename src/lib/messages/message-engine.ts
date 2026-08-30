@@ -23,6 +23,19 @@ import {
   loadCustomerReplySourceBundle,
 } from "./customer-reply-sources";
 import { reserveCustomerReplyAiRequest } from "@/lib/ai/payload-usage-limit";
+import { withPaymentInvoiceOperationLock } from "@/lib/invoices/payment-operation-lock";
+import {
+  assertAndClaimPaymentReminderSend,
+  paymentReminderInvoiceId,
+} from "@/lib/invoices/payment-reminder-policy";
+import {
+  assertMessageDeliveryClass,
+  assertControlledPilotAutomationRecipientAllowed,
+  messageDeliveryClass,
+  MessageDeliveryClassConflictError,
+  MessageDeliveryClassRequiredError,
+  type MessageDeliveryClass,
+} from "./automation-recipient-policy";
 
 export const manualQuestionReplyPlaceholder =
   "Skriv et kontrollert svar til kunden her før utsending.";
@@ -109,7 +122,9 @@ export async function enqueueMessageJob(
   payload: Payload,
   messageId: number,
   correlationId: string,
+  deliveryClass: MessageDeliveryClass,
 ) {
+  assertMessageDeliveryClass(deliveryClass);
   const idempotencyKey = makeIdempotencyKey("message.delivery", { messageId });
   const existing = await payload.find({
     collection: "operational-jobs",
@@ -136,8 +151,16 @@ export async function enqueueMessageJob(
           result: null,
           lastErrorCode: null,
           lastErrorMessage: null,
+          payload: { messageId, deliveryClass },
         },
       });
+    }
+    const existingDeliveryClass = messageDeliveryClass(job.payload);
+    if (!existingDeliveryClass) {
+      throw new MessageDeliveryClassRequiredError();
+    }
+    if (existingDeliveryClass !== deliveryClass) {
+      throw new MessageDeliveryClassConflictError();
     }
     return job;
   }
@@ -152,7 +175,7 @@ export async function enqueueMessageJob(
       attempts: 0,
       maxAttempts: 3,
       availableAt: new Date().toISOString(),
-      payload: { messageId },
+      payload: { messageId, deliveryClass },
     },
   });
 }
@@ -283,7 +306,12 @@ export async function createReceiptMessage(
       queuedAt: now,
     },
   });
-  const job = await enqueueMessageJob(payload, message.id, correlationId);
+  const job = await enqueueMessageJob(
+    payload,
+    message.id,
+    correlationId,
+    "customer_initiated",
+  );
   return { skipped: false as const, duplicate: false as const, message, job };
 }
 
@@ -620,18 +648,23 @@ export async function createManualCustomerQuestionReplyDraft(
   return { duplicate: false as const, message };
 }
 
-export async function deliverMessage(
-  payload: Payload,
-  provider: EmailProvider,
-  messageId: number,
-  correlationId: string,
-) {
-  const message = await payload.findByID({
+async function loadDeliveryMessage(payload: Payload, messageId: number) {
+  return payload.findByID({
     collection: "messages",
     id: messageId,
     depth: 1,
     overrideAccess: true,
   });
+}
+
+async function deliverMessageUnlocked(
+  payload: Payload,
+  provider: EmailProvider,
+  correlationId: string,
+  deliveryClass: MessageDeliveryClass,
+  message: Awaited<ReturnType<typeof loadDeliveryMessage>>,
+  paymentInvoiceId: number | null,
+) {
   if (["sent", "delivered"].includes(message.status))
     return { duplicate: true as const, message };
   assertMessageCanDeliver(message);
@@ -639,14 +672,6 @@ export async function deliverMessage(
     throw new TypeError("SMS delivery is not enabled");
   const leadId = relationId(message.lead);
   if (!leadId) throw new TypeError("Message has no lead");
-  const lead = await payload.findByID({
-    collection: "leads",
-    id: leadId,
-    depth: 0,
-    overrideAccess: true,
-  });
-  const deliveryEmail = lead.communicationEmail || lead.email;
-  if (!deliveryEmail) throw new TypeError("Lead has no email address");
   try {
     const attachments = [];
     for (const relation of message.attachments ?? []) {
@@ -673,6 +698,28 @@ export async function deliverMessage(
       provider,
       currentSources?.context.purpose,
     );
+    const lead = await payload.findByID({
+      collection: "leads",
+      id: leadId,
+      depth: 0,
+      overrideAccess: true,
+    });
+    const deliveryEmail = lead.communicationEmail || lead.email;
+    if (!deliveryEmail) throw new TypeError("Lead has no email address");
+    if (deliveryClass === "automation") {
+      assertControlledPilotAutomationRecipientAllowed(deliveryEmail);
+    }
+    if (paymentInvoiceId !== null) {
+      await assertAndClaimPaymentReminderSend(
+        payload,
+        message,
+        paymentInvoiceId,
+        new Date(),
+      );
+    }
+    if (deliveryClass === "automation") {
+      assertControlledPilotAutomationRecipientAllowed(deliveryEmail);
+    }
     const result = await provider.send({
       template: message.category,
       to: deliveryEmail,
@@ -893,4 +940,36 @@ export async function deliverMessage(
     });
     throw error;
   }
+}
+
+export async function deliverMessage(
+  payload: Payload,
+  provider: EmailProvider,
+  messageId: number,
+  correlationId: string,
+  deliveryClass: MessageDeliveryClass,
+) {
+  assertMessageDeliveryClass(deliveryClass);
+  const message = await loadDeliveryMessage(payload, messageId);
+  const invoiceId = paymentReminderInvoiceId(message);
+  if (invoiceId === null) {
+    return deliverMessageUnlocked(
+      payload,
+      provider,
+      correlationId,
+      deliveryClass,
+      message,
+      null,
+    );
+  }
+  return withPaymentInvoiceOperationLock(payload, invoiceId, async () =>
+    deliverMessageUnlocked(
+      payload,
+      provider,
+      correlationId,
+      deliveryClass,
+      await loadDeliveryMessage(payload, messageId),
+      invoiceId,
+    ),
+  );
 }

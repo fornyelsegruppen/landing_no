@@ -22,15 +22,25 @@ const operationalWorkflow = readFileSync(
 );
 
 describe("operational scheduler configuration", () => {
-  it("uses GitHub Actions as the only operational-jobs scheduler", () => {
+  it("uses GitHub Actions as the only periodic operational-jobs scheduler", () => {
     expect(
-      vercelConfiguration.crons?.filter(
-        (cron) => cron.path === "/api/cron/operational-jobs",
+      vercelConfiguration.crons?.filter((cron) =>
+        cron.path.startsWith("/api/cron/operational-jobs"),
       ),
     ).toEqual([]);
 
-    expect(operationalWorkflow).toContain('cron: "*/15 * * * *"');
+    expect(
+      operationalWorkflow.match(/cron: "\*\/15 \* \* \* \*"/g),
+    ).toHaveLength(1);
     expect(operationalWorkflow).toContain("takfornyelse-operational-jobs");
+    expect(operationalWorkflow).toContain("cancel-in-progress: false");
+    expect(operationalWorkflow).toContain("permissions:\n  contents: read");
+    expect(operationalWorkflow).toContain(
+      "CRON_SECRET: ${{ secrets.TAKFORNYELSE_CRON_SECRET }}",
+    );
+    expect(operationalWorkflow).toContain(
+      '-H "Authorization: Bearer ${CRON_SECRET}"',
+    );
     expect(operationalWorkflow).toContain(
       "/api/cron/operational-jobs?limit=50",
     );

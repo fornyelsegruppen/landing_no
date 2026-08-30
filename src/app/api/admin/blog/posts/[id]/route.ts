@@ -16,6 +16,7 @@ import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { attachPexelsStockImageToPost } from "@/lib/blog/stock-image";
 import { reviewerNameForUser } from "@/lib/blog/reviewer";
+import { evaluateEditedBlogDraft } from "@/lib/blog/edited-draft-quality";
 
 const actionSchema = z.object({
   action: z.enum([
@@ -96,7 +97,31 @@ export async function POST(
       });
     }
     if (parsed.data.action === "save") {
-      if (!parsed.data.titleNo || !parsed.data.contentNo) throw new TypeError("Title and article text are required");
+      if (!parsed.data.titleNo || !parsed.data.contentNo)
+        throw new TypeError("Title and article text are required");
+      const existingPosts = await payload.find({
+        collection: "posts",
+        depth: 0,
+        limit: 500,
+        pagination: false,
+        overrideAccess: true,
+        where: { id: { not_equals: post.id } },
+      });
+      const quality = evaluateEditedBlogDraft({
+        post,
+        edits: {
+          titleNo: parsed.data.titleNo,
+          excerptNo: parsed.data.excerptNo,
+          contentNo: parsed.data.contentNo,
+          seoTitleNo: parsed.data.seoTitleNo,
+          seoDescriptionNo: parsed.data.seoDescriptionNo,
+          primaryKeyword: parsed.data.primaryKeyword,
+        },
+        existing: existingPosts.docs.map((item) => ({
+          title: item.titleNo,
+          primaryKeyword: item.primaryKeyword,
+        })),
+      });
       const data = {
         titleNo: parsed.data.titleNo,
         excerptNo: parsed.data.excerptNo || null,
@@ -104,10 +129,49 @@ export async function POST(
         seoTitleNo: parsed.data.seoTitleNo || null,
         seoDescriptionNo: parsed.data.seoDescriptionNo || null,
         primaryKeyword: parsed.data.primaryKeyword || null,
+        qualityScore: quality.score,
+        qualityChecks: quality,
+        editorialStatus: "human_review" as const,
+        scheduledAt: null,
+        reviewerName: null,
+        reviewedAt: null,
+        _status: "draft" as const,
       };
-      const updated = await payload.update({ collection: "posts", id: post.id, draft: true, overrideAccess: true, data });
-      await recordAuditEvent(createPayloadAuditWriter(payload), { actorId: user.id, action: "blog.save", entityType: "post", entityId: post.id, correlationId, changedFields: Object.keys(data), before: { titleNo: post.titleNo, contentNo: post.contentNo }, after: { titleNo: updated.titleNo, contentNo: updated.contentNo } });
-      return NextResponse.json({ ok: true, postId: updated.id, action: "save" });
+      const updated = await payload.update({
+        collection: "posts",
+        id: post.id,
+        draft: true,
+        overrideAccess: true,
+        context: { trustedBlogQualityRevalidation: true },
+        data,
+      });
+      await recordAuditEvent(createPayloadAuditWriter(payload), {
+        actorId: user.id,
+        action: "blog.save",
+        entityType: "post",
+        entityId: post.id,
+        correlationId,
+        changedFields: Object.keys(data),
+        before: {
+          titleNo: post.titleNo,
+          contentNo: post.contentNo,
+          editorialStatus: post.editorialStatus,
+          qualityScore: post.qualityScore,
+        },
+        after: {
+          titleNo: updated.titleNo,
+          contentNo: updated.contentNo,
+          editorialStatus: updated.editorialStatus,
+          qualityScore: updated.qualityScore,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        postId: updated.id,
+        action: "save",
+        qualityPassed: quality.passed,
+        qualityScore: quality.score,
+      });
     }
     const quality =
       post.qualityChecks && typeof post.qualityChecks === "object"

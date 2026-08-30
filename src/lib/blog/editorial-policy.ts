@@ -21,7 +21,67 @@ export type EditorialPost = {
   publishedAt?: string | null;
   qualityChecks?: { passed?: boolean | null } | null;
   qualityScore?: number | null;
+  [key: string]: unknown;
 };
+
+type EditorialPreparationOptions = {
+  qualityRevalidated?: boolean;
+};
+
+const qualityInputFields = [
+  "slug",
+  "titleNo",
+  "excerptNo",
+  "contentNo",
+  "seoTitleNo",
+  "seoDescriptionNo",
+  "primaryKeyword",
+  "secondaryKeywords",
+  "searchIntent",
+  "locationText",
+  "sources",
+  "reviewFlags",
+  "proposedInternalLinks",
+  "ctaVariant",
+  "faqItems",
+  "imageBrief",
+  "imageAlt",
+  "aiAssisted",
+] as const;
+
+function qualityInputChanged(
+  original: EditorialPost | null | undefined,
+  incoming: EditorialPost,
+) {
+  if (!original) return false;
+  return qualityInputFields.some(
+    (field) =>
+      Object.prototype.hasOwnProperty.call(incoming, field) &&
+      JSON.stringify(incoming[field]) !== JSON.stringify(original[field]),
+  );
+}
+
+function invalidateStaleReview(
+  original: EditorialPost | null | undefined,
+  incoming: EditorialPost,
+  options: EditorialPreparationOptions,
+) {
+  if (options.qualityRevalidated || !qualityInputChanged(original, incoming)) {
+    return incoming;
+  }
+  return {
+    ...incoming,
+    _status: "draft" as const,
+    editorialStatus: "human_review" as const,
+    qualityScore: null,
+    qualityChecks: null,
+    scheduledAt: null,
+    reviewerName: null,
+    reviewedAt: null,
+    ...(original?.aiAssisted === true ? { aiAssisted: true } : {}),
+    ...(original?.publishedAt ? { publishedAt: original.publishedAt } : {}),
+  };
+}
 
 function present(value: string | null | undefined) {
   return Boolean(value?.trim());
@@ -68,17 +128,19 @@ export function prepareEditorialPost(
   original: EditorialPost | null | undefined,
   incoming: EditorialPost,
   now: Date = new Date(),
+  options: EditorialPreparationOptions = {},
 ) {
-  const merged = { ...(original ?? {}), ...incoming };
+  const prepared = invalidateStaleReview(original, incoming, options);
+  const merged = { ...(original ?? {}), ...prepared };
   const errors = validateEditorialPost(merged);
   if (errors.length) throw new TypeError(errors.join("; "));
 
-  if (merged._status !== "published") return incoming;
+  if (merged._status !== "published") return prepared;
   return {
-    ...incoming,
+    ...prepared,
     editorialStatus: "published" as const,
     publishedAt:
-      incoming.publishedAt || original?.publishedAt || now.toISOString(),
+      prepared.publishedAt || original?.publishedAt || now.toISOString(),
   };
 }
 
@@ -87,10 +149,14 @@ export function prepareAdminPublication(
   incoming: EditorialPost,
   reviewerName: string,
   now: Date = new Date(),
+  options: EditorialPreparationOptions = {},
 ) {
-  const merged = { ...(original ?? {}), ...incoming };
+  const prepared = invalidateStaleReview(original, incoming, options);
+  const merged = { ...(original ?? {}), ...prepared };
   if (merged._status !== "published") {
-    return prepareEditorialPost(original, incoming, now);
+    return prepareEditorialPost(original, prepared, now, {
+      qualityRevalidated: true,
+    });
   }
 
   if (
@@ -103,7 +169,7 @@ export function prepareAdminPublication(
   }
 
   const reviewed = {
-    ...incoming,
+    ...prepared,
     authorName: merged.authorName?.trim() || "Takfornyelse",
     reviewerName: merged.reviewerName?.trim() || reviewerName,
     reviewedAt: merged.reviewedAt || now.toISOString(),
@@ -114,5 +180,7 @@ export function prepareAdminPublication(
       : ("approved" as const),
   };
 
-  return prepareEditorialPost(original, reviewed, now);
+  return prepareEditorialPost(original, reviewed, now, {
+    qualityRevalidated: true,
+  });
 }
