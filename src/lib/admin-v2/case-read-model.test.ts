@@ -470,6 +470,97 @@ describe("admin case read model", () => {
     );
   });
 
+  it("keeps draft and official invoices identity-safe when their numeric ids collide", async () => {
+    const findByID = vi.fn().mockResolvedValue({
+      id: 18,
+      name: "Invoice collision UAT",
+      status: "converted",
+      createdAt: "2026-08-30T08:00:00.000Z",
+    });
+    const responses = [
+      { docs: [] },
+      { docs: [] },
+      { docs: [] },
+      { docs: [] },
+      { docs: [] },
+      { docs: [] },
+      {
+        docs: [
+          {
+            id: 7,
+            reference: "FU-18-V1",
+            status: "draft",
+            document: 70,
+            createdAt: "2026-08-30T09:00:00.000Z",
+          },
+        ],
+      },
+      { docs: [] },
+      {
+        docs: [
+          {
+            id: 7,
+            reference: "FIKEN-18-1001",
+            invoiceNumber: "1001",
+            status: "sent",
+            originalDocument: 71,
+            createdAt: "2026-08-30T10:00:00.000Z",
+          },
+        ],
+      },
+      {
+        docs: [
+          {
+            id: 70,
+            filename: "FU-18-V1.pdf",
+            classification: "invoice",
+            ownerType: "invoice-record",
+            ownerId: "7",
+            createdAt: "2026-08-30T09:00:00.000Z",
+          },
+          {
+            id: 71,
+            filename: "FIKEN-18-1001.pdf",
+            classification: "invoice",
+            ownerType: "invoice-record",
+            ownerId: "7",
+            createdAt: "2026-08-30T10:00:00.000Z",
+          },
+        ],
+      },
+    ];
+    const result = await loadAdminCase(
+      {
+        findByID,
+        find: vi.fn().mockImplementation(async () => responses.shift()),
+      } as unknown as Payload,
+      18,
+    );
+
+    const invoiceEvents = result?.timeline.filter(
+      (item) => item.type === "invoice",
+    );
+    expect(invoiceEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "invoice-invoice-records-7",
+          sourceCollection: "invoice-records",
+          sourceId: 7,
+          title: "FU-18-V1",
+        }),
+        expect.objectContaining({
+          id: "invoice-official-invoices-7",
+          sourceCollection: "official-invoices",
+          sourceId: 7,
+          title: "1001",
+        }),
+      ]),
+    );
+    expect(new Set(invoiceEvents?.map((item) => item.id)).size).toBe(2);
+    expect(result?.invoice?.documentId).toBe(70);
+    expect(result?.officialInvoices[0]?.originalDocumentId).toBe(71);
+  });
+
   it("does not offer an obsolete draft after a newer equivalent was sent", async () => {
     const findByID = vi.fn().mockResolvedValue({
       id: 1,

@@ -256,10 +256,27 @@ export type CasePriceCalculation = CaseEntity & {
   vatOre?: number;
 };
 
+export type CaseTimelineSourceCollection =
+  | "change-agreements"
+  | "contracts"
+  | "customer-contract-requests"
+  | "invoice-records"
+  | "leads"
+  | "messages"
+  | "official-invoices"
+  | "price-calculations"
+  | "private-media"
+  | "quotes"
+  | "roof-measurements"
+  | "warranties"
+  | "work-orders";
+
 export type CaseTimelineItem = {
   at: string;
   href?: string;
   id: string;
+  sourceCollection?: CaseTimelineSourceCollection;
+  sourceId?: number;
   status?: string;
   title: string;
   type:
@@ -673,14 +690,19 @@ function timelineDate(record: Record<string, unknown>) {
 
 function makeTimeline(
   type: CaseTimelineItem["type"],
-  _collection: string,
+  collection: CaseTimelineSourceCollection,
   raw: unknown,
   title: string,
 ): CaseTimelineItem {
   const record = asRecord(raw);
   const id = numericId(record.id);
   return {
-    id: `${type}-${id}`,
+    id:
+      type === "invoice"
+        ? `${type}-${collection}-${id}`
+        : `${type}-${id}`,
+    sourceCollection: collection,
+    sourceId: id,
     type,
     title,
     status: stringValue(record.status),
@@ -710,7 +732,7 @@ function makeTimeline(
 
 function makeTimedEvent(
   type: CaseTimelineItem["type"],
-  collection: string,
+  collection: CaseTimelineSourceCollection,
   raw: Record<string, unknown>,
   field: string,
   status: string,
@@ -720,6 +742,8 @@ function makeTimedEvent(
   const id = numericId(raw.id);
   return {
     id: `${type}-${id}-${field}`,
+    sourceCollection: collection,
+    sourceId: id,
     type,
     title: stringValue(raw.reference) || `#${id}`,
     status,
@@ -1328,6 +1352,8 @@ export async function loadAdminCase(
 
   const leadTimeline: CaseTimelineItem = {
     id: `lead-${leadId}`,
+    sourceCollection: "leads",
+    sourceId: leadId,
     type: "lead",
     title: stringValue(lead.name) || `#${leadId}`,
     status: stringValue(lead.status),
@@ -1351,6 +1377,8 @@ export async function loadAdminCase(
       return [
         {
           id: `message-${id}-manual-contact`,
+          sourceCollection: "messages" as const,
+          sourceId: id,
           type: "message" as const,
           title: `Manuell kontakt · ${stringValue(item.subject) || `#${id}`}`,
           status: recovery.channel || "contacted",
@@ -1464,6 +1492,8 @@ export async function loadAdminCase(
       at: document.createdAt || new Date(0).toISOString(),
       href: document.href,
       id: `document-${document.id}`,
+      sourceCollection: "private-media" as const,
+      sourceId: document.id,
       status: document.classification,
       title: document.filename,
       type: "document" as const,

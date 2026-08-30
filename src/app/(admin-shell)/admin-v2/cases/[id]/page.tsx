@@ -138,6 +138,13 @@ const timelineSourceCollections = {
 } as const satisfies Record<CaseTimelineItem["type"], string>;
 
 function timelineEntityId(item: CaseTimelineItem) {
+  if (
+    Number.isSafeInteger(item.sourceId) &&
+    typeof item.sourceId === "number" &&
+    item.sourceId > 0
+  ) {
+    return item.sourceId;
+  }
   const value = Number.parseInt(item.id.slice(item.type.length + 1), 10);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
@@ -146,6 +153,7 @@ function timelineSourceCollection(
   item: CaseTimelineItem,
   caseData: AdminCaseWorkspace,
 ) {
+  if (item.sourceCollection) return item.sourceCollection;
   const entityId = timelineEntityId(item);
   if (
     item.type === "invoice" &&
@@ -245,11 +253,12 @@ function timelineHistoryLinks(
 
   const documentId =
     item.type === "invoice"
-      ? caseData.officialInvoices.find((invoice) => invoice.id === entityId)
-          ?.originalDocumentId ||
-        (caseData.invoice?.id === entityId
+      ? collection === "official-invoices"
+        ? caseData.officialInvoices.find((invoice) => invoice.id === entityId)
+            ?.originalDocumentId
+        : caseData.invoice?.id === entityId
           ? caseData.invoice.documentId
-          : undefined)
+          : undefined
       : item.type === "warranty" && caseData.warranty?.id === entityId
         ? caseData.warranty.documentId
         : undefined;
@@ -269,7 +278,6 @@ function timelineHistoryLinks(
   > = {
     change: ["change-agreement"],
     contract: ["contract"],
-    invoice: ["invoice-record"],
     lead: ["lead"],
     measurement: ["roof-measurement"],
     quote: ["quote"],
@@ -419,7 +427,8 @@ function timelineHistorySummary(
       ?.reasonCode;
   }
   if (item.type === "invoice") {
-    return caseData.invoice?.id === entityId
+    return timelineSourceCollection(item, caseData) === "invoice-records" &&
+      caseData.invoice?.id === entityId
       ? caseData.invoice.adminNote
       : undefined;
   }
@@ -553,11 +562,18 @@ function documentOwnerReference(
     return caseData.workOrder?.id === ownerId
       ? caseData.workOrder.reference
       : undefined;
-  if (document.ownerType === "invoice-record")
+  if (document.ownerType === "invoice-record") {
+    if (caseData.invoice?.documentId === document.id)
+      return caseData.invoice.reference;
+    const officialInvoice = caseData.officialInvoices.find(
+      (item) => item.originalDocumentId === document.id,
+    );
+    if (officialInvoice) return officialInvoice.reference;
     return caseData.invoice?.id === ownerId
       ? caseData.invoice.reference
       : caseData.officialInvoices.find((item) => item.id === ownerId)
           ?.reference;
+  }
   if (document.ownerType === "warranty")
     return caseData.warranty?.id === ownerId
       ? caseData.warranty.reference
