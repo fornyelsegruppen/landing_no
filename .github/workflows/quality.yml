@@ -99,6 +99,11 @@ jobs:
         run: npm run build
 
       - name: Public and authenticated browser smoke against production build
+        env:
+          # The job-level default is fail-closed so unit coverage exercises the
+          # disabled state. Browser smoke explicitly opens the synthetic worker
+          # portal to verify the authenticated worker journey and 401 boundary.
+          FEATURE_WORKER_PORTAL: "true"
         run: npm run test:e2e
 
       - name: Rehearse PostgreSQL backup and restore with synthetic data
