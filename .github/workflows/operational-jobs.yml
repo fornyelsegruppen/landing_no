@@ -1,0 +1,33 @@
+name: Process operational jobs
+
+# Scheduled workflows run from the default branch, so this file must be part of
+# the release pull request merged into main.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: takfornyelse-operational-jobs
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run due jobs
+        env:
+          CRON_URL: ${{ vars.TAKFORNYELSE_CRON_URL }}
+          CRON_SECRET: ${{ secrets.TAKFORNYELSE_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "${CRON_SECRET}"
+          URL="${CRON_URL:-https://www.takfornyelse.as}"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${URL%/}/api/cron/operational-jobs?limit=50"
