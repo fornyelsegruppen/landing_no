@@ -53,6 +53,7 @@ function makeCase(
       id: 17,
       name: "Test customer",
       nextActionOverdue: false,
+      photoCount: 0,
       recordState: "active",
       revision: 1,
     },
