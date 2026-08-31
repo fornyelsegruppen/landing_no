@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import Image from "next/image";
+import { Clock, Mail, MapPin, Phone, X } from "lucide-react";
 import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -35,6 +36,7 @@ import {
   createUploadTicketState,
   getOrCreateUploadTicket,
 } from "@/lib/leads/upload-ticket-coordinator";
+import { appendUniquePhotoFiles } from "@/lib/leads/photo-selection";
 
 const MAX_PHOTOS = 15;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -56,6 +58,7 @@ type InquiryType = (typeof inquiryTypes)[number];
 type PhotoItem = {
   id: string;
   file: File;
+  previewUrl: string;
   status: "queued" | "uploading" | "ready" | "error";
   url?: string;
   done: Promise<string | null>;
@@ -259,9 +262,11 @@ export function ContactSection() {
   const [honeypot, setHoneypot] = useState({ website: "", company_url_hp: "" });
   const [consent, setConsent] = useState(false);
   const photosInputRef = useRef<HTMLInputElement>(null);
+  const photosButtonRef = useRef<HTMLButtonElement>(null);
   const photosRef = useRef<PhotoItem[]>([]);
   const queueRef = useRef<PhotoItem[]>([]);
   const activeRef = useRef(0);
+  const submittingRef = useRef(false);
   const uploadTicketStateRef = useRef(createUploadTicketState());
   const turnstileTokenRef = useRef<string | null>(null);
   const attributionRef = useRef<LeadAttribution>({});
@@ -269,6 +274,13 @@ export function ContactSection() {
   useEffect(() => {
     photosRef.current = photos;
   }, [photos]);
+
+  useEffect(
+    () => () => {
+      photosRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    },
+    [],
+  );
 
   useEffect(() => {
     attributionRef.current = captureLeadAttribution(
@@ -303,6 +315,17 @@ export function ContactSection() {
     photoQueued: copy.contact.form.photoQueued,
     photoReady: copy.contact.form.photoReady,
     photoFailed: copy.contact.form.photoFailed,
+    photoSelected: locale === "no" ? "Valgt" : "Selected",
+    photosAtLimit:
+      locale === "no"
+        ? "Du har valgt maksimalt 15 bilder."
+        : "You have selected the maximum of 15 photos.",
+    addMorePhotos: locale === "no" ? "Legg til flere" : "Add more",
+    removePhoto: locale === "no" ? "Fjern bilde" : "Remove photo",
+    duplicatePhotos:
+      locale === "no"
+        ? "Bildet er allerede valgt."
+        : "That photo is already selected.",
   };
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -310,9 +333,13 @@ export function ContactSection() {
   }
 
   function patchPhoto(id: string, patch: Partial<PhotoItem>) {
-    setPhotos((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
+    setPhotos((prev) => {
+      const next = prev.map((item) =>
+        item.id === id ? { ...item, ...patch } : item,
+      );
+      photosRef.current = next;
+      return next;
+    });
   }
 
   function handleTurnstileToken(token: string | null) {
@@ -363,42 +390,65 @@ export function ContactSection() {
   }
 
   function onPhotosSelected(fileList: FileList | null) {
-    const all = Array.from(fileList || []);
-    const truncated = all.length > MAX_PHOTOS;
-    if (truncated) {
+    const selected = Array.from(fileList || []);
+    if (!selected.length) return;
+
+    const existing = photosRef.current;
+    const result = appendUniquePhotoFiles(
+      existing.map((item) => item.file),
+      selected,
+      MAX_PHOTOS,
+      MAX_SOURCE_BYTES,
+    );
+
+    if (result.ignoredByLimit > 0) {
       toast.warning(ui.photosTooMany, { duration: 6000 });
       setPhotosLimitNotice(ui.photosLimitInline);
     } else {
       setPhotosLimitNotice(null);
     }
-
-    const nextFiles = all.slice(0, MAX_PHOTOS);
-    if (nextFiles.some((file) => file.size > MAX_SOURCE_BYTES)) {
+    if (result.oversized > 0) {
       toast.error(ui.photoTooLarge);
     }
+    if (result.duplicates > 0) {
+      toast.message(ui.duplicatePhotos);
+    }
 
-    queueRef.current = [];
-    activeRef.current = 0;
-
-    const next: PhotoItem[] = nextFiles
-      .filter((file) => file.size <= MAX_SOURCE_BYTES)
-      .map((file) => {
-        let resolveDone: (url: string | null) => void = () => {};
-        const done = new Promise<string | null>((resolve) => {
-          resolveDone = resolve;
-        });
-        return {
-          id: photoKey(file),
-          file,
-          status: "queued" as const,
-          done,
-          resolve: resolveDone,
-        };
+    const added: PhotoItem[] = result.added.map((file) => {
+      let resolveDone: (url: string | null) => void = () => {};
+      const done = new Promise<string | null>((resolve) => {
+        resolveDone = resolve;
       });
+      return {
+        id: photoKey(file),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: "queued" as const,
+        done,
+        resolve: resolveDone,
+      };
+    });
 
+    if (!added.length) return;
+    const next = [...existing, ...added];
+    photosRef.current = next;
     setPhotos(next);
-    queueRef.current = [...next];
-    pumpQueue();
+  }
+
+  function removePhoto(id: string) {
+    if (submittingRef.current) return;
+    const removed = photosRef.current.find((item) => item.id === id);
+    if (!removed) return;
+
+    queueRef.current = queueRef.current.filter((item) => item.id !== id);
+    if (removed.status === "queued") removed.resolve(null);
+    URL.revokeObjectURL(removed.previewUrl);
+
+    const next = photosRef.current.filter((item) => item.id !== id);
+    photosRef.current = next;
+    setPhotos(next);
+    setPhotosLimitNotice(null);
+    window.requestAnimationFrame(() => photosButtonRef.current?.focus());
   }
 
   function goNext() {
@@ -426,6 +476,7 @@ export function ContactSection() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submittingRef.current) return;
     trackLeadFormEvent("lead_form_submit_attempt", {
       step: 2,
       inquiryType: form.type,
@@ -485,6 +536,7 @@ export function ContactSection() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       if (turnstileConfigured() && !turnstileTokenRef.current) {
@@ -502,8 +554,16 @@ export function ContactSection() {
       const consentText = settings.privacy.consentLabel[locale];
 
       const current = photosRef.current;
+      queueRef.current.push(
+        ...current.filter((item) => item.status === "queued"),
+      );
+      pumpQueue();
       const settled = await Promise.all(current.map((p) => p.done));
-      const photoUrls = settled.filter((url): url is string => Boolean(url));
+      const retainedIds = new Set(photosRef.current.map((item) => item.id));
+      const photoUrls = settled.filter(
+        (url, index): url is string =>
+          Boolean(url) && retainedIds.has(current[index].id),
+      );
       const failed = settled.length - photoUrls.length;
 
       if (current.length && !photoUrls.length) {
@@ -560,7 +620,9 @@ export function ContactSection() {
         toast.message(copy.contact.form.partialUpload);
       }
       setForm(initial);
+      current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       setPhotos([]);
+      photosRef.current = [];
       setPhotosLimitNotice(null);
       setHoneypot({ website: "", company_url_hp: "" });
       turnstileTokenRef.current = null;
@@ -574,6 +636,7 @@ export function ContactSection() {
       console.error("Lead submit failed:", err);
       toast.error(copy.contact.form.error);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -795,59 +858,103 @@ export function ContactSection() {
                     accept="image/*"
                     multiple
                     className="sr-only"
-                    onChange={(e) => onPhotosSelected(e.target.files)}
+                    onChange={(e) => {
+                      onPhotosSelected(e.currentTarget.files);
+                      e.currentTarget.value = "";
+                    }}
                   />
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
+                      ref={photosButtonRef}
                       type="button"
                       variant="secondary"
-                      disabled={loading || turnstileRefreshing}
+                      disabled={
+                        loading ||
+                        turnstileRefreshing ||
+                        photos.length >= MAX_PHOTOS
+                      }
                       onClick={() => photosInputRef.current?.click()}
                     >
-                      {ui.choosePhotos}
+                      {photos.length ? ui.addMorePhotos : ui.choosePhotos}
                     </Button>
-                    <span className="text-muted-foreground text-sm">
+                    <span
+                      aria-live="polite"
+                      className="text-muted-foreground text-sm"
+                    >
                       {photos.length
-                        ? ui.photosSelected(photos.length)
+                        ? `${ui.photosSelected(photos.length)} · ${photos.length}/${MAX_PHOTOS}`
                         : ui.noPhotos}
                     </span>
                   </div>
                   <p className="text-muted-foreground text-xs">
                     {copy.contact.form.photosHint}
                   </p>
-                  {photosLimitNotice ? (
+                  {photosLimitNotice || photos.length >= MAX_PHOTOS ? (
                     <p
                       className="text-accent text-xs font-medium"
                       role="status"
                     >
-                      {photosLimitNotice}
+                      {photosLimitNotice || ui.photosAtLimit}
                     </p>
                   ) : null}
                   {photos.length > 0 ? (
-                    <ul className="text-muted-foreground space-y-1 text-xs">
+                    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       {photos.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-center justify-between gap-3"
+                          className="border-border/70 bg-card/60 group relative min-w-0 overflow-hidden rounded-xl border"
                         >
-                          <span className="truncate">{item.file.name}</span>
-                          <span
-                            className={
-                              item.status === "ready"
-                                ? "text-accent shrink-0"
+                          <div className="relative aspect-[4/3] overflow-hidden bg-black/20">
+                            <Image
+                              src={item.previewUrl}
+                              alt=""
+                              fill
+                              unoptimized
+                              sizes="(max-width: 639px) 45vw, 180px"
+                              className="object-cover"
+                            />
+                            <button
+                              type="button"
+                              disabled={loading}
+                              onClick={() => removePhoto(item.id)}
+                              aria-label={`${ui.removePhoto}: ${item.file.name}`}
+                              title={ui.removePhoto}
+                              className="absolute top-1.5 right-1.5 flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/75 text-white shadow-lg transition hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none disabled:opacity-50"
+                            >
+                              <X className="size-5" aria-hidden="true" />
+                            </button>
+                          </div>
+                          <div className="flex min-w-0 items-center justify-between gap-2 px-2.5 py-2">
+                            <span
+                              className="min-w-0 truncate text-xs"
+                              title={item.file.name}
+                            >
+                              {item.file.name}
+                            </span>
+                            <span
+                              aria-live="polite"
+                              role={
+                                item.status === "error" ? "alert" : "status"
+                              }
+                              className={
+                                item.status === "ready"
+                                  ? "text-accent shrink-0 text-xs"
+                                  : item.status === "error"
+                                    ? "shrink-0 text-xs text-red-400"
+                                    : "text-muted-foreground shrink-0 text-xs"
+                              }
+                            >
+                              {item.status === "ready"
+                                ? ui.photoReady
                                 : item.status === "error"
-                                  ? "shrink-0 text-red-400"
-                                  : "shrink-0"
-                            }
-                          >
-                            {item.status === "ready"
-                              ? ui.photoReady
-                              : item.status === "error"
-                                ? ui.photoFailed
-                                : item.status === "queued"
-                                  ? ui.photoQueued
-                                  : ui.photoUploading}
-                          </span>
+                                  ? ui.photoFailed
+                                  : item.status === "queued"
+                                    ? loading
+                                      ? ui.photoQueued
+                                      : ui.photoSelected
+                                    : ui.photoUploading}
+                            </span>
+                          </div>
                         </li>
                       ))}
                     </ul>
