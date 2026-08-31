@@ -30,6 +30,11 @@ import {
   readContentSource,
   type LeadAttribution,
 } from "@/lib/lead-attribution";
+import {
+  clearUploadTicket,
+  createUploadTicketState,
+  getOrCreateUploadTicket,
+} from "@/lib/leads/upload-ticket-coordinator";
 
 const MAX_PHOTOS = 15;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -247,19 +252,23 @@ export function ContactSection() {
   const [photosLimitNotice, setPhotosLimitNotice] = useState<string | null>(
     null,
   );
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [turnstileRefreshing, setTurnstileRefreshing] = useState(
+    turnstileConfigured(),
+  );
   const [honeypot, setHoneypot] = useState({ website: "", company_url_hp: "" });
   const [consent, setConsent] = useState(false);
   const photosInputRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef<PhotoItem[]>([]);
   const queueRef = useRef<PhotoItem[]>([]);
   const activeRef = useRef(0);
-  const uploadTicketRef = useRef<string | null>(null);
+  const uploadTicketStateRef = useRef(createUploadTicketState());
   const turnstileTokenRef = useRef<string | null>(null);
   const attributionRef = useRef<LeadAttribution>({});
   const formStartedRef = useRef(false);
-  useEffect(() => { photosRef.current = photos; }, [photos]);
-  useEffect(() => { turnstileTokenRef.current = turnstileToken; }, [turnstileToken]);
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
 
   useEffect(() => {
     attributionRef.current = captureLeadAttribution(
@@ -306,11 +315,24 @@ export function ContactSection() {
     );
   }
 
+  function handleTurnstileToken(token: string | null) {
+    turnstileTokenRef.current = token;
+    setTurnstileRefreshing(turnstileConfigured() && !token);
+  }
+
+  function requestFreshTurnstileToken() {
+    turnstileTokenRef.current = null;
+    if (!turnstileConfigured()) return;
+    setTurnstileRefreshing(true);
+    setTurnstileResetKey((current) => current + 1);
+  }
+
   async function ensureUploadTicket(): Promise<string> {
-    if (uploadTicketRef.current) return uploadTicketRef.current;
-    const ticket = await fetchUploadTicket(turnstileTokenRef.current);
-    uploadTicketRef.current = ticket;
-    return ticket;
+    return getOrCreateUploadTicket(
+      uploadTicketStateRef.current,
+      () => fetchUploadTicket(turnstileTokenRef.current),
+      requestFreshTurnstileToken,
+    );
   }
 
   function pumpQueue() {
@@ -329,7 +351,7 @@ export function ContactSection() {
         } catch (err) {
           console.error("Photo upload failed:", err);
           // Ticket may have expired — clear so the next attempt refreshes it.
-          uploadTicketRef.current = null;
+          clearUploadTicket(uploadTicketStateRef.current);
           patchPhoto(item.id, { status: "error" });
           item.resolve(null);
         } finally {
@@ -465,7 +487,7 @@ export function ContactSection() {
 
     setLoading(true);
     try {
-      if (turnstileConfigured() && !turnstileToken) {
+      if (turnstileConfigured() && !turnstileTokenRef.current) {
         toast.error(copy.contact.form.securityRequired);
         setLoading(false);
         return;
@@ -488,6 +510,12 @@ export function ContactSection() {
         throw new Error("All photo uploads failed");
       }
 
+      const submissionTurnstileToken = turnstileTokenRef.current;
+      if (turnstileConfigured() && !submissionTurnstileToken) {
+        toast.error(copy.contact.form.securityRequired);
+        return;
+      }
+
       const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -502,7 +530,7 @@ export function ContactSection() {
           roofSize: step2.data.roofSize || undefined,
           message: step2.data.message || undefined,
           photoUrls: photoUrls.length ? photoUrls : undefined,
-          turnstileToken: turnstileToken || undefined,
+          turnstileToken: submissionTurnstileToken || undefined,
           consent: true as const,
           consentText,
           ...attributionRef.current,
@@ -518,6 +546,11 @@ export function ContactSection() {
       } | null;
 
       if (!res.ok || !data?.ok) {
+        if (data?.error === "Captcha failed") {
+          requestFreshTurnstileToken();
+          toast.error(copy.contact.form.securityRequired);
+          return;
+        }
         throw new Error(data?.error || "Failed");
       }
 
@@ -530,9 +563,9 @@ export function ContactSection() {
       setPhotos([]);
       setPhotosLimitNotice(null);
       setHoneypot({ website: "", company_url_hp: "" });
-      setTurnstileToken(null);
+      turnstileTokenRef.current = null;
       setConsent(false);
-      uploadTicketRef.current = null;
+      clearUploadTicket(uploadTicketStateRef.current);
       queueRef.current = [];
       if (photosInputRef.current) photosInputRef.current.value = "";
       setStep(1);
@@ -768,7 +801,7 @@ export function ContactSection() {
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={loading}
+                      disabled={loading || turnstileRefreshing}
                       onClick={() => photosInputRef.current?.click()}
                     >
                       {ui.choosePhotos}
@@ -863,7 +896,10 @@ export function ContactSection() {
                     }
                   />
                 </div>
-                <TurnstileWidget onToken={setTurnstileToken} />
+                <TurnstileWidget
+                  onToken={handleTurnstileToken}
+                  resetKey={turnstileResetKey}
+                />
                 <label className="text-muted-foreground flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm leading-relaxed">
                   <input
                     type="checkbox"
@@ -897,11 +933,15 @@ export function ContactSection() {
                     type="submit"
                     size="lg"
                     className="w-full flex-1"
-                    disabled={loading}
+                    disabled={loading || turnstileRefreshing}
                   >
                     {loading
                       ? copy.contact.form.sending
-                      : copy.contact.form.submit}
+                      : turnstileRefreshing
+                        ? locale === "no"
+                          ? "Oppdaterer sikkerhetskontroll…"
+                          : "Refreshing security check…"
+                        : copy.contact.form.submit}
                   </Button>
                 </div>
               </>
