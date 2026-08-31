@@ -24,16 +24,20 @@ declare global {
 
 type Props = {
   onToken: (token: string | null) => void;
+  resetKey?: number;
 };
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-export function TurnstileWidget({ onToken }: Props) {
+export function TurnstileWidget({ onToken, resetKey = 0 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
+  const handledResetKeyRef = useRef(resetKey);
 
-  useEffect(() => { onTokenRef.current = onToken; }, [onToken]);
+  useEffect(() => {
+    onTokenRef.current = onToken;
+  }, [onToken]);
 
   useEffect(() => {
     if (!SITE_KEY || !containerRef.current) return;
@@ -86,6 +90,14 @@ export function TurnstileWidget({ onToken }: Props) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (handledResetKeyRef.current === resetKey) return;
+    handledResetKeyRef.current = resetKey;
+    onTokenRef.current(null);
+    if (!widgetIdRef.current || !window.turnstile) return;
+    window.turnstile.reset(widgetIdRef.current);
+  }, [resetKey]);
 
   if (!SITE_KEY) return null;
 

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   receipt: vi.fn(),
   deliver: vi.fn(),
   enqueueAi: vi.fn(),
+  verifyTurnstile: vi.fn(),
 }));
 
 vi.mock("@/lib/payload", () => ({
@@ -19,7 +20,9 @@ vi.mock("@/lib/rate-limit", () => ({
   clientIp: () => "127.0.0.1",
   rateLimit: vi.fn(async () => ({ success: true })),
 }));
-vi.mock("@/lib/turnstile", () => ({ verifyTurnstile: vi.fn(async () => ({ ok: true, skipped: true })) }));
+vi.mock("@/lib/turnstile", () => ({
+  verifyTurnstile: mocks.verifyTurnstile,
+}));
 vi.mock("@/lib/monitoring", () => ({ captureException: vi.fn() }));
 
 import { POST } from "./route";
@@ -47,9 +50,15 @@ describe("public lead durability", () => {
     delete process.env.RESEND_API_KEY;
     delete process.env.FEATURE_AI_DRAFTS;
     mocks.create.mockReset().mockResolvedValue({ id: 55 });
-    mocks.receipt.mockReset().mockResolvedValue({ skipped: true, reason: "no_email" });
+    mocks.receipt
+      .mockReset()
+      .mockResolvedValue({ skipped: true, reason: "no_email" });
     mocks.deliver.mockReset();
     mocks.enqueueAi.mockReset();
+    mocks.verifyTurnstile.mockReset().mockResolvedValue({
+      ok: true,
+      skipped: true,
+    });
   });
 
   afterEach(() => {
@@ -62,10 +71,14 @@ describe("public lead durability", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ok: true, id: 55 });
     expect(mocks.create).toHaveBeenCalledTimes(1);
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
-      collection: "leads",
-      data: expect.objectContaining({ nextAction: expect.stringContaining("Ring kunden") }),
-    }));
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: "leads",
+        data: expect.objectContaining({
+          nextAction: expect.stringContaining("Ring kunden"),
+        }),
+      }),
+    );
   });
 
   it("keeps the saved lead when AI job enqueueing fails", async () => {
@@ -74,6 +87,27 @@ describe("public lead durability", () => {
     const response = await POST(request("kunde@example.test"));
     expect(response.status).toBe(200);
     expect(mocks.create).toHaveBeenCalledTimes(1);
-    expect(mocks.enqueueAi).toHaveBeenCalledWith(expect.anything(), 55, expect.any(String));
+    expect(mocks.enqueueAi).toHaveBeenCalledWith(
+      expect.anything(),
+      55,
+      expect.any(String),
+    );
+  });
+
+  it("rejects a consumed Turnstile token before creating a lead", async () => {
+    mocks.verifyTurnstile.mockResolvedValueOnce({
+      ok: false,
+      skipped: false,
+      errorCodes: ["timeout-or-duplicate"],
+    });
+
+    const response = await POST(request("kunde@example.test"));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "Captcha failed" });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.receipt).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.enqueueAi).not.toHaveBeenCalled();
   });
 });
