@@ -312,6 +312,8 @@ describe("admin case read model", () => {
       postal: "0001",
       city: "Oslo",
       inquiryType: "takvask",
+      photoUrls:
+        "https://safe.blob.vercel-storage.com/leads/roof-1.jpg\nhttps://safe.blob.vercel-storage.com/leads/roof-2.jpg",
       status: "quoted",
       createdAt: "2026-08-24T08:00:00.000Z",
     });
@@ -439,6 +441,8 @@ describe("admin case read model", () => {
     );
 
     expect(result?.lead.address).toBe("Testveien 1 0001 Oslo");
+    expect(result?.lead.photoCount).toBe(2);
+    expect(JSON.stringify(result)).not.toContain("roof-1.jpg");
     expect(result?.quote?.reference).toBe("T-1-V1");
     expect(result?.price?.reference).toBe("PB-1-V1");
     expect(result?.priceCalculations[0]).toMatchObject({

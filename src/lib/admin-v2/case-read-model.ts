@@ -1,4 +1,5 @@
 import type { Payload, Where } from "payload";
+import { parseLeadPhotoUrls } from "@/lib/lead-photo-token";
 import {
   loadCustomerQuestionContext,
   type CustomerQuestionContext,
@@ -351,6 +352,7 @@ export type AdminCase = {
     nextActionBlocker?: string;
     nextActionOwner?: string;
     nextActionOverdue: boolean;
+    photoCount: number;
     revision: number;
     streetAddress?: string;
     phone?: string;
@@ -1550,6 +1552,7 @@ export async function loadAdminCase(
         stringValue(lead.nextActionAt) &&
         new Date(stringValue(lead.nextActionAt) || 0).getTime() <= loadedAt,
       ),
+      photoCount: parseLeadPhotoUrls(lead.photoUrls).slice(0, 15).length,
       revision: numberValue(lead.caseRevision) || 1,
       createdAt: stringValue(lead.createdAt),
     },
