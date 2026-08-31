@@ -9,6 +9,7 @@ import {
   Phone,
 } from "lucide-react";
 import { CaseActionPanel } from "@/components/admin-v2/case-action-panel";
+import { AdminLeadPhotoGallery } from "@/components/admin-v2/admin-lead-photo-gallery";
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
 import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-editor";
@@ -1172,6 +1173,12 @@ export default async function AdminCasePage({
             </dt>
             <dd className="mt-1 font-semibold">{caseData.messages.length}</dd>
           </div>
+          <div>
+            <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+              {workspaceCopy.photos.title}
+            </dt>
+            <dd className="mt-1 font-semibold">{caseData.lead.photoCount}</dd>
+          </div>
         </dl>
         {caseData.lead.message ? (
           <p className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm whitespace-pre-wrap text-white/80">
@@ -2068,6 +2075,11 @@ export default async function AdminCasePage({
                         {caseData.lead.message}
                       </div>
                     ) : null}
+                    <AdminLeadPhotoGallery
+                      copy={workspaceCopy.photos}
+                      leadId={caseData.lead.id}
+                      photoCount={caseData.lead.photoCount}
+                    />
                   </Section>
 
                   <Section id="ai-section" title={copy.ai}>

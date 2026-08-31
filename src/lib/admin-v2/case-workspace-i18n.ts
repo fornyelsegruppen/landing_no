@@ -56,6 +56,14 @@ type CaseWorkspaceQuestionCopy = {
   title: string;
 };
 
+export type CaseWorkspacePhotoCopy = {
+  description: string;
+  empty: string;
+  image: string;
+  open: string;
+  title: string;
+};
+
 type CaseWorkspaceProcessCopy = {
   closeInspector: string;
   closeStage: string;
@@ -84,6 +92,7 @@ export type CaseWorkspaceCopy = {
   evidence: Record<CaseWorkspaceEvidenceKey, string>;
   help: Record<CaseWorkspaceHelpKey, string>;
   process: CaseWorkspaceProcessCopy;
+  photos: CaseWorkspacePhotoCopy;
   questions: Record<
     CaseWorkspaceQuestionPresentation,
     CaseWorkspaceQuestionCopy
@@ -150,6 +159,13 @@ const nb = {
       blocked: "Fasen er blokkert",
       completed: "Fullført",
     },
+  },
+  photos: {
+    description: "Bildene kunden sendte inn med henvendelsen.",
+    empty: "Ingen kundebilder er vedlagt.",
+    image: "Kundebilde",
+    open: "Åpne bilde",
+    title: "Kundebilder",
   },
   questions: {
     prepare: {
@@ -292,6 +308,13 @@ const lt = {
       blocked: "Etapas užblokuotas",
       completed: "Užbaigta",
     },
+  },
+  photos: {
+    description: "Nuotraukos, kurias klientas pateikė kartu su užklausa.",
+    empty: "Kliento nuotraukų nepridėta.",
+    image: "Kliento nuotrauka",
+    open: "Atidaryti nuotrauką",
+    title: "Kliento nuotraukos",
   },
   questions: {
     prepare: {
@@ -436,6 +459,13 @@ const en = {
       completed: "Completed",
     },
   },
+  photos: {
+    description: "Photos submitted by the customer with the enquiry.",
+    empty: "No customer photos were attached.",
+    image: "Customer photo",
+    open: "Open photo",
+    title: "Customer photos",
+  },
   questions: {
     prepare: {
       status: "A reply must be prepared",
@@ -537,6 +567,7 @@ export type CaseWorkspaceI18nKey =
   | `blockers.${CaseWorkspaceBlockerKey}`
   | `evidence.${CaseWorkspaceEvidenceKey}`
   | `help.${CaseWorkspaceHelpKey}`
+  | `photos.${keyof CaseWorkspacePhotoCopy}`
   | `process.${Exclude<keyof CaseWorkspaceProcessCopy, "states">}`
   | `process.states.${CaseProcessStageState}`
   | `questions.${CaseWorkspaceQuestionPresentation}.${keyof CaseWorkspaceQuestionCopy}`
