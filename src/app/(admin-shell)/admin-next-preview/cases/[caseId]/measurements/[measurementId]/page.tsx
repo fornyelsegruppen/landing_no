@@ -1,11 +1,23 @@
 import { notFound, redirect } from "next/navigation";
+import type { PayloadRequest } from "payload";
 import { AdminNextR4MeasurementReview } from "@/components/admin-next/admin-next-r4-measurement-review";
 import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-fixture";
-import { adminNextFixtureR4Adapter } from "@/lib/admin-next/r4-read-adapter";
+import {
+  adminNextFixtureR4Adapter,
+  createAdminNextRoofFusionR4Adapter,
+  loadAdminNextR4WithMissingCanonicalFallback,
+  parseAdminNextR4CaseIdentityV1,
+} from "@/lib/admin-next/r4-read-adapter";
 import { resolveAdminNextServerRead } from "@/lib/admin-next/server-read-resolver";
 import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
+import { getPayload } from "@/lib/payload";
+import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
+import {
+  AdminRoofFusionPreviewReadAdapterV1,
+  PayloadRoofFusionCaseAuthorizationV1,
+} from "@/lib/roof-fusion/preview-read-adapters-v1";
 
 type Params = Promise<{ caseId: string; measurementId: string }>;
 
@@ -20,22 +32,51 @@ export default async function AdminNextR4MeasurementPage({
   if (access.kind === "legacy_fallback") redirect(access.href);
 
   const { caseId, measurementId } = await params;
+  const payload = await getPayload();
+  const canonical = createAdminNextRoofFusionR4Adapter(
+    new AdminRoofFusionPreviewReadAdapterV1(
+      new PayloadRoofSnapshotRepositoryV1(payload),
+      new PayloadRoofFusionCaseAuthorizationV1(payload),
+    ),
+    user as PayloadRequest["user"],
+  );
   const selection = resolveAdminNextServerRead({
     moduleId: "roofWorkbench",
     rollout,
     role: user.role,
-    canonical: undefined,
+    canonical,
     fixture: adminNextFixtureR4Adapter,
   });
   if (selection.kind === "legacy_fallback") redirect(selection.href);
-  const result = await selection.adapter.load(caseId, measurementId);
+  const result =
+    selection.kind === "canonical_read"
+      ? await loadAdminNextR4WithMissingCanonicalFallback({
+          canonical: selection.adapter,
+          fixture: adminNextFixtureR4Adapter,
+          caseReference: caseId,
+          measurementReference: measurementId,
+        })
+      : await selection.adapter.load(caseId, measurementId);
 
   if (result.status === "not_found") notFound();
+
+  let customer = adminNextCaseWorkspaceFixture.customer;
+  if (result.source === "canonical") {
+    const identity = parseAdminNextR4CaseIdentityV1(caseId);
+    if (!identity) notFound();
+    const lead = await payload.findByID({
+      collection: "leads",
+      id: identity.leadId,
+      depth: 0,
+      overrideAccess: true,
+    });
+    customer = lead.name;
+  }
 
   return (
     <AdminNextR4MeasurementReview
       caseReference={caseId}
-      customer={adminNextCaseWorkspaceFixture.customer}
+      customer={customer}
       locale={user.interfaceLanguage}
       measurement={result.value}
     />

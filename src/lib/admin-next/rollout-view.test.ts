@@ -59,7 +59,7 @@ describe("Admin Next rollout view", () => {
     expect(view.counts.planned).toBe(0);
   });
 
-  it("distinguishes implemented-but-disabled from missing configuration", () => {
+  it("keeps the R4 canonical reader independent from the legacy evidence flag", () => {
     const disabled = buildAdminNextRolloutView({
       ADMIN_NEXT_MODE: "preview",
       VERCEL_ENV: "preview",
@@ -68,7 +68,7 @@ describe("Admin Next rollout view", () => {
       "implemented_disabled",
     );
 
-    const blocked = buildAdminNextRolloutView({
+    const legacyOnly = buildAdminNextRolloutView({
       ADMIN_NEXT_MODE: "preview",
       VERCEL_ENV: "preview",
       FEATURE_CASE_STATE_ENGINE_V2: "true",
@@ -76,12 +76,17 @@ describe("Admin Next rollout view", () => {
       FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
     });
     expect(
-      blocked.modules.find(({ id }) => id === "roofWorkbench")?.state,
-    ).toBe("blocked_configuration");
+      legacyOnly.modules.find(({ id }) => id === "roofWorkbench")?.state,
+    ).toBe("implemented_disabled");
+
+    const roofFusion = buildAdminNextRolloutView({
+      ADMIN_NEXT_MODE: "preview",
+      VERCEL_ENV: "preview",
+      FEATURE_ROOF_FUSION_V1: "true",
+    });
     expect(
-      blocked.modules.find(({ id }) => id === "roofWorkbench")
-        ?.unavailableIntegrations,
-    ).toEqual(["privateStorage"]);
+      roofFusion.modules.find(({ id }) => id === "roofWorkbench")?.state,
+    ).toBe("preview_ready");
   });
 
   it("exposes field visit only when the worker portal dependency is enabled", () => {

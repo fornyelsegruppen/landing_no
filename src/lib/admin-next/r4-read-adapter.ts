@@ -1,4 +1,6 @@
-import type { RoofSnapshotAppendOnlyRepositoryV1 } from "@/lib/roof-fusion/repository-contract-v1";
+import type { PayloadRequest } from "payload";
+import type { AdminRoofFusionPreviewReadAdapterV1 } from "@/lib/roof-fusion/preview-read-adapters-v1";
+import { roofFusionCaseIdForLeadV1 } from "@/lib/roof-fusion/preview-read-adapters-v1";
 import {
   parseRoofSnapshotV1,
   type RoofMeasurementValueV1,
@@ -12,7 +14,14 @@ export type AdminNextR4MeasurementView = NonNullable<
 >;
 export type AdminNextR4LoadResult =
   | { status: "ready"; source: "fixture" | "canonical"; value: AdminNextR4MeasurementView }
-  | { status: "not_found" };
+  | {
+      status: "not_found";
+      reason:
+        | "canonical_snapshot_missing"
+        | "case_identity_invalid"
+        | "fixture_missing"
+        | "measurement_mismatch";
+    };
 export interface AdminNextR4Adapter {
   load(caseReference: string, measurementReference: string): Promise<AdminNextR4LoadResult>;
 }
@@ -24,7 +33,7 @@ export const adminNextFixtureR4Adapter: AdminNextR4Adapter = {
       caseReference !== adminNextCaseWorkspaceFixture.reference ||
       !measurement ||
       measurement.reference !== measurementReference
-    ) return { status: "not_found" };
+    ) return { status: "not_found", reason: "fixture_missing" };
     return { status: "ready", source: "fixture", value: measurement };
   },
 };
@@ -107,17 +116,53 @@ export function projectRoofSnapshotToR4(
   };
 }
 
-export function createAdminNextCanonicalR4Adapter(
-  repository: Pick<RoofSnapshotAppendOnlyRepositoryV1, "readLatestSnapshot" | "readSnapshot">,
+export type AdminNextR4CaseIdentityV1 = {
+  caseReference: string;
+  leadId: number;
+  roofFusionCaseId: string;
+};
+
+export function parseAdminNextR4CaseIdentityV1(
+  caseReference: string,
+): AdminNextR4CaseIdentityV1 | null {
+  const match = /^TF-([1-9]\d*)$/u.exec(caseReference);
+  if (!match) return null;
+  const leadId = Number(match[1]);
+  if (!Number.isSafeInteger(leadId)) return null;
+  return {
+    caseReference,
+    leadId,
+    roofFusionCaseId: roofFusionCaseIdForLeadV1(leadId),
+  };
+}
+
+export function createAdminNextRoofFusionR4Adapter(
+  reader: Pick<
+    AdminRoofFusionPreviewReadAdapterV1,
+    "readLatestSnapshot" | "readSnapshot"
+  >,
+  user: PayloadRequest["user"],
 ): AdminNextR4Adapter {
   return {
     async load(caseReference, measurementReference) {
-      const latestRaw = await repository.readLatestSnapshot(caseReference);
-      if (!latestRaw) return { status: "not_found" };
+      const identity = parseAdminNextR4CaseIdentityV1(caseReference);
+      if (!identity)
+        return { status: "not_found", reason: "case_identity_invalid" };
+      const latestRaw = await reader.readLatestSnapshot(
+        identity.roofFusionCaseId,
+        user,
+      );
+      if (!latestRaw)
+        return { status: "not_found", reason: "canonical_snapshot_missing" };
       const latest = parseRoofSnapshotV1(latestRaw);
-      if (latest.snapshotId !== measurementReference) return { status: "not_found" };
+      if (latest.snapshotId !== measurementReference)
+        return { status: "not_found", reason: "measurement_mismatch" };
       const previous = latest.supersedesSnapshotId
-        ? await repository.readSnapshot(latest.supersedesSnapshotId)
+        ? await reader.readSnapshot(
+            identity.roofFusionCaseId,
+            latest.supersedesSnapshotId,
+            user,
+          )
         : null;
       return {
         status: "ready",
@@ -126,4 +171,23 @@ export function createAdminNextCanonicalR4Adapter(
       };
     },
   };
+}
+
+export async function loadAdminNextR4WithMissingCanonicalFallback(input: {
+  canonical: AdminNextR4Adapter;
+  fixture: AdminNextR4Adapter;
+  caseReference: string;
+  measurementReference: string;
+}) {
+  const canonical = await input.canonical.load(
+    input.caseReference,
+    input.measurementReference,
+  );
+  if (
+    canonical.status !== "not_found" ||
+    canonical.reason !== "canonical_snapshot_missing"
+  ) {
+    return canonical;
+  }
+  return input.fixture.load(input.caseReference, input.measurementReference);
 }

@@ -46,9 +46,8 @@ describe("Admin Next server read resolver", () => {
       VERCEL_ENV: "preview",
       FEATURE_CASE_STATE_ENGINE_V2: "true",
       FEATURE_ADMIN_EXCEPTION_FLOWS_V2: "true",
-      FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
+      FEATURE_ROOF_FUSION_V1: "true",
       FEATURE_WORKER_PORTAL: "true",
-      BLOB_READ_WRITE_TOKEN: "configured",
     };
     expect(select("today", environment).kind).toBe("canonical_read");
     expect(select("caseWorkspace", environment).kind).toBe("canonical_read");
@@ -60,8 +59,7 @@ describe("Admin Next server read resolver", () => {
     const environment = {
       ADMIN_NEXT_MODE: "preview",
       VERCEL_ENV: "preview",
-      FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
-      BLOB_READ_WRITE_TOKEN: "configured",
+      FEATURE_ROOF_FUSION_V1: "true",
     };
     const result = resolveAdminNextServerRead({
       moduleId: "roofWorkbench",

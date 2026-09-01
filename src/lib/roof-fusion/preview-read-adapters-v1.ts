@@ -40,6 +40,9 @@ export function assertRoofFusionPreviewReadEnabledV1(
   }
 }
 
+export const assertRoofFusionPreviewEnabledV1 =
+  assertRoofFusionPreviewReadEnabledV1;
+
 export function roofFusionCaseIdForLeadV1(leadId: string | number) {
   const normalized = String(leadId);
   if (!/^[1-9]\d*$/u.test(normalized)) {
