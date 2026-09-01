@@ -9,9 +9,11 @@ type Rule = { serviceKey: string; serviceName: string; unitPriceExVatOre: number
 
 export function CommercialQuoteEditor(props: {
   currentService?: string;
+  expectedRevision: number;
   leadId: number;
   locale: PanelLocale;
   rules: Rule[];
+  sourceQuoteId: number;
   unitPriceExVatOre?: number;
 }) {
   const copy = getAdminCaseCopy(props.locale);
@@ -74,7 +76,9 @@ export function CommercialQuoteEditor(props: {
           discountKind,
           discountValue: Number(discountValue.replace(",", ".")),
           depositPercent: Number(depositPercent.replace(",", ".")),
+          expectedRevision: props.expectedRevision,
           reason,
+          sourceQuoteId: props.sourceQuoteId,
           ...(recommendedService ? { recommendedServiceKey: recommendedService } : {}),
         }),
       });
