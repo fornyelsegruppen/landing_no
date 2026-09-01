@@ -7,6 +7,9 @@ The reviewed UI and Roof Fusion milestone set is **IMPLEMENTED** and
 `NOT_PASS`; this package does not authorize deployment, Production activation,
 database mutation, customer communication, or the Case 13 P1 hotfix.
 
+PR #2 is open. Merge remains withheld until the exact post-portability-fix SHA
+passes the protected Linux CI gate.
+
 ## Exact integration boundary
 
 - Target branch: `codex/full-production-integration`
@@ -38,6 +41,20 @@ All twelve milestones replayed without conflict. The approved graphite/navy +
 amber Dark Design Lock, R4 measurement drawer and four-state worker visit flow
 remain unchanged.
 
+## Cross-platform CI incident and remediation
+
+The first Linux CI attempt exposed ICU/OS-dependent `localeCompare` ordering in
+canonical RF hash paths. Windows evidence was green, but Ubuntu produced six
+golden/hash failures across four RF test files. The PR remained unmerged.
+
+- RF source fix: `7909657c8bf114857e9287a2e1f16e62e8bc3298`;
+- integrated fix: `2fbcf0b`;
+- shared canonicalization now uses locale-independent UTF-16 code-unit ordering,
+  Unicode NFC, LF line endings and recursive `undefined` pruning;
+- regression coverage locks LF/CRLF, Unicode, locale independence and optional
+  field boundaries to one canonical golden set;
+- no OS-specific golden alternatives were accepted.
+
 ## Contract result
 
 The I1 technical boundary is accepted:
@@ -62,6 +79,14 @@ The I1 technical boundary is accepted:
 - generated Payload type parity: PASS;
 - diff check: PASS;
 - worktree: clean before this report.
+
+Post-portability-fix evidence:
+
+- RF source worktree: 233/233 files, 1059/1059 tests PASS;
+- integration worktree focused RF: 8/8 files, 51/51 tests PASS;
+- integration worktree TypeScript: PASS;
+- integration worktree targeted ESLint: PASS;
+- exact post-fix Linux CI: pending at the time of this update.
 
 The protected target branch must run the full PostgreSQL build, authenticated
 Playwright and backup/restore quality gate on the final PR SHA before merge.
