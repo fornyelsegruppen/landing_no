@@ -3,6 +3,8 @@ import {
   adminNextCanonicalCapabilityIds,
   adminNextCanonicalCapabilityRegistry,
   adminNextModuleDefinitions,
+  adminNextRoofFusionActionCapabilityIds,
+  adminNextRoofFusionI1TargetContract,
 } from "@/lib/admin-next/capability-registry";
 
 describe("Admin Next capability registry", () => {
@@ -36,5 +38,25 @@ describe("Admin Next capability registry", () => {
     expect(
       adminNextModuleDefinitions.some(({ stage }) => stage === "release_ready"),
     ).toBe(false);
+  });
+
+  it("records the accepted I1 target without claiming a canonical adapter", () => {
+    expect(adminNextCanonicalCapabilityRegistry.Roof).toMatchObject({
+      canonicalSource: "roof-measurements",
+      maturity: "legacy_bridge",
+      targetCanonicalSource: "append-only roof-snapshot.v1 repository",
+    });
+    expect(adminNextRoofFusionActionCapabilityIds).toHaveLength(7);
+    expect(new Set(adminNextRoofFusionActionCapabilityIds).size).toBe(7);
+    expect(adminNextRoofFusionI1TargetContract).toMatchObject({
+      status: "contract_accepted_adapter_blocked",
+      featureGate: "roofFusionV1",
+      previewMutationPolicy: "forbidden",
+      downstreamReadPolicy: "approved_renderer_envelope_only",
+    });
+    expect(
+      adminNextModuleDefinitions.find(({ id }) => id === "roofWorkbench")
+        ?.stage,
+    ).toBe("adapter_ready");
   });
 });

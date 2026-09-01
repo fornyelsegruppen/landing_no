@@ -14,7 +14,10 @@ export type AdminNextCanonicalCapabilityId =
 export type AdminNextCanonicalCapabilityContract = {
   id: AdminNextCanonicalCapabilityId;
   canonicalSource: "leads" | "roof-measurements" | "work-orders";
+  maturity: "canonical" | "legacy_bridge";
   readContract: string;
+  targetCanonicalSource?: string;
+  targetReadContracts?: readonly string[];
   mutationOwner: string;
   previewMutationPolicy: "forbidden";
 };
@@ -25,6 +28,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
   Case: {
     id: "Case",
     canonicalSource: "leads",
+    maturity: "canonical",
     readContract: "src/lib/admin-v2/case-read-model.ts",
     mutationOwner: "Admin V2 lead APIs and case commands",
     previewMutationPolicy: "forbidden",
@@ -32,6 +36,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
   Property: {
     id: "Property",
     canonicalSource: "leads",
+    maturity: "canonical",
     readContract: "lead address/property projection through the Case adapter",
     mutationOwner: "Admin V2 lead APIs",
     previewMutationPolicy: "forbidden",
@@ -39,6 +44,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
   Customer: {
     id: "Customer",
     canonicalSource: "leads",
+    maturity: "canonical",
     readContract: "lead customer projection through the Case adapter",
     mutationOwner: "Admin V2 lead and customer-contact APIs",
     previewMutationPolicy: "forbidden",
@@ -46,17 +52,49 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
   Roof: {
     id: "Roof",
     canonicalSource: "roof-measurements",
+    maturity: "legacy_bridge",
     readContract: "AdminNextCaseWorkspaceAdapter.measurementReview",
+    targetCanonicalSource: "append-only roof-snapshot.v1 repository",
+    targetReadContracts: [
+      "roof-snapshot.v1 (authorized internal read)",
+      "approved-roof-renderer-envelope.v1 (downstream read)",
+    ],
     mutationOwner: "canonical measurement APIs and approval workflow",
     previewMutationPolicy: "forbidden",
   },
   Visit: {
     id: "Visit",
     canonicalSource: "work-orders",
+    maturity: "canonical",
     readContract: "AdminNextFieldVisitAdapter",
     mutationOwner: "worker work-order APIs and workflow",
     previewMutationPolicy: "forbidden",
   },
+} as const;
+
+export const adminNextRoofFusionActionCapabilityIds = [
+  "roof_fusion.snapshot.read",
+  "roof_fusion.evidence.read",
+  "roof_fusion.calculate",
+  "roof_fusion.review",
+  "roof_fusion.correct",
+  "roof_fusion.approve",
+  "roof_fusion.renderer.read_approved",
+] as const;
+
+export type AdminNextRoofFusionActionCapabilityId =
+  (typeof adminNextRoofFusionActionCapabilityIds)[number];
+
+export const adminNextRoofFusionI1TargetContract = {
+  status: "contract_accepted_adapter_blocked",
+  snapshotSchemaVersion: "roof-snapshot.v1",
+  rendererSchemaVersion: "roof-renderer.v1",
+  approvedRendererEnvelopeVersion: "approved-roof-renderer-envelope.v1",
+  featureGate: "roofFusionV1",
+  actionCapabilities: adminNextRoofFusionActionCapabilityIds,
+  previewMutationPolicy: "forbidden",
+  downstreamReadPolicy: "approved_renderer_envelope_only",
+  mutationOwner: "future authorized Roof Fusion command API",
 } as const;
 
 export type AdminNextModuleId =
