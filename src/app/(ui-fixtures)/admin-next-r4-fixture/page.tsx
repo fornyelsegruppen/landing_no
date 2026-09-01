@@ -20,6 +20,7 @@ export default function AdminNextR4VisualFixture() {
         customer={adminNextCaseWorkspaceFixture.customer}
         locale="lt"
         measurement={measurement}
+        source="fixture"
       />
     </AdminNextShell>
   );

@@ -85,6 +85,23 @@ export type AdminNextCaseWorkspaceView = {
       reason: string;
       varianceMeters: number;
     }[];
+    diagram?: {
+      vertices: readonly {
+        id: string;
+        xMeters: number;
+        yMeters: number;
+      }[];
+      surfaces: readonly {
+        id: string;
+        vertexIds: readonly string[];
+      }[];
+      edges: readonly {
+        id: string;
+        fromVertexId: string;
+        toVertexId: string;
+        state: "verified" | "review";
+      }[];
+    };
     primarySlopes: readonly {
       id: "S1" | "S2" | "S3" | "S4";
       areaSquareMeters: number;
