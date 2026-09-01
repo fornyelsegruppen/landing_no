@@ -376,6 +376,13 @@ describe("Roof geometry calculation v1", () => {
       },
       "OPENING_OVERLAP",
     ],
+    [
+      "calculator-side verified-class promotion",
+      (input: RoofGeometryInputV1) => {
+        input.measurement.class = "verified_geometry";
+      },
+      "MEASUREMENT_CLASS_NOT_CALCULABLE",
+    ],
   ] as const)("fails closed for %s", (_name, mutate, code) => {
     const input = inputFixture();
     mutate(input);

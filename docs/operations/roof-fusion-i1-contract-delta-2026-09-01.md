@@ -108,7 +108,7 @@ Rules:
 - confidence belongs to the value; UI must not replace it with one case-wide badge;
 - AI text cannot promote `unknown` or a range to an exact value.
 
-Measurement classes are `preliminary`, `fused_estimate`, `verified_geometry`, and `instrument_site_verified`. I1 does not define automatic promotion; that remains DEC-RF-001.
+Measurement classes are `preliminary`, `fused_estimate`, `verified_geometry`, and `instrument_site_verified`. The later I1 technical closure resolves DEC-RF-001 ownership: system calculation is limited to the first two classes, while hash/revision-bound administrator review owns verified promotion and instrument promotion additionally requires accepted authorized instrument evidence.
 
 ## Geometry and total semantics
 
@@ -215,15 +215,15 @@ An approved/rejected/superseded snapshot is immutable. A correction creates revi
 
 No central capability or feature registry was changed. RF proposes the following action-level capabilities for the canonical UI foundation:
 
-| Proposed capability ID               | Scope                                        | Intended actors                                |
-| ------------------------------------ | -------------------------------------------- | ---------------------------------------------- |
-| `roof_fusion.snapshot.read`          | full internal snapshot/read model            | administrator; scoped worker where authorized  |
-| `roof_fusion.evidence.read`          | internal provenance and licence details      | administrator only                             |
-| `roof_fusion.calculate`              | create deterministic draft/review snapshot   | system/service only                            |
-| `roof_fusion.review`                 | view quality gates and submit review outcome | administrator only                             |
-| `roof_fusion.correct`                | create a corrected snapshot revision         | administrator only                             |
-| `roof_fusion.approve`                | approve exact expected snapshot hash         | administrator only                             |
-| `roof_fusion.renderer.read_approved` | approved renderer envelope                   | case-scoped administrator, worker, or customer |
+| Proposed capability ID               | Scope                                        | Intended actors                               |
+| ------------------------------------ | -------------------------------------------- | --------------------------------------------- |
+| `roof_fusion.snapshot.read`          | full internal snapshot/read model            | administrator only; workers explicitly denied |
+| `roof_fusion.evidence.read`          | internal provenance and licence details      | administrator only                            |
+| `roof_fusion.calculate`              | create deterministic draft/review snapshot   | system/service only                           |
+| `roof_fusion.review`                 | view quality gates and submit review outcome | administrator only                            |
+| `roof_fusion.correct`                | create a corrected snapshot revision         | administrator only                            |
+| `roof_fusion.approve`                | approve exact expected snapshot hash         | administrator only                            |
+| `roof_fusion.renderer.read_approved` | approved renderer envelope                   | administrator, assigned worker, customer, PDF |
 
 Recommended rollout isolation is one future `roofFusionV1` feature gate plus the action-level capabilities above. The existing `roofMeasurement` and `measurementEvidenceV2` flags must not silently enable RF approval/customer publication. Adding or mapping this flag belongs to the UI/integration stream because it owns the shared registry.
 
@@ -261,6 +261,7 @@ RF may continue only isolated RF-2 negative/golden fixtures while this Gate repo
 - RF-0/RF-1 contract milestone: `e753423`
 - RF-1 hardening milestone: `8e90e29`
 - RF-2 geometry milestone: `eee8223`
-- RF tests at RF-2: 35/35 passed
-- full unit regression: 1,043/1,043 tests across 230 files passed
+- RF tests at RF-2 baseline: 35/35 passed
+- RF tests after I1 technical closure: 47/47 passed
+- full unit regression after I1 closure: 1,055/1,055 tests across 232 files passed
 - TypeScript, RF ESLint, and diff-check: passed

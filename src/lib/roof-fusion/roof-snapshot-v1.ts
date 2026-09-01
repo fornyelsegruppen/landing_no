@@ -327,6 +327,7 @@ const auditEventSchema = z
       "source_ingested",
       "source_normalized",
       "quality_evaluated",
+      "review_completed",
       "manual_correction_applied",
       "submitted_for_review",
       "approved",
@@ -1338,7 +1339,7 @@ export function serializeRoofSnapshotV1(value: RoofSnapshotV1) {
   return canonicalJson(parseRoofSnapshotV1(value));
 }
 
-const approvalCommandSchema = z
+export const roofSnapshotApprovalCommandV1Schema = z
   .object({
     schemaVersion: z.literal("roof-snapshot-approval-command.v1"),
     expectedSnapshotHash: sha256,
@@ -1349,7 +1350,7 @@ const approvalCommandSchema = z
   })
   .strict();
 export type RoofSnapshotApprovalCommandV1 = z.infer<
-  typeof approvalCommandSchema
+  typeof roofSnapshotApprovalCommandV1Schema
 >;
 
 export function approveRoofSnapshotV1(
@@ -1357,7 +1358,7 @@ export function approveRoofSnapshotV1(
   commandInput: RoofSnapshotApprovalCommandV1,
 ) {
   const snapshot = parseRoofSnapshotV1(snapshotInput);
-  const command = approvalCommandSchema.parse(commandInput);
+  const command = roofSnapshotApprovalCommandV1Schema.parse(commandInput);
   const repeated = snapshot.auditTrail.some(
     (event) =>
       event.eventType === "approved" &&
@@ -1396,55 +1397,58 @@ export function approveRoofSnapshotV1(
   return finalizeRoofSnapshot(seed);
 }
 
-const correctionCommandSchema = z.discriminatedUnion("correctionType", [
-  z
-    .object({
-      schemaVersion: z.literal("roof-snapshot-correction-command.v1"),
-      correctionType: z.literal("edge_type"),
-      edgeId: identifier,
-      value: edgeType,
-      newSnapshotId: identifier,
-      expectedSnapshotHash: sha256,
-      idempotencyKey: z.string().trim().min(8).max(300),
-      actor: actorSchema,
-      correctedAt: timestamp,
-      reason: z.string().trim().min(5).max(1_000),
-      sourceRefs: z.array(identifier).min(1).max(100),
-    })
-    .strict(),
-  z
-    .object({
-      schemaVersion: z.literal("roof-snapshot-correction-command.v1"),
-      correctionType: z.literal("edge_gutter_candidate"),
-      edgeId: identifier,
-      value: z.boolean(),
-      newSnapshotId: identifier,
-      expectedSnapshotHash: sha256,
-      idempotencyKey: z.string().trim().min(8).max(300),
-      actor: actorSchema,
-      correctedAt: timestamp,
-      reason: z.string().trim().min(5).max(1_000),
-      sourceRefs: z.array(identifier).min(1).max(100),
-    })
-    .strict(),
-  z
-    .object({
-      schemaVersion: z.literal("roof-snapshot-correction-command.v1"),
-      correctionType: z.literal("surface_pitch"),
-      surfaceId: identifier,
-      value: measurementValueSchema,
-      newSnapshotId: identifier,
-      expectedSnapshotHash: sha256,
-      idempotencyKey: z.string().trim().min(8).max(300),
-      actor: actorSchema,
-      correctedAt: timestamp,
-      reason: z.string().trim().min(5).max(1_000),
-      sourceRefs: z.array(identifier).min(1).max(100),
-    })
-    .strict(),
-]);
+export const roofSnapshotCorrectionCommandV1Schema = z.discriminatedUnion(
+  "correctionType",
+  [
+    z
+      .object({
+        schemaVersion: z.literal("roof-snapshot-correction-command.v1"),
+        correctionType: z.literal("edge_type"),
+        edgeId: identifier,
+        value: edgeType,
+        newSnapshotId: identifier,
+        expectedSnapshotHash: sha256,
+        idempotencyKey: z.string().trim().min(8).max(300),
+        actor: actorSchema,
+        correctedAt: timestamp,
+        reason: z.string().trim().min(5).max(1_000),
+        sourceRefs: z.array(identifier).min(1).max(100),
+      })
+      .strict(),
+    z
+      .object({
+        schemaVersion: z.literal("roof-snapshot-correction-command.v1"),
+        correctionType: z.literal("edge_gutter_candidate"),
+        edgeId: identifier,
+        value: z.boolean(),
+        newSnapshotId: identifier,
+        expectedSnapshotHash: sha256,
+        idempotencyKey: z.string().trim().min(8).max(300),
+        actor: actorSchema,
+        correctedAt: timestamp,
+        reason: z.string().trim().min(5).max(1_000),
+        sourceRefs: z.array(identifier).min(1).max(100),
+      })
+      .strict(),
+    z
+      .object({
+        schemaVersion: z.literal("roof-snapshot-correction-command.v1"),
+        correctionType: z.literal("surface_pitch"),
+        surfaceId: identifier,
+        value: measurementValueSchema,
+        newSnapshotId: identifier,
+        expectedSnapshotHash: sha256,
+        idempotencyKey: z.string().trim().min(8).max(300),
+        actor: actorSchema,
+        correctedAt: timestamp,
+        reason: z.string().trim().min(5).max(1_000),
+        sourceRefs: z.array(identifier).min(1).max(100),
+      })
+      .strict(),
+  ],
+);
 export type RoofSnapshotCorrectionCommandV1 = z.infer<
-  typeof correctionCommandSchema
+  typeof roofSnapshotCorrectionCommandV1Schema
 >;
 
 function surfaceAreaForPitch(
@@ -1482,7 +1486,7 @@ export function applyRoofSnapshotCorrectionV1(
   commandInput: RoofSnapshotCorrectionCommandV1,
 ) {
   const snapshot = parseRoofSnapshotV1(snapshotInput);
-  const command = correctionCommandSchema.parse(commandInput);
+  const command = roofSnapshotCorrectionCommandV1Schema.parse(commandInput);
   const repeated = snapshot.manualCorrections.some(
     (correction) => correction.idempotencyKey === command.idempotencyKey,
   );

@@ -592,6 +592,12 @@ export function calculateRoofGeometryV1(
   inputValue: RoofGeometryInputV1,
 ): RoofGeometryCalculationV1 {
   const input = roofGeometryInputV1Schema.parse(inputValue);
+  if (!["preliminary", "fused_estimate"].includes(input.measurement.class)) {
+    throw new RoofGeometryCalculationError(
+      "MEASUREMENT_CLASS_NOT_CALCULABLE",
+      "Deterministic calculation cannot promote a measurement into a verified class",
+    );
+  }
   assertUniqueInputIds(input);
   const sourceIds = new Set(
     input.provenance.sources.map((source) => source.sourceId),

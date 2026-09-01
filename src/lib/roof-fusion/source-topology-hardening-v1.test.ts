@@ -250,4 +250,47 @@ describe("Roof topology and provenance hardening", () => {
     expect(limited.quality.status).toBe("review_required");
     expect(limited.state).toBe("review_required");
   });
+
+  it("keeps restricted licences and unresolved evidence conflicts explicit", () => {
+    const restricted = snapshotWith((normalized) => {
+      const source = normalized.provenance.sources.find(
+        (item) => item.sourceId === "src-provider",
+      )!;
+      source.license.status = "restricted";
+      source.license.name = "Fixture licence requiring human review";
+    });
+    expect(restricted.quality.status).toBe("review_required");
+    expect(
+      restricted.quality.checks.find(
+        (check) => check.code === "SOURCE_LICENSE",
+      ),
+    ).toMatchObject({
+      status: "review_required",
+      entityRefs: ["src-provider"],
+    });
+
+    const conflicted = snapshotWith((normalized) => {
+      const observation = normalized.provenance.observations.find(
+        (item) => item.observationId === "obs-north-pitch",
+      )!;
+      observation.status = "conflicted";
+      observation.reasons = ["Synthetic unresolved pitch conflict"];
+      normalized.provenance.fusionDecision.acceptedObservationIds =
+        normalized.provenance.fusionDecision.acceptedObservationIds.filter(
+          (observationId) => observationId !== observation.observationId,
+        );
+      normalized.provenance.fusionDecision.conflictedObservationIds.push(
+        observation.observationId,
+      );
+    });
+    expect(conflicted.quality.status).toBe("review_required");
+    expect(
+      conflicted.quality.checks.find(
+        (check) => check.code === "EVIDENCE_CONFLICTS",
+      ),
+    ).toMatchObject({
+      status: "review_required",
+      entityRefs: ["obs-north-pitch"],
+    });
+  });
 });
