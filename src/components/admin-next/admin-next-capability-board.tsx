@@ -17,6 +17,7 @@ const copy = {
     preview: "Beskyttet forhåndsvisning",
     active: "Godkjent for full drift",
     fallback: "Bruk dagens funksjon",
+    roofUat: "Åpne RF UAT",
     details: "Tekniske avhengigheter",
     dependencies: "Funksjonsavhengigheter",
     integrations: "Mangler konfigurasjon",
@@ -46,6 +47,7 @@ const copy = {
     preview: "Apsaugota peržiūra",
     active: "Patvirtinta pilnam veikimui",
     fallback: "Naudoti dabartinę funkciją",
+    roofUat: "Atidaryti RF UAT",
     details: "Techninės priklausomybės",
     dependencies: "Funkcijų priklausomybės",
     integrations: "Trūksta konfigūracijos",
@@ -75,6 +77,7 @@ const copy = {
     preview: "Protected preview",
     active: "Approved for full operation",
     fallback: "Use current function",
+    roofUat: "Open RF UAT",
     details: "Technical dependencies",
     dependencies: "Feature dependencies",
     integrations: "Missing configuration",
@@ -128,19 +131,19 @@ export function AdminNextPreviewNotice({
 
   return (
     <Link
-      className="mx-auto mb-5 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-accent/35 bg-accent/8 px-4 py-3 text-sm transition hover:border-accent/65 hover:bg-accent/12"
+      className="border-accent/35 bg-accent/8 hover:border-accent/65 hover:bg-accent/12 mx-auto mb-5 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-sm transition"
       href="/admin-next-preview/today"
     >
       <span className="flex min-w-0 items-center gap-3">
-        <Layers3 aria-hidden="true" className="size-5 shrink-0 text-accent" />
+        <Layers3 aria-hidden="true" className="text-accent size-5 shrink-0" />
         <span className="min-w-0">
           <strong className="block">{t.eyebrow}</strong>
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className="text-muted-foreground block truncate text-xs">
             {rolloutLabel(locale, rollout.state)}
           </span>
         </span>
       </span>
-      <ArrowRight aria-hidden="true" className="size-5 shrink-0 text-accent" />
+      <ArrowRight aria-hidden="true" className="text-accent size-5 shrink-0" />
     </Link>
   );
 }
@@ -157,29 +160,35 @@ export function AdminNextCapabilityBoard({
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="max-w-3xl">
-        <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">
+        <p className="text-accent text-xs font-bold tracking-[.2em] uppercase">
           {t.eyebrow}
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
           {t.title}
         </h1>
-        <p className="mt-3 text-muted-foreground">{t.intro}</p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-accent/35 bg-accent/8 px-3 py-1.5 text-xs font-bold text-accent">
+        <p className="text-muted-foreground mt-3">{t.intro}</p>
+        <div className="border-accent/35 bg-accent/8 text-accent mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold">
           <ShieldCheck aria-hidden="true" className="size-4" />
           {rolloutLabel(locale, rollout.state)}
         </div>
       </header>
 
-      <section aria-label={t.eyebrow} className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      <section
+        aria-label={t.eyebrow}
+        className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3"
+      >
         {rollout.modules.map((module) => (
           <article
-            className="flex min-h-64 flex-col rounded-3xl border border-white/10 bg-background-elevated/75 p-5"
+            className="bg-background-elevated/75 flex min-h-64 flex-col rounded-3xl border border-white/10 p-5"
             data-capability-state={module.state}
             key={module.id}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CircleDashed aria-hidden="true" className="size-5 text-accent" />
+                <CircleDashed
+                  aria-hidden="true"
+                  className="text-accent size-5"
+                />
                 <h2 className="mt-3 text-lg font-bold">
                   {t.modules[module.id as AdminNextModuleId]}
                 </h2>
@@ -191,19 +200,23 @@ export function AdminNextCapabilityBoard({
               </span>
             </div>
 
-            <details className="mt-5 text-xs text-muted-foreground">
+            <details className="text-muted-foreground mt-5 text-xs">
               <summary className="cursor-pointer font-semibold hover:text-white">
                 {t.details}
               </summary>
               <dl className="mt-3 grid gap-2">
                 <div>
-                  <dt className="font-semibold text-white/70">{t.dependencies}</dt>
+                  <dt className="font-semibold text-white/70">
+                    {t.dependencies}
+                  </dt>
                   <dd className="mt-1 break-words">
                     {module.dependencies.join(" · ") || t.none}
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-semibold text-white/70">{t.integrations}</dt>
+                  <dt className="font-semibold text-white/70">
+                    {t.integrations}
+                  </dt>
                   <dd className="mt-1 break-words">
                     {module.unavailableIntegrations.join(" · ") || t.none}
                   </dd>
@@ -211,13 +224,26 @@ export function AdminNextCapabilityBoard({
               </dl>
             </details>
 
-            <Link
-              className="mt-auto flex min-h-11 items-center justify-between gap-3 rounded-xl border border-white/15 px-3 py-2.5 text-sm font-semibold transition hover:border-accent/50 hover:bg-white/5"
-              href={module.legacyHref}
-            >
-              {t.fallback}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
+            <div className="mt-auto grid gap-2">
+              {module.id === "roofWorkbench" &&
+              module.state === "preview_ready" ? (
+                <Link
+                  className="border-accent/40 bg-accent/8 text-accent hover:border-accent/70 hover:bg-accent/12 flex min-h-11 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition"
+                  data-roof-fusion-uat-link="true"
+                  href="/admin-next-preview/roof-fusion/uat"
+                >
+                  {t.roofUat}
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              ) : null}
+              <Link
+                className="hover:border-accent/50 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-white/15 px-3 py-2.5 text-sm font-semibold transition hover:bg-white/5"
+                href={module.legacyHref}
+              >
+                {t.fallback}
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            </div>
           </article>
         ))}
       </section>
