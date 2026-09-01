@@ -49,6 +49,7 @@ const copy = {
     evidence: "Dokumentasjon og bevis",
     evidenceIntro: "Alt som støtter neste beslutning, samlet på ett sted.",
     openEvidence: "Åpne i dagens løsning",
+    reviewMeasurement: "Kontroller R4",
     timeline: "Tidslinje",
     timelineIntro: "Siste hendelser med kilde og tidspunkt.",
     fallbackTitle: "Fungerende Admin V2 er fortsatt tilgjengelig",
@@ -79,6 +80,7 @@ const copy = {
     evidence: "Dokumentai ir įrodymai",
     evidenceIntro: "Viskas, ko reikia kitam sprendimui, vienoje vietoje.",
     openEvidence: "Atidaryti dabartinėje sistemoje",
+    reviewMeasurement: "Peržiūrėti R4",
     timeline: "Įvykių seka",
     timelineIntro: "Naujausi įvykiai su šaltiniu ir laiku.",
     fallbackTitle: "Veikiantis Admin V2 lieka pasiekiamas",
@@ -109,6 +111,7 @@ const copy = {
     evidence: "Evidence and documents",
     evidenceIntro: "Everything needed for the next decision in one place.",
     openEvidence: "Open in current system",
+    reviewMeasurement: "Review R4",
     timeline: "Timeline",
     timelineIntro: "Latest events with source and time.",
     fallbackTitle: "Working Admin V2 remains available",
@@ -254,6 +257,9 @@ export function AdminNextCaseWorkspace({
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {value.evidence.map((item) => {
               const Icon = evidenceIcons[item.kind];
+              const actionLabel = item.previewHref
+                ? t.reviewMeasurement
+                : t.openEvidence;
               return (
                 <article className="flex min-h-56 flex-col rounded-2xl border border-[#dfe4e8] bg-[#fbfcfc] p-4" key={item.id}>
                   <div className="flex items-start justify-between gap-3">
@@ -265,8 +271,8 @@ export function AdminNextCaseWorkspace({
                   {item.metric ? <strong className="mt-3 block text-sm text-[#315675]">{item.metric}</strong> : null}
                   <div className="mt-auto flex items-end justify-between gap-3 pt-4">
                     <small className="text-[#85909b]">{item.recordedAt}</small>
-                    <Link aria-label={`${t.openEvidence}: ${item.title}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[#315675] hover:bg-[#eaf2f8]" href={item.fallbackHref}>
-                      {t.openEvidence}<ArrowRight aria-hidden="true" className="size-3.5" />
+                    <Link aria-label={`${actionLabel}: ${item.title}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[#315675] hover:bg-[#eaf2f8]" href={item.previewHref || item.fallbackHref}>
+                      {actionLabel}<ArrowRight aria-hidden="true" className="size-3.5" />
                     </Link>
                   </div>
                 </article>

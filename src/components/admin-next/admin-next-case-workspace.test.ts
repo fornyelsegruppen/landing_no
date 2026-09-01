@@ -30,7 +30,10 @@ describe("Admin Next Case Workspace preview", () => {
     );
 
     expect(html).not.toContain("<button");
-    expect(html.match(/href="\/admin-v2\//g)?.length).toBeGreaterThanOrEqual(7);
+    expect(html.match(/href="\/admin-v2\//g)?.length).toBeGreaterThanOrEqual(6);
+    expect(html).toContain(
+      'href="/admin-next-preview/cases/TF-1042/measurements/R4-2026-1042"',
+    );
     expect(html).toContain("Preview nekeičia klientų duomenų");
   });
 });
