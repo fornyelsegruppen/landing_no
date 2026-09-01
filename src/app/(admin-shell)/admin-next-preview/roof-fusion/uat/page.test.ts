@@ -35,6 +35,7 @@ describe("Admin Next Roof Fusion UAT page", () => {
       defaultCaseReference: "TF-13",
       locale: "lt",
     });
+    expect(element.props.action).toBeTypeOf("function");
   });
 
   it("does not exist in Production", async () => {

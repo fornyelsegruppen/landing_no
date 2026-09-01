@@ -75,7 +75,7 @@ describe("Admin Next capability registry", () => {
       "[measurementId]/page.tsx",
     );
     expect(adminNextRoofFusionI1TargetContract.previewUatHarness).toContain(
-      "preview-uat/route.ts#POST",
+      "roof-fusion/uat/page.tsx#prepareR4Uat",
     );
     expect(
       adminNextModuleDefinitions.find(({ id }) => id === "roofWorkbench")

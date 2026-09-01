@@ -103,7 +103,7 @@ export const adminNextRoofFusionI1TargetContract = {
   r4ReadRoute:
     "src/app/(admin-shell)/admin-next-preview/cases/[caseId]/measurements/[measurementId]/page.tsx",
   previewUatHarness:
-    "src/app/api/admin/roof-fusion/preview-uat/route.ts#POST",
+    "src/app/(admin-shell)/admin-next-preview/roof-fusion/uat/page.tsx#prepareR4Uat",
   mutationOwner: "future authorized Roof Fusion command API",
 } as const;
 
