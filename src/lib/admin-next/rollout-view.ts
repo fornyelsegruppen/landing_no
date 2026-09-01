@@ -4,6 +4,16 @@ import {
   type FeatureFlagName,
   type IntegrationName,
 } from "@/lib/platform/features";
+import {
+  adminNextModuleDefinitions,
+  type AdminNextModuleDefinition,
+} from "@/lib/admin-next/capability-registry";
+
+export {
+  adminNextModuleDefinitions,
+  type AdminNextModuleDefinition,
+  type AdminNextModuleId,
+} from "@/lib/admin-next/capability-registry";
 
 export type AdminNextRolloutState = "legacy" | "preview" | "active";
 
@@ -16,13 +26,6 @@ export type AdminNextRolloutReason =
   | "missing_release_evidence"
   | "non_production_active_is_preview";
 
-export type AdminNextModuleId =
-  | "today"
-  | "caseWorkspace"
-  | "roofWorkbench"
-  | "documentPreflight"
-  | "fieldVisit";
-
 export type AdminNextCapabilityState =
   | "legacy_active"
   | "implemented_disabled"
@@ -30,15 +33,6 @@ export type AdminNextCapabilityState =
   | "preview_ready"
   | "enabled"
   | "planned";
-
-type AdminNextModuleStage = "adapter_ready" | "release_ready" | "planned";
-
-export type AdminNextModuleDefinition = {
-  id: AdminNextModuleId;
-  stage: AdminNextModuleStage;
-  dependencies: readonly FeatureFlagName[];
-  legacyHref: string;
-};
 
 export type AdminNextModuleView = AdminNextModuleDefinition & {
   state: AdminNextCapabilityState;
@@ -54,43 +48,6 @@ export type AdminNextRolloutView = {
   modules: AdminNextModuleView[];
   counts: Record<AdminNextCapabilityState, number>;
 };
-
-export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = [
-  {
-    id: "today",
-    stage: "adapter_ready",
-    dependencies: ["caseStateEngineV2", "adminExceptionFlowsV2"],
-    legacyHref: "/admin-v2",
-  },
-  {
-    id: "caseWorkspace",
-    stage: "adapter_ready",
-    dependencies: ["caseStateEngineV2"],
-    legacyHref: "/admin-v2/cases",
-  },
-  {
-    id: "roofWorkbench",
-    stage: "planned",
-    dependencies: ["measurementEvidenceV2"],
-    legacyHref: "/admin-v2/cases",
-  },
-  {
-    id: "documentPreflight",
-    stage: "adapter_ready",
-    dependencies: [
-      "customerQuotes",
-      "contractSigning",
-      "communicationRoutingV2",
-    ],
-    legacyHref: "/admin-v2/documents",
-  },
-  {
-    id: "fieldVisit",
-    stage: "adapter_ready",
-    dependencies: ["workerPortal"],
-    legacyHref: "/admin-v2/work",
-  },
-] as const;
 
 function resolveGlobalRollout(environment: Environment) {
   const requestedMode = environment.ADMIN_NEXT_MODE?.trim().toLowerCase();

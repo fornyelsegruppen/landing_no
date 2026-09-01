@@ -48,7 +48,7 @@ describe("Admin Next rollout view", () => {
       "preview_ready",
     );
     expect(view.modules.find(({ id }) => id === "roofWorkbench")?.state).toBe(
-      "planned",
+      "implemented_disabled",
     );
     expect(
       view.modules.find(({ id }) => id === "documentPreflight")?.state,
@@ -56,7 +56,7 @@ describe("Admin Next rollout view", () => {
     expect(
       view.modules.find(({ id }) => id === "fieldVisit")?.state,
     ).toBe("implemented_disabled");
-    expect(view.counts.planned).toBe(1);
+    expect(view.counts.planned).toBe(0);
   });
 
   it("distinguishes implemented-but-disabled from missing configuration", () => {
@@ -77,7 +77,7 @@ describe("Admin Next rollout view", () => {
     });
     expect(
       blocked.modules.find(({ id }) => id === "roofWorkbench")?.state,
-    ).toBe("planned");
+    ).toBe("blocked_configuration");
     expect(
       blocked.modules.find(({ id }) => id === "roofWorkbench")
         ?.unavailableIntegrations,
