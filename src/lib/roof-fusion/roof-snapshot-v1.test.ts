@@ -89,7 +89,23 @@ function result(
               sourceRef: "src-provider",
             },
           ]
-        : [],
+        : ["failed", "unknown_version"].includes(status)
+          ? [
+              {
+                code:
+                  status === "failed"
+                    ? "SOURCE_PROVIDER_FAILED"
+                    : "SOURCE_VERSION_UNSUPPORTED",
+                severity: "error" as const,
+                message:
+                  status === "failed"
+                    ? "Provider request failed"
+                    : "Provider returned an unsupported input version",
+                retryable: status === "failed",
+                sourceRef: "src-provider",
+              },
+            ]
+          : [],
     normalized: resolvedNormalized,
   });
 }

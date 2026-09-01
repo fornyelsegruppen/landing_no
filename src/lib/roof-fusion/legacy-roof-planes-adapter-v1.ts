@@ -434,6 +434,6 @@ export function legacyRoofPlanesToSourceResultV1(
             sourceRef: input.source.sourceId,
           },
         ],
-    normalized,
+    normalized: proposal.roofPlanes.length ? normalized : undefined,
   });
 }

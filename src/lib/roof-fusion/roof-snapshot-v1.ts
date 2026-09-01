@@ -821,6 +821,25 @@ function segmentsIntersect(
   );
 }
 
+function polygonSignedArea(points: { xM: number; yM: number }[]) {
+  return (
+    points.reduce((sum, point, index) => {
+      const next = points[(index + 1) % points.length];
+      return sum + point.xM * next.yM - next.xM * point.yM;
+    }, 0) / 2
+  );
+}
+
+function measurementContains(
+  value: RoofMeasurementValueV1,
+  actual: number,
+  tolerance: number,
+) {
+  if (value.mode === "unknown" || value.min === null || value.max === null)
+    return true;
+  return actual >= value.min - tolerance && actual <= value.max + tolerance;
+}
+
 function topologyFailures(seed: RoofSnapshotSeedV1) {
   const failures: string[] = [];
   const vertices = new Map(
@@ -839,6 +858,14 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
   const sourceIds = new Set(
     seed.provenance.sources.map((source) => source.sourceId),
   );
+  const obstacleIds = new Set(
+    seed.geometry.obstacles.map((obstacle) => obstacle.obstacleId),
+  );
+  const observationIds = new Set(
+    seed.provenance.observations.map(
+      (observation) => observation.observationId,
+    ),
+  );
 
   const duplicateIds = [
     ...duplicates(seed.geometry.vertices.map((item) => item.vertexId)),
@@ -853,7 +880,7 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
     ),
   ];
   if (duplicateIds.length)
-    failures.push(`duplicate_ids:${uniqueSorted(duplicateIds).join(",")}`);
+    failures.push(`duplicate_ids:${uniqueSorted(duplicateIds).join(".")}`);
 
   for (const contour of seed.geometry.contours) {
     if (new Set(contour.vertexIds).size < 3)
@@ -863,6 +890,18 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
     const points = contour.vertexIds
       .map((id) => vertices.get(id))
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
+    if (points.length === contour.vertexIds.length) {
+      if (Math.abs(polygonSignedArea(points)) < 1e-9)
+        failures.push(`contour_zero_area:${contour.contourId}`);
+      if (
+        contour.vertexIds.some(
+          (vertexId, index) =>
+            vertexId ===
+            contour.vertexIds[(index + 1) % contour.vertexIds.length],
+        )
+      )
+        failures.push(`contour_repeated_vertex:${contour.contourId}`);
+    }
     for (let first = 0; first < points.length; first += 1) {
       const firstNext = (first + 1) % points.length;
       for (let second = first + 1; second < points.length; second += 1) {
@@ -889,7 +928,24 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
       failures.push(`surface_edge_missing:${surface.surfaceId}`);
     if (surface.openingIds.some((id) => !openingIds.has(id)))
       failures.push(`surface_opening_missing:${surface.surfaceId}`);
+    for (const edgeId of surface.edgeIds) {
+      const edge = seed.geometry.edges.find((item) => item.edgeId === edgeId);
+      if (edge && !edge.adjacentSurfaceIds.includes(surface.surfaceId))
+        failures.push(
+          `surface_edge_not_reciprocal:${surface.surfaceId}:${edgeId}`,
+        );
+    }
+    for (const openingId of surface.openingIds) {
+      const opening = seed.geometry.openings.find(
+        (item) => item.openingId === openingId,
+      );
+      if (opening && opening.surfaceId !== surface.surfaceId)
+        failures.push(
+          `surface_opening_not_reciprocal:${surface.surfaceId}:${openingId}`,
+        );
+    }
   }
+  const edgePairs = new Map<string, string[]>();
   for (const edge of seed.geometry.edges) {
     if (!vertices.has(edge.fromVertexId) || !vertices.has(edge.toVertexId))
       failures.push(`edge_vertex_missing:${edge.edgeId}`);
@@ -897,12 +953,55 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
       failures.push(`edge_zero_length:${edge.edgeId}`);
     if (edge.adjacentSurfaceIds.some((id) => !surfaceIds.has(id)))
       failures.push(`edge_surface_missing:${edge.edgeId}`);
+    for (const surfaceId of edge.adjacentSurfaceIds) {
+      const surface = seed.geometry.surfaces.find(
+        (item) => item.surfaceId === surfaceId,
+      );
+      if (surface && !surface.edgeIds.includes(edge.edgeId))
+        failures.push(
+          `edge_surface_not_reciprocal:${edge.edgeId}:${surfaceId}`,
+        );
+    }
+    const pair = [edge.fromVertexId, edge.toVertexId].sort().join("|");
+    edgePairs.set(pair, [...(edgePairs.get(pair) ?? []), edge.edgeId]);
+    const from = vertices.get(edge.fromVertexId);
+    const to = vertices.get(edge.toVertexId);
+    if (from && to) {
+      const length2d = Math.hypot(to.xM - from.xM, to.yM - from.yM);
+      const tolerance = Math.max(0.005, from.uncertaintyM + to.uncertaintyM);
+      if (!measurementContains(edge.length2d, length2d, tolerance))
+        failures.push(`edge_length2d_mismatch:${edge.edgeId}`);
+      if (from.zM !== undefined && to.zM !== undefined) {
+        const length3d = Math.hypot(
+          to.xM - from.xM,
+          to.yM - from.yM,
+          to.zM - from.zM,
+        );
+        if (!measurementContains(edge.length3d, length3d, tolerance))
+          failures.push(`edge_length3d_mismatch:${edge.edgeId}`);
+      }
+    }
+  }
+  for (const edgeIdsForPair of edgePairs.values()) {
+    if (edgeIdsForPair.length > 1)
+      failures.push(`duplicate_edge_pair:${edgeIdsForPair.sort().join(".")}`);
   }
   for (const opening of seed.geometry.openings) {
     if (!surfaceIds.has(opening.surfaceId))
       failures.push(`opening_surface_missing:${opening.openingId}`);
     if (!contourIds.has(opening.contourId))
       failures.push(`opening_contour_missing:${opening.openingId}`);
+    const surface = seed.geometry.surfaces.find(
+      (item) => item.surfaceId === opening.surfaceId,
+    );
+    if (surface && !surface.openingIds.includes(opening.openingId))
+      failures.push(`opening_surface_not_reciprocal:${opening.openingId}`);
+  }
+  for (const obstacle of seed.geometry.obstacles) {
+    if (obstacle.surfaceId && !surfaceIds.has(obstacle.surfaceId))
+      failures.push(`obstacle_surface_missing:${obstacle.obstacleId}`);
+    if (obstacle.contourId && !contourIds.has(obstacle.contourId))
+      failures.push(`obstacle_contour_missing:${obstacle.obstacleId}`);
   }
   const allSourceRefs = [
     ...seed.geometry.vertices.flatMap((item) => item.sourceRefs),
@@ -925,6 +1024,48 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
   ];
   if (allSourceRefs.some((id) => !sourceIds.has(id)))
     failures.push("source_reference_missing");
+
+  const validObservationTargets = new Set([
+    seed.snapshotId,
+    ...surfaceIds,
+    ...edgeIds,
+    ...openingIds,
+    ...obstacleIds,
+    ...sourceIds,
+  ]);
+  for (const observation of seed.provenance.observations) {
+    if (
+      observation.kind !== "unknown" &&
+      !validObservationTargets.has(observation.targetRef)
+    )
+      failures.push(`observation_target_missing:${observation.observationId}`);
+  }
+  const decision = seed.provenance.fusionDecision;
+  const buckets = {
+    accepted: new Set(decision.acceptedObservationIds),
+    rejected: new Set(decision.rejectedObservationIds),
+    conflicted: new Set(decision.conflictedObservationIds),
+  };
+  const decisionIds = [
+    ...decision.acceptedObservationIds,
+    ...decision.rejectedObservationIds,
+    ...decision.conflictedObservationIds,
+  ];
+  if (decisionIds.some((id) => !observationIds.has(id)))
+    failures.push("fusion_observation_missing");
+  if (duplicates(decisionIds).length)
+    failures.push("fusion_observation_bucket_overlap");
+  for (const observation of seed.provenance.observations) {
+    const memberships = (
+      ["accepted", "rejected", "conflicted"] as const
+    ).filter((status) => buckets[status].has(observation.observationId));
+    if (
+      (observation.status === "unknown" && memberships.length !== 0) ||
+      (observation.status !== "unknown" &&
+        (memberships.length !== 1 || memberships[0] !== observation.status))
+    )
+      failures.push(`fusion_status_mismatch:${observation.observationId}`);
+  }
   return uniqueSorted(failures);
 }
 
@@ -979,23 +1120,27 @@ export function evaluateRoofSnapshotQualityV1(
   );
 
   const denied = seed.provenance.sources.filter(
-    (source) => source.license.status === "denied",
+    (source) =>
+      source.license.status === "denied" ||
+      source.quality.status === "rejected",
   );
-  const uncertain = seed.provenance.sources.filter((source) =>
-    ["restricted", "unknown"].includes(source.license.status),
+  const uncertain = seed.provenance.sources.filter(
+    (source) =>
+      ["restricted", "unknown"].includes(source.license.status) ||
+      ["limited", "unknown"].includes(source.quality.status),
   );
   if (denied.length)
     add(
       "SOURCE_LICENSE",
       "fail",
-      "One or more sources are not authorized",
+      "One or more sources are not authorized or usable",
       denied.map((source) => source.sourceId),
     );
   else if (uncertain.length)
     add(
       "SOURCE_LICENSE",
       "review_required",
-      "One or more source licenses require review",
+      "One or more source licenses or suitability results require review",
       uncertain.map((source) => source.sourceId),
     );
   else

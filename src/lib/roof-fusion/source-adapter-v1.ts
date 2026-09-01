@@ -101,10 +101,18 @@ export const roofSourceResultV1Schema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (["complete", "partial"].includes(value.status) && !value.normalized) {
+    const normalizedStatus = ["complete", "partial"].includes(value.status);
+    if (normalizedStatus && !value.normalized) {
       context.addIssue({
         code: "custom",
         message: `${value.status} source result requires normalized content`,
+        path: ["normalized"],
+      });
+    }
+    if (!normalizedStatus && value.normalized) {
+      context.addIssue({
+        code: "custom",
+        message: `${value.status} source result cannot claim normalized content`,
         path: ["normalized"],
       });
     }
@@ -121,6 +129,36 @@ export const roofSourceResultV1Schema = z
         message:
           "A normalized content hash cannot exist without normalized content",
         path: ["normalizedContentHash"],
+      });
+    }
+    if (
+      value.status === "complete" &&
+      value.issues.some((issue) => issue.severity === "error")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A complete source result cannot contain error issues",
+        path: ["issues"],
+      });
+    }
+    if (
+      value.status === "partial" &&
+      !value.issues.some((issue) => issue.severity !== "info")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A partial source result must explain its limitation",
+        path: ["issues"],
+      });
+    }
+    if (
+      ["failed", "unknown_version"].includes(value.status) &&
+      !value.issues.some((issue) => issue.severity === "error")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: `${value.status} source result requires an error issue`,
+        path: ["issues"],
       });
     }
   });
@@ -239,6 +277,120 @@ export function buildRoofSourceResultV1(
   });
 }
 
+function duplicateIdentifiers(values: string[]) {
+  const seen = new Set<string>();
+  return [
+    ...new Set(
+      values.filter((value) => (seen.has(value) ? true : !seen.add(value))),
+    ),
+  ].sort();
+}
+
+function assertSourceRecordParity(result: RoofSourceResultV1) {
+  const declaredDuplicates = duplicateIdentifiers(
+    result.sourceRecords.map((source) => source.sourceId),
+  );
+  if (declaredDuplicates.length) {
+    throw new RoofSourceIntegrityError(
+      `Duplicate declared roof source records: ${declaredDuplicates.join(",")}`,
+    );
+  }
+  if (!result.normalized) return;
+
+  const normalizedDuplicates = duplicateIdentifiers(
+    result.normalized.provenance.sources.map((source) => source.sourceId),
+  );
+  if (normalizedDuplicates.length) {
+    throw new RoofSourceIntegrityError(
+      `Duplicate normalized roof sources: ${normalizedDuplicates.join(",")}`,
+    );
+  }
+
+  const declared = new Map(
+    result.sourceRecords.map((source) => [source.sourceId, source]),
+  );
+  const normalized = new Map(
+    result.normalized.provenance.sources.map((source) => [
+      source.sourceId,
+      source,
+    ]),
+  );
+  const allIds = [
+    ...new Set([...declared.keys(), ...normalized.keys()]),
+  ].sort();
+  const mismatched = allIds.filter((sourceId) => {
+    const declaredSource = declared.get(sourceId);
+    const normalizedSource = normalized.get(sourceId);
+    return (
+      !declaredSource ||
+      !normalizedSource ||
+      canonicalJson(declaredSource) !== canonicalJson(normalizedSource)
+    );
+  });
+  if (mismatched.length) {
+    throw new RoofSourceIntegrityError(
+      `Declared and normalized roof provenance differ: ${mismatched.join(",")}`,
+    );
+  }
+}
+
+export function validateRoofSourceResultForRequestV1(
+  requestInput: RoofSourceRequestV1,
+  resultInput: unknown,
+  expectedAdapter?: Pick<RoofSourceAdapterV1, "adapterId" | "adapterVersion">,
+): RoofSourceResultV1 {
+  const request = roofSourceRequestV1Schema.parse(requestInput);
+  if (roofSourceInputHashV1(request) !== request.inputHash) {
+    throw new RoofSourceIntegrityError(
+      "Roof source request input hash mismatch",
+    );
+  }
+  const version =
+    resultInput && typeof resultInput === "object"
+      ? (resultInput as { schemaVersion?: unknown }).schemaVersion
+      : undefined;
+  if (version !== ROOF_SOURCE_RESULT_SCHEMA_VERSION) {
+    throw new UnsupportedRoofSourceResultVersionError(version);
+  }
+  const result = roofSourceResultV1Schema.parse(resultInput);
+  if (
+    expectedAdapter &&
+    (result.adapterId !== expectedAdapter.adapterId ||
+      result.adapterVersion !== expectedAdapter.adapterVersion)
+  ) {
+    throw new RoofSourceIntegrityError("Roof source adapter identity mismatch");
+  }
+  if (
+    result.requestInputHash !== request.inputHash ||
+    result.idempotencyKey !== request.idempotencyKey
+  ) {
+    throw new RoofSourceIntegrityError(
+      "Roof source result does not belong to the requested idempotent input",
+    );
+  }
+  if (result.providerInputVersion !== request.expectedInputVersion) {
+    throw new RoofSourceIntegrityError(
+      "Roof source provider input version does not match the request",
+    );
+  }
+  if (Date.parse(result.receivedAt) < Date.parse(request.requestedAt)) {
+    throw new RoofSourceIntegrityError(
+      "Roof source result predates the source request",
+    );
+  }
+  if (
+    result.normalized &&
+    roofSourceNormalizedHashV1(result.normalized) !==
+      result.normalizedContentHash
+  ) {
+    throw new RoofSourceIntegrityError(
+      "Normalized roof source content hash mismatch",
+    );
+  }
+  assertSourceRecordParity(result);
+  return result;
+}
+
 export async function ingestRoofSourceV1(
   adapter: RoofSourceAdapterV1,
   requestInput: RoofSourceRequestV1,
@@ -255,52 +407,7 @@ export async function ingestRoofSourceV1(
     );
   }
   const raw = await adapter.ingest(request);
-  const version =
-    raw && typeof raw === "object"
-      ? (raw as { schemaVersion?: unknown }).schemaVersion
-      : undefined;
-  if (version !== ROOF_SOURCE_RESULT_SCHEMA_VERSION) {
-    throw new UnsupportedRoofSourceResultVersionError(version);
-  }
-  const result = roofSourceResultV1Schema.parse(raw);
-  if (
-    result.adapterId !== adapter.adapterId ||
-    result.adapterVersion !== adapter.adapterVersion
-  ) {
-    throw new RoofSourceIntegrityError("Roof source adapter identity mismatch");
-  }
-  if (
-    result.requestInputHash !== request.inputHash ||
-    result.idempotencyKey !== request.idempotencyKey
-  ) {
-    throw new RoofSourceIntegrityError(
-      "Roof source result does not belong to the requested idempotent input",
-    );
-  }
-  if (
-    result.normalized &&
-    roofSourceNormalizedHashV1(result.normalized) !==
-      result.normalizedContentHash
-  ) {
-    throw new RoofSourceIntegrityError(
-      "Normalized roof source content hash mismatch",
-    );
-  }
-  const normalizedSourceIds = new Set(
-    result.normalized?.provenance.sources.map((source) => source.sourceId) ??
-      [],
-  );
-  if (
-    result.normalized &&
-    result.sourceRecords.some(
-      (source) => !normalizedSourceIds.has(source.sourceId),
-    )
-  ) {
-    throw new RoofSourceIntegrityError(
-      "Normalized roof source omitted declared provenance",
-    );
-  }
-  return result;
+  return validateRoofSourceResultForRequestV1(request, raw, adapter);
 }
 
 export class FakeRoofSourceAdapterV1 implements RoofSourceAdapterV1 {
@@ -397,15 +504,7 @@ export function roofSourceResultToSnapshotV1(
   metadata: RoofSourceSnapshotMetadataV1,
 ) {
   const request = roofSourceRequestV1Schema.parse(requestInput);
-  const result = roofSourceResultV1Schema.parse(resultInput);
-  if (
-    result.requestInputHash !== request.inputHash ||
-    result.idempotencyKey !== request.idempotencyKey
-  ) {
-    throw new RoofSourceIntegrityError(
-      "Cannot normalize a roof source result for a different request",
-    );
-  }
+  const result = validateRoofSourceResultForRequestV1(request, resultInput);
   const normalized =
     result.normalized ?? fallbackNormalizedContent(result, metadata);
   const processing = processingStatus(result.status);
