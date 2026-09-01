@@ -8,11 +8,13 @@ import {
   loadAdminNextR4WithMissingCanonicalFallback,
   parseAdminNextR4CaseIdentityV1,
 } from "@/lib/admin-next/r4-read-adapter";
+import { appendAdminNextR4LeadPhotoEvidence } from "@/lib/admin-next/r4-evidence-photo-adapter";
 import { resolveAdminNextServerRead } from "@/lib/admin-next/server-read-resolver";
 import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
+import { parseLeadPhotoUrls } from "@/lib/lead-photo-token";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
 import {
   AdminRoofFusionPreviewReadAdapterV1,
@@ -63,6 +65,7 @@ export default async function AdminNextR4MeasurementPage({
   let customer = adminNextCaseWorkspaceFixture.customer;
   let address = adminNextCaseWorkspaceFixture.address;
   let owner = adminNextCaseWorkspaceFixture.owner.name;
+  let measurement = result.value;
   if (result.source === "canonical") {
     const identity = parseAdminNextR4CaseIdentityV1(caseId);
     if (!identity) notFound();
@@ -79,6 +82,13 @@ export default async function AdminNextR4MeasurementPage({
     if (lead.assignedTo && typeof lead.assignedTo === "object") {
       owner = lead.assignedTo.displayName || lead.assignedTo.email;
     }
+    measurement = appendAdminNextR4LeadPhotoEvidence({
+      measurement,
+      leadId: identity.leadId,
+      photoCount: parseLeadPhotoUrls(lead.photoUrls).length,
+      capturedAt: lead.updatedAt,
+      locale: user.interfaceLanguage,
+    });
   }
 
   return (
@@ -87,7 +97,7 @@ export default async function AdminNextR4MeasurementPage({
       caseReference={caseId}
       customer={customer}
       locale={user.interfaceLanguage}
-      measurement={result.value}
+      measurement={measurement}
       owner={owner}
       source={result.source}
     />
