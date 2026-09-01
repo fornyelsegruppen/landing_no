@@ -3,6 +3,8 @@ import { AdminLanguageSwitcher } from "@/components/admin-v2/admin-language-swit
 import { AdminLogoutButton } from "@/components/admin-v2/admin-logout-button";
 import { AdminNavigation } from "@/components/admin-v2/admin-navigation";
 import { ControlledPilotBanner } from "@/components/admin-v2/controlled-pilot-banner";
+import { AdminNextPreviewNotice } from "@/components/admin-next/admin-next-capability-board";
+import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { buildOperatingMode } from "@/lib/platform/operating-mode";
@@ -55,6 +57,10 @@ export default async function AdminV2Layout({ children }: { children: React.Reac
 
       <main className="min-h-[calc(100dvh-4rem)] bg-background/0 px-4 py-6 sm:px-6 lg:ml-72 lg:px-8 lg:py-8">
         <ControlledPilotBanner locale={user.interfaceLanguage} status={buildOperatingMode()} />
+        <AdminNextPreviewNotice
+          locale={user.interfaceLanguage}
+          rollout={buildAdminNextRolloutView()}
+        />
         {children}
       </main>
     </div>
