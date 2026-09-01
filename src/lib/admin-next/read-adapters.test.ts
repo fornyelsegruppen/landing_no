@@ -45,4 +45,3 @@ describe("Admin Next canonical read projections", () => {
     expect(value.measurementReview).toBeUndefined();
   });
 });
-

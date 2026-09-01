@@ -37,4 +37,3 @@ export type AdminNextTodayLoadResult = {
 export interface AdminNextTodayAdapter {
   load(): Promise<AdminNextTodayLoadResult>;
 }
-

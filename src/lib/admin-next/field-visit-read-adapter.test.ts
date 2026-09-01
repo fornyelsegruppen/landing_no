@@ -31,4 +31,3 @@ describe("Admin Next canonical field visit reader", () => {
     await expect(adapter.load("WV-99", "assigned")).resolves.toEqual({ status: "not_found" });
   });
 });
-

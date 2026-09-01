@@ -35,4 +35,3 @@ describe("Admin Next canonical R4 reader", () => {
     expect(repository.readSnapshot).not.toHaveBeenCalled();
   });
 });
-

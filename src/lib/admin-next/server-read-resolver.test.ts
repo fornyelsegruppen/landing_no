@@ -90,4 +90,3 @@ describe("Admin Next server read resolver", () => {
     expect(select("caseWorkspace", preview, { role: "worker" })).toMatchObject({ kind: "legacy_fallback", reason: "access_denied" });
   });
 });
-
