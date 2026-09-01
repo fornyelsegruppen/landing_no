@@ -1,0 +1,163 @@
+{
+  "schemaVersion": "roof-repository-golden-summary.v1",
+  "calculate": {
+    "schemaVersion": "roof-repository-command-result.v1",
+    "repositoryContractVersion": "roof-snapshot-repository.v1",
+    "status": "applied",
+    "commandType": "calculate",
+    "commandHash": "d6df5c52ce3b8e9a099e25f6fed5512c6f4335fbe1c0293929efca03836afe39",
+    "idempotencyKey": "roof-repository:case-12:calculate-r1",
+    "caseId": "case-12",
+    "snapshot": {
+      "snapshotId": "roof-case-12-r1",
+      "revision": 1,
+      "snapshotHash": "e31e98d42b6e7b17d15749d666580aa04b5656b13733fa4358467ff3bf022014",
+      "state": "review_required",
+      "measurementClass": "fused_estimate"
+    },
+    "audit": {
+      "schemaVersion": "roof-repository-command-audit.v1",
+      "commandType": "calculate",
+      "commandHash": "d6df5c52ce3b8e9a099e25f6fed5512c6f4335fbe1c0293929efca03836afe39",
+      "idempotencyKey": "roof-repository:case-12:calculate-r1",
+      "caseId": "case-12",
+      "actor": {
+        "actorId": "roof-fusion-engine",
+        "actorType": "system",
+        "displayName": "Roof Fusion Engine"
+      },
+      "occurredAt": "2026-09-01T10:00:00.000Z",
+      "sourceRefs": [],
+      "resultingSnapshot": {
+        "snapshotId": "roof-case-12-r1",
+        "revision": 1,
+        "snapshotHash": "e31e98d42b6e7b17d15749d666580aa04b5656b13733fa4358467ff3bf022014",
+        "state": "review_required",
+        "measurementClass": "fused_estimate"
+      }
+    }
+  },
+  "review": {
+    "schemaVersion": "roof-repository-command-result.v1",
+    "repositoryContractVersion": "roof-snapshot-repository.v1",
+    "status": "applied",
+    "commandType": "review",
+    "commandHash": "8b9e54744371c63a3cf4c5f0b1db5626b3a5f799b7966ea87547cf9012f08332",
+    "idempotencyKey": "roof-repository:case-12:review-r1",
+    "caseId": "case-12",
+    "previousSnapshot": {
+      "snapshotId": "roof-case-12-r1",
+      "revision": 1,
+      "snapshotHash": "e31e98d42b6e7b17d15749d666580aa04b5656b13733fa4358467ff3bf022014",
+      "state": "review_required",
+      "measurementClass": "verified_geometry"
+    },
+    "snapshot": {
+      "snapshotId": "roof-case-12-r2-verified",
+      "revision": 2,
+      "snapshotHash": "21cd1890d67e2088c60b1acb9af15bb1b39ee69da10b0759bb69e6e4ce4bce2a",
+      "state": "review_required",
+      "measurementClass": "verified_geometry"
+    },
+    "audit": {
+      "schemaVersion": "roof-repository-command-audit.v1",
+      "commandType": "review",
+      "commandHash": "8b9e54744371c63a3cf4c5f0b1db5626b3a5f799b7966ea87547cf9012f08332",
+      "idempotencyKey": "roof-repository:case-12:review-r1",
+      "caseId": "case-12",
+      "actor": {
+        "actorId": "admin-17",
+        "actorType": "administrator",
+        "displayName": "RF Reviewer"
+      },
+      "occurredAt": "2026-09-01T10:05:00.000Z",
+      "reason": "Administrator confirmed geometry against the accepted evidence",
+      "sourceRefs": ["src-provider"],
+      "previousSnapshot": {
+        "snapshotId": "roof-case-12-r1",
+        "revision": 1,
+        "snapshotHash": "e31e98d42b6e7b17d15749d666580aa04b5656b13733fa4358467ff3bf022014",
+        "state": "review_required",
+        "measurementClass": "verified_geometry"
+      },
+      "resultingSnapshot": {
+        "snapshotId": "roof-case-12-r2-verified",
+        "revision": 2,
+        "snapshotHash": "21cd1890d67e2088c60b1acb9af15bb1b39ee69da10b0759bb69e6e4ce4bce2a",
+        "state": "review_required",
+        "measurementClass": "verified_geometry"
+      }
+    }
+  },
+  "approve": {
+    "schemaVersion": "roof-repository-command-result.v1",
+    "repositoryContractVersion": "roof-snapshot-repository.v1",
+    "status": "applied",
+    "commandType": "approve",
+    "commandHash": "5c73fa203ff0cd44008e7729364a6a7ad96573047c5beb8cbf9459b310929eb3",
+    "idempotencyKey": "roof-repository:case-12:approve-r2",
+    "caseId": "case-12",
+    "previousSnapshot": {
+      "snapshotId": "roof-case-12-r2-verified",
+      "revision": 2,
+      "snapshotHash": "21cd1890d67e2088c60b1acb9af15bb1b39ee69da10b0759bb69e6e4ce4bce2a",
+      "state": "review_required",
+      "measurementClass": "verified_geometry"
+    },
+    "snapshot": {
+      "snapshotId": "roof-case-12-r3-approved",
+      "revision": 3,
+      "snapshotHash": "1d6b9e07da22b411d65c6a913a6aa0a538c97e28e3c234e1fd7fb9dc2e917985",
+      "state": "approved",
+      "measurementClass": "verified_geometry"
+    },
+    "audit": {
+      "schemaVersion": "roof-repository-command-audit.v1",
+      "commandType": "approve",
+      "commandHash": "5c73fa203ff0cd44008e7729364a6a7ad96573047c5beb8cbf9459b310929eb3",
+      "idempotencyKey": "roof-repository:case-12:approve-r2",
+      "caseId": "case-12",
+      "actor": {
+        "actorId": "admin-17",
+        "actorType": "administrator",
+        "displayName": "RF Reviewer"
+      },
+      "occurredAt": "2026-09-01T10:06:00.000Z",
+      "sourceRefs": [],
+      "previousSnapshot": {
+        "snapshotId": "roof-case-12-r2-verified",
+        "revision": 2,
+        "snapshotHash": "21cd1890d67e2088c60b1acb9af15bb1b39ee69da10b0759bb69e6e4ce4bce2a",
+        "state": "review_required",
+        "measurementClass": "verified_geometry"
+      },
+      "resultingSnapshot": {
+        "snapshotId": "roof-case-12-r3-approved",
+        "revision": 3,
+        "snapshotHash": "1d6b9e07da22b411d65c6a913a6aa0a538c97e28e3c234e1fd7fb9dc2e917985",
+        "state": "approved",
+        "measurementClass": "verified_geometry"
+      }
+    }
+  },
+  "latest": {
+    "snapshotId": "roof-case-12-r3-approved",
+    "revision": 3,
+    "snapshotHash": "1d6b9e07da22b411d65c6a913a6aa0a538c97e28e3c234e1fd7fb9dc2e917985",
+    "renderHash": "a36353a8578e2399af959500785c33763759ac617147aed67567534099f21cc9",
+    "state": "approved",
+    "measurementClass": "verified_geometry",
+    "auditEventTypes": [
+      "source_ingested",
+      "source_normalized",
+      "quality_evaluated",
+      "review_completed",
+      "approved"
+    ]
+  },
+  "rendererBinding": {
+    "schemaVersion": "approved-roof-renderer-envelope.v1",
+    "sourceSnapshotHash": "1d6b9e07da22b411d65c6a913a6aa0a538c97e28e3c234e1fd7fb9dc2e917985",
+    "renderHash": "a36353a8578e2399af959500785c33763759ac617147aed67567534099f21cc9"
+  }
+}
