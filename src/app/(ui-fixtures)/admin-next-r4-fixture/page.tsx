@@ -16,10 +16,12 @@ export default function AdminNextR4VisualFixture() {
   return (
     <AdminNextShell displayName="Demo administratorius" locale="lt">
       <AdminNextR4MeasurementReview
+        address={adminNextCaseWorkspaceFixture.address}
         caseReference={adminNextCaseWorkspaceFixture.reference}
         customer={adminNextCaseWorkspaceFixture.customer}
         locale="lt"
         measurement={measurement}
+        owner={adminNextCaseWorkspaceFixture.owner.name}
         source="fixture"
       />
     </AdminNextShell>

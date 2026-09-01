@@ -16,12 +16,12 @@ const admin = {
 
 describe("Admin Next authorized Roof Fusion R4 reader", () => {
   it("maps TF lead identity and binds the authenticated admin to every read", async () => {
-    const snapshot = (
-      await buildRoofFusionPreviewUatGoldenPlanV1(12)
-    ).finalSnapshot;
+    const plan = await buildRoofFusionPreviewUatGoldenPlanV1(12);
+    const snapshot = plan.finalSnapshot;
+    const previous = plan.snapshots[1];
     const reader = {
       readLatestSnapshot: vi.fn().mockResolvedValue(snapshot),
-      readSnapshot: vi.fn().mockResolvedValue(null),
+      readSnapshot: vi.fn().mockResolvedValue(previous),
     };
     const result = await createAdminNextRoofFusionR4Adapter(
       reader,
@@ -41,7 +41,19 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
         reference: snapshot.snapshotId,
         state: "verified",
         planeCount: snapshot.geometry.surfaces.length,
+        comparedToReference: previous.snapshotId,
+        overallPitchDegrees: expect.any(Number),
+        perimeterMeters: expect.any(Number),
         provenance: { checksum: snapshot.snapshotHash },
+        sources: snapshot.provenance.sources.map((source) => ({
+          id: source.sourceId,
+          kind: source.kind,
+          label: source.provider,
+          attribution: source.license.attribution,
+          capturedAt: source.capturedAt || source.retrievedAt,
+          licenseState: source.license.status,
+          qualityState: source.quality.status,
+        })),
         diagram: {
           vertices: snapshot.rendererPayload.vertices.map((vertex) => ({
             id: vertex.vertexId,

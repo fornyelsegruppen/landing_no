@@ -61,24 +61,34 @@ export default async function AdminNextR4MeasurementPage({
   if (result.status === "not_found") notFound();
 
   let customer = adminNextCaseWorkspaceFixture.customer;
+  let address = adminNextCaseWorkspaceFixture.address;
+  let owner = adminNextCaseWorkspaceFixture.owner.name;
   if (result.source === "canonical") {
     const identity = parseAdminNextR4CaseIdentityV1(caseId);
     if (!identity) notFound();
     const lead = await payload.findByID({
       collection: "leads",
       id: identity.leadId,
-      depth: 0,
+      depth: 1,
       overrideAccess: true,
     });
     customer = lead.name;
+    address = [lead.address, lead.postal, lead.city]
+      .filter((part): part is string => Boolean(part?.trim()))
+      .join(", ");
+    if (lead.assignedTo && typeof lead.assignedTo === "object") {
+      owner = lead.assignedTo.displayName || lead.assignedTo.email;
+    }
   }
 
   return (
     <AdminNextR4MeasurementReview
+      address={address}
       caseReference={caseId}
       customer={customer}
       locale={user.interfaceLanguage}
       measurement={result.value}
+      owner={owner}
       source={result.source}
     />
   );

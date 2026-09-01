@@ -73,8 +73,15 @@ describe("Admin Next R4 Preview page route", () => {
     mocks.requireAdminUser.mockReset().mockResolvedValue(admin);
     mocks.getPayload.mockReset().mockResolvedValue(mocks.payload);
     mocks.payload.findByID.mockReset().mockResolvedValue({
+      address: "Testgata 13",
+      assignedTo: {
+        displayName: "Aistė",
+        email: "aiste@example.invalid",
+      },
+      city: "Oslo",
       id: 13,
       name: "Canonical UAT Customer",
+      postal: "0013",
     });
     mocks.adminReader.readLatestSnapshot.mockReset();
     mocks.adminReader.readSnapshot.mockReset().mockResolvedValue(null);
@@ -113,11 +120,16 @@ describe("Admin Next R4 Preview page route", () => {
       admin,
     );
     expect(element.props).toMatchObject({
+      address: "Testgata 13, 0013, Oslo",
       caseReference: "TF-13",
       customer: "Canonical UAT Customer",
       locale: "lt",
       measurement: { reference: snapshot.snapshotId },
+      owner: "Aistė",
     });
+    expect(mocks.payload.findByID).toHaveBeenCalledWith(
+      expect.objectContaining({ collection: "leads", depth: 1, id: 13 }),
+    );
   });
 
   it("uses the fixture only after an authorized canonical absence", async () => {
