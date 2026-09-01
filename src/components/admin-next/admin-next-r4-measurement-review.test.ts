@@ -40,7 +40,26 @@ describe("Admin Next R4 measurement review", () => {
     );
 
     expect(html).toContain("disabled=\"\"");
-    expect(html).toContain("Patvirtinimas bus įjungtas tik prijungus");
+    expect(html).toContain("Confirm užrakintas");
     expect(html).toContain(`href="${measurement.fallbackHref}"`);
+  });
+
+  it("renders four primary slopes, photos, R3 delta and verification gates", () => {
+    expect(measurement).toBeDefined();
+    if (!measurement) return;
+    const html = renderToStaticMarkup(
+      createElement(AdminNextR4MeasurementReview, {
+        locale: "lt",
+        caseReference: adminNextCaseWorkspaceFixture.reference,
+        customer: adminNextCaseWorkspaceFixture.customer,
+        measurement,
+      }),
+    );
+
+    expect(html).toContain("S1");
+    expect(html).toContain("S4");
+    expect(html).toContain("Nuotraukos ir šaltiniai");
+    expect(html).toContain("Pasikeitė nuo R3");
+    expect(html).toContain("Verification gates");
   });
 });

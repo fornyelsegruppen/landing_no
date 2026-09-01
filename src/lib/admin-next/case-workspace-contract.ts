@@ -58,6 +58,7 @@ export type AdminNextCaseWorkspaceView = {
     recordedAt: string;
     fallbackHref: string;
     previewHref?: string;
+    previewAction?: "review_measurement" | "document_preflight";
   }[];
   measurementReview?: {
     reference: string;
@@ -84,6 +85,52 @@ export type AdminNextCaseWorkspaceView = {
       reason: string;
       varianceMeters: number;
     }[];
+    primarySlopes: readonly {
+      id: "S1" | "S2" | "S3" | "S4";
+      areaSquareMeters: number;
+      pitchDegrees: number;
+      perimeterMeters: number;
+    }[];
+    photos: readonly {
+      id: string;
+      label: string;
+      source: string;
+      capturedAt: string;
+    }[];
+    deltaFromR3: {
+      areaSquareMeters: number;
+      confidencePoints: number;
+      planeCount: number;
+    };
+    verificationGates: readonly {
+      id: "source_identity" | "plane_sum" | "review_edges" | "approval";
+      state: "verified" | "review_required" | "locked";
+      detail: string;
+    }[];
+    nextAction: string;
+    fallbackHref: string;
+  };
+  documentPreflight?: {
+    packageReference: string;
+    state: "blocked" | "ready";
+    policyCode: "PS-SEND-007";
+    recipient: {
+      name: string;
+      email: string;
+    };
+    artifacts: readonly {
+      id: "measurement" | "price" | "quote" | "contract" | "recipient" | "pdf";
+      state: "verified" | "review_required" | "locked";
+      reference: string;
+      revision: string;
+      hash: string;
+      summary: string;
+    }[];
+    sequence: readonly {
+      id: "measurement_review" | "reload" | "verify_artifacts" | "owner_gate" | "send";
+      state: "current" | "locked" | "ready";
+    }[];
+    blocker: string;
     nextAction: string;
     fallbackHref: string;
   };

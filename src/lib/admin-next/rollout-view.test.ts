@@ -50,7 +50,10 @@ describe("Admin Next rollout view", () => {
     expect(view.modules.find(({ id }) => id === "roofWorkbench")?.state).toBe(
       "planned",
     );
-    expect(view.counts.planned).toBe(3);
+    expect(
+      view.modules.find(({ id }) => id === "documentPreflight")?.state,
+    ).toBe("implemented_disabled");
+    expect(view.counts.planned).toBe(2);
   });
 
   it("distinguishes implemented-but-disabled from missing configuration", () => {

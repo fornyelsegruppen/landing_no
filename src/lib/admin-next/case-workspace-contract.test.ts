@@ -37,6 +37,9 @@ describe("Admin Next Case Workspace adapter boundary", () => {
     expect(result.value.measurementReview?.confidencePercent).toBe(82);
     expect(result.value.measurementReview?.planes).toHaveLength(7);
     expect(result.value.measurementReview?.reviewEdges).toHaveLength(2);
+    expect(result.value.measurementReview?.primarySlopes).toHaveLength(4);
+    expect(result.value.measurementReview?.photos).toHaveLength(3);
+    expect(result.value.measurementReview?.verificationGates).toHaveLength(4);
     expect(new Set(result.value.timeline.map(({ id }) => id)).size).toBe(
       result.value.timeline.length,
     );
@@ -64,6 +67,33 @@ describe("Admin Next Case Workspace adapter boundary", () => {
       0,
     );
     expect(sum).toBeCloseTo(measurement?.areaSquareMeters || 0, 5);
+    const primarySlopeSum = measurement?.primarySlopes.reduce(
+      (total, slope) => total + slope.areaSquareMeters,
+      0,
+    );
+    expect(primarySlopeSum).toBeCloseTo(
+      measurement?.areaSquareMeters || 0,
+      5,
+    );
+  });
+
+  it("keeps PS-SEND-007 blocked until the exact measurement review completes", () => {
+    const preflight = adminNextCaseWorkspaceFixture.documentPreflight;
+    expect(preflight).toBeDefined();
+    expect(preflight?.state).toBe("blocked");
+    expect(preflight?.policyCode).toBe("PS-SEND-007");
+    expect(preflight?.artifacts).toHaveLength(6);
+    expect(
+      preflight?.artifacts.find(({ id }) => id === "measurement")?.state,
+    ).toBe("review_required");
+    expect(preflight?.sequence.map(({ id }) => id)).toEqual([
+      "measurement_review",
+      "reload",
+      "verify_artifacts",
+      "owner_gate",
+      "send",
+    ]);
+    expect(preflight?.sequence.at(-1)?.state).toBe("locked");
   });
 
   it("fails closed for an unknown fixture reference", async () => {
