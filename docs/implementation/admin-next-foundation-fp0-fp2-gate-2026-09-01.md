@@ -79,7 +79,7 @@ The executable registry is
 | Case | `leads` | Admin V2 case read model / Case adapter | existing Admin V2 lead APIs and case commands |
 | Property | `leads` address/property projection | Case adapter | existing Admin V2 lead APIs |
 | Customer | `leads` customer projection | Case adapter | existing lead/contact APIs |
-| Roof | `roof-measurements` | `AdminNextCaseWorkspaceAdapter.measurementReview` | canonical measurement and approval flow |
+| Roof | `roof-measurements` legacy bridge; target append-only `roof-snapshot.v1` repository | current Case adapter; target internal snapshot plus approved renderer-envelope adapters | future authorized Roof Fusion command API |
 | Visit | `work-orders` | `AdminNextFieldVisitAdapter` | worker work-order APIs and workflow |
 
 Every Preview contract is read-only. `previewMutationPolicy` is `forbidden`;
@@ -154,7 +154,8 @@ Local milestone evidence:
 
 - Roof, document preflight and Visit remain fixture adapters.
 - R4 requires formal immutable measurement evidence/private-storage readiness
-  and the agreed Roof Fusion read contract; this milestone does not change
+  and the I1 Roof Fusion read contract reviewed in
+  `admin-next-roof-fusion-i1-review-2026-09-01.md`; this stream does not change
   Roof Fusion.
 - Preflight requires exact canonical quote/contract/recipient/PDF revisions,
   hashes and action-time owner-gate evidence.
