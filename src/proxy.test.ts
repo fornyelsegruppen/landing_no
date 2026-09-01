@@ -18,6 +18,16 @@ describe("proxy route matching", () => {
     ).toBe(false);
   });
 
+  it("leaves the protected Admin Next worker preview outside locale middleware", () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        nextConfig: {},
+        url: "https://takfornyelse-staging.vercel.app/worker-next-preview/visits/A-K-8-V1",
+      }),
+    ).toBe(false);
+  });
+
   it("continues to localize public marketing pages", () => {
     expect(
       unstable_doesMiddlewareMatch({
