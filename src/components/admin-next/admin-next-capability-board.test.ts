@@ -52,6 +52,6 @@ describe("Admin Next capability UI", () => {
     expect(html).toContain("Darbuotojo vizitas");
     expect(html.match(/Naudoti dabartinę funkciją/g)).toHaveLength(5);
     expect(html).toContain('data-capability-state="preview_ready"');
-    expect(html).toContain('data-capability-state="planned"');
+    expect(html).toContain('data-capability-state="implemented_disabled"');
   });
 });

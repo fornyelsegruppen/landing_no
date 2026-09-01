@@ -5,6 +5,7 @@ import {
   parseAdminNextFieldVisitState,
 } from "@/lib/admin-next/field-visit-contract";
 import { adminNextFixtureFieldVisitAdapter } from "@/lib/admin-next/field-visit-fixture";
+import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireInternalUser } from "@/lib/auth/internal-session";
 
@@ -20,13 +21,8 @@ export default async function AdminNextWorkerVisitPreviewPage({
 }) {
   const user = await requireInternalUser();
   const rollout = buildAdminNextRolloutView();
-  const fieldVisitModule = rollout.modules.find(({ id }) => id === "fieldVisit");
-  if (
-    rollout.state !== "preview" ||
-    fieldVisitModule?.state !== "preview_ready"
-  ) {
-    redirect("/user");
-  }
+  const access = resolveAdminNextPreviewAccess(rollout, "fieldVisit", "worker");
+  if (access.kind === "legacy_fallback") redirect(access.href);
 
   const [{ visitId }, query] = await Promise.all([params, searchParams]);
   const state = parseAdminNextFieldVisitState(query.state);
