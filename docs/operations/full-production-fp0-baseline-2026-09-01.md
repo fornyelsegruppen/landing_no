@@ -71,6 +71,24 @@ The local branch must not be called protected or FP0 `PASS` until it is pushed,
 remote required checks/review are configured, and the exact assembled SHA has a
 green full quality run.
 
+### First exact-SHA quality evidence
+
+- SHA: `f37f4b4906373435db57cb0516c310ad858d4b4f`
+- GitHub Actions run: `33513022629`
+- Job: `verify` (`99873088044`)
+- Result: `PASS` in 4m 40s
+- Passed stages: install, production dependency audit, generated Payload type
+  parity, lint, typecheck, unit/API, migration up/down, empty PostgreSQL
+  bootstrap, deterministic content seed, authenticated-account seed, Chromium
+  install, Production build, 11/11 public/authenticated Playwright smoke tests,
+  and PostgreSQL backup/restore rehearsal.
+- Non-blocking runner annotation: GitHub Actions v4 actions currently emit a
+  Node.js 20 deprecation warning while GitHub forces the runner to Node.js 24.
+
+This evidence covers the operational tree plus the initial FP0 CI/document
+commit. The evidence-recording commit itself must receive the same green gate
+before the baseline tag is created.
+
 Rollback before any remote publication is local and non-destructive: stop using
 this worktree/branch and continue from the preserved source branches. After
 remote publication, rollback means creating a new branch from the recorded
@@ -79,9 +97,9 @@ branch.
 
 ## Remaining FP0 gate
 
-- Run the full local quality baseline on the exact post-commit SHA.
-- Record a baseline tag only after that result is green.
+- Obtain a green repeat of the full quality gate on this evidence-recording
+  commit, then create the baseline tag on that exact SHA.
 - Review active cherry-pick candidates; none may arrive through a blind merge.
-- Push through the normal reviewed path, then configure required checks/review.
+- Configure remote required checks/review for the integration branch.
 - Produce exact-SHA Preview and current-function smoke evidence.
 - Keep FP0 `NOT_PASS` until all items above are proven.
