@@ -44,8 +44,11 @@ function repository() {
 const input = {
   administratorId: 9,
   correlationId: "commercial-test",
+  expectedRevision: 12,
   leadId: 12,
   requestKey: "a2cc6d27-9977-41a7-af73-50d5bda1ef25",
+  requestFingerprint: "commercial.package-rebuild-body:stable",
+  sourceQuoteId: 20,
   now: new Date("2026-09-01T08:00:00.000Z"),
 };
 
@@ -96,6 +99,72 @@ describe("commercial package request idempotency", () => {
     expect(repo.payload.create).toHaveBeenCalledTimes(1);
   });
 
+  it("serializes different client keys for the same case revision", async () => {
+    const repo = repository();
+    await claimCommercialPackageRequest(repo.payload as never, input);
+    await expect(
+      claimCommercialPackageRequest(repo.payload as never, {
+        ...input,
+        requestKey: "68fcf792-5853-45b2-824a-b3d8de93d57a",
+      }),
+    ).resolves.toEqual({ kind: "processing" });
+    expect(repo.payload.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a different request body for the same case revision", async () => {
+    const repo = repository();
+    await claimCommercialPackageRequest(repo.payload as never, input);
+    await expect(
+      claimCommercialPackageRequest(repo.payload as never, {
+        ...input,
+        requestFingerprint: "commercial.package-rebuild-body:changed",
+        requestKey: "68fcf792-5853-45b2-824a-b3d8de93d57a",
+      }),
+    ).resolves.toEqual({ kind: "conflict" });
+    expect(repo.payload.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves a stale running request to attention instead of allowing another version", async () => {
+    const repo = repository();
+    await claimCommercialPackageRequest(repo.payload as never, input);
+    await expect(
+      claimCommercialPackageRequest(repo.payload as never, {
+        ...input,
+        now: new Date("2026-09-01T08:16:00.001Z"),
+      }),
+    ).resolves.toEqual({ kind: "failed" });
+    expect(repo.jobs[0]).toMatchObject({
+      status: "attention",
+      lastErrorCode: "commercial_package_rebuild_stale",
+    });
+    expect(repo.payload.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a new operation only after the case revision advances", async () => {
+    const repo = repository();
+    await claimCommercialPackageRequest(repo.payload as never, input);
+    await completeCommercialPackageRequest(
+      repo.payload as never,
+      1,
+      {
+        baseQuoteId: 21,
+        baseQuoteReference: "T-12-V2",
+        recommendedQuoteId: null,
+        recommendedQuoteReference: null,
+      },
+      input.now,
+    );
+    await expect(
+      claimCommercialPackageRequest(repo.payload as never, {
+        ...input,
+        expectedRevision: 13,
+        requestFingerprint: "commercial.package-rebuild-body:revision-13",
+        sourceQuoteId: 21,
+      }),
+    ).resolves.toEqual({ kind: "claimed", jobId: 2 });
+    expect(repo.jobs).toHaveLength(2);
+  });
+
   it("turns a failed attempt into an attention record that cannot silently retry", async () => {
     const repo = repository();
     await claimCommercialPackageRequest(repo.payload as never, input);
@@ -119,7 +188,13 @@ describe("commercial package request idempotency", () => {
     repo.payload.find
       .mockResolvedValueOnce({ docs: [] })
       .mockResolvedValueOnce({
-        docs: [{ id: 8, status: "running", result: null }],
+        docs: [{
+          id: 8,
+          status: "running",
+          result: null,
+          startedAt: input.now.toISOString(),
+          payload: { requestFingerprint: input.requestFingerprint },
+        }],
       });
     repo.payload.create.mockRejectedValueOnce(new Error("duplicate key"));
     await expect(

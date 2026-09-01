@@ -2400,9 +2400,11 @@ export default async function AdminCasePage({
                     caseData.price ? (
                       <CommercialQuoteEditor
                         currentService={caseData.lead.inquiryType}
+                        expectedRevision={caseData.lead.revision}
                         leadId={caseData.lead.id}
                         locale={user.interfaceLanguage}
                         rules={rules}
+                        sourceQuoteId={caseData.quote.id}
                         unitPriceExVatOre={
                           caseData.quote.optionKind === "recommended"
                             ? undefined

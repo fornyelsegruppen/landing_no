@@ -12,7 +12,10 @@ export type CommercialPackageClaim =
   | { kind: "claimed"; jobId: number }
   | { kind: "completed"; result: CommercialPackageResult }
   | { kind: "processing" }
+  | { kind: "conflict" }
   | { kind: "failed" };
+
+const staleRequestMs = 15 * 60 * 1000;
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0
@@ -68,15 +71,44 @@ async function findRequest(payload: Payload, idempotencyKey: string) {
   return result.docs[0] ?? null;
 }
 
-function existingClaim(
+function payloadValue(value: unknown) {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+async function existingClaim(
+  payload: Payload,
   job: Awaited<ReturnType<typeof findRequest>>,
-): CommercialPackageClaim {
+  requestFingerprint: string,
+  now: Date,
+): Promise<CommercialPackageClaim> {
   if (!job) throw new Error("Commercial package request is missing");
+  const storedFingerprint = textValue(payloadValue(job.payload)?.requestFingerprint);
+  if (!storedFingerprint || storedFingerprint !== requestFingerprint) {
+    return { kind: "conflict" };
+  }
   if (job.status === "completed") {
     const result = completedResult(job.result);
     return result ? { kind: "completed", result } : { kind: "failed" };
   }
   if (["pending", "running", "retry"].includes(job.status)) {
+    const startedAt = Date.parse(textValue(job.startedAt) || "");
+    if (!Number.isFinite(startedAt) || now.getTime() - startedAt > staleRequestMs) {
+      await payload.update({
+        collection: "operational-jobs",
+        id: job.id,
+        depth: 0,
+        overrideAccess: true,
+        data: {
+          status: "attention",
+          lastErrorCode: "commercial_package_rebuild_stale",
+          lastErrorMessage:
+            "Commercial package rebuild stopped before completion; inspect the case before retrying",
+        },
+      });
+      return { kind: "failed" };
+    }
     return { kind: "processing" };
   }
   return { kind: "failed" };
@@ -87,19 +119,22 @@ export async function claimCommercialPackageRequest(
   input: {
     administratorId: number;
     correlationId: string;
+    expectedRevision: number;
     leadId: number;
     requestKey: string;
+    requestFingerprint: string;
+    sourceQuoteId: number;
     now?: Date;
   },
 ): Promise<CommercialPackageClaim> {
   const idempotencyKey = makeIdempotencyKey("commercial.package-rebuild", {
     leadId: input.leadId,
-    requestKey: input.requestKey,
+    expectedRevision: input.expectedRevision,
   });
-  const existing = await findRequest(payload, idempotencyKey);
-  if (existing) return existingClaim(existing);
-
   const now = input.now ?? new Date();
+  const existing = await findRequest(payload, idempotencyKey);
+  if (existing) return existingClaim(payload, existing, input.requestFingerprint, now);
+
   try {
     const created = await payload.create({
       collection: "operational-jobs",
@@ -116,7 +151,13 @@ export async function claimCommercialPackageRequest(
         startedAt: now.toISOString(),
         payload: {
           administratorId: input.administratorId,
+          expectedRevision: input.expectedRevision,
           leadId: input.leadId,
+          requestFingerprint: input.requestFingerprint,
+          requestKeyHash: makeIdempotencyKey("commercial.package-client-request", {
+            requestKey: input.requestKey,
+          }),
+          sourceQuoteId: input.sourceQuoteId,
         },
       },
     });
@@ -126,7 +167,7 @@ export async function claimCommercialPackageRequest(
     return { kind: "claimed", jobId: createdId };
   } catch (error) {
     const raced = await findRequest(payload, idempotencyKey);
-    if (raced) return existingClaim(raced);
+    if (raced) return existingClaim(payload, raced, input.requestFingerprint, now);
     throw error;
   }
 }
