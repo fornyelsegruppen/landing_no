@@ -99,9 +99,16 @@ const copy = {
     unsavedCommercialChanges:
       "Du har valg eller prisendringer som ikke er brukt ennå. Opprett først en ny kontrollert tilbudsversjon før du godkjenner og sender pakken.",
     rebuildCommercialPackage: "Opprett ny kontrollert tilbudsversjon",
+    reviewCommercialPackage: "Kontroller og bekreft ny tilbudsversjon",
     previewQuotePdf: "Kontroller tilbud og kontrakt som PDF",
+    commercialConfirmTitle: "Bekreft ny tilbudsversjon",
     commercialConfirm:
       "Dette erstatter åpne utkast med en ny, auditert pris- og dokumentversjon. Fortsette?",
+    commercialCancel: "Avbryt",
+    commercialConfirmAction: "Bekreft og opprett",
+    commercialCreatedNotice: "Ny kontrollert tilbudsversjon er opprettet:",
+    commercialProcessingNotice:
+      "Den samme forespørselen behandles allerede. Vent et øyeblikk og oppdater saken; ikke trykk flere ganger.",
     discountSafety:
       "Rabatt over 20 % eller enhetspris utenfor 80–200 % av godkjent prisliste blokkeres.",
     validUntil: "Gyldig til",
@@ -355,9 +362,17 @@ const copy = {
     unsavedCommercialChanges:
       "Yra dar nepritaikytų pasirinkimų arba kainos pakeitimų. Prieš patvirtindami ir siųsdami paketą pirmiausia sukurkite naują patikrintą pasiūlymo versiją.",
     rebuildCommercialPackage: "Sukurti naują patikrintą pasiūlymo versiją",
+    reviewCommercialPackage:
+      "Peržiūrėti ir patvirtinti naują pasiūlymo versiją",
     previewQuotePdf: "Peržiūrėti pasiūlymo ir sutarties PDF",
+    commercialConfirmTitle: "Patvirtinkite naują pasiūlymo versiją",
     commercialConfirm:
       "Atviri juodraščiai bus pakeisti nauja audituojama kainos ir dokumentų versija. Tęsti?",
+    commercialCancel: "Atšaukti",
+    commercialConfirmAction: "Patvirtinti ir sukurti",
+    commercialCreatedNotice: "Sukurta nauja patikrinta pasiūlymo versija:",
+    commercialProcessingNotice:
+      "Ta pati užklausa jau vykdoma. Palaukite ir atnaujinkite bylą; daugiau nespauskite.",
     discountSafety:
       "Didesnė nei 20 % nuolaida arba vieneto kaina už 80–200 % patvirtinto kainyno ribų blokuojama.",
     validUntil: "Galioja iki",
@@ -611,9 +626,16 @@ const copy = {
     unsavedCommercialChanges:
       "You have selections or price changes that have not been applied. Create a new verified quote version before approving and sending the package.",
     rebuildCommercialPackage: "Create a new verified quote version",
+    reviewCommercialPackage: "Review and confirm a new quote version",
     previewQuotePdf: "Review quote and contract PDF",
+    commercialConfirmTitle: "Confirm the new quote version",
     commercialConfirm:
       "This replaces open drafts with a new audited price and document version. Continue?",
+    commercialCancel: "Cancel",
+    commercialConfirmAction: "Confirm and create",
+    commercialCreatedNotice: "A new verified quote version was created:",
+    commercialProcessingNotice:
+      "The same request is already processing. Wait and refresh the case; do not click again.",
     discountSafety:
       "Discounts above 20% or unit prices outside 80–200% of the approved price list are blocked.",
     validUntil: "Valid until",
