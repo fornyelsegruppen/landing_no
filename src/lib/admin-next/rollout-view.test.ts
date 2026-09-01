@@ -53,7 +53,10 @@ describe("Admin Next rollout view", () => {
     expect(
       view.modules.find(({ id }) => id === "documentPreflight")?.state,
     ).toBe("implemented_disabled");
-    expect(view.counts.planned).toBe(2);
+    expect(
+      view.modules.find(({ id }) => id === "fieldVisit")?.state,
+    ).toBe("implemented_disabled");
+    expect(view.counts.planned).toBe(1);
   });
 
   it("distinguishes implemented-but-disabled from missing configuration", () => {
@@ -79,6 +82,18 @@ describe("Admin Next rollout view", () => {
       blocked.modules.find(({ id }) => id === "roofWorkbench")
         ?.unavailableIntegrations,
     ).toEqual(["privateStorage"]);
+  });
+
+  it("exposes field visit only when the worker portal dependency is enabled", () => {
+    const view = buildAdminNextRolloutView({
+      ADMIN_NEXT_MODE: "preview",
+      VERCEL_ENV: "preview",
+      FEATURE_WORKER_PORTAL: "true",
+    });
+
+    expect(view.modules.find(({ id }) => id === "fieldVisit")?.state).toBe(
+      "preview_ready",
+    );
   });
 
   it("requires release evidence before production activation", () => {

@@ -86,7 +86,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   },
   {
     id: "fieldVisit",
-    stage: "planned",
+    stage: "adapter_ready",
     dependencies: ["workerPortal"],
     legacyHref: "/admin-v2/work",
   },
