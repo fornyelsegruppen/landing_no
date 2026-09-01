@@ -115,7 +115,7 @@ export type AdminNextModuleDefinition = {
   dependencies: readonly FeatureFlagName[];
   legacyHref: string;
   workerLegacyHref?: string;
-  previewAdapter: "fixture_only";
+  previewAdapter: "fixture_only" | "canonical_read_with_fixture_fallback";
   mutationPolicy: "legacy_only";
 };
 
@@ -127,7 +127,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
     capabilities: ["Case", "Customer", "Property", "Visit"],
     dependencies: ["caseStateEngineV2", "adminExceptionFlowsV2"],
     legacyHref: "/admin-v2",
-    previewAdapter: "fixture_only",
+    previewAdapter: "canonical_read_with_fixture_fallback",
     mutationPolicy: "legacy_only",
   },
   {
@@ -137,7 +137,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
     capabilities: ["Case", "Customer", "Property", "Roof", "Visit"],
     dependencies: ["caseStateEngineV2"],
     legacyHref: "/admin-v2/cases",
-    previewAdapter: "fixture_only",
+    previewAdapter: "canonical_read_with_fixture_fallback",
     mutationPolicy: "legacy_only",
   },
   {
@@ -147,7 +147,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
     capabilities: ["Case", "Property", "Roof"],
     dependencies: ["measurementEvidenceV2"],
     legacyHref: "/admin-v2/cases",
-    previewAdapter: "fixture_only",
+    previewAdapter: "canonical_read_with_fixture_fallback",
     mutationPolicy: "legacy_only",
   },
   {
@@ -172,7 +172,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
     dependencies: ["workerPortal"],
     legacyHref: "/admin-v2/work",
     workerLegacyHref: "/user",
-    previewAdapter: "fixture_only",
+    previewAdapter: "canonical_read_with_fixture_fallback",
     mutationPolicy: "legacy_only",
   },
 ] as const;

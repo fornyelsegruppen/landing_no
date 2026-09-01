@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { AdminNextR4MeasurementReview } from "@/components/admin-next/admin-next-r4-measurement-review";
-import { loadAdminNextCaseWorkspace } from "@/lib/admin-next/case-workspace-contract";
-import { adminNextFixtureCaseWorkspaceAdapter } from "@/lib/admin-next/case-workspace-fixture";
+import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-fixture";
+import { adminNextFixtureR4Adapter } from "@/lib/admin-next/r4-read-adapter";
+import { resolveAdminNextServerRead } from "@/lib/admin-next/server-read-resolver";
 import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
@@ -19,21 +20,24 @@ export default async function AdminNextR4MeasurementPage({
   if (access.kind === "legacy_fallback") redirect(access.href);
 
   const { caseId, measurementId } = await params;
-  const result = await loadAdminNextCaseWorkspace(
-    adminNextFixtureCaseWorkspaceAdapter,
-    caseId,
-  );
+  const selection = resolveAdminNextServerRead({
+    moduleId: "roofWorkbench",
+    rollout,
+    role: user.role,
+    canonical: undefined,
+    fixture: adminNextFixtureR4Adapter,
+  });
+  if (selection.kind === "legacy_fallback") redirect(selection.href);
+  const result = await selection.adapter.load(caseId, measurementId);
 
   if (result.status === "not_found") notFound();
-  const measurement = result.value.measurementReview;
-  if (!measurement || measurement.reference !== measurementId) notFound();
 
   return (
     <AdminNextR4MeasurementReview
-      caseReference={result.value.reference}
-      customer={result.value.customer}
+      caseReference={caseId}
+      customer={adminNextCaseWorkspaceFixture.customer}
       locale={user.interfaceLanguage}
-      measurement={measurement}
+      measurement={result.value}
     />
   );
 }
