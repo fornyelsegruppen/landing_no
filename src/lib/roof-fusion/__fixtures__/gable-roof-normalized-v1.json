@@ -1,0 +1,741 @@
+{
+  "coordinateSystem": {
+    "kind": "local_cartesian",
+    "reference": "EPSG:4326 tangent plane at property anchor",
+    "axisOrder": "x_east_y_north_z_up",
+    "origin": {
+      "latitude": 59.9139,
+      "longitude": 10.7522,
+      "elevationM": 112.4
+    }
+  },
+  "geometry": {
+    "vertices": [
+      {
+        "vertexId": "v1",
+        "xM": 0,
+        "yM": 0,
+        "zM": 0,
+        "uncertaintyM": 0.04,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v2",
+        "xM": 10,
+        "yM": 0,
+        "zM": 0,
+        "uncertaintyM": 0.04,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v3",
+        "xM": 10,
+        "yM": 4,
+        "zM": 2.309401076758503,
+        "uncertaintyM": 0.05,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v4",
+        "xM": 0,
+        "yM": 4,
+        "zM": 2.309401076758503,
+        "uncertaintyM": 0.05,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v5",
+        "xM": 10,
+        "yM": 8,
+        "zM": 0,
+        "uncertaintyM": 0.04,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v6",
+        "xM": 0,
+        "yM": 8,
+        "zM": 0,
+        "uncertaintyM": 0.04,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v7",
+        "xM": 2,
+        "yM": 1,
+        "zM": 0.5773502691896257,
+        "uncertaintyM": 0.06,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v8",
+        "xM": 3.5,
+        "yM": 1,
+        "zM": 0.5773502691896257,
+        "uncertaintyM": 0.06,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v9",
+        "xM": 3.5,
+        "yM": 1.8,
+        "zM": 1.0392304845413263,
+        "uncertaintyM": 0.06,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v10",
+        "xM": 2,
+        "yM": 1.8,
+        "zM": 1.0392304845413263,
+        "uncertaintyM": 0.06,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v11",
+        "xM": 7.2,
+        "yM": 5.2,
+        "zM": 1.616580753730952,
+        "uncertaintyM": 0.08,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v12",
+        "xM": 8.1,
+        "yM": 5.2,
+        "zM": 1.616580753730952,
+        "uncertaintyM": 0.08,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v13",
+        "xM": 8.1,
+        "yM": 6.1,
+        "zM": 1.096965511460289,
+        "uncertaintyM": 0.08,
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "vertexId": "v14",
+        "xM": 7.2,
+        "yM": 6.1,
+        "zM": 1.096965511460289,
+        "uncertaintyM": 0.08,
+        "sourceRefs": ["src-provider"]
+      }
+    ],
+    "contours": [
+      {
+        "contourId": "contour-south",
+        "kind": "surface_boundary",
+        "vertexIds": ["v1", "v2", "v3", "v4"],
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "contourId": "contour-north",
+        "kind": "surface_boundary",
+        "vertexIds": ["v4", "v3", "v5", "v6"],
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "contourId": "contour-skylight",
+        "kind": "opening_boundary",
+        "vertexIds": ["v7", "v8", "v9", "v10"],
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "contourId": "contour-chimney",
+        "kind": "obstacle_boundary",
+        "vertexIds": ["v11", "v12", "v13", "v14"],
+        "sourceRefs": ["src-provider"]
+      }
+    ],
+    "surfaces": [
+      {
+        "surfaceId": "surface-south",
+        "outerContourId": "contour-south",
+        "openingIds": ["opening-skylight"],
+        "edgeIds": [
+          "edge-south-eave",
+          "edge-south-east-rake",
+          "edge-ridge",
+          "edge-south-west-rake"
+        ],
+        "normal": [0, -0.5, 0.8660254037844386],
+        "azimuthDegrees": 180,
+        "pitch": {
+          "mode": "exact",
+          "unit": "deg",
+          "min": 30,
+          "max": 30,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.96,
+            "basis": "calibrated",
+            "rationale": "Structured provider plane normal"
+          }
+        },
+        "grossHorizontalArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 40,
+          "max": 40,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Closed calibrated contour"
+          }
+        },
+        "grossSurfaceArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 46.18802153517006,
+          "max": 46.18802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "Gross area from horizontal area and pitch"
+          }
+        },
+        "netSurfaceArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 44.8023808890323,
+          "max": 44.8023808890323,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.94,
+            "basis": "derived",
+            "rationale": "Gross area less skylight opening"
+          }
+        },
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "surfaceId": "surface-north",
+        "outerContourId": "contour-north",
+        "openingIds": [],
+        "edgeIds": [
+          "edge-north-eave",
+          "edge-north-east-rake",
+          "edge-ridge",
+          "edge-north-west-rake"
+        ],
+        "normal": [0, 0.5, 0.8660254037844386],
+        "azimuthDegrees": 0,
+        "pitch": {
+          "mode": "exact",
+          "unit": "deg",
+          "min": 30,
+          "max": 30,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.96,
+            "basis": "calibrated",
+            "rationale": "Structured provider plane normal"
+          }
+        },
+        "grossHorizontalArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 40,
+          "max": 40,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Closed calibrated contour"
+          }
+        },
+        "grossSurfaceArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 46.18802153517006,
+          "max": 46.18802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "Gross area from horizontal area and pitch"
+          }
+        },
+        "netSurfaceArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 46.18802153517006,
+          "max": 46.18802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "No roof opening was subtracted"
+          }
+        },
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      }
+    ],
+    "edges": [
+      {
+        "edgeId": "edge-south-eave",
+        "fromVertexId": "v1",
+        "toVertexId": "v2",
+        "adjacentSurfaceIds": ["surface-south"],
+        "type": "eave",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 10,
+          "max": 10,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Structured line segment"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 10,
+          "max": 10,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Horizontal eave segment"
+          }
+        },
+        "gutterCandidate": true,
+        "quality": "estimated",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "edgeId": "edge-north-eave",
+        "fromVertexId": "v6",
+        "toVertexId": "v5",
+        "adjacentSurfaceIds": ["surface-north"],
+        "type": "eave",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 10,
+          "max": 10,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Structured line segment"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 10,
+          "max": 10,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Horizontal eave segment"
+          }
+        },
+        "gutterCandidate": true,
+        "quality": "estimated",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "edgeId": "edge-ridge",
+        "fromVertexId": "v4",
+        "toVertexId": "v3",
+        "adjacentSurfaceIds": ["surface-south", "surface-north"],
+        "type": "ridge",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 10,
+          "max": 10,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Shared ridge segment"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 10,
+          "max": 10,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.97,
+            "basis": "calibrated",
+            "rationale": "Shared ridge segment"
+          }
+        },
+        "gutterCandidate": false,
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "edgeId": "edge-south-west-rake",
+        "fromVertexId": "v1",
+        "toVertexId": "v4",
+        "adjacentSurfaceIds": ["surface-south"],
+        "type": "rake",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4,
+          "max": 4,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.96,
+            "basis": "calibrated",
+            "rationale": "Plan length"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4.618802153517006,
+          "max": 4.618802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "Slope-corrected segment"
+          }
+        },
+        "gutterCandidate": false,
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "edgeId": "edge-south-east-rake",
+        "fromVertexId": "v2",
+        "toVertexId": "v3",
+        "adjacentSurfaceIds": ["surface-south"],
+        "type": "rake",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4,
+          "max": 4,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.96,
+            "basis": "calibrated",
+            "rationale": "Plan length"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4.618802153517006,
+          "max": 4.618802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "Slope-corrected segment"
+          }
+        },
+        "gutterCandidate": false,
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "edgeId": "edge-north-west-rake",
+        "fromVertexId": "v4",
+        "toVertexId": "v6",
+        "adjacentSurfaceIds": ["surface-north"],
+        "type": "rake",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4,
+          "max": 4,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.96,
+            "basis": "calibrated",
+            "rationale": "Plan length"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4.618802153517006,
+          "max": 4.618802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "Slope-corrected segment"
+          }
+        },
+        "gutterCandidate": false,
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      },
+      {
+        "edgeId": "edge-north-east-rake",
+        "fromVertexId": "v3",
+        "toVertexId": "v5",
+        "adjacentSurfaceIds": ["surface-north"],
+        "type": "rake",
+        "length2d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4,
+          "max": 4,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.96,
+            "basis": "calibrated",
+            "rationale": "Plan length"
+          }
+        },
+        "length3d": {
+          "mode": "exact",
+          "unit": "m",
+          "min": 4.618802153517006,
+          "max": 4.618802153517006,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.95,
+            "basis": "derived",
+            "rationale": "Slope-corrected segment"
+          }
+        },
+        "gutterCandidate": false,
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      }
+    ],
+    "openings": [
+      {
+        "openingId": "opening-skylight",
+        "surfaceId": "surface-south",
+        "contourId": "contour-skylight",
+        "kind": "skylight",
+        "horizontalArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 1.2,
+          "max": 1.2,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.93,
+            "basis": "calibrated",
+            "rationale": "Provider opening contour"
+          }
+        },
+        "surfaceArea": {
+          "mode": "exact",
+          "unit": "m2",
+          "min": 1.3856406461378438,
+          "max": 1.3856406461378438,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "high",
+            "score": 0.92,
+            "basis": "derived",
+            "rationale": "Opening area corrected for pitch"
+          }
+        },
+        "quality": "verified",
+        "sourceRefs": ["src-provider"]
+      }
+    ],
+    "obstacles": [
+      {
+        "obstacleId": "obstacle-chimney",
+        "surfaceId": "surface-north",
+        "contourId": "contour-chimney",
+        "kind": "chimney",
+        "height": {
+          "mode": "range",
+          "unit": "m",
+          "min": 0.7,
+          "max": 0.9,
+          "sourceRefs": ["src-provider"],
+          "confidence": {
+            "level": "medium",
+            "score": 0.78,
+            "basis": "provider_reported",
+            "rationale": "Provider obstacle estimate"
+          }
+        },
+        "quality": "estimated",
+        "sourceRefs": ["src-provider"]
+      }
+    ]
+  },
+  "provenance": {
+    "sources": [
+      {
+        "sourceId": "src-provider",
+        "kind": "licensed_report",
+        "provider": "fake-roof-provider",
+        "providerObjectId": "fixture-gable-001",
+        "inputSchemaVersion": "fake-provider-roof.v1",
+        "adapterVersion": "fake-roof-adapter.v1",
+        "capturedAt": "2026-08-31T08:00:00.000Z",
+        "retrievedAt": "2026-09-01T08:00:00.000Z",
+        "rawContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license": {
+          "status": "authorized",
+          "name": "Synthetic fixture license",
+          "attribution": "Synthetic RF fixture",
+          "termsVersion": "fixture-terms.v1"
+        },
+        "visibility": "customer_safe",
+        "quality": {
+          "status": "usable",
+          "score": 0.97,
+          "reasons": ["Deterministic structured fixture"]
+        }
+      },
+      {
+        "sourceId": "src-manual",
+        "kind": "manual",
+        "provider": "takfornyelse-workbench",
+        "inputSchemaVersion": "roof-manual-correction.v1",
+        "adapterVersion": "roof-fusion.v1",
+        "retrievedAt": "2026-09-01T08:00:00.000Z",
+        "rawContentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "license": {
+          "status": "authorized",
+          "name": "Internal operational evidence",
+          "attribution": "Takfornyelse administrator"
+        },
+        "visibility": "internal",
+        "quality": {
+          "status": "usable",
+          "score": 1,
+          "reasons": ["Reserved for auditable manual corrections"]
+        }
+      }
+    ],
+    "observations": [
+      {
+        "observationId": "obs-south-pitch",
+        "kind": "surface_pitch",
+        "targetRef": "surface-south",
+        "value": { "degrees": 30, "uncertaintyDegrees": 0.4 },
+        "status": "accepted",
+        "sourceRefs": ["src-provider"],
+        "confidence": {
+          "level": "high",
+          "score": 0.96,
+          "basis": "calibrated",
+          "rationale": "Structured provider plane normal"
+        },
+        "reasons": ["Plane fit passed fixture tolerance"]
+      },
+      {
+        "observationId": "obs-north-pitch",
+        "kind": "surface_pitch",
+        "targetRef": "surface-north",
+        "value": { "degrees": 30, "uncertaintyDegrees": 0.4 },
+        "status": "accepted",
+        "sourceRefs": ["src-provider"],
+        "confidence": {
+          "level": "high",
+          "score": 0.96,
+          "basis": "calibrated",
+          "rationale": "Structured provider plane normal"
+        },
+        "reasons": ["Plane fit passed fixture tolerance"]
+      },
+      {
+        "observationId": "obs-ridge",
+        "kind": "edge_type",
+        "targetRef": "edge-ridge",
+        "value": "ridge",
+        "status": "accepted",
+        "sourceRefs": ["src-provider"],
+        "confidence": {
+          "level": "high",
+          "score": 0.97,
+          "basis": "calibrated",
+          "rationale": "Shared edge between two facets"
+        },
+        "reasons": ["Facet adjacency confirms ridge"]
+      },
+      {
+        "observationId": "obs-skylight",
+        "kind": "opening_exists",
+        "targetRef": "opening-skylight",
+        "value": true,
+        "status": "accepted",
+        "sourceRefs": ["src-provider"],
+        "confidence": {
+          "level": "high",
+          "score": 0.93,
+          "basis": "provider_reported",
+          "rationale": "Structured provider opening"
+        },
+        "reasons": ["Opening contour is inside the south surface"]
+      }
+    ],
+    "fusionDecision": {
+      "decisionId": "fusion-gable-001",
+      "policyVersion": "roof-fusion-policy.v1",
+      "acceptedObservationIds": [
+        "obs-south-pitch",
+        "obs-north-pitch",
+        "obs-ridge",
+        "obs-skylight"
+      ],
+      "rejectedObservationIds": [],
+      "conflictedObservationIds": [],
+      "decidedAt": "2026-09-01T08:01:00.000Z",
+      "decidedBy": {
+        "actorId": "roof-fusion-engine",
+        "actorType": "system",
+        "displayName": "Roof Fusion Engine"
+      },
+      "rationale": "All deterministic fixture observations agree"
+    }
+  },
+  "measurement": {
+    "method": "provider_structured_import",
+    "class": "fused_estimate",
+    "confidence": {
+      "level": "high",
+      "score": 0.95,
+      "basis": "calibrated",
+      "rationale": "Structured geometry passed deterministic fixture validation"
+    }
+  }
+}
