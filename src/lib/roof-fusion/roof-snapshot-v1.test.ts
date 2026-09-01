@@ -145,7 +145,7 @@ describe("Roof Snapshot v1 contract", () => {
 
     expect(parsed).toEqual(generated);
     expect(parsed.snapshotHash).toBe(
-      "1feae771b507a76a4cf91e0ea13480caf45b25711e3879821338e07dc567ee1d",
+      "fd45e545cc5accb4b4d0f7a5e4db223d27eb36fb842fd989748da10ed40f115e",
     );
   });
 
@@ -192,11 +192,12 @@ describe("Roof Snapshot v1 contract", () => {
     expect(value.totals.verifiedGutterLength.mode).toBe("unknown");
     expect(value.quality.status).toBe("pass");
     expect(value.state).toBe("review_required");
+    expect(Object.hasOwn(value, "supersedesSnapshotId")).toBe(false);
     expect(value.snapshotHash).toBe(
-      "b560c40aadaef3782fbe813067eb585bfa078bee62ebcf4f4706b2d386af9897",
+      "03660f8caaaabf15eab6d0974237231e29f409b8ecfed2821184fb8f1d7d5395",
     );
     expect(value.rendererPayload.renderHash).toBe(
-      "975f0612665d77d7e43e21cb8e247d351131e931963418178f7bf8f45ced8abe",
+      "0e98625f2c57632b85bfd74de49b5b6e36e569bae58790dcb43fca3ea54df739",
     );
 
     const serialized = serializeRoofSnapshotV1(value);

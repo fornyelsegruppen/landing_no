@@ -1,5 +1,11 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import {
+  canonicalJsonV1,
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+  compareCanonicalStringsV1,
+  uniqueCanonicalStringsV1,
+} from "./canonicalization-v1";
 
 export const ROOF_SNAPSHOT_SCHEMA_VERSION = "roof-snapshot.v1" as const;
 export const ROOF_RENDERER_SCHEMA_VERSION = "roof-renderer.v1" as const;
@@ -590,26 +596,12 @@ export class RoofSnapshotIntegrityError extends Error {
   }
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function digest(domain: string, value: unknown) {
-  return createHash("sha256")
-    .update(`${domain}:${canonicalJson(value)}`)
-    .digest("hex");
+  return canonicalSha256V1(value, domain);
 }
 
 function uniqueSorted(values: string[]) {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return uniqueCanonicalStringsV1(values);
 }
 
 function canonicalRing(vertexIds: string[]) {
@@ -623,7 +615,7 @@ function canonicalRing(vertexIds: string[]) {
     ...rotations([...vertexIds].reverse()),
   ];
   return candidates.sort((left, right) =>
-    left.join("\u0000").localeCompare(right.join("\u0000")),
+    compareCanonicalStringsV1(left.join("\u0000"), right.join("\u0000")),
   )[0];
 }
 
@@ -636,7 +628,7 @@ export function canonicalRoofGeometryV1(
 ): RoofSnapshotV1["geometry"] {
   const value = clone(geometry);
   value.vertices.sort((left, right) =>
-    left.vertexId.localeCompare(right.vertexId),
+    compareCanonicalStringsV1(left.vertexId, right.vertexId),
   );
   value.contours = value.contours
     .map((contour) => ({
@@ -644,7 +636,9 @@ export function canonicalRoofGeometryV1(
       vertexIds: canonicalRing(contour.vertexIds),
       sourceRefs: uniqueSorted(contour.sourceRefs),
     }))
-    .sort((left, right) => left.contourId.localeCompare(right.contourId));
+    .sort((left, right) =>
+      compareCanonicalStringsV1(left.contourId, right.contourId),
+    );
   value.surfaces = value.surfaces
     .map((surface) => ({
       ...surface,
@@ -652,21 +646,29 @@ export function canonicalRoofGeometryV1(
       edgeIds: uniqueSorted(surface.edgeIds),
       sourceRefs: uniqueSorted(surface.sourceRefs),
     }))
-    .sort((left, right) => left.surfaceId.localeCompare(right.surfaceId));
+    .sort((left, right) =>
+      compareCanonicalStringsV1(left.surfaceId, right.surfaceId),
+    );
   value.edges = value.edges
     .map((edge) => ({
       ...edge,
-      fromVertexId: [edge.fromVertexId, edge.toVertexId].sort()[0],
-      toVertexId: [edge.fromVertexId, edge.toVertexId].sort()[1],
+      fromVertexId: [edge.fromVertexId, edge.toVertexId].sort(
+        compareCanonicalStringsV1,
+      )[0],
+      toVertexId: [edge.fromVertexId, edge.toVertexId].sort(
+        compareCanonicalStringsV1,
+      )[1],
       adjacentSurfaceIds: uniqueSorted(edge.adjacentSurfaceIds),
       sourceRefs: uniqueSorted(edge.sourceRefs),
     }))
-    .sort((left, right) => left.edgeId.localeCompare(right.edgeId));
+    .sort((left, right) =>
+      compareCanonicalStringsV1(left.edgeId, right.edgeId),
+    );
   value.openings.sort((left, right) =>
-    left.openingId.localeCompare(right.openingId),
+    compareCanonicalStringsV1(left.openingId, right.openingId),
   );
   value.obstacles.sort((left, right) =>
-    left.obstacleId.localeCompare(right.obstacleId),
+    compareCanonicalStringsV1(left.obstacleId, right.obstacleId),
   );
   return value;
 }
@@ -677,10 +679,10 @@ function canonicalSnapshotContent(
   const value = clone(snapshot);
   value.geometry = canonicalRoofGeometryV1(value.geometry);
   value.provenance.sources.sort((left, right) =>
-    left.sourceId.localeCompare(right.sourceId),
+    compareCanonicalStringsV1(left.sourceId, right.sourceId),
   );
   value.provenance.observations.sort((left, right) =>
-    left.observationId.localeCompare(right.observationId),
+    compareCanonicalStringsV1(left.observationId, right.observationId),
   );
   value.provenance.fusionDecision.acceptedObservationIds = uniqueSorted(
     value.provenance.fusionDecision.acceptedObservationIds,
@@ -963,7 +965,9 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
           `edge_surface_not_reciprocal:${edge.edgeId}:${surfaceId}`,
         );
     }
-    const pair = [edge.fromVertexId, edge.toVertexId].sort().join("|");
+    const pair = [edge.fromVertexId, edge.toVertexId]
+      .sort(compareCanonicalStringsV1)
+      .join("|");
     edgePairs.set(pair, [...(edgePairs.get(pair) ?? []), edge.edgeId]);
     const from = vertices.get(edge.fromVertexId);
     const to = vertices.get(edge.toVertexId);
@@ -985,7 +989,9 @@ function topologyFailures(seed: RoofSnapshotSeedV1) {
   }
   for (const edgeIdsForPair of edgePairs.values()) {
     if (edgeIdsForPair.length > 1)
-      failures.push(`duplicate_edge_pair:${edgeIdsForPair.sort().join(".")}`);
+      failures.push(
+        `duplicate_edge_pair:${edgeIdsForPair.sort(compareCanonicalStringsV1).join(".")}`,
+      );
   }
   for (const opening of seed.geometry.openings) {
     if (!surfaceIds.has(opening.surfaceId))
@@ -1218,7 +1224,9 @@ function buildRendererPayload(
         attribution: source.license.attribution,
         licenseStatus: source.license.status,
       }))
-      .sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
+      .sort((left, right) =>
+        compareCanonicalStringsV1(left.sourceId, right.sourceId),
+      ),
   };
   return rendererPayloadSchema.parse({
     ...payload,
@@ -1261,7 +1269,9 @@ function normalizeLifecycle(
 }
 
 function finalizeRoofSnapshot(seedInput: RoofSnapshotSeedV1): RoofSnapshotV1 {
-  const parsedSeed = roofSnapshotV1SeedSchema.parse(seedInput);
+  const parsedSeed = roofSnapshotV1SeedSchema.parse(
+    canonicalizeJsonValueV1(seedInput),
+  );
   const quality = evaluateRoofSnapshotQualityV1(parsedSeed);
   const seed = normalizeLifecycle(parsedSeed, quality);
   const totals = deriveTotals(seed.geometry);
@@ -1299,19 +1309,19 @@ function stripDerived(snapshot: RoofSnapshotV1): RoofSnapshotSeedV1 {
 
 function assertDerivedParity(snapshot: RoofSnapshotV1) {
   const rebuilt = finalizeRoofSnapshot(stripDerived(snapshot));
-  if (canonicalJson(rebuilt.totals) !== canonicalJson(snapshot.totals)) {
+  if (canonicalJsonV1(rebuilt.totals) !== canonicalJsonV1(snapshot.totals)) {
     throw new RoofSnapshotIntegrityError(
       "Roof snapshot totals do not match its geometry",
     );
   }
-  if (canonicalJson(rebuilt.quality) !== canonicalJson(snapshot.quality)) {
+  if (canonicalJsonV1(rebuilt.quality) !== canonicalJsonV1(snapshot.quality)) {
     throw new RoofSnapshotIntegrityError(
       "Roof snapshot quality gates do not match its content",
     );
   }
   if (
-    canonicalJson(rebuilt.rendererPayload) !==
-    canonicalJson(snapshot.rendererPayload)
+    canonicalJsonV1(rebuilt.rendererPayload) !==
+    canonicalJsonV1(snapshot.rendererPayload)
   ) {
     throw new RoofSnapshotIntegrityError(
       "Roof renderer payload has drifted from the canonical snapshot",
@@ -1336,7 +1346,7 @@ export function parseRoofSnapshotV1(value: unknown): RoofSnapshotV1 {
 }
 
 export function serializeRoofSnapshotV1(value: RoofSnapshotV1) {
-  return canonicalJson(parseRoofSnapshotV1(value));
+  return canonicalJsonV1(parseRoofSnapshotV1(value));
 }
 
 export const roofSnapshotApprovalCommandV1Schema = z

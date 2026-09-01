@@ -1,5 +1,11 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import {
+  canonicalJsonV1,
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+  compareCanonicalStringsV1,
+  uniqueCanonicalStringsV1,
+} from "./canonicalization-v1";
 import {
   buildRoofSnapshotV1,
   canonicalRoofGeometryV1,
@@ -186,22 +192,8 @@ export class RoofSourceIntegrityError extends Error {
   }
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function digest(domain: string, value: unknown) {
-  return createHash("sha256")
-    .update(`${domain}:${canonicalJson(value)}`)
-    .digest("hex");
+  return canonicalSha256V1(value, domain);
 }
 
 export function roofSourceInputHashV1(
@@ -220,7 +212,9 @@ export function roofSourceInputHashV1(
 export function buildRoofSourceRequestV1(
   request: Omit<RoofSourceRequestV1, "inputHash">,
 ): RoofSourceRequestV1 {
-  const parsed = roofSourceRequestCoreSchema.parse(request);
+  const parsed = roofSourceRequestCoreSchema.parse(
+    canonicalizeJsonValueV1(request),
+  );
   return roofSourceRequestV1Schema.parse({
     ...parsed,
     inputHash: roofSourceInputHashV1(parsed),
@@ -242,12 +236,12 @@ function canonicalNormalizedContent(
   const value = JSON.parse(JSON.stringify(normalized)) as typeof normalized;
   value.geometry = canonicalRoofGeometryV1(value.geometry);
   value.provenance.sources.sort((left, right) =>
-    left.sourceId.localeCompare(right.sourceId),
+    compareCanonicalStringsV1(left.sourceId, right.sourceId),
   );
   value.provenance.observations.sort((left, right) =>
-    left.observationId.localeCompare(right.observationId),
+    compareCanonicalStringsV1(left.observationId, right.observationId),
   );
-  const uniqueSorted = (items: string[]) => [...new Set(items)].sort();
+  const uniqueSorted = (items: string[]) => uniqueCanonicalStringsV1(items);
   value.provenance.fusionDecision.acceptedObservationIds = uniqueSorted(
     value.provenance.fusionDecision.acceptedObservationIds,
   );
@@ -268,22 +262,22 @@ export function buildRoofSourceResultV1(
   const normalized = result.normalized
     ? canonicalNormalizedContent(result.normalized)
     : undefined;
-  return roofSourceResultV1Schema.parse({
-    ...result,
-    normalized,
-    normalizedContentHash: normalized
-      ? roofSourceNormalizedHashV1(normalized)
-      : undefined,
-  });
+  return roofSourceResultV1Schema.parse(
+    canonicalizeJsonValueV1({
+      ...result,
+      normalized,
+      normalizedContentHash: normalized
+        ? roofSourceNormalizedHashV1(normalized)
+        : undefined,
+    }),
+  );
 }
 
 function duplicateIdentifiers(values: string[]) {
   const seen = new Set<string>();
-  return [
-    ...new Set(
-      values.filter((value) => (seen.has(value) ? true : !seen.add(value))),
-    ),
-  ].sort();
+  return uniqueCanonicalStringsV1(
+    values.filter((value) => (seen.has(value) ? true : !seen.add(value))),
+  );
 }
 
 function assertSourceRecordParity(result: RoofSourceResultV1) {
@@ -315,16 +309,17 @@ function assertSourceRecordParity(result: RoofSourceResultV1) {
       source,
     ]),
   );
-  const allIds = [
-    ...new Set([...declared.keys(), ...normalized.keys()]),
-  ].sort();
+  const allIds = uniqueCanonicalStringsV1([
+    ...declared.keys(),
+    ...normalized.keys(),
+  ]);
   const mismatched = allIds.filter((sourceId) => {
     const declaredSource = declared.get(sourceId);
     const normalizedSource = normalized.get(sourceId);
     return (
       !declaredSource ||
       !normalizedSource ||
-      canonicalJson(declaredSource) !== canonicalJson(normalizedSource)
+      canonicalJsonV1(declaredSource) !== canonicalJsonV1(normalizedSource)
     );
   });
   if (mismatched.length) {
@@ -339,7 +334,9 @@ export function validateRoofSourceResultForRequestV1(
   resultInput: unknown,
   expectedAdapter?: Pick<RoofSourceAdapterV1, "adapterId" | "adapterVersion">,
 ): RoofSourceResultV1 {
-  const request = roofSourceRequestV1Schema.parse(requestInput);
+  const request = roofSourceRequestV1Schema.parse(
+    canonicalizeJsonValueV1(requestInput),
+  );
   if (roofSourceInputHashV1(request) !== request.inputHash) {
     throw new RoofSourceIntegrityError(
       "Roof source request input hash mismatch",
@@ -352,7 +349,9 @@ export function validateRoofSourceResultForRequestV1(
   if (version !== ROOF_SOURCE_RESULT_SCHEMA_VERSION) {
     throw new UnsupportedRoofSourceResultVersionError(version);
   }
-  const result = roofSourceResultV1Schema.parse(resultInput);
+  const result = roofSourceResultV1Schema.parse(
+    canonicalizeJsonValueV1(resultInput),
+  );
   if (
     expectedAdapter &&
     (result.adapterId !== expectedAdapter.adapterId ||
@@ -395,7 +394,9 @@ export async function ingestRoofSourceV1(
   adapter: RoofSourceAdapterV1,
   requestInput: RoofSourceRequestV1,
 ): Promise<RoofSourceResultV1> {
-  const request = roofSourceRequestV1Schema.parse(requestInput);
+  const request = roofSourceRequestV1Schema.parse(
+    canonicalizeJsonValueV1(requestInput),
+  );
   if (roofSourceInputHashV1(request) !== request.inputHash) {
     throw new RoofSourceIntegrityError(
       "Roof source request input hash mismatch",
@@ -503,7 +504,9 @@ export function roofSourceResultToSnapshotV1(
   resultInput: RoofSourceResultV1,
   metadata: RoofSourceSnapshotMetadataV1,
 ) {
-  const request = roofSourceRequestV1Schema.parse(requestInput);
+  const request = roofSourceRequestV1Schema.parse(
+    canonicalizeJsonValueV1(requestInput),
+  );
   const result = validateRoofSourceResultForRequestV1(request, resultInput);
   const normalized =
     result.normalized ?? fallbackNormalizedContent(result, metadata);

@@ -949,7 +949,7 @@
         "actorType": "system"
       },
       "details": {
-        "normalizedContentHash": "862e1ec9bfb1bb3f798caa64b33020217eaf56a6af7bcd0591f4d2e6a184b64d"
+        "normalizedContentHash": "ec70c8c71178c3fb092f5f877be0d0f73506da8b111066c08193345fa675aa91"
       }
     },
     {
@@ -975,7 +975,7 @@
       },
       "idempotencyKey": "roof-approval:case-12:svg-r1",
       "details": {
-        "reviewedSnapshotHash": "9c8db53be7368d2355747a3884f54d8227329dc11f961be429da5e5c673ab8f5"
+        "reviewedSnapshotHash": "e31e98d42b6e7b17d15749d666580aa04b5656b13733fa4358467ff3bf022014"
       }
     }
   ],
@@ -1694,7 +1694,7 @@
         "licenseStatus": "authorized"
       }
     ],
-    "renderHash": "31009c8980383d0abf653c2a8ad188f8d3eac39a0b84ab3f1a6fb189e822ead7"
+    "renderHash": "e3efab153e47f9bdcee296582dc456b24a212f463684e83c05005020a4fd082f"
   },
-  "snapshotHash": "1feae771b507a76a4cf91e0ea13480caf45b25711e3879821338e07dc567ee1d"
+  "snapshotHash": "fd45e545cc5accb4b4d0f7a5e4db223d27eb36fb842fd989748da10ed40f115e"
 }

@@ -15,7 +15,7 @@ describe("approved Roof Snapshot SVG renderer", () => {
 
     expect(first.bytes.equals(second.bytes)).toBe(true);
     expect(first.artifactHash).toBe(
-      "eb29e389a9cd9b9da528e2d1b45f2fe35f491d198e075746c799d63e8125e2ac",
+      "b07061adc816c35e82903bce011b10bb1a704b7605d9f344e6724dadbebca6ca",
     );
     expect(first.sourceSnapshotHash).toBe(envelope.sourceSnapshotHash);
     expect(first.sourceRendererHash).toBe(envelope.payload.renderHash);

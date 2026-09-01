@@ -199,6 +199,9 @@ describe("Roof Snapshot append-only repository contract v1", () => {
       calculate,
     );
     expect(calculated.status).toBe("applied");
+    expect(Object.hasOwn(calculated, "previousSnapshot")).toBe(false);
+    expect(Object.hasOwn(calculated.audit, "previousSnapshot")).toBe(false);
+    expect(Object.hasOwn(calculated.audit, "reason")).toBe(false);
     expect(replayed).toMatchObject({
       status: "replayed",
       commandHash: calculated.commandHash,

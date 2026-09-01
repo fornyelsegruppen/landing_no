@@ -1,5 +1,9 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import {
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+  compareCanonicalStringsV1,
+} from "./canonicalization-v1";
 import {
   approvedRoofRendererPayloadV1,
   applyRoofSnapshotCorrectionV1,
@@ -250,22 +254,8 @@ export interface RoofSnapshotAppendOnlyRepositoryV1 {
   }): Promise<void>;
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function digest(domain: string, value: unknown) {
-  return createHash("sha256")
-    .update(`${domain}:${canonicalJson(value)}`)
-    .digest("hex");
+  return canonicalSha256V1(value, domain);
 }
 
 function clone<T>(value: T): T {
@@ -572,6 +562,7 @@ function buildResult(
     ? snapshotReference(previousSnapshot)
     : undefined;
   const resulting = snapshotReference(snapshot);
+  const reason = commandReason(command);
   const audit: RoofRepositoryCommandAuditV1 = {
     schemaVersion: "roof-repository-command-audit.v1",
     commandType: command.commandType,
@@ -580,9 +571,9 @@ function buildResult(
     caseId: command.caseId,
     actor: commandActor(command),
     occurredAt: commandOccurredAt(command),
-    reason: commandReason(command),
-    sourceRefs: [...commandSourceRefs(command)].sort(),
-    previousSnapshot: previous,
+    ...(reason ? { reason } : {}),
+    sourceRefs: [...commandSourceRefs(command)].sort(compareCanonicalStringsV1),
+    ...(previous ? { previousSnapshot: previous } : {}),
     resultingSnapshot: resulting,
   };
   return {
@@ -593,7 +584,7 @@ function buildResult(
     commandHash: hash,
     idempotencyKey: commandIdempotencyKey(command),
     caseId: command.caseId,
-    previousSnapshot: previous,
+    ...(previous ? { previousSnapshot: previous } : {}),
     snapshot: resulting,
     audit,
   };
@@ -615,7 +606,9 @@ export async function executeRoofRepositoryCommandV1(
   }
   let command: RoofRepositoryCommandV1;
   try {
-    command = roofRepositoryCommandV1Schema.parse(commandInput);
+    command = roofRepositoryCommandV1Schema.parse(
+      canonicalizeJsonValueV1(commandInput),
+    );
   } catch (error) {
     throw new RoofRepositoryCommandErrorV1(
       "INVALID_COMMAND",
@@ -772,7 +765,9 @@ export async function readBoundApprovedRoofRendererV1(
   }
   let binding: RoofRendererReadBindingV1;
   try {
-    binding = roofRendererReadBindingV1Schema.parse(bindingInput);
+    binding = roofRendererReadBindingV1Schema.parse(
+      canonicalizeJsonValueV1(bindingInput),
+    );
   } catch (error) {
     throw new RoofRepositoryCommandErrorV1(
       "INVALID_RENDERER_BINDING",

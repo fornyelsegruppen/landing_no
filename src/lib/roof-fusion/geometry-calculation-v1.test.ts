@@ -108,13 +108,13 @@ describe("Roof geometry calculation v1", () => {
     const calculation = calculateRoofGeometryV1(inputFixture());
 
     expect(calculation.inputHash).toBe(
-      "421c96bf07c50ce53bbf397317ec93e9daea64011673f6ee77b396ea754c1664",
+      "1a5951010dc66dcf935f0e78536a71e64e8df50cecfe72670a9989dfa1bc68ec",
     );
     expect(calculation.normalizedContentHash).toBe(
-      "7437ce4564f7188ace06426d77ceb40116f7a4854072ab2710d68356f3814bae",
+      "a0e36223df6be0faf616d71e23f9f2cd787c335122819830a472e4c135bd9791",
     );
     expect(calculation.calculationHash).toBe(
-      "c9fe555d0ea647df583eef17a6a16c2db473f4857e54d167ef440d5ceab5fd6c",
+      "388078cc274ad23d5d3a8ccc6ecba651acbf0d6e80f74161217a135ba6b61a9c",
     );
     expect(calculation.trace.surfaces).toEqual([
       {
@@ -215,10 +215,10 @@ describe("Roof geometry calculation v1", () => {
     expect(snapshot.totals.gutterCandidateLength.min).toBe(20);
     expect(snapshot.totals.verifiedGutterLength.mode).toBe("unknown");
     expect(snapshot.snapshotHash).toBe(
-      "20d7481087b8f627633b84913a16c2bb8c921644d39a17ff6067b21c31ce9e89",
+      "0b03530e8cc91ec7efd6b744b9f3f3f7d25ee0b904bbc4eded02bb8d23e03b47",
     );
     expect(snapshot.rendererPayload.renderHash).toBe(
-      "345388e4622b79cfb82126f757ad6f2c3a0b658082ee7a390587c9fe86934aed",
+      "34f0af3af93b75576ce6c64843a38f3408a18f698b5491ae57cd6c75e95c88e0",
     );
     expect({
       schemaVersion: calculation.schemaVersion,

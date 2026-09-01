@@ -1,5 +1,10 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import {
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+  compareCanonicalStringsV1,
+  uniqueCanonicalStringsV1,
+} from "./canonicalization-v1";
 import {
   canonicalRoofGeometryV1,
   roofSnapshotV1SeedSchema,
@@ -151,22 +156,8 @@ export class RoofGeometryCalculationError extends Error {
   }
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function digest(domain: string, value: unknown) {
-  return createHash("sha256")
-    .update(`${domain}:${canonicalJson(value)}`)
-    .digest("hex");
+  return canonicalSha256V1(value, domain);
 }
 
 function round(value: number, decimals = 9) {
@@ -175,7 +166,7 @@ function round(value: number, decimals = 9) {
 }
 
 function uniqueSorted(values: string[]) {
-  return [...new Set(values)].sort();
+  return uniqueCanonicalStringsV1(values);
 }
 
 function duplicates(values: string[]) {
@@ -188,22 +179,22 @@ function duplicates(values: string[]) {
 function canonicalInput(input: RoofGeometryInputV1) {
   const value = structuredClone(input);
   value.vertices.sort((left, right) =>
-    left.vertexId.localeCompare(right.vertexId),
+    compareCanonicalStringsV1(left.vertexId, right.vertexId),
   );
   value.surfaces.sort((left, right) =>
-    left.surfaceId.localeCompare(right.surfaceId),
+    compareCanonicalStringsV1(left.surfaceId, right.surfaceId),
   );
   value.openings.sort((left, right) =>
-    left.openingId.localeCompare(right.openingId),
+    compareCanonicalStringsV1(left.openingId, right.openingId),
   );
   value.obstacles.sort((left, right) =>
-    left.obstacleId.localeCompare(right.obstacleId),
+    compareCanonicalStringsV1(left.obstacleId, right.obstacleId),
   );
   value.provenance.sources.sort((left, right) =>
-    left.sourceId.localeCompare(right.sourceId),
+    compareCanonicalStringsV1(left.sourceId, right.sourceId),
   );
   value.provenance.observations.sort((left, right) =>
-    left.observationId.localeCompare(right.observationId),
+    compareCanonicalStringsV1(left.observationId, right.observationId),
   );
   value.provenance.fusionDecision.acceptedObservationIds = uniqueSorted(
     value.provenance.fusionDecision.acceptedObservationIds,
@@ -591,7 +582,9 @@ function assertUniqueInputIds(input: RoofGeometryInputV1) {
 export function calculateRoofGeometryV1(
   inputValue: RoofGeometryInputV1,
 ): RoofGeometryCalculationV1 {
-  const input = roofGeometryInputV1Schema.parse(inputValue);
+  const input = roofGeometryInputV1Schema.parse(
+    canonicalizeJsonValueV1(inputValue),
+  );
   if (!["preliminary", "fused_estimate"].includes(input.measurement.class)) {
     throw new RoofGeometryCalculationError(
       "MEASUREMENT_CLASS_NOT_CALCULABLE",
@@ -639,7 +632,9 @@ export function calculateRoofGeometryV1(
       const toVertexId =
         surface.vertexIds[(index + 1) % surface.vertexIds.length];
       const edgeId = surface.edgeIds[index];
-      const physicalKey = [fromVertexId, toVertexId].sort().join("|");
+      const physicalKey = [fromVertexId, toVertexId]
+        .sort(compareCanonicalStringsV1)
+        .join("|");
       const existingPhysicalId = physicalEdges.get(physicalKey);
       if (existingPhysicalId && existingPhysicalId !== edgeId) {
         throw new RoofGeometryCalculationError(
@@ -652,8 +647,9 @@ export function calculateRoofGeometryV1(
       const existing = workingEdges.get(edgeId);
       if (
         existing &&
-        [existing.fromVertexId, existing.toVertexId].sort().join("|") !==
-          physicalKey
+        [existing.fromVertexId, existing.toVertexId]
+          .sort(compareCanonicalStringsV1)
+          .join("|") !== physicalKey
       ) {
         throw new RoofGeometryCalculationError(
           "EDGE_ID_GEOMETRY_CONFLICT",
@@ -803,8 +799,10 @@ export function calculateRoofGeometryV1(
     return {
       surfaceId: surface.surfaceId,
       outerContourId: surface.contourId,
-      openingIds: openings.map((opening) => opening.openingId).sort(),
-      edgeIds: [...surface.edgeIds].sort(),
+      openingIds: openings
+        .map((opening) => opening.openingId)
+        .sort(compareCanonicalStringsV1),
+      edgeIds: [...surface.edgeIds].sort(compareCanonicalStringsV1),
       normal: [
         round(working.plane.normal.x),
         round(working.plane.normal.y),
@@ -943,7 +941,9 @@ export function calculateRoofGeometryV1(
       pitchDegrees: surface.pitch.min!,
       azimuthDegrees: surface.azimuthDegrees,
     }))
-    .sort((left, right) => left.surfaceId.localeCompare(right.surfaceId));
+    .sort((left, right) =>
+      compareCanonicalStringsV1(left.surfaceId, right.surfaceId),
+    );
   const edgeTrace = calculatedEdges
     .map((edge) => ({
       edgeId: edge.edgeId,
@@ -952,7 +952,9 @@ export function calculateRoofGeometryV1(
       length3dM: edge.length3d.min!,
       adjacentSurfaceIds: edge.adjacentSurfaceIds,
     }))
-    .sort((left, right) => left.edgeId.localeCompare(right.edgeId));
+    .sort((left, right) =>
+      compareCanonicalStringsV1(left.edgeId, right.edgeId),
+    );
   const trace = {
     assumptions: [
       "Input vertices are expressed in metres in the declared local or projected coordinate system",
@@ -1025,7 +1027,9 @@ export function roofGeometryCalculationToSourceResultV1(
   calculationInput: RoofGeometryCalculationV1,
   receivedAt: string,
 ) {
-  const request = roofSourceRequestV1Schema.parse(requestInput);
+  const request = roofSourceRequestV1Schema.parse(
+    canonicalizeJsonValueV1(requestInput),
+  );
   const calculation = verifyRoofGeometryCalculationV1(calculationInput);
   if (roofSourceInputHashV1(request) !== request.inputHash) {
     throw new RoofGeometryCalculationError(

@@ -1,7 +1,11 @@
-import { createHash } from "node:crypto";
 import { measureRoofPlanes } from "@/lib/measurements/geometry";
 import { roofProposalSchema } from "@/lib/measurements/proposal";
 import type { GeoPoint } from "@/lib/measurements/types";
+import {
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+  compareCanonicalStringsV1,
+} from "./canonicalization-v1";
 import {
   buildRoofSourceResultV1,
   roofSourceRequestV1Schema,
@@ -46,20 +50,8 @@ export type LegacyRoofPlanesAdapterInputV1 = {
   decidedAt: string;
 };
 
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function hash(value: unknown) {
-  return createHash("sha256").update(stableJson(value)).digest("hex");
+  return canonicalSha256V1(value);
 }
 
 function safeId(prefix: string, value: string) {
@@ -198,7 +190,9 @@ function normalizeGeometry(
     for (let index = 0; index < vertexIds.length; index += 1) {
       const fromVertexId = vertexIds[index];
       const toVertexId = vertexIds[(index + 1) % vertexIds.length];
-      const edgeKey = [fromVertexId, toVertexId].sort().join(":");
+      const edgeKey = [fromVertexId, toVertexId]
+        .sort(compareCanonicalStringsV1)
+        .join(":");
       const edgeId = `edge-${hash(edgeKey).slice(0, 16)}`;
       edgeIds.push(edgeId);
       const existing = edges.get(edgeKey);
@@ -363,7 +357,9 @@ export function legacyRoofPlanesToSourceResultV1(
   requestInput: RoofSourceRequestV1,
   input: LegacyRoofPlanesAdapterInputV1,
 ) {
-  const request = roofSourceRequestV1Schema.parse(requestInput);
+  const request = roofSourceRequestV1Schema.parse(
+    canonicalizeJsonValueV1(requestInput),
+  );
   if (
     request.adapterId !== LEGACY_ROOF_PLANES_ADAPTER_ID ||
     request.expectedInputVersion !== LEGACY_ROOF_PLANES_INPUT_VERSION
