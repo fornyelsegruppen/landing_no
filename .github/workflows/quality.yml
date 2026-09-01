@@ -2,7 +2,9 @@ name: Quality gate
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - codex/full-production-integration
   push:
     branches:
       - main
