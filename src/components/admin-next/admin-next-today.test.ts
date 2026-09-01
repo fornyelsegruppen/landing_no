@@ -34,5 +34,6 @@ describe("Admin Next Today preview", () => {
     expect(html).toContain("grid-cols-4");
     expect(html).toContain("Apsaugota Preview");
     expect(html).toContain("Mano");
+    expect(html.match(/data-admin-next-nav="cases" href="\/admin-next-preview\/today"/g)).toHaveLength(2);
   });
 });

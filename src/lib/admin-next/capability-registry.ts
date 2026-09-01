@@ -86,7 +86,7 @@ export type AdminNextRoofFusionActionCapabilityId =
   (typeof adminNextRoofFusionActionCapabilityIds)[number];
 
 export const adminNextRoofFusionI1TargetContract = {
-  status: "preview_read_adapters_ready",
+  status: "r4_preview_read_wired",
   snapshotSchemaVersion: "roof-snapshot.v1",
   rendererSchemaVersion: "roof-renderer.v1",
   approvedRendererEnvelopeVersion: "approved-roof-renderer-envelope.v1",
@@ -100,6 +100,10 @@ export const adminNextRoofFusionI1TargetContract = {
     "src/lib/roof-fusion/preview-read-adapters-v1.ts#AdminRoofFusionPreviewReadAdapterV1",
   workerReadAdapter:
     "src/lib/roof-fusion/preview-read-adapters-v1.ts#WorkerRoofFusionPreviewRendererAdapterV1",
+  r4ReadRoute:
+    "src/app/(admin-shell)/admin-next-preview/cases/[caseId]/measurements/[measurementId]/page.tsx",
+  previewUatHarness:
+    "src/app/api/admin/roof-fusion/preview-uat/route.ts#POST",
   mutationOwner: "future authorized Roof Fusion command API",
 } as const;
 
@@ -151,7 +155,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
     stage: "adapter_ready",
     foundationTarget: "FP2",
     capabilities: ["Case", "Property", "Roof"],
-    dependencies: ["measurementEvidenceV2"],
+    dependencies: ["roofFusionV1"],
     legacyHref: "/admin-v2/cases",
     previewAdapter: "canonical_read_with_fixture_fallback",
     mutationPolicy: "legacy_only",

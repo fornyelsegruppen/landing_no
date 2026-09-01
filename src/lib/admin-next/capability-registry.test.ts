@@ -60,7 +60,7 @@ describe("Admin Next capability registry", () => {
     expect(adminNextRoofFusionActionCapabilityIds).toHaveLength(7);
     expect(new Set(adminNextRoofFusionActionCapabilityIds).size).toBe(7);
     expect(adminNextRoofFusionI1TargetContract).toMatchObject({
-      status: "preview_read_adapters_ready",
+      status: "r4_preview_read_wired",
       featureGate: "roofFusionV1",
       previewMutationPolicy: "forbidden",
       downstreamReadPolicy: "approved_renderer_envelope_only",
@@ -71,9 +71,19 @@ describe("Admin Next capability registry", () => {
     expect(adminNextRoofFusionI1TargetContract.workerReadAdapter).toContain(
       "WorkerRoofFusionPreviewRendererAdapterV1",
     );
+    expect(adminNextRoofFusionI1TargetContract.r4ReadRoute).toContain(
+      "[measurementId]/page.tsx",
+    );
+    expect(adminNextRoofFusionI1TargetContract.previewUatHarness).toContain(
+      "preview-uat/route.ts#POST",
+    );
     expect(
       adminNextModuleDefinitions.find(({ id }) => id === "roofWorkbench")
         ?.stage,
     ).toBe("adapter_ready");
+    expect(
+      adminNextModuleDefinitions.find(({ id }) => id === "roofWorkbench")
+        ?.dependencies,
+    ).toEqual(["roofFusionV1"]);
   });
 });

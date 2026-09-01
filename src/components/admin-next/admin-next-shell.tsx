@@ -82,7 +82,7 @@ const copy = {
 
 const primaryNavigation = [
   { key: "today", href: "/admin-next-preview/today", icon: LayoutDashboard },
-  { key: "cases", href: "/admin-next-preview/cases/TF-1042", icon: FolderKanban },
+  { key: "cases", href: "/admin-next-preview/today", icon: FolderKanban },
   { key: "calendar", href: "/admin-v2/work", icon: CalendarDays },
   { key: "customers", href: "/admin-v2/cases", icon: Users },
   { key: "work", href: "/admin-v2/work", icon: BriefcaseBusiness },
@@ -91,7 +91,7 @@ const primaryNavigation = [
 
 const mobileNavigation = [
   { key: "today", href: "/admin-next-preview/today", icon: House },
-  { key: "cases", href: "/admin-next-preview/cases/TF-1042", icon: FolderKanban },
+  { key: "cases", href: "/admin-next-preview/today", icon: FolderKanban },
   { key: "calendar", href: "/admin-v2/work", icon: CalendarDays },
   { key: "work", href: "/admin-v2/next-preview", icon: Menu },
 ] as const;
