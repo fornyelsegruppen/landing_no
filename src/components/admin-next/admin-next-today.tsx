@@ -17,6 +17,7 @@ import {
   type AdminNextTaskPriority,
   type AdminNextTodayView,
 } from "@/lib/admin-next/today-fixture";
+import type { AdminNextTodayTask } from "@/lib/admin-next/today-contract";
 
 const copy = {
   nb: {
@@ -24,6 +25,7 @@ const copy = {
     title: "God dag. Her er det som trenger oppmerksomhet.",
     intro: "Prioritert etter frist, risiko og neste nødvendige handling.",
     synthetic: "Design Preview — bare syntetiske data",
+    canonical: "Preview — skrivebeskyttet canonical data",
     filters: "Filtrer arbeidskø",
     views: { all: "Alle", overdue: "Forsinket", mine: "Mine", waiting: "Venter" },
     metrics: [
@@ -52,6 +54,7 @@ const copy = {
     title: "Laba diena. Štai kam šiandien reikia dėmesio.",
     intro: "Surikiuota pagal terminą, riziką ir kitą būtiną veiksmą.",
     synthetic: "Dizaino Preview — tik sintetiniai duomenys",
+    canonical: "Preview — canonical duomenys tik skaitymui",
     filters: "Filtruoti darbo eilę",
     views: { all: "Visi", overdue: "Vėluoja", mine: "Mano", waiting: "Laukia" },
     metrics: [
@@ -80,6 +83,7 @@ const copy = {
     title: "Good day. Here is what needs attention.",
     intro: "Prioritized by deadline, risk and the next required action.",
     synthetic: "Design Preview — synthetic data only",
+    canonical: "Preview — canonical read-only data",
     filters: "Filter work queue",
     views: { all: "All", overdue: "Overdue", mine: "Mine", waiting: "Waiting" },
     metrics: [["12", "Actions today"], ["3", "Overdue"], ["5", "Visits in 72h"], ["2", "Waiting for customer"]],
@@ -107,9 +111,9 @@ const priorityStyle: Record<AdminNextTaskPriority, { dot: string; label: string 
   scheduled: { dot: "bg-[var(--an-success)]", label: "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]" },
 };
 
-export function AdminNextToday({ locale, view }: { locale: PanelLocale; view: AdminNextTodayView }) {
+export function AdminNextToday({ locale, source = "fixture", tasks: inputTasks = adminNextTodayTasks, view }: { locale: PanelLocale; source?: "fixture" | "canonical"; tasks?: readonly AdminNextTodayTask[]; view: AdminNextTodayView }) {
   const t = copy[locale];
-  const tasks = filterAdminNextTodayTasks(adminNextTodayTasks, view);
+  const tasks = filterAdminNextTodayTasks(inputTasks, view);
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-6" data-admin-next-section="today">
@@ -121,7 +125,7 @@ export function AdminNextToday({ locale, view }: { locale: PanelLocale; view: Ad
         </div>
         <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[color:rgba(244,182,63,.32)] bg-[var(--an-amber-soft)] px-3 py-2 text-xs font-bold text-[var(--an-amber)]">
           <Sparkles aria-hidden="true" className="size-4" />
-          {t.synthetic}
+          {source === "canonical" ? t.canonical : t.synthetic}
         </span>
       </section>
 

@@ -41,11 +41,11 @@ describe("Roof Fusion I1 capability boundary", () => {
     ).toBe("approved-roof-renderer-envelope.v1");
   });
 
-  it("does not claim that the shared feature registry is implemented", () => {
+  it("records the independent fail-closed Preview activation", () => {
     expect(roofFusionCapabilityContractV1).toMatchObject({
       schemaVersion: "roof-fusion-capabilities.v1",
       featureGate: "roofFusionV1",
-      activation: "shared_registry_not_implemented",
+      activation: "preview_only_fail_closed",
     });
   });
 });

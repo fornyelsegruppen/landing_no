@@ -41,6 +41,7 @@ const copy = {
 const featureLabels: Record<FeatureFlagName, string> = {
   aiDrafts: "AI drafts",
   roofMeasurement: "Roof measurement",
+  roofFusionV1: "Roof Fusion v1 Preview",
   customerQuotes: "Customer quotes",
   contractSigning: "Contract signing",
   workerPortal: "Worker portal",
