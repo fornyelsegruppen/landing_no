@@ -9,13 +9,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f3f5f7",
+  themeColor: "#080c11",
 };
 
 export default function UiFixtureRootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html className="min-h-full bg-[#f3f5f7]" lang="lt">
-      <body className="min-h-dvh bg-[#f3f5f7] antialiased">{children}</body>
+    <html className="min-h-full bg-[#080c11]" lang="lt">
+      <body className="min-h-dvh bg-[#080c11] antialiased">{children}</body>
     </html>
   );
 }
