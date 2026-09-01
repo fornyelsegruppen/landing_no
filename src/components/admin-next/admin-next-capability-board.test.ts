@@ -40,6 +40,7 @@ describe("Admin Next capability UI", () => {
       VERCEL_ENV: "preview",
       FEATURE_CASE_STATE_ENGINE_V2: "true",
       FEATURE_ADMIN_EXCEPTION_FLOWS_V2: "true",
+      FEATURE_ROOF_FUSION_V1: "true",
     });
     const html = renderToStaticMarkup(
       createElement(AdminNextCapabilityBoard, { locale: "lt", rollout }),
@@ -53,5 +54,7 @@ describe("Admin Next capability UI", () => {
     expect(html.match(/Naudoti dabartinę funkciją/g)).toHaveLength(5);
     expect(html).toContain('data-capability-state="preview_ready"');
     expect(html).toContain('data-capability-state="implemented_disabled"');
+    expect(html).toContain('data-roof-fusion-uat-link="true"');
+    expect(html).toContain("/admin-next-preview/roof-fusion/uat");
   });
 });
