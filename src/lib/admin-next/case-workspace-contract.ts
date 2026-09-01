@@ -64,8 +64,11 @@ export type AdminNextCaseWorkspaceView = {
     reference: string;
     state: "review_required" | "verified";
     areaSquareMeters: number;
+    overallPitchDegrees?: number;
+    perimeterMeters?: number;
     confidencePercent: number;
     planeCount: number;
+    comparedToReference?: string;
     provenance: {
       evidenceId: string;
       source: string;
@@ -113,6 +116,16 @@ export type AdminNextCaseWorkspaceView = {
       label: string;
       source: string;
       capturedAt: string;
+      previewHref?: string;
+    }[];
+    sources?: readonly {
+      id: string;
+      kind: string;
+      label: string;
+      attribution: string;
+      capturedAt: string;
+      licenseState: "authorized" | "restricted" | "denied" | "unknown";
+      qualityState: "usable" | "limited" | "rejected" | "unknown";
     }[];
     deltaFromR3: {
       areaSquareMeters: number;

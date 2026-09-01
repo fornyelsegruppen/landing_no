@@ -80,8 +80,11 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
     reference: "R4-2026-1042",
     state: "review_required",
     areaSquareMeters: 186.4,
+    overallPitchDegrees: 22,
+    perimeterMeters: 61.2,
     confidencePercent: 82,
     planeCount: 7,
+    comparedToReference: "R3",
     provenance: {
       evidenceId: "EVD-R4-1042-01",
       source: "Deterministic Preview fixture · R4 aerial evidence",

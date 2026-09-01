@@ -12,10 +12,12 @@ describe("Admin Next R4 measurement review", () => {
     if (!measurement) return;
     const html = renderToStaticMarkup(
       createElement(AdminNextR4MeasurementReview, {
+        address: adminNextCaseWorkspaceFixture.address,
         locale: "lt",
         caseReference: adminNextCaseWorkspaceFixture.reference,
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
+        owner: adminNextCaseWorkspaceFixture.owner.name,
       }),
     );
 
@@ -32,10 +34,12 @@ describe("Admin Next R4 measurement review", () => {
     if (!measurement) return;
     const html = renderToStaticMarkup(
       createElement(AdminNextR4MeasurementReview, {
+        address: adminNextCaseWorkspaceFixture.address,
         locale: "lt",
         caseReference: adminNextCaseWorkspaceFixture.reference,
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
+        owner: adminNextCaseWorkspaceFixture.owner.name,
       }),
     );
 
@@ -49,18 +53,20 @@ describe("Admin Next R4 measurement review", () => {
     if (!measurement) return;
     const html = renderToStaticMarkup(
       createElement(AdminNextR4MeasurementReview, {
+        address: adminNextCaseWorkspaceFixture.address,
         locale: "lt",
         caseReference: adminNextCaseWorkspaceFixture.reference,
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
+        owner: adminNextCaseWorkspaceFixture.owner.name,
       }),
     );
 
     expect(html).toContain("S1");
     expect(html).toContain("S4");
-    expect(html).toContain("Nuotraukos ir šaltiniai");
+    expect(html).toContain("Šaltiniai ir įrodymai");
     expect(html).toContain("Pasikeitė nuo R3");
-    expect(html).toContain("Verification gates");
+    expect(html).toContain("Patikros vartai");
   });
 
   it("renders an approved canonical snapshot without fixture-only edge warnings", () => {
@@ -96,16 +102,20 @@ describe("Admin Next R4 measurement review", () => {
     };
     const html = renderToStaticMarkup(
       createElement(AdminNextR4MeasurementReview, {
+        address: "Testgata 13, 0013 Oslo",
         locale: "lt",
         caseReference: "TF-13",
         customer: "UAT-01 Testkunde",
         measurement: approved,
+        owner: "Aistė",
         source: "canonical",
       }),
     );
 
     expect(html).toContain("Canonical Roof Fusion");
-    expect(html).toContain("Patvirtinta");
+    expect(html).toContain("Paruošta tvirtinti");
+    expect(html).toContain("Duomenų pakanka");
+    expect(html).toContain("Aistė");
     expect(html).toContain("Konfliktinių kraštų nėra");
     expect(html).toContain("Snapshot patvirtintas");
     expect(html).not.toContain("E-04");

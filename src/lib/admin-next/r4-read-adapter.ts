@@ -44,6 +44,19 @@ function midpoint(value: RoofMeasurementValueV1) {
 function confidence(snapshot: RoofSnapshotV1) {
   return Math.round((snapshot.measurement.confidence.score || 0) * 100);
 }
+function overallPitch(snapshot: RoofSnapshotV1) {
+  const weighted = snapshot.geometry.surfaces.reduce(
+    (result, surface) => {
+      const area = midpoint(surface.netSurfaceArea);
+      return {
+        area: result.area + area,
+        pitchArea: result.pitchArea + midpoint(surface.pitch) * area,
+      };
+    },
+    { area: 0, pitchArea: 0 },
+  );
+  return weighted.area ? weighted.pitchArea / weighted.area : 0;
+}
 function perimeter(snapshot: RoofSnapshotV1, surfaceId: string) {
   return snapshot.geometry.edges
     .filter((edge) => edge.adjacentSurfaceIds.includes(surfaceId))
@@ -73,8 +86,11 @@ export function projectRoofSnapshotToR4(
     reference: snapshot.snapshotId,
     state: snapshot.state === "approved" && snapshot.quality.status === "pass" ? "verified" : "review_required",
     areaSquareMeters: area,
+    overallPitchDegrees: overallPitch(snapshot),
+    perimeterMeters: midpoint(snapshot.totals.footprintPerimeter),
     confidencePercent: confidence(snapshot),
     planeCount: snapshot.geometry.surfaces.length,
+    comparedToReference: previous?.snapshotId,
     provenance: {
       evidenceId: sources[0]?.sourceId || snapshot.snapshotId,
       source: sources.map((source) => source.provider).join(" + ") || "Roof Fusion",
@@ -123,6 +139,15 @@ export function projectRoofSnapshotToR4(
       label: source.provider,
       source: source.license.attribution,
       capturedAt: source.capturedAt || source.retrievedAt,
+    })),
+    sources: sources.map((source) => ({
+      id: source.sourceId,
+      kind: source.kind,
+      label: source.provider,
+      attribution: source.license.attribution,
+      capturedAt: source.capturedAt || source.retrievedAt,
+      licenseState: source.license.status,
+      qualityState: source.quality.status,
     })),
     deltaFromR3: {
       areaSquareMeters: area - (previous ? midpoint(previous.totals.netSurfaceArea) : area),
