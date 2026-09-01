@@ -1,0 +1,183 @@
+{
+  "schemaVersion": "roof-geometry-calculation.v1",
+  "calculatorVersion": "roof-geometry-calculator.v1.0.0",
+  "calculationId": "calc-gable-3d-001",
+  "inputHash": "421c96bf07c50ce53bbf397317ec93e9daea64011673f6ee77b396ea754c1664",
+  "normalizedContentHash": "7437ce4564f7188ace06426d77ceb40116f7a4854072ab2710d68356f3814bae",
+  "calculationHash": "c9fe555d0ea647df583eef17a6a16c2db473f4857e54d167ef440d5ceab5fd6c",
+  "sourceStatus": "complete",
+  "snapshotHash": "20d7481087b8f627633b84913a16c2bb8c921644d39a17ff6067b21c31ce9e89",
+  "rendererHash": "345388e4622b79cfb82126f757ad6f2c3a0b658082ee7a390587c9fe86934aed",
+  "qualityStatus": "pass",
+  "totals": {
+    "grossHorizontalArea": {
+      "mode": "exact",
+      "unit": "m2",
+      "min": 80,
+      "max": 80,
+      "sourceRefs": ["src-provider"],
+      "confidence": {
+        "level": "high",
+        "score": 0.975,
+        "basis": "derived",
+        "rationale": "Deterministic planar calculation from explicit calibrated 3D vertices"
+      }
+    },
+    "grossSurfaceArea": {
+      "mode": "exact",
+      "unit": "m2",
+      "min": 92.37604307,
+      "max": 92.37604307,
+      "sourceRefs": ["src-provider"],
+      "confidence": {
+        "level": "high",
+        "score": 0.975,
+        "basis": "derived",
+        "rationale": "Deterministic planar calculation from explicit calibrated 3D vertices"
+      }
+    },
+    "netSurfaceArea": {
+      "mode": "exact",
+      "unit": "m2",
+      "min": 90.990402424,
+      "max": 90.990402424,
+      "sourceRefs": ["src-provider"],
+      "confidence": {
+        "level": "high",
+        "score": 0.975,
+        "basis": "derived",
+        "rationale": "Deterministic planar calculation from explicit calibrated 3D vertices"
+      }
+    },
+    "footprintPerimeter": {
+      "mode": "exact",
+      "unit": "m",
+      "min": 36,
+      "max": 36,
+      "sourceRefs": ["src-provider"],
+      "confidence": {
+        "level": "high",
+        "score": 0.975,
+        "basis": "derived",
+        "rationale": "Deterministic edge length and topology classification from 3D vertices"
+      }
+    },
+    "eaveLength": {
+      "mode": "exact",
+      "unit": "m",
+      "min": 20,
+      "max": 20,
+      "sourceRefs": ["src-provider"],
+      "confidence": {
+        "level": "high",
+        "score": 0.98,
+        "basis": "derived",
+        "rationale": "Deterministic edge length and topology classification from 3D vertices"
+      }
+    },
+    "gutterCandidateLength": {
+      "mode": "exact",
+      "unit": "m",
+      "min": 20,
+      "max": 20,
+      "sourceRefs": ["src-provider"],
+      "confidence": {
+        "level": "high",
+        "score": 0.98,
+        "basis": "derived",
+        "rationale": "Deterministic edge length and topology classification from 3D vertices"
+      }
+    },
+    "verifiedGutterLength": {
+      "mode": "unknown",
+      "unit": "m",
+      "min": null,
+      "max": null,
+      "sourceRefs": [],
+      "confidence": {
+        "level": "unknown",
+        "score": null,
+        "basis": "unknown",
+        "rationale": "No supported measurement is available"
+      }
+    }
+  },
+  "trace": {
+    "assumptions": [
+      "Input vertices are expressed in metres in the declared local or projected coordinate system",
+      "Each surface and opening is planar within twice its declared vertex uncertainty",
+      "Eave and shared-edge classifications are geometric candidates, not proof of installed guttering"
+    ],
+    "surfaces": [
+      {
+        "surfaceId": "surface-north",
+        "horizontalAreaM2": 40,
+        "surfaceAreaM2": 46.188021535,
+        "openingAreaM2": 0,
+        "netSurfaceAreaM2": 46.188021535,
+        "pitchDegrees": 30,
+        "azimuthDegrees": 0
+      },
+      {
+        "surfaceId": "surface-south",
+        "horizontalAreaM2": 40,
+        "surfaceAreaM2": 46.188021535,
+        "openingAreaM2": 1.385640646,
+        "netSurfaceAreaM2": 44.802380889,
+        "pitchDegrees": 30,
+        "azimuthDegrees": 180
+      }
+    ],
+    "edges": [
+      {
+        "edgeId": "edge-north-east-rake",
+        "classification": "rake",
+        "length2dM": 4,
+        "length3dM": 4.618802154,
+        "adjacentSurfaceIds": ["surface-north"]
+      },
+      {
+        "edgeId": "edge-north-eave",
+        "classification": "eave",
+        "length2dM": 10,
+        "length3dM": 10,
+        "adjacentSurfaceIds": ["surface-north"]
+      },
+      {
+        "edgeId": "edge-north-west-rake",
+        "classification": "rake",
+        "length2dM": 4,
+        "length3dM": 4.618802154,
+        "adjacentSurfaceIds": ["surface-north"]
+      },
+      {
+        "edgeId": "edge-ridge",
+        "classification": "ridge",
+        "length2dM": 10,
+        "length3dM": 10,
+        "adjacentSurfaceIds": ["surface-north", "surface-south"]
+      },
+      {
+        "edgeId": "edge-south-east-rake",
+        "classification": "rake",
+        "length2dM": 4,
+        "length3dM": 4.618802154,
+        "adjacentSurfaceIds": ["surface-south"]
+      },
+      {
+        "edgeId": "edge-south-eave",
+        "classification": "eave",
+        "length2dM": 10,
+        "length3dM": 10,
+        "adjacentSurfaceIds": ["surface-south"]
+      },
+      {
+        "edgeId": "edge-south-west-rake",
+        "classification": "rake",
+        "length2dM": 4,
+        "length3dM": 4.618802154,
+        "adjacentSurfaceIds": ["surface-south"]
+      }
+    ]
+  }
+}
