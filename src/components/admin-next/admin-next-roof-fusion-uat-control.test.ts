@@ -7,12 +7,14 @@ describe("Admin Next Roof Fusion UAT control", () => {
   it("renders an explicit, Preview-only synthetic preparation action", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUatControl, {
+        action: async () => ({ kind: "idle" as const }),
         defaultCaseReference: "TF-13",
         locale: "lt",
       }),
     );
 
     expect(html).toContain('data-roof-fusion-uat="preview-only"');
+    expect(html).toContain('name="caseReference"');
     expect(html).toContain("Paruošti R4 UAT");
     expect(html).toContain("TF-13");
     expect(html).toContain("Production duomenys neliečiami");

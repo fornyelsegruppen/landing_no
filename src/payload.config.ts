@@ -103,8 +103,11 @@ const databaseAdapter = usePostgres
         idleTimeoutMillis: 20_000,
         connectionTimeoutMillis: 15_000,
       },
-      // Avoid nested transaction connection grabs that stall with small pools.
-      transactionOptions: false,
+      // Roof Fusion persists each snapshot and its command ledger entry as one
+      // append-only unit. Enable database transactions only with the independent
+      // Roof Fusion flag; the repository owns and closes every transaction.
+      transactionOptions:
+        process.env.FEATURE_ROOF_FUSION_V1 === "true" ? undefined : false,
       // Production never auto-pushes; migrations handle schema.
       // Local/dev push stays available unless explicitly disabled.
       push: process.env.NODE_ENV !== "production",
