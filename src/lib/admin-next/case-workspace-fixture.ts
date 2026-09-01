@@ -42,6 +42,7 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       fallbackHref: "/admin-v2/cases",
       previewHref:
         "/admin-next-preview/cases/TF-1042/measurements/R4-2026-1042",
+      previewAction: "review_measurement",
     },
     {
       id: "PHOTOSET-1042-01",
@@ -62,6 +63,8 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       metric: "PDF · 214 KB",
       recordedAt: "Vakar 16:52",
       fallbackHref: "/admin-v2/documents",
+      previewHref: "/admin-next-preview/cases/TF-1042/documents/preflight",
+      previewAction: "document_preflight",
     },
     {
       id: "MSG-1042-03",
@@ -109,9 +112,102 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
         varianceMeters: 0.31,
       },
     ],
+    primarySlopes: [
+      { id: "S1", areaSquareMeters: 54.2, pitchDegrees: 22, perimeterMeters: 31.8 },
+      { id: "S2", areaSquareMeters: 49.8, pitchDegrees: 24, perimeterMeters: 29.6 },
+      { id: "S3", areaSquareMeters: 43.6, pitchDegrees: 22, perimeterMeters: 27.4 },
+      { id: "S4", areaSquareMeters: 38.8, pitchDegrees: 17, perimeterMeters: 25.9 },
+    ],
+    photos: [
+      { id: "IMG-1042-N", label: "Šiaurinė stogo pusė", source: "Aerial source A", capturedAt: "2026-09-01 08:35" },
+      { id: "IMG-1042-S", label: "Pietinė stogo pusė", source: "Aerial source B", capturedAt: "2026-09-01 08:36" },
+      { id: "IMG-1042-C", label: "Kamino ir kraigo zona", source: "Field photo 07", capturedAt: "2026-09-01 08:37" },
+    ],
+    deltaFromR3: {
+      areaSquareMeters: 3.8,
+      confidencePoints: 6,
+      planeCount: 1,
+    },
+    verificationGates: [
+      { id: "source_identity", state: "verified", detail: "Evidence ID ir checksum sutampa" },
+      { id: "plane_sum", state: "verified", detail: "S1–S4 suma yra 186,4 m²" },
+      { id: "review_edges", state: "review_required", detail: "E-04 ir E-11 dar nepatvirtinti" },
+      { id: "approval", state: "locked", detail: "Confirm laukia exact edge review" },
+    ],
     nextAction:
       "Palyginti E-04 ir E-11 kraštus su objekto nuotraukomis, tada patvirtinti arba pataisyti geometriją veikiančiame matavimo sraute.",
     fallbackHref: "/admin-v2/cases",
+  },
+  documentPreflight: {
+    packageReference: "PKG-1042-R12",
+    state: "blocked",
+    policyCode: "PS-SEND-007",
+    recipient: {
+      name: "Kari Nilsen",
+      email: "kari.nilsen@example.no",
+    },
+    artifacts: [
+      {
+        id: "measurement",
+        state: "review_required",
+        reference: "R4-2026-1042",
+        revision: "R4-r07",
+        hash: "sha256:demo-r4-1042-r07",
+        summary: "186,4 m² · 82 % · E-04 ir E-11 nepatvirtinti",
+      },
+      {
+        id: "price",
+        state: "locked",
+        reference: "PRICE-1042-R12",
+        revision: "price-r12",
+        hash: "sha256:demo-price-1042-r12",
+        summary: "NOK 286 400 su PVM · sutampa su pasiūlymu",
+      },
+      {
+        id: "quote",
+        state: "locked",
+        reference: "Q-1042-R12",
+        revision: "quote-r12",
+        hash: "sha256:demo-quote-1042-r12",
+        summary: "Pasiūlymo turinys sugeneruotas iš price-r12",
+      },
+      {
+        id: "contract",
+        state: "locked",
+        reference: "C-1042-DRAFT-R03",
+        revision: "contract-r03",
+        hash: "sha256:demo-contract-1042-r03",
+        summary: "Sutarties projektas susietas su Q-1042-R12",
+      },
+      {
+        id: "recipient",
+        state: "verified",
+        reference: "RECIPIENT-1042-R02",
+        revision: "recipient-r02",
+        hash: "sha256:demo-recipient-1042-r02",
+        summary: "Kari Nilsen · kari.nilsen@example.no",
+      },
+      {
+        id: "pdf",
+        state: "locked",
+        reference: "PDF-1042-R12",
+        revision: "pdf-r12",
+        hash: "sha256:demo-pdf-1042-r12",
+        summary: "8 puslapiai · PDF/A · sugeneruota iš exact artefaktų",
+      },
+    ],
+    sequence: [
+      { id: "measurement_review", state: "current" },
+      { id: "reload", state: "locked" },
+      { id: "verify_artifacts", state: "locked" },
+      { id: "owner_gate", state: "locked" },
+      { id: "send", state: "locked" },
+    ],
+    blocker:
+      "R4-2026-1042 vis dar yra review_required: E-04 ir E-11 kraštai nepatvirtinti.",
+    nextAction:
+      "Atskirai atidaryti exact R4-r07 matavimą, patikrinti E-04 ir E-11, patvirtinti arba pataisyti geometriją veikiančiame sraute ir tik tada iš naujo įkelti preflight.",
+    fallbackHref: "/admin-v2/documents",
   },
   timeline: [
     {

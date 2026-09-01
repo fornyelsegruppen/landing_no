@@ -1,10 +1,9 @@
 import Link from "next/link";
 import {
-  AlertTriangle,
-  ArrowLeft,
   ArrowRight,
+  ArrowRightLeft,
+  Camera,
   CheckCircle2,
-  Clock3,
   Database,
   Fingerprint,
   Layers3,
@@ -12,328 +11,92 @@ import {
   Ruler,
   ShieldAlert,
   Target,
+  X,
 } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import type { AdminNextCaseWorkspaceView } from "@/lib/admin-next/case-workspace-contract";
 
-type MeasurementReview = NonNullable<
-  AdminNextCaseWorkspaceView["measurementReview"]
->;
+type MeasurementReview = NonNullable<AdminNextCaseWorkspaceView["measurementReview"]>;
+type Gate = MeasurementReview["verificationGates"][number];
 
 const copy = {
   nb: {
-    back: "Tilbake til saken",
-    eyebrow: "R4 målingskontroll",
-    synthetic: "Syntetiske Preview-data",
-    status: "2 kanter må kontrolleres",
-    title: "Kontroller takgeometrien før tilbud",
-    intro: "Sammenlign markerte kanter med kildebildene. Preview utfører ingen godkjenning eller datamutasjon.",
-    area: "Takareal",
-    confidence: "Confidence",
-    planes: "Takflater",
-    edges: "Til kontroll",
-    schematic: "Skjematisk flatekart",
-    schematicHelp: "Gule flater inneholder en kant som må kontrolleres.",
-    schematicPreview: "Preview-skjema · canonical geometri kobles inn senere",
-    reviewEdges: "Markerte kanter",
-    variance: "Avvik",
-    planeTable: "Flatedetaljer",
-    plane: "Flate",
-    pitch: "Helning",
-    state: "Status",
-    verified: "Bekreftet",
-    review: "Kontroller",
-    provenance: "Kilde og proveniens",
-    evidenceId: "Evidence-ID",
-    source: "Kilde",
-    captured: "Registrert",
-    model: "Modell/schema",
-    checksum: "Kontrollsum",
-    next: "Neste nødvendige handling",
-    fallback: "Åpne fungerende måleflyt",
-    approve: "Godkjenn måling",
-    approvalDisabled: "Godkjenning aktiveres først når canonical evidence- og approval-kontraktene er koblet og godkjent.",
+    close: "Lukk målingskontroll", eyebrow: "R4 målingskontroll", synthetic: "Syntetiske Preview-data", status: "2 kanter må kontrolleres", title: "Takplan og verification gates", intro: "Kontroller exact R4-evidence i sakskontekst før Confirm.", area: "Takareal", confidence: "Confidence", planes: "Flater", edges: "Review", plan: "Takplan", planHelp: "Fire hovedflater. Markerte linjer viser E-04 og E-11.", pitch: "Helning", perimeter: "Omkrets", photos: "Bilder og kilder", delta: "Endret fra R3", deltaArea: "areal", deltaConfidence: "confidence", deltaPlanes: "flate", gates: "Verification gates", provenance: "Evidence provenance", next: "Neste handling", confirm: "Confirm R4", confirmDisabled: "Confirm er låst til E-04 og E-11 er kontrollert i canonical approval-flow.", fallback: "Åpne fungerende måleflyt", gateLabels: { source_identity: "Kildeidentitet", plane_sum: "Areal og flatesum", review_edges: "Markerte kanter", approval: "Approval gate" },
   },
   lt: {
-    back: "Grįžti į bylą",
-    eyebrow: "R4 matavimo peržiūra",
-    synthetic: "Sintetiniai Preview duomenys",
-    status: "Reikia patikrinti 2 kraštus",
-    title: "Patikrinkite stogo geometriją prieš pasiūlymą",
-    intro: "Palyginkite pažymėtus kraštus su šaltinio nuotraukomis. Preview neatlieka patvirtinimo ir nekeičia duomenų.",
-    area: "Stogo plotas",
-    confidence: "Patikimumas",
-    planes: "Plokštumos",
-    edges: "Peržiūrėti",
-    schematic: "Scheminis plokštumų žemėlapis",
-    schematicHelp: "Geltonos plokštumos turi kraštą, kurį reikia patikrinti.",
-    schematicPreview: "Preview schema · canonical geometrija bus prijungta vėliau",
-    reviewEdges: "Pažymėti kraštai",
-    variance: "Nuokrypis",
-    planeTable: "Plokštumų detalės",
-    plane: "Plokštuma",
-    pitch: "Nuolydis",
-    state: "Būsena",
-    verified: "Patvirtinta",
-    review: "Peržiūrėti",
-    provenance: "Šaltinis ir provenance",
-    evidenceId: "Evidence ID",
-    source: "Šaltinis",
-    captured: "Užfiksuota",
-    model: "Modelis / schema",
-    checksum: "Kontrolinė suma",
-    next: "Kitas būtinas veiksmas",
-    fallback: "Atidaryti veikiantį matavimo srautą",
-    approve: "Patvirtinti matavimą",
-    approvalDisabled: "Patvirtinimas bus įjungtas tik prijungus ir patvirtinus canonical evidence bei approval kontraktus.",
+    close: "Uždaryti matavimo peržiūrą", eyebrow: "R4 matavimo peržiūra", synthetic: "Sintetiniai Preview duomenys", status: "Reikia patikrinti 2 kraštus", title: "Stogo planas ir verification gates", intro: "Prieš Confirm patikrinkite exact R4 evidence bylos kontekste.", area: "Stogo plotas", confidence: "Patikimumas", planes: "Plokštumos", edges: "Peržiūrėti", plan: "Stogo planas", planHelp: "Keturi pagrindiniai šlaitai. Pažymėtos linijos rodo E-04 ir E-11.", pitch: "Nuolydis", perimeter: "Perimetras", photos: "Nuotraukos ir šaltiniai", delta: "Pasikeitė nuo R3", deltaArea: "plotas", deltaConfidence: "patikimumas", deltaPlanes: "plokštuma", gates: "Verification gates", provenance: "Evidence provenance", next: "Kitas veiksmas", confirm: "Confirm R4", confirmDisabled: "Confirm užrakintas, kol E-04 ir E-11 nepatikrinti canonical approval sraute.", fallback: "Atidaryti veikiantį matavimo srautą", gateLabels: { source_identity: "Šaltinio tapatybė", plane_sum: "Plotas ir šlaitų suma", review_edges: "Pažymėti kraštai", approval: "Approval gate" },
   },
   en: {
-    back: "Back to case",
-    eyebrow: "R4 measurement review",
-    synthetic: "Synthetic Preview data",
-    status: "2 edges require review",
-    title: "Review roof geometry before the offer",
-    intro: "Compare flagged edges with source photos. Preview performs no approval or data mutation.",
-    area: "Roof area",
-    confidence: "Confidence",
-    planes: "Planes",
-    edges: "Review",
-    schematic: "Schematic plane map",
-    schematicHelp: "Amber planes contain an edge that requires review.",
-    schematicPreview: "Preview schematic · canonical geometry connects later",
-    reviewEdges: "Flagged edges",
-    variance: "Variance",
-    planeTable: "Plane details",
-    plane: "Plane",
-    pitch: "Pitch",
-    state: "State",
-    verified: "Verified",
-    review: "Review",
-    provenance: "Source and provenance",
-    evidenceId: "Evidence ID",
-    source: "Source",
-    captured: "Captured",
-    model: "Model / schema",
-    checksum: "Checksum",
-    next: "Next required action",
-    fallback: "Open working measurement flow",
-    approve: "Approve measurement",
-    approvalDisabled: "Approval is enabled only after canonical evidence and approval contracts are connected and accepted.",
+    close: "Close measurement review", eyebrow: "R4 measurement review", synthetic: "Synthetic Preview data", status: "2 edges require review", title: "Roof plan and verification gates", intro: "Review exact R4 evidence in case context before Confirm.", area: "Roof area", confidence: "Confidence", planes: "Planes", edges: "Review", plan: "Roof plan", planHelp: "Four primary slopes. Highlighted lines show E-04 and E-11.", pitch: "Pitch", perimeter: "Perimeter", photos: "Photos and sources", delta: "Changed from R3", deltaArea: "area", deltaConfidence: "confidence", deltaPlanes: "plane", gates: "Verification gates", provenance: "Evidence provenance", next: "Next action", confirm: "Confirm R4", confirmDisabled: "Confirm stays locked until E-04 and E-11 are reviewed in the canonical approval flow.", fallback: "Open working measurement flow", gateLabels: { source_identity: "Source identity", plane_sum: "Area and slope sum", review_edges: "Flagged edges", approval: "Approval gate" },
   },
 } as const;
 
 function localeTag(locale: PanelLocale) {
-  if (locale === "lt") return "lt-LT";
-  if (locale === "nb") return "nb-NO";
-  return "en-GB";
+  return locale === "lt" ? "lt-LT" : locale === "nb" ? "nb-NO" : "en-GB";
 }
 
-function formatDecimal(locale: PanelLocale, value: number) {
-  return new Intl.NumberFormat(localeTag(locale), {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: value % 1 ? 1 : 0,
-  }).format(value);
+function number(locale: PanelLocale, value: number) {
+  return new Intl.NumberFormat(localeTag(locale), { maximumFractionDigits: 2, minimumFractionDigits: value % 1 ? 1 : 0 }).format(value);
 }
 
-const schematicPlanes = [
-  { id: "P1", points: "55,190 190,65 310,190", labelX: 180, labelY: 150 },
-  { id: "P2", points: "55,190 310,190 245,310 35,310", labelX: 150, labelY: 250 },
-  { id: "P3", points: "190,65 335,25 310,190", labelX: 265, labelY: 95 },
-  { id: "P4", points: "335,25 470,65 310,190", labelX: 380, labelY: 95 },
-  { id: "P5", points: "310,190 565,190 585,310 375,310", labelX: 475, labelY: 250 },
-  { id: "P6", points: "245,310 310,190 375,310", labelX: 310, labelY: 275 },
-  { id: "P7", points: "470,65 565,190 310,190", labelX: 465, labelY: 150 },
-] as const;
+const gateTone: Record<Gate["state"], string> = {
+  verified: "an-success",
+  review_required: "an-danger",
+  locked: "an-disabled",
+};
 
-export function AdminNextR4MeasurementReview({
-  locale,
-  caseReference,
-  customer,
-  measurement,
-}: {
-  locale: PanelLocale;
-  caseReference: string;
-  customer: string;
-  measurement: MeasurementReview;
-}) {
+export function AdminNextR4MeasurementReview({ locale, caseReference, customer, measurement }: { locale: PanelLocale; caseReference: string; customer: string; measurement: MeasurementReview }) {
   const t = copy[locale];
   const caseHref = `/admin-next-preview/cases/${encodeURIComponent(caseReference)}`;
-  const metrics = [
-    [t.area, `${formatDecimal(locale, measurement.areaSquareMeters)} m²`, Ruler],
-    [t.confidence, `${measurement.confidencePercent} %`, Target],
-    [t.planes, String(measurement.planeCount), Layers3],
-    [t.edges, String(measurement.reviewEdges.length), ShieldAlert],
-  ] as const;
+  const metrics = [[t.area, `${number(locale, measurement.areaSquareMeters)} m²`, Ruler], [t.confidence, `${measurement.confidencePercent} %`, Target], [t.planes, String(measurement.planeCount), Layers3], [t.edges, String(measurement.reviewEdges.length), ShieldAlert]] as const;
 
   return (
-    <div className="mx-auto max-w-[1500px]" data-admin-next-section="cases">
-      <div className="grid min-h-[calc(100dvh-8rem)] overflow-hidden rounded-3xl border border-[#dfe4e8] bg-white shadow-[0_18px_55px_rgba(18,38,57,.12)] lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-[#dfe4e8] bg-[#f6f8f9] p-6 lg:flex lg:flex-col">
-          <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-[#506171] hover:bg-white hover:text-[#183b58]" href={caseHref}>
-            <ArrowLeft aria-hidden="true" className="size-4" />
-            {t.back}
-          </Link>
-          <div className="mt-10">
-            <span className="rounded-full border border-[#edcaca] bg-[#fff7f7] px-2.5 py-1 text-[11px] font-bold text-[#a53f3f]">{t.status}</span>
-            <p className="mt-5 text-xs font-bold uppercase tracking-[.18em] text-[#607286]">{caseReference}</p>
-            <h2 className="mt-2 text-xl font-bold text-[#172637]">{customer}</h2>
-            <p className="mt-2 text-sm text-[#6c7886]">{measurement.reference}</p>
-          </div>
-          <section className="mt-8 rounded-2xl border border-[#ead9ae] bg-[#fff8e7] p-4" aria-labelledby="r4-next-action-side">
-            <p className="text-[11px] font-bold uppercase tracking-[.15em] text-[#805d1b]">{t.next}</p>
-            <h3 className="mt-2 text-sm font-bold text-[#5e481b]" id="r4-next-action-side">{measurement.nextAction}</h3>
-          </section>
-          <div className="mt-6 rounded-2xl border border-[#dce3e8] bg-white p-4 text-xs text-[#667483]">
-            <Fingerprint aria-hidden="true" className="mb-2 size-5 text-[#527896]" />
-            <strong className="block text-[#2a3b4c]">{measurement.provenance.evidenceId}</strong>
-            <span className="mt-2 block">{measurement.provenance.source}</span>
-            <span className="mt-1 block">{measurement.provenance.capturedAt}</span>
-            <span className="mt-1 block break-all">{measurement.provenance.checksum}</span>
-          </div>
-        </aside>
-
-        <section className="min-w-0 bg-[#f3f5f7]" aria-labelledby="r4-review-title">
-          <header className="sticky top-0 z-20 border-b border-[#dfe4e8] bg-white/96 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
-            <div className="flex items-start gap-3">
-              <Link aria-label={t.back} className="grid size-11 shrink-0 place-items-center rounded-xl border border-[#dfe4e8] text-[#506171] hover:bg-[#f3f5f7] lg:hidden" href={caseHref}>
-                <ArrowLeft aria-hidden="true" className="size-5" />
-              </Link>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-bold uppercase tracking-[.18em] text-[#607286]">{t.eyebrow}</p>
-                  <span className="rounded-full border border-[#ead9ae] bg-[#fff8e7] px-2 py-1 text-[10px] font-bold text-[#6c5219]">{t.synthetic}</span>
-                </div>
-                <h1 className="mt-2 text-xl font-bold tracking-[-.02em] text-[#152333] sm:text-2xl" id="r4-review-title">{t.title}</h1>
-                <p className="mt-1 max-w-3xl text-sm text-[#687585]">{t.intro}</p>
-              </div>
-            </div>
-          </header>
-
-          <div className="space-y-5 p-4 pb-28 sm:p-6 sm:pb-28 lg:p-8 lg:pb-32">
-            <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label={t.eyebrow}>
-              {metrics.map(([label, value, Icon], index) => (
-                <article className={`rounded-2xl border bg-white p-4 ${index === 3 ? "border-[#edcaca]" : "border-[#dfe4e8]"}`} key={label}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-[#6b7886]">{label}</p>
-                      <strong className={`mt-2 block text-2xl tracking-tight ${index === 3 ? "text-[#a53f3f]" : "text-[#172637]"}`}>{value}</strong>
-                    </div>
-                    <Icon aria-hidden="true" className={`size-5 ${index === 3 ? "text-[#c84f4f]" : "text-[#527896]"}`} />
-                  </div>
-                </article>
-              ))}
-            </section>
-
-            <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,.8fr)]">
-              <div className="min-w-0 space-y-5">
-                <section className="rounded-3xl border border-[#dfe4e8] bg-white p-5 sm:p-6" aria-labelledby="r4-schematic-title">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="font-bold text-[#172637]" id="r4-schematic-title">{t.schematic}</h2>
-                      <p className="mt-1 text-sm text-[#6a7684]">{t.schematicHelp}</p>
-                    </div>
-                    <Layers3 aria-hidden="true" className="size-5 shrink-0 text-[#527896]" />
-                  </div>
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-[#dfe4e8] bg-[#eef3f6] p-3 sm:p-5">
-                    <svg aria-label={t.schematic} className="h-auto w-full" role="img" viewBox="0 0 620 340">
-                      {schematicPlanes.map((plane) => {
-                        const review = plane.id === "P3" || plane.id === "P6";
-                        return (
-                          <g key={plane.id}>
-                            <polygon fill={review ? "#f7dfaa" : "#dce9f0"} points={plane.points} stroke={review ? "#c98a20" : "#7795aa"} strokeWidth={review ? 5 : 3} />
-                            <text fill={review ? "#805d1b" : "#315675"} fontSize="18" fontWeight="800" textAnchor="middle" x={plane.labelX} y={plane.labelY}>{plane.id}</text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
-                  <p className="mt-3 text-center text-xs text-[#7c8793]">{t.schematicPreview}</p>
-                </section>
-
-                <section className="rounded-3xl border border-[#edcaca] bg-[#fffafa] p-5 sm:p-6" aria-labelledby="r4-review-edges-title">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle aria-hidden="true" className="size-5 text-[#c84f4f]" />
-                    <h2 className="font-bold text-[#7d3333]" id="r4-review-edges-title">{t.reviewEdges}</h2>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {measurement.reviewEdges.map((edge) => (
-                      <article className="rounded-2xl border border-[#edcaca] bg-white p-4" key={edge.id}>
-                        <div className="flex items-center justify-between gap-3">
-                          <strong className="text-sm text-[#9b3737]">{edge.id} · {edge.between}</strong>
-                          <span className="rounded-full bg-[#fff0f0] px-2 py-1 text-[10px] font-bold text-[#a53f3f]">{t.variance} {formatDecimal(locale, edge.varianceMeters)} m</span>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#6d5555]">{edge.reason}</p>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              </div>
-
-              <div className="min-w-0 space-y-5">
-                <section className="rounded-3xl border border-[#dfe4e8] bg-white p-5 sm:p-6" aria-labelledby="r4-plane-table-title">
-                  <h2 className="font-bold text-[#172637]" id="r4-plane-table-title">{t.planeTable}</h2>
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-[#dfe4e8]">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#f3f5f7] text-[#667483]">
-                        <tr><th className="px-3 py-3">{t.plane}</th><th className="px-3 py-3">m²</th><th className="px-3 py-3">{t.pitch}</th><th className="px-3 py-3">{t.state}</th></tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#e5e9ed]">
-                        {measurement.planes.map((plane) => (
-                          <tr className={plane.state === "review" ? "bg-[#fffbf3]" : "bg-white"} key={plane.id}>
-                            <th className="px-3 py-3 font-bold text-[#243546]">{plane.id}</th>
-                            <td className="px-3 py-3 text-[#5f6e7d]">{formatDecimal(locale, plane.areaSquareMeters)}</td>
-                            <td className="px-3 py-3 text-[#5f6e7d]">{plane.pitchDegrees}°</td>
-                            <td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-bold ${plane.state === "review" ? "bg-[#fff2d8] text-[#805d1b]" : "bg-[#edf8f3] text-[#2f785d]"}`}>{plane.state === "review" ? <AlertTriangle aria-hidden="true" className="size-3" /> : <CheckCircle2 aria-hidden="true" className="size-3" />}{plane.state === "review" ? t.review : t.verified}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-
-                <section className="rounded-3xl border border-[#dfe4e8] bg-white p-5 sm:p-6" aria-labelledby="r4-provenance-title">
-                  <div className="flex items-center gap-3">
-                    <Database aria-hidden="true" className="size-5 text-[#527896]" />
-                    <h2 className="font-bold text-[#172637]" id="r4-provenance-title">{t.provenance}</h2>
-                  </div>
-                  <dl className="mt-4 grid gap-3 text-xs">
-                    {[
-                      [t.evidenceId, measurement.provenance.evidenceId],
-                      [t.source, measurement.provenance.source],
-                      [t.captured, measurement.provenance.capturedAt],
-                      [t.model, measurement.provenance.modelVersion],
-                      [t.checksum, measurement.provenance.checksum],
-                    ].map(([label, value]) => (
-                      <div className="grid gap-1 rounded-xl bg-[#f6f8f9] p-3" key={label}>
-                        <dt className="font-bold text-[#73808d]">{label}</dt>
-                        <dd className="break-all font-semibold text-[#2d3e4f]">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              </div>
-            </div>
-          </div>
-
-          <footer className="fixed inset-x-0 bottom-[4.5rem] z-30 border-t border-[#dfe4e8] bg-white/96 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-64 lg:px-8">
-            <div className="mx-auto flex max-w-[1180px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="hidden min-w-0 xl:block">
-                <p className="text-xs font-bold text-[#7a4e15]">{t.next}</p>
-                <p className="mt-1 truncate text-xs text-[#6d7884]">{measurement.nextAction}</p>
-              </div>
-              <div className="ml-auto grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-                <button aria-describedby="r4-approval-disabled" className="inline-flex min-h-12 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[#d9dee3] bg-[#f3f5f7] px-4 text-xs font-bold text-[#89939d]" disabled type="button">
-                  <LockKeyhole aria-hidden="true" className="size-4" />{t.approve}
-                </button>
-                <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#183b58] px-4 text-xs font-bold text-white hover:bg-[#244e6e]" href={measurement.fallbackHref}>
-                  {t.fallback}<ArrowRight aria-hidden="true" className="size-4" />
-                </Link>
-              </div>
-            </div>
-            <p className="mx-auto mt-2 max-w-[1180px] text-right text-[10px] text-[#7d8791]" id="r4-approval-disabled"><Clock3 aria-hidden="true" className="mr-1 inline size-3" />{t.approvalDisabled}</p>
-          </footer>
-        </section>
+    <div className="relative min-h-[calc(100dvh-8rem)]" data-admin-next-section="cases">
+      <div aria-hidden="true" className="an-surface min-h-[900px] rounded-3xl border p-6 opacity-55 lg:p-8">
+        <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.18em] text-[var(--an-amber)]">{caseReference}</p><h2 className="mt-3 text-3xl font-bold text-[var(--an-text)]">{customer}</h2><p className="mt-2 text-[var(--an-muted)]">Testveien 12, Oslo · Takfornyelse</p></div>
+        <div className="mt-8 grid max-w-3xl grid-cols-3 gap-3">{["R4 review", "Pasiūlymas blokuotas", "SLA vėluoja"].map((label) => <div className="an-elevated rounded-2xl border p-5 text-sm font-bold text-[var(--an-muted)]" key={label}>{label}</div>)}</div>
       </div>
+
+      <div aria-hidden="true" className="fixed inset-x-0 bottom-[4.5rem] top-16 z-40 bg-black/55 backdrop-blur-[2px] lg:bottom-0 lg:left-64" />
+      <aside aria-labelledby="r4-drawer-title" aria-modal="true" className="fixed bottom-[4.5rem] right-0 top-16 z-50 flex w-full flex-col overflow-hidden border-l border-[var(--an-border-strong)] bg-[var(--an-surface)] shadow-[-24px_0_70px_rgba(0,0,0,.48)] lg:bottom-0 lg:w-[760px] xl:w-[820px]" role="dialog">
+        <header className="shrink-0 border-b border-[var(--an-border)] bg-[var(--an-sidebar)] px-4 py-4 sm:px-6">
+          <div className="flex items-start gap-3">
+            <Link aria-label={t.close} className="grid size-11 shrink-0 place-items-center rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-muted)] hover:text-[var(--an-amber)]" href={caseHref}><X aria-hidden="true" className="size-5" /></Link>
+            <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-xs font-bold uppercase tracking-[.18em] text-[var(--an-amber)]">{t.eyebrow}</p><span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[10px] font-bold text-[var(--an-amber)]">{t.synthetic}</span></div><h1 className="mt-2 text-xl font-bold text-[var(--an-text)] sm:text-2xl" id="r4-drawer-title">{t.title}</h1><p className="mt-1 text-sm text-[var(--an-muted)]">{caseReference} · {measurement.reference} · {t.intro}</p></div>
+            <span className="an-danger hidden rounded-full border px-2.5 py-1 text-[10px] font-bold sm:inline-flex">{t.status}</span>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-6 sm:p-6">
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={t.eyebrow}>
+            {metrics.map(([label, value, Icon], index) => <article className={`an-elevated rounded-2xl border p-3 ${index === 3 ? "!border-[color:rgba(255,113,113,.38)]" : ""}`} key={label}><div className="flex items-start justify-between gap-2"><p className="text-[10px] font-bold uppercase tracking-wider text-[var(--an-muted)]">{label}</p><Icon aria-hidden="true" className={`size-4 ${index === 3 ? "text-[var(--an-danger)]" : "text-[var(--an-amber)]"}`} /></div><strong className={`mt-2 block text-xl ${index === 3 ? "text-[var(--an-danger)]" : "text-[var(--an-text)]"}`}>{value}</strong></article>)}
+          </section>
+
+          <section className="an-elevated mt-4 rounded-2xl border p-4 sm:p-5" aria-labelledby="roof-plan-title">
+            <div className="flex items-start justify-between gap-3"><div><h2 className="font-bold text-[var(--an-text)]" id="roof-plan-title">{t.plan}</h2><p className="mt-1 text-xs text-[var(--an-muted)]">{t.planHelp}</p></div><Layers3 aria-hidden="true" className="size-5 text-[var(--an-amber)]" /></div>
+            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="overflow-hidden rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                <svg aria-label={t.plan} className="h-auto w-full" role="img" viewBox="0 0 620 330">
+                  <polygon fill="#1b2935" points="55,165 310,30 310,165" stroke="#6f8497" strokeWidth="3"/><polygon fill="#202f3b" points="310,30 565,165 310,165" stroke="#6f8497" strokeWidth="3"/><polygon fill="#17242f" points="55,165 310,165 245,305 35,305" stroke="#6f8497" strokeWidth="3"/><polygon fill="#1d2b37" points="310,165 565,165 585,305 375,305" stroke="#6f8497" strokeWidth="3"/>
+                  <line stroke="var(--an-amber)" strokeDasharray="10 7" strokeWidth="6" x1="310" x2="245" y1="165" y2="305"/><line stroke="var(--an-danger)" strokeDasharray="10 7" strokeWidth="6" x1="310" x2="375" y1="165" y2="305"/>
+                  {[["S1",195,120],["S2",425,120],["S3",150,245],["S4",470,245]].map(([id,x,y]) => <text fill="#f5f7fa" fontSize="20" fontWeight="800" key={String(id)} textAnchor="middle" x={Number(x)} y={Number(y)}>{id}</text>)}
+                  <text fill="var(--an-amber)" fontSize="13" fontWeight="800" x="220" y="290">E-04</text><text fill="var(--an-danger)" fontSize="13" fontWeight="800" x="382" y="290">E-11</text>
+                </svg>
+              </div>
+              <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">{measurement.primarySlopes.map((slope) => <article className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3" key={slope.id}><div className="flex items-center justify-between"><strong className="text-sm text-[var(--an-amber)]">{slope.id}</strong><span className="text-xs font-bold text-[var(--an-text)]">{number(locale, slope.areaSquareMeters)} m²</span></div><p className="mt-2 text-[10px] text-[var(--an-muted)]">{t.pitch} {slope.pitchDegrees}° · {t.perimeter} {number(locale, slope.perimeterMeters)} m</p></article>)}</div>
+            </div>
+          </section>
+
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_260px]">
+            <div className="an-elevated rounded-2xl border p-4" aria-labelledby="r4-photos-title"><div className="flex items-center gap-2"><Camera aria-hidden="true" className="size-5 text-[var(--an-amber)]"/><h2 className="font-bold" id="r4-photos-title">{t.photos}</h2></div><div className="mt-4 grid grid-cols-3 gap-2">{measurement.photos.map((photo,index) => <article className="overflow-hidden rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)]" key={photo.id}><div className={`grid aspect-[4/3] place-items-center ${index === 2 ? "bg-[linear-gradient(145deg,#3b3022,#111820)]" : "bg-[linear-gradient(145deg,#233546,#101821)]"}`}><Camera aria-hidden="true" className="size-7 text-[var(--an-muted)]"/></div><div className="p-2"><strong className="block truncate text-[10px]">{photo.label}</strong><span className="mt-1 block truncate text-[9px] text-[var(--an-subtle)]">{photo.source} · {photo.capturedAt.slice(11)}</span></div></article>)}</div></div>
+            <div className="an-elevated rounded-2xl border p-4" aria-labelledby="r4-delta-title"><div className="flex items-center gap-2"><ArrowRightLeft aria-hidden="true" className="size-5 text-[var(--an-amber)]"/><h2 className="font-bold" id="r4-delta-title">{t.delta}</h2></div><dl className="mt-4 grid gap-2 text-xs"><div className="flex justify-between rounded-lg bg-[var(--an-soft)] p-2"><dt>{t.deltaArea}</dt><dd className="font-bold text-[var(--an-amber)]">+{number(locale,measurement.deltaFromR3.areaSquareMeters)} m²</dd></div><div className="flex justify-between rounded-lg bg-[var(--an-soft)] p-2"><dt>{t.deltaConfidence}</dt><dd className="font-bold text-[var(--an-success)]">+{measurement.deltaFromR3.confidencePoints} pp</dd></div><div className="flex justify-between rounded-lg bg-[var(--an-soft)] p-2"><dt>{t.deltaPlanes}</dt><dd className="font-bold text-[var(--an-amber)]">+{measurement.deltaFromR3.planeCount}</dd></div></dl></div>
+          </section>
+
+          <section className="an-elevated mt-4 rounded-2xl border p-4" aria-labelledby="r4-gates-title"><div className="flex items-center justify-between"><h2 className="font-bold" id="r4-gates-title">{t.gates}</h2><Fingerprint aria-hidden="true" className="size-5 text-[var(--an-amber)]"/></div><div className="mt-4 grid gap-2 sm:grid-cols-2">{measurement.verificationGates.map((gate) => <article className={`${gateTone[gate.state]} rounded-xl border p-3`} key={gate.id}><div className="flex items-center justify-between gap-2"><strong className="text-xs">{t.gateLabels[gate.id]}</strong>{gate.state === "verified" ? <CheckCircle2 aria-hidden="true" className="size-4"/> : gate.state === "locked" ? <LockKeyhole aria-hidden="true" className="size-4"/> : <ShieldAlert aria-hidden="true" className="size-4"/>}</div><p className="mt-2 text-[10px] opacity-80">{gate.detail}</p></article>)}</div><div className="mt-4 flex items-start gap-2 border-t border-[var(--an-border)] pt-4 text-[10px] text-[var(--an-muted)]"><Database aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"/><p><strong className="text-[var(--an-text)]">{t.provenance}:</strong> {measurement.provenance.evidenceId} · {measurement.provenance.source} · {measurement.provenance.modelVersion} · {measurement.provenance.checksum}</p></div></section>
+        </div>
+
+        <footer className="shrink-0 border-t border-[var(--an-border)] bg-[var(--an-sidebar)] p-3 sm:p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-[var(--an-amber)]">{t.next}</p><p className="mt-1 truncate text-xs text-[var(--an-muted)]">{measurement.nextAction}</p></div><div className="grid grid-cols-2 gap-2 sm:flex"><Link className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-elevated)] px-3 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)]" href={measurement.fallbackHref}>{t.fallback}<ArrowRight aria-hidden="true" className="size-4"/></Link><button aria-describedby="r4-confirm-disabled" className="an-cta inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-xl px-4 text-xs font-black opacity-55" disabled type="button"><LockKeyhole aria-hidden="true" className="size-4"/>{t.confirm}</button></div></div><p className="mt-2 text-right text-[9px] text-[var(--an-subtle)]" id="r4-confirm-disabled">{t.confirmDisabled}</p></footer>
+      </aside>
     </div>
   );
 }

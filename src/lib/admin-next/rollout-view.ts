@@ -76,7 +76,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   },
   {
     id: "documentPreflight",
-    stage: "planned",
+    stage: "adapter_ready",
     dependencies: [
       "customerQuotes",
       "contractSigning",
