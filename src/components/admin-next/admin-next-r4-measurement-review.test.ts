@@ -62,4 +62,54 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).toContain("Pasikeitė nuo R3");
     expect(html).toContain("Verification gates");
   });
+
+  it("renders an approved canonical snapshot without fixture-only edge warnings", () => {
+    expect(measurement).toBeDefined();
+    if (!measurement) return;
+    const approved = {
+      ...measurement,
+      state: "verified" as const,
+      planeCount: 2,
+      reviewEdges: [],
+      primarySlopes: measurement.primarySlopes.slice(0, 2),
+      verificationGates: measurement.verificationGates.map((gate) => ({
+        ...gate,
+        state: "verified" as const,
+        detail: gate.id === "review_edges" ? "0 conflict edge(s)" : "pass",
+      })),
+      nextAction: "Ready for approved rendering",
+      diagram: {
+        vertices: [
+          { id: "v1", xMeters: 0, yMeters: 0 },
+          { id: "v2", xMeters: 10, yMeters: 0 },
+          { id: "v3", xMeters: 10, yMeters: 8 },
+          { id: "v4", xMeters: 0, yMeters: 8 },
+        ],
+        surfaces: [
+          { id: "S1", vertexIds: ["v1", "v2", "v3"] },
+          { id: "S2", vertexIds: ["v1", "v3", "v4"] },
+        ],
+        edges: [
+          { id: "ridge-1", fromVertexId: "v1", toVertexId: "v3", state: "verified" as const },
+        ],
+      },
+    };
+    const html = renderToStaticMarkup(
+      createElement(AdminNextR4MeasurementReview, {
+        locale: "lt",
+        caseReference: "TF-13",
+        customer: "UAT-01 Testkunde",
+        measurement: approved,
+        source: "canonical",
+      }),
+    );
+
+    expect(html).toContain("Canonical Roof Fusion");
+    expect(html).toContain("Patvirtinta");
+    expect(html).toContain("Konfliktinių kraštų nėra");
+    expect(html).toContain("Snapshot patvirtintas");
+    expect(html).not.toContain("E-04");
+    expect(html).not.toContain("E-11");
+    expect(html).not.toContain("Sintetiniai Preview duomenys");
+  });
 });

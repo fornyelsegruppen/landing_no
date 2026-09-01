@@ -56,6 +56,12 @@ export function projectRoofSnapshotToR4(
 ): AdminNextR4MeasurementView {
   const reviewedEdges = snapshot.geometry.edges.filter((edge) => edge.quality === "conflicted");
   const sources = snapshot.provenance.sources;
+  const rendererContours = new Map(
+    snapshot.rendererPayload.contours.map((contour) => [
+      contour.contourId,
+      contour,
+    ]),
+  );
   const primarySlopes = snapshot.geometry.surfaces.slice(0, 4).map((surface, index) => ({
     id: (["S1", "S2", "S3", "S4"] as const)[index],
     areaSquareMeters: midpoint(surface.netSurfaceArea),
@@ -93,6 +99,24 @@ export function projectRoofSnapshotToR4(
         0,
       ),
     })),
+    diagram: {
+      vertices: snapshot.rendererPayload.vertices.map((vertex) => ({
+        id: vertex.vertexId,
+        xMeters: vertex.xM,
+        yMeters: vertex.yM,
+      })),
+      surfaces: snapshot.rendererPayload.surfaces.map((surface) => ({
+        id: surface.surfaceId,
+        vertexIds:
+          rendererContours.get(surface.outerContourId)?.vertexIds || [],
+      })),
+      edges: snapshot.rendererPayload.edges.map((edge) => ({
+        id: edge.edgeId,
+        fromVertexId: edge.fromVertexId,
+        toVertexId: edge.toVertexId,
+        state: edge.quality === "conflicted" ? "review" : "verified",
+      })),
+    },
     primarySlopes,
     photos: sources.filter((source) => source.kind === "photo").map((source) => ({
       id: source.sourceId,

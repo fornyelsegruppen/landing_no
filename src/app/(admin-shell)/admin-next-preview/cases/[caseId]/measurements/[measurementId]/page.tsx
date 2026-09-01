@@ -79,6 +79,7 @@ export default async function AdminNextR4MeasurementPage({
       customer={customer}
       locale={user.interfaceLanguage}
       measurement={result.value}
+      source={result.source}
     />
   );
 }

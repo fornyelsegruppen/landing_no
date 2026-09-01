@@ -42,6 +42,15 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
         state: "verified",
         planeCount: snapshot.geometry.surfaces.length,
         provenance: { checksum: snapshot.snapshotHash },
+        diagram: {
+          vertices: snapshot.rendererPayload.vertices.map((vertex) => ({
+            id: vertex.vertexId,
+            xMeters: vertex.xM,
+            yMeters: vertex.yM,
+          })),
+          surfaces: expect.any(Array),
+          edges: expect.any(Array),
+        },
       },
     });
   });
