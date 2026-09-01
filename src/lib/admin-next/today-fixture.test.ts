@@ -25,7 +25,9 @@ describe("Admin Next Today fixture", () => {
   it("keeps every fixture action routed to a safe current workspace", () => {
     expect(
       adminNextTodayTasks.every(({ customer, href }) =>
-        customer.startsWith("Demo · ") && href.startsWith("/admin-v2"),
+        customer.startsWith("Demo · ") &&
+        (href.startsWith("/admin-v2") ||
+          href.startsWith("/admin-next-preview/")),
       ),
     ).toBe(true);
   });

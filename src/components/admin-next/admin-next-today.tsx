@@ -112,7 +112,7 @@ export function AdminNextToday({ locale, view }: { locale: PanelLocale; view: Ad
   const tasks = filterAdminNextTodayTasks(adminNextTodayTasks, view);
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6">
+    <div className="mx-auto max-w-[1500px] space-y-6" data-admin-next-section="today">
       <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-3xl">
           <p className="text-xs font-bold uppercase tracking-[.16em] text-[#607286]">{t.eyebrow}</p>

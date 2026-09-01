@@ -81,7 +81,7 @@ const copy = {
 
 const primaryNavigation = [
   { key: "today", href: "/admin-next-preview/today", icon: LayoutDashboard },
-  { key: "cases", href: "/admin-v2/cases", icon: FolderKanban },
+  { key: "cases", href: "/admin-next-preview/cases/TF-1042", icon: FolderKanban },
   { key: "calendar", href: "/admin-v2/work", icon: CalendarDays },
   { key: "customers", href: "/admin-v2/cases", icon: Users },
   { key: "work", href: "/admin-v2/work", icon: BriefcaseBusiness },
@@ -90,7 +90,7 @@ const primaryNavigation = [
 
 const mobileNavigation = [
   { key: "today", href: "/admin-next-preview/today", icon: House },
-  { key: "cases", href: "/admin-v2/cases", icon: FolderKanban },
+  { key: "cases", href: "/admin-next-preview/cases/TF-1042", icon: FolderKanban },
   { key: "calendar", href: "/admin-v2/work", icon: CalendarDays },
   { key: "work", href: "/admin-v2/next-preview", icon: Menu },
 ] as const;
@@ -108,6 +108,13 @@ export function AdminNextShell({
 
   return (
     <div className="admin-next-shell min-h-dvh bg-[#f3f5f7] text-[#17202b]">
+      <style>{`
+        .admin-next-shell:has([data-admin-next-section="today"]) [data-admin-next-nav="today"],
+        .admin-next-shell:has([data-admin-next-section="cases"]) [data-admin-next-nav="cases"] {
+          background: #eaf2f8;
+          color: #102c46;
+        }
+      `}</style>
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-[#dfe4e8] bg-white px-4 py-5 lg:flex lg:flex-col">
         <Link className="flex items-center gap-3 px-2" href="/admin-next-preview/today">
           <span className="grid size-10 place-items-center rounded-xl bg-[#152a42] text-sm font-black text-white">
@@ -121,15 +128,10 @@ export function AdminNextShell({
 
         <nav aria-label={t.workspace} className="mt-8 grid gap-1">
           {primaryNavigation.map(({ key, href, icon: Icon }) => {
-            const active = key === "today";
             return (
               <Link
-                aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
-                  active
-                    ? "bg-[#eaf2f8] text-[#102c46]"
-                    : "text-[#596779] hover:bg-[#f3f5f7] hover:text-[#17202b]"
-                }`}
+                className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#596779] transition hover:bg-[#f3f5f7] hover:text-[#17202b]"
+                data-admin-next-nav={key}
                 href={href}
                 key={key}
               >
@@ -196,9 +198,8 @@ export function AdminNextShell({
 
       <nav aria-label={t.workspace} className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-[#dfe4e8] bg-white/96 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
         {mobileNavigation.map(({ key, href, icon: Icon }) => {
-          const active = key === "today";
           return (
-            <Link className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold ${active ? "text-[#173b58]" : "text-[#6d7987]"}`} href={href} key={key}>
+            <Link className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold text-[#6d7987]" data-admin-next-nav={key} href={href} key={key}>
               <Icon aria-hidden="true" className="size-5" />
               {t.nav[key]}
             </Link>
