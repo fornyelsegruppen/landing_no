@@ -33,6 +33,10 @@ describe("Admin Next Case Workspace adapter boundary", () => {
     expect(result.source).toBe("fixture");
     expect(result.value.reference).toBe("TF-1042");
     expect(result.value.evidence).toHaveLength(4);
+    expect(result.value.measurementReview?.areaSquareMeters).toBe(186.4);
+    expect(result.value.measurementReview?.confidencePercent).toBe(82);
+    expect(result.value.measurementReview?.planes).toHaveLength(7);
+    expect(result.value.measurementReview?.reviewEdges).toHaveLength(2);
     expect(new Set(result.value.timeline.map(({ id }) => id)).size).toBe(
       result.value.timeline.length,
     );
@@ -46,9 +50,20 @@ describe("Admin Next Case Workspace adapter boundary", () => {
       ...adminNextCaseWorkspaceFixture.evidence.map(({ fallbackHref }) =>
         fallbackHref,
       ),
+      adminNextCaseWorkspaceFixture.measurementReview?.fallbackHref || "",
     ];
 
     expect(hrefs.every((href) => href.startsWith("/admin-v2/"))).toBe(true);
+  });
+
+  it("keeps the R4 plane sum aligned with the presented total", () => {
+    const measurement = adminNextCaseWorkspaceFixture.measurementReview;
+    expect(measurement).toBeDefined();
+    const sum = measurement?.planes.reduce(
+      (total, plane) => total + plane.areaSquareMeters,
+      0,
+    );
+    expect(sum).toBeCloseTo(measurement?.areaSquareMeters || 0, 5);
   });
 
   it("fails closed for an unknown fixture reference", async () => {

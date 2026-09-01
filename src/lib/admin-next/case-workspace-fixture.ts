@@ -40,6 +40,8 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       metric: "186,4 m² · 82 %",
       recordedAt: "08:41",
       fallbackHref: "/admin-v2/cases",
+      previewHref:
+        "/admin-next-preview/cases/TF-1042/measurements/R4-2026-1042",
     },
     {
       id: "PHOTOSET-1042-01",
@@ -71,6 +73,46 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       fallbackHref: "/admin-v2/cases",
     },
   ],
+  measurementReview: {
+    reference: "R4-2026-1042",
+    state: "review_required",
+    areaSquareMeters: 186.4,
+    confidencePercent: 82,
+    planeCount: 7,
+    provenance: {
+      evidenceId: "EVD-R4-1042-01",
+      source: "Deterministic Preview fixture · R4 aerial evidence",
+      capturedAt: "2026-09-01 08:37",
+      modelVersion: "R4 preview schema v1",
+      checksum: "sha256:demo-1042-r4",
+    },
+    planes: [
+      { id: "P1", areaSquareMeters: 42.8, pitchDegrees: 22, state: "verified" },
+      { id: "P2", areaSquareMeters: 38.6, pitchDegrees: 24, state: "verified" },
+      { id: "P3", areaSquareMeters: 31.2, pitchDegrees: 22, state: "review" },
+      { id: "P4", areaSquareMeters: 28.4, pitchDegrees: 24, state: "verified" },
+      { id: "P5", areaSquareMeters: 18.7, pitchDegrees: 17, state: "verified" },
+      { id: "P6", areaSquareMeters: 15.9, pitchDegrees: 17, state: "review" },
+      { id: "P7", areaSquareMeters: 10.8, pitchDegrees: 12, state: "verified" },
+    ],
+    reviewEdges: [
+      {
+        id: "E-04",
+        between: "P2 ↔ P3",
+        reason: "Kraigo pabaigos taškas nesutampa su nuotraukos kontūru",
+        varianceMeters: 0.42,
+      },
+      {
+        id: "E-11",
+        between: "P5 ↔ P6",
+        reason: "Kraštą dalinai uždengia kamino šešėlis",
+        varianceMeters: 0.31,
+      },
+    ],
+    nextAction:
+      "Palyginti E-04 ir E-11 kraštus su objekto nuotraukomis, tada patvirtinti arba pataisyti geometriją veikiančiame matavimo sraute.",
+    fallbackHref: "/admin-v2/cases",
+  },
   timeline: [
     {
       id: "timeline-measurement-ready",

@@ -57,7 +57,36 @@ export type AdminNextCaseWorkspaceView = {
     metric?: string;
     recordedAt: string;
     fallbackHref: string;
+    previewHref?: string;
   }[];
+  measurementReview?: {
+    reference: string;
+    state: "review_required" | "verified";
+    areaSquareMeters: number;
+    confidencePercent: number;
+    planeCount: number;
+    provenance: {
+      evidenceId: string;
+      source: string;
+      capturedAt: string;
+      modelVersion: string;
+      checksum: string;
+    };
+    planes: readonly {
+      id: string;
+      areaSquareMeters: number;
+      pitchDegrees: number;
+      state: "verified" | "review";
+    }[];
+    reviewEdges: readonly {
+      id: string;
+      between: string;
+      reason: string;
+      varianceMeters: number;
+    }[];
+    nextAction: string;
+    fallbackHref: string;
+  };
   timeline: readonly {
     id: string;
     kind: AdminNextTimelineKind;
@@ -91,4 +120,3 @@ export function loadAdminNextCaseWorkspace(
 ) {
   return adapter.load(reference.trim().toUpperCase());
 }
-
