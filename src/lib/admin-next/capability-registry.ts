@@ -86,7 +86,7 @@ export type AdminNextRoofFusionActionCapabilityId =
   (typeof adminNextRoofFusionActionCapabilityIds)[number];
 
 export const adminNextRoofFusionI1TargetContract = {
-  status: "contract_accepted_adapter_blocked",
+  status: "preview_read_adapters_ready",
   snapshotSchemaVersion: "roof-snapshot.v1",
   rendererSchemaVersion: "roof-renderer.v1",
   approvedRendererEnvelopeVersion: "approved-roof-renderer-envelope.v1",
@@ -94,6 +94,12 @@ export const adminNextRoofFusionI1TargetContract = {
   actionCapabilities: adminNextRoofFusionActionCapabilityIds,
   previewMutationPolicy: "forbidden",
   downstreamReadPolicy: "approved_renderer_envelope_only",
+  snapshotRepository:
+    "src/lib/roof-fusion/payload-repository-v1.ts#PayloadRoofSnapshotRepositoryV1",
+  adminReadAdapter:
+    "src/lib/roof-fusion/preview-read-adapters-v1.ts#AdminRoofFusionPreviewReadAdapterV1",
+  workerReadAdapter:
+    "src/lib/roof-fusion/preview-read-adapters-v1.ts#WorkerRoofFusionPreviewRendererAdapterV1",
   mutationOwner: "future authorized Roof Fusion command API",
 } as const;
 

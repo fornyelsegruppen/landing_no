@@ -39,6 +39,10 @@ import { InvoiceRecords } from "./payload/collections/InvoiceRecords";
 import { Warranties } from "./payload/collections/Warranties";
 import { OfficialInvoices } from "./payload/collections/OfficialInvoices";
 import { CustomerContractRequests } from "./payload/collections/CustomerContractRequests";
+import {
+  RoofFusionCommands,
+  RoofFusionSnapshots,
+} from "./payload/collections/RoofFusion";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 
@@ -179,6 +183,8 @@ export default buildConfig({
     OperationalJobs,
     AccessTokens,
     PrivateMedia,
+    RoofFusionSnapshots,
+    RoofFusionCommands,
   ],
   globals: [SiteSettings],
   editor: lexicalEditor(),

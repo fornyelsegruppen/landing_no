@@ -35,6 +35,7 @@ const completeEnvironment = {
   PRODUCTION_OWNER_APPROVAL_REFERENCE: "OWNER-1",
   AI_CONTENT_PILOT_REFERENCE: "AI-1",
   ROOF_TECHNICAL_QA_REFERENCE: "ROOF-TECH-1",
+  ROOF_FUSION_V1_QA_REFERENCE: "ROOF-FUSION-PREVIEW-1",
   ROOF_VALIDATION_REFERENCE: "ROOF-1",
   PRICING_APPROVAL_REFERENCE: "PRICE-1",
   QUOTE_JOURNEY_QA_REFERENCE: "QUOTE-1",
@@ -55,13 +56,13 @@ describe("production release gate", () => {
   it("keeps every risky feature safely disabled by default", () => {
     const gate = buildReleaseGate({});
     expect(gate.productionReady).toBe(false);
-    expect(gate.counts).toEqual({ go: 0, noGo: 0, disabled: 13 });
+    expect(gate.counts).toEqual({ go: 0, noGo: 0, disabled: 14 });
   });
 
   it("returns go only when integrations and named evidence are complete", () => {
     const gate = buildReleaseGate(completeEnvironment);
     expect(gate.productionReady).toBe(true);
-    expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 0 });
+    expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 1 });
   });
 
   it("does not require real-pilot evidence to run a controlled feature wave", () => {
@@ -72,7 +73,7 @@ describe("production release gate", () => {
     const gate = buildReleaseGate(environment);
 
     expect(gate.productionReady).toBe(true);
-    expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 0 });
+    expect(gate.counts).toEqual({ go: 13, noGo: 0, disabled: 1 });
   });
 
   it("permits technical roof QA in a controlled wave while keeping pricing evidence on quotes", () => {
@@ -104,6 +105,19 @@ describe("production release gate", () => {
     const serialized = JSON.stringify(gate);
     expect(serialized).not.toContain("secret-gemini");
     expect(serialized).not.toContain("secret-resend");
+  });
+
+  it("makes an enabled Preview-only Roof Fusion flag a production no-go", () => {
+    const gate = buildReleaseGate({
+      ...completeEnvironment,
+      FEATURE_ROOF_FUSION_V1: "true",
+    });
+
+    expect(gate.features.roofFusionV1).toMatchObject({
+      status: "no_go",
+      missingEvidence: ["ROOF_FUSION_V1_PRODUCTION_ACTIVATION_FORBIDDEN"],
+    });
+    expect(gate.productionReady).toBe(false);
   });
 
   it("blocks the SEO scheduler when licensed stock imagery is not configured", () => {

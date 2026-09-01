@@ -12,6 +12,7 @@ describe("platform feature configuration", () => {
     expect(readFeatureFlags({})).toEqual({
       aiDrafts: false,
       roofMeasurement: false,
+      roofFusionV1: false,
       customerQuotes: false,
       contractSigning: false,
       workerPortal: false,
@@ -89,6 +90,19 @@ describe("platform feature configuration", () => {
     expect(readIntegrationStatus({}).imagery.readiness).toBe(
       "configuration_required",
     );
+  });
+
+  it("keeps Roof Fusion independent from every legacy roof flag", () => {
+    expect(
+      featureReadiness("roofFusionV1", {
+        FEATURE_ROOF_MEASUREMENT: "true",
+        FEATURE_MEASUREMENT_EVIDENCE_V2: "true",
+        BLOB_READ_WRITE_TOKEN: "configured",
+      }),
+    ).toEqual({ enabled: false, ready: false, unavailable: [] });
+    expect(
+      featureReadiness("roofFusionV1", { FEATURE_ROOF_FUSION_V1: "true" }),
+    ).toEqual({ enabled: true, ready: true, unavailable: [] });
   });
 
   it("distinguishes disabled from missing configuration", () => {

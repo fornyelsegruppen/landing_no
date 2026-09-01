@@ -17,6 +17,7 @@ const commonEvidence = [
 const featureEvidence: Record<FeatureFlagName, readonly string[]> = {
   aiDrafts: ["AI_CONTENT_PILOT_REFERENCE"],
   roofMeasurement: ["ROOF_TECHNICAL_QA_REFERENCE"],
+  roofFusionV1: ["ROOF_FUSION_V1_QA_REFERENCE"],
   customerQuotes: ["PRICING_APPROVAL_REFERENCE", "QUOTE_JOURNEY_QA_REFERENCE"],
   contractSigning: [
     "SIGNATURE_APPROVAL_REFERENCE",
@@ -33,6 +34,10 @@ const featureEvidence: Record<FeatureFlagName, readonly string[]> = {
   securityHardeningV2: ["SECURITY_HARDENING_QA_REFERENCE"],
 };
 
+const previewOnlyFeatures = new Set<FeatureFlagName>(["roofFusionV1"]);
+const PREVIEW_ONLY_PRODUCTION_BLOCK =
+  "ROOF_FUSION_V1_PRODUCTION_ACTIVATION_FORBIDDEN";
+
 function isConfigured(environment: Environment, key: string) {
   return Boolean(environment[key]?.trim());
 }
@@ -47,7 +52,14 @@ export function buildReleaseGate(environment: Environment = process.env) {
       const readiness = featureReadiness(name, environment);
       const requiredEvidence = [...commonEvidence, ...featureEvidence[name]];
       const missingEvidence = readiness.enabled
-        ? requiredEvidence.filter((key) => !isConfigured(environment, key))
+        ? [
+            ...requiredEvidence.filter(
+              (key) => !isConfigured(environment, key),
+            ),
+            ...(previewOnlyFeatures.has(name)
+              ? [PREVIEW_ONLY_PRODUCTION_BLOCK]
+              : []),
+          ]
         : [];
       const status: ReleaseGateStatus = !readiness.enabled
         ? "disabled"

@@ -18,7 +18,7 @@ describe("controlled pilot banner", () => {
 
     expect(html).toContain("Kontroliuojamas pilotas");
     expect(html).toContain("PROD-8.0");
-    expect(html).toContain("13 dar išjungta");
+    expect(html).toContain("14 dar išjungta");
     expect(html).toContain("siuntimai pristabdyti");
   });
 });

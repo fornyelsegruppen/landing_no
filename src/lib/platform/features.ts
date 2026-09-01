@@ -1,6 +1,7 @@
 export const featureFlagNames = [
   "aiDrafts",
   "roofMeasurement",
+  "roofFusionV1",
   "customerQuotes",
   "contractSigning",
   "workerPortal",
@@ -21,6 +22,7 @@ export type Environment = Readonly<Record<string, string | undefined>>;
 export const featureEnvironmentKeys: Record<FeatureFlagName, string> = {
   aiDrafts: "FEATURE_AI_DRAFTS",
   roofMeasurement: "FEATURE_ROOF_MEASUREMENT",
+  roofFusionV1: "FEATURE_ROOF_FUSION_V1",
   customerQuotes: "FEATURE_CUSTOMER_QUOTES",
   contractSigning: "FEATURE_CONTRACT_SIGNING",
   workerPortal: "FEATURE_WORKER_PORTAL",
@@ -262,6 +264,7 @@ export function readIntegrationStatus(
 const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   aiDrafts: ["ai"],
   roofMeasurement: ["maps", "buildingFootprints"],
+  roofFusionV1: [],
   customerQuotes: ["email", "legal"],
   contractSigning: ["signature", "email", "legal"],
   workerPortal: [],

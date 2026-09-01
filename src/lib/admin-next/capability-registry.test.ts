@@ -51,7 +51,7 @@ describe("Admin Next capability registry", () => {
     ).toBe(false);
   });
 
-  it("records the accepted I1 target without claiming a canonical adapter", () => {
+  it("records the accepted I1 target and its Preview read adapters", () => {
     expect(adminNextCanonicalCapabilityRegistry.Roof).toMatchObject({
       canonicalSource: "roof-measurements",
       maturity: "legacy_bridge",
@@ -60,11 +60,17 @@ describe("Admin Next capability registry", () => {
     expect(adminNextRoofFusionActionCapabilityIds).toHaveLength(7);
     expect(new Set(adminNextRoofFusionActionCapabilityIds).size).toBe(7);
     expect(adminNextRoofFusionI1TargetContract).toMatchObject({
-      status: "contract_accepted_adapter_blocked",
+      status: "preview_read_adapters_ready",
       featureGate: "roofFusionV1",
       previewMutationPolicy: "forbidden",
       downstreamReadPolicy: "approved_renderer_envelope_only",
     });
+    expect(adminNextRoofFusionI1TargetContract.adminReadAdapter).toContain(
+      "AdminRoofFusionPreviewReadAdapterV1",
+    );
+    expect(adminNextRoofFusionI1TargetContract.workerReadAdapter).toContain(
+      "WorkerRoofFusionPreviewRendererAdapterV1",
+    );
     expect(
       adminNextModuleDefinitions.find(({ id }) => id === "roofWorkbench")
         ?.stage,

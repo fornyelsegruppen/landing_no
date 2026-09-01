@@ -31,7 +31,7 @@ describe("platform operating mode", () => {
       automaticCommunicationPaused: true,
     });
     expect(status.enabledFeatures).toEqual(["aiDrafts"]);
-    expect(status.disabledFeatures).toHaveLength(12);
+    expect(status.disabledFeatures).toHaveLength(13);
   });
 
   it("allows full mode only after lead and physical roof pilot evidence is recorded", () => {

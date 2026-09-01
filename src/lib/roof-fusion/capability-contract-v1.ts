@@ -4,7 +4,7 @@ export const ROOF_FUSION_CAPABILITY_CONTRACT_VERSION =
 export const roofFusionCapabilityContractV1 = {
   schemaVersion: ROOF_FUSION_CAPABILITY_CONTRACT_VERSION,
   featureGate: "roofFusionV1",
-  activation: "shared_registry_not_implemented",
+  activation: "preview_only_fail_closed",
   capabilities: {
     "roof_fusion.snapshot.read": {
       actors: ["administrator"],

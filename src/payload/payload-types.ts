@@ -96,6 +96,8 @@ export interface Config {
     'operational-jobs': OperationalJob;
     'access-tokens': AccessToken;
     'private-media': PrivateMedia;
+    'roof-fusion-snapshots': RoofFusionSnapshot;
+    'roof-fusion-commands': RoofFusionCommand;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -132,6 +134,8 @@ export interface Config {
     'operational-jobs': OperationalJobsSelect<false> | OperationalJobsSelect<true>;
     'access-tokens': AccessTokensSelect<false> | AccessTokensSelect<true>;
     'private-media': PrivateMediaSelect<false> | PrivateMediaSelect<true>;
+    'roof-fusion-snapshots': RoofFusionSnapshotsSelect<false> | RoofFusionSnapshotsSelect<true>;
+    'roof-fusion-commands': RoofFusionCommandsSelect<false> | RoofFusionCommandsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -1595,6 +1599,56 @@ export interface AccessToken {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-snapshots".
+ */
+export interface RoofFusionSnapshot {
+  id: number;
+  snapshotId: string;
+  caseId: string;
+  caseRevisionKey: string;
+  revision: number;
+  supersedesSnapshotId?: string | null;
+  snapshotHash: string;
+  state: string;
+  measurementClass: string;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-commands".
+ */
+export interface RoofFusionCommand {
+  id: number;
+  ledgerKey: string;
+  caseId: string;
+  idempotencyKey: string;
+  commandHash: string;
+  commandType: string;
+  snapshotId: string;
+  result:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1732,6 +1786,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'private-media';
         value: number | PrivateMedia;
+      } | null)
+    | ({
+        relationTo: 'roof-fusion-snapshots';
+        value: number | RoofFusionSnapshot;
+      } | null)
+    | ({
+        relationTo: 'roof-fusion-commands';
+        value: number | RoofFusionCommand;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2683,6 +2745,38 @@ export interface PrivateMediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-snapshots_select".
+ */
+export interface RoofFusionSnapshotsSelect<T extends boolean = true> {
+  snapshotId?: T;
+  caseId?: T;
+  caseRevisionKey?: T;
+  revision?: T;
+  supersedesSnapshotId?: T;
+  snapshotHash?: T;
+  state?: T;
+  measurementClass?: T;
+  snapshot?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-commands_select".
+ */
+export interface RoofFusionCommandsSelect<T extends boolean = true> {
+  ledgerKey?: T;
+  caseId?: T;
+  idempotencyKey?: T;
+  commandHash?: T;
+  commandType?: T;
+  snapshotId?: T;
+  result?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
