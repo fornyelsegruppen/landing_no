@@ -32,7 +32,7 @@ export const adminNextTodayTasks: readonly AdminNextTodayTask[] = [
     owner: "Marius",
     ownedByCurrentUser: true,
     priority: "critical",
-    href: "/admin-v2/cases",
+    href: "/admin-next-preview/cases/TF-1042",
   },
   {
     id: "TF-1038",

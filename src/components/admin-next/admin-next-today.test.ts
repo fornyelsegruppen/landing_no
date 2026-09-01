@@ -1,3 +1,4 @@
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AdminNextShell } from "./admin-next-shell";
@@ -6,7 +7,7 @@ import { AdminNextToday } from "./admin-next-today";
 describe("Admin Next Today preview", () => {
   it("renders one clear next action for every synthetic case", () => {
     const html = renderToStaticMarkup(
-      <AdminNextToday locale="lt" view="all" />,
+      createElement(AdminNextToday, { locale: "lt", view: "all" }),
     );
 
     expect(html).toContain("Mano darbo eilė");
@@ -17,10 +18,16 @@ describe("Admin Next Today preview", () => {
   });
 
   it("keeps the mobile shell free from wide fixed content", () => {
+    const shellProps = {
+      locale: "lt",
+      displayName: "Demo Admin",
+    } as ComponentProps<typeof AdminNextShell>;
     const html = renderToStaticMarkup(
-      <AdminNextShell displayName="Demo Admin" locale="lt">
-        <AdminNextToday locale="lt" view="mine" />
-      </AdminNextShell>,
+      createElement(
+        AdminNextShell,
+        shellProps,
+        createElement(AdminNextToday, { locale: "lt", view: "mine" }),
+      ),
     );
 
     expect(html).toContain("min-w-0");
