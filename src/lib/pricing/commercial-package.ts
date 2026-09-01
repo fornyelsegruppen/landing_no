@@ -20,6 +20,8 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
   reason: string;
   recommendedServiceKey?: string;
   depositBasisPoints?: number;
+  expectedRevision: number;
+  sourceQuoteId: number;
 }) {
   const [lead, measurementResult, quoteResult] = await Promise.all([
     payload.findByID({ collection: "leads", id: input.leadId, depth: 0, overrideAccess: true }),
@@ -28,8 +30,10 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
   ]);
   const measurement = measurementResult.docs[0];
   const currentQuote = quoteResult.docs[0];
+  if (Number(lead.caseRevision || 1) !== input.expectedRevision) throw new Error("Commercial package state changed; reload before editing");
   if (!measurement || !["draft", "review_required", "approved"].includes(measurement.status)) throw new Error("A reviewable roof measurement is required");
   if (!currentQuote || !["draft", "declined"].includes(currentQuote.status)) throw new Error("Commercial terms may only be edited for a draft or a declined quote");
+  if (relationId(currentQuote.id) !== input.sourceQuoteId) throw new Error("Commercial quote version changed; reload before editing");
   const requestedService = lead.inquiryType;
   if (!requestedService || requestedService === "usikker") throw new Error("A concrete requested service is required");
   const serviceKeys = [requestedService, input.recommendedServiceKey].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
@@ -93,7 +97,7 @@ export async function rebuildCommercialPackage(payload: Payload, input: {
       payload.update({ collection: "quotes", id: recommended.quote.id, depth: 0, overrideAccess: true, data: { siblingQuote: base.quote.id } }),
     ]);
   }
-  await updateCaseState(payload, { leadId: input.leadId, actorId: input.administratorId, command: "rebuild_commercial_package", idempotencyKey: `commercial-package:${currentQuote.id}:${group}`, patch: {
+  await updateCaseState(payload, { leadId: input.leadId, actorId: input.administratorId, command: "rebuild_commercial_package", expectedRevision: input.expectedRevision, idempotencyKey: `commercial-package:${currentQuote.id}:${input.expectedRevision}`, patch: {
     status: "quoted", nextActionOwner: "administrator",
     nextAction: recommended ? "Kontroller begge tilbudsalternativene, godkjenn og send dem samlet til kunden." : "Kontroller den nye prisversjonen, godkjenn og send tilbudet til kunden.",
     nextActionAt: now.toISOString(),
