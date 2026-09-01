@@ -85,6 +85,7 @@ export function AdminNextRoofFusionUatControl({
     try {
       const response = await fetch("/api/admin/roof-fusion/preview-uat", {
         body: JSON.stringify({ caseReference, confirmation }),
+        credentials: "same-origin",
         headers: { "content-type": "application/json" },
         method: "POST",
       });
