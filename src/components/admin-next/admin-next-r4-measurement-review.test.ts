@@ -122,4 +122,36 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).not.toContain("E-11");
     expect(html).not.toContain("Sintetiniai Preview duomenys");
   });
+
+  it("renders real evidence previews only through the authenticated admin proxy", () => {
+    expect(measurement).toBeDefined();
+    if (!measurement) return;
+    const withEvidence = {
+      ...measurement,
+      photos: [
+        {
+          id: "lead-13-photo-0",
+          label: "Kliento nuotrauka 1",
+          source: "Pateikė klientas",
+          capturedAt: "2026-09-02T00:30:00.000Z",
+          previewHref: "/api/admin/leads/13/photo?index=0",
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(AdminNextR4MeasurementReview, {
+        address: "Testgata 13, 0013 Oslo",
+        locale: "lt",
+        caseReference: "TF-13",
+        customer: "UAT-01 Testkunde",
+        measurement: withEvidence,
+        owner: "Aistė",
+        source: "canonical",
+      }),
+    );
+
+    expect(html).toContain("Kliento nuotrauka 1");
+    expect(html).toContain("/api/admin/leads/13/photo?index=0");
+    expect(html).not.toContain("blob.vercel-storage.com");
+  });
 });

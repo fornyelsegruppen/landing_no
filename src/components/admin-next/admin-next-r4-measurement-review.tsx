@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -182,17 +183,23 @@ export function AdminNextR4MeasurementReview({ address, locale, caseReference, c
     measurement.deltaFromR3.areaSquareMeters === 0 &&
     measurement.deltaFromR3.confidencePoints === 0 &&
     measurement.deltaFromR3.planeCount === 0;
-  const sourceCards = measurement.sources?.length
-    ? measurement.sources
-    : measurement.photos.map((photo) => ({
+  const photoCards = measurement.photos.map((photo) => ({
         id: photo.id,
         kind: "photo",
         label: photo.label,
         attribution: photo.source,
         capturedAt: photo.capturedAt,
+        previewHref: photo.previewHref,
         licenseState: "authorized" as const,
-        qualityState: "usable" as const,
+        qualityState: "unknown" as const,
       }));
+  const photoIds = new Set(photoCards.map((photo) => photo.id));
+  const sourceCards = [
+    ...photoCards,
+    ...(measurement.sources || [])
+      .filter((sourceItem) => !photoIds.has(sourceItem.id))
+      .map((sourceItem) => ({ ...sourceItem, previewHref: undefined })),
+  ];
 
   return (
     <div className="relative min-h-[calc(100dvh-8rem)]" data-admin-next-section="cases">
@@ -273,7 +280,7 @@ export function AdminNextR4MeasurementReview({ address, locale, caseReference, c
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{measurement.primarySlopes.map((slope) => <article className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3" key={slope.id}><div className="flex items-center justify-between"><strong className="text-sm text-[var(--an-amber)]">{slope.id}</strong><span className="text-xs font-bold text-[var(--an-text)]">{number(locale, slope.areaSquareMeters)} m²</span></div><p className="mt-2 text-[10px] text-[var(--an-muted)]">{t.pitch} {number(locale, slope.pitchDegrees)}° · {t.perimeter} {number(locale, slope.perimeterMeters)} m</p></article>)}</div>
           </section>
 
-          <section className="an-elevated mt-4 rounded-2xl border p-4" aria-labelledby="r4-photos-title"><div className="flex items-center gap-2"><Camera aria-hidden="true" className="size-5 text-[var(--an-amber)]"/><h2 className="font-bold" id="r4-photos-title">{t.photos}</h2></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{sourceCards.map((item,index) => <article className="overflow-hidden rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)]" key={item.id}><div className={`grid aspect-[16/9] place-items-center ${index % 3 === 2 ? "bg-[linear-gradient(145deg,#3b3022,#111820)]" : "bg-[linear-gradient(145deg,#233546,#101821)]"}`}><Database aria-hidden="true" className="size-7 text-[var(--an-muted)]"/></div><div className="p-2"><div className="flex items-start justify-between gap-2"><strong className="block min-w-0 truncate text-[10px]">{item.label}</strong><CheckCircle2 aria-hidden="true" className={`size-3 shrink-0 ${item.qualityState === "usable" ? "text-[var(--an-success)]" : "text-[var(--an-amber)]"}`}/></div><span className="mt-1 block truncate text-[9px] text-[var(--an-subtle)]">{item.kind.replaceAll("_", " ")} · {dateTime(locale, item.capturedAt)}</span><span className={`mt-2 inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-bold ${item.licenseState === "authorized" && item.qualityState === "usable" ? "an-success" : "border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]"}`}>{item.licenseState === "authorized" ? t.authorized : item.licenseState} · {item.qualityState === "usable" ? t.usable : item.qualityState}</span></div></article>)}</div></section>
+          <section className="an-elevated mt-4 rounded-2xl border p-4" aria-labelledby="r4-photos-title"><div className="flex items-center gap-2"><Camera aria-hidden="true" className="size-5 text-[var(--an-amber)]"/><h2 className="font-bold" id="r4-photos-title">{t.photos}</h2></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{sourceCards.map((item,index) => <article className="overflow-hidden rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)]" key={item.id}><div className={`relative grid aspect-[16/9] place-items-center overflow-hidden ${index % 3 === 2 ? "bg-[linear-gradient(145deg,#3b3022,#111820)]" : "bg-[linear-gradient(145deg,#233546,#101821)]"}`}>{item.previewHref ? <Image alt={item.label} className="object-cover" fill sizes="(min-width: 640px) 180px, 50vw" src={item.previewHref} unoptimized/> : <Database aria-hidden="true" className="size-7 text-[var(--an-muted)]"/>}</div><div className="p-2"><div className="flex items-start justify-between gap-2"><strong className="block min-w-0 truncate text-[10px]">{item.label}</strong><CheckCircle2 aria-hidden="true" className={`size-3 shrink-0 ${item.qualityState === "usable" ? "text-[var(--an-success)]" : "text-[var(--an-amber)]"}`}/></div><span className="mt-1 block truncate text-[9px] text-[var(--an-subtle)]">{item.kind.replaceAll("_", " ")} · {dateTime(locale, item.capturedAt)}</span><span className={`mt-2 inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-bold ${item.licenseState === "authorized" && item.qualityState === "usable" ? "an-success" : "border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]"}`}>{item.licenseState === "authorized" ? t.authorized : item.licenseState} · {item.qualityState === "usable" ? t.usable : item.qualityState}</span></div></article>)}</div></section>
 
           <section className="an-elevated mt-4 rounded-2xl border p-4" aria-labelledby="r4-gates-title"><div className="flex items-center justify-between"><h2 className="font-bold" id="r4-gates-title">{t.gates}</h2><Fingerprint aria-hidden="true" className="size-5 text-[var(--an-amber)]"/></div><div className="mt-4 grid gap-2 sm:grid-cols-2">{measurement.verificationGates.map((gate) => <article className={`${gateTone[gate.state]} rounded-xl border p-3`} key={gate.id}><div className="flex items-center justify-between gap-2"><strong className="text-xs">{t.gateLabels[gate.id]}</strong>{gate.state === "verified" ? <CheckCircle2 aria-hidden="true" className="size-4"/> : gate.state === "locked" ? <LockKeyhole aria-hidden="true" className="size-4"/> : <ShieldAlert aria-hidden="true" className="size-4"/>}</div><p className="mt-2 text-[10px] opacity-80">{gate.detail}</p></article>)}</div><div className="mt-4 flex items-start gap-2 border-t border-[var(--an-border)] pt-4 text-[10px] text-[var(--an-muted)]"><Database aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"/><p><strong className="text-[var(--an-text)]">{t.provenance}:</strong> {measurement.provenance.evidenceId} · {measurement.provenance.source} · {measurement.provenance.modelVersion} · {measurement.provenance.checksum}</p></div></section>
         </div>
