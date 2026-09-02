@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
+import {
+  etrs89ToUtm33,
+  type KartverketHeightSurfaceV1,
+} from "@/lib/providers/kartverket-hoydedata-provider";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
+import { segmentSimpleRoofPlanesV1 } from "./simple-roof-plane-segmentation-v1";
 import { buildHeightSurfaceVisualizationV1 } from "./hoydedata-surface-visualization-v1";
 
 const candidate: BuildingFootprintCandidate = {
@@ -67,6 +71,81 @@ const surface: KartverketHeightSurfaceV1 = {
   },
 };
 
+function segmentationSurfaceFixture(
+  roof: (
+    point: { x: number; y: number },
+    center: { x: number; y: number },
+  ) => number,
+): KartverketHeightSurfaceV1 {
+  const polygon = candidate.polygon.map(etrs89ToUtm33);
+  const bbox = {
+    minEastingM: Math.floor(
+      Math.min(...polygon.map((point) => point.eastingM)) - 4,
+    ),
+    minNorthingM: Math.floor(
+      Math.min(...polygon.map((point) => point.northingM)) - 4,
+    ),
+    maxEastingM: Math.ceil(
+      Math.max(...polygon.map((point) => point.eastingM)) + 4,
+    ),
+    maxNorthingM: Math.ceil(
+      Math.max(...polygon.map((point) => point.northingM)) + 4,
+    ),
+  };
+  const center = {
+    x: polygon.reduce((sum, point) => sum + point.eastingM, 0) / polygon.length,
+    y:
+      polygon.reduce((sum, point) => sum + point.northingM, 0) / polygon.length,
+  };
+  const width = bbox.maxEastingM - bbox.minEastingM;
+  const height = bbox.maxNorthingM - bbox.minNorthingM;
+  const domElevationM: number[] = [];
+  const dtmElevationM: number[] = [];
+  const heightAboveTerrainM: number[] = [];
+  for (let row = 0; row < height; row += 1) {
+    const y = bbox.maxNorthingM - (row + 0.5);
+    for (let column = 0; column < width; column += 1) {
+      const x = bbox.minEastingM + column + 0.5;
+      const roofHeight = roof({ x, y }, center);
+      dtmElevationM.push(100);
+      domElevationM.push(100 + roofHeight);
+      heightAboveTerrainM.push(roofHeight);
+    }
+  }
+  return {
+    schemaVersion: "kartverket-height-surface.v1",
+    provider: "Kartverket Nasjonal detaljert høydemodell WCS",
+    coordinateSystem: "EPSG:25833",
+    bbox,
+    grid: {
+      width,
+      height,
+      cellWidthM: 1,
+      cellHeightM: 1,
+      rowOrder: "north_to_south",
+    },
+    values: { domElevationM, dtmElevationM, heightAboveTerrainM },
+    quality: {
+      status: "usable",
+      coverageRatio: 1,
+      validSamples: width * height,
+      totalSamples: width * height,
+      maxHeightAboveTerrainM: Math.max(...heightAboveTerrainM),
+      reasons: ["Synthetic visualization fixture"],
+    },
+    provenance: {
+      retrievedAt: "2026-09-02T16:00:00.000Z",
+      domCoverageId: "nhm_dom_topo_25833",
+      dtmCoverageId: "nhm_dtm_topo_25833",
+      domContentSha256: "c".repeat(64),
+      dtmContentSha256: "d".repeat(64),
+      resolutionM: 1,
+      license: "Norsk lisens for offentlige data (NLOD) 2.0",
+      attribution: "Kartverket",
+    },
+  };
+}
+
 describe("Høydedata surface visualization", () => {
   it("renders deterministic shaded relief and a co-registered footprint", async () => {
     const result = await buildHeightSurfaceVisualizationV1({
@@ -78,6 +157,8 @@ describe("Høydedata surface visualization", () => {
       mimeType: "image/png",
       width: 4,
       height: 4,
+      planes: null,
+      ridge: null,
       minHeightAboveTerrainM: 3,
       maxHeightAboveTerrainM: 9,
       attribution:
@@ -85,5 +166,31 @@ describe("Høydedata surface visualization", () => {
     });
     expect(result.dataUrl).toMatch(/^data:image\/png;base64,/u);
     expect(result.overlayPoints.split(" ")).toHaveLength(4);
+  });
+
+  it("projects optional roof-plane segmentation overlays and ridge onto the same surface", async () => {
+    const segmentationSurface = segmentationSurfaceFixture(
+      (point, center) => 12 - Math.abs(point.x - center.x) * 0.5,
+    );
+    const segmentation = segmentSimpleRoofPlanesV1({
+      candidate,
+      surface: segmentationSurface,
+    });
+
+    const result = await buildHeightSurfaceVisualizationV1({
+      surface: segmentationSurface,
+      candidate,
+      segmentation,
+    });
+
+    expect(result.planes).toHaveLength(2);
+    expect(result.planes?.map((plane) => plane.pitchDegrees)).toEqual(
+      segmentation.planes.map((plane) => plane.pitchDegrees),
+    );
+    expect(
+      result.planes?.every((plane) => plane.overlayPoints.length > 0),
+    ).toBe(true);
+    expect(result.ridge?.overlayPoints.split(" ")).toHaveLength(2);
+    expect(result.ridge?.lengthMeters).toBe(segmentation.ridge?.lengthMeters);
   });
 });

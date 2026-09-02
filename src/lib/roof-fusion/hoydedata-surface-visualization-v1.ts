@@ -4,6 +4,7 @@ import {
   etrs89ToUtm33,
   type KartverketHeightSurfaceV1,
 } from "@/lib/providers/kartverket-hoydedata-provider";
+import type { SimpleRoofPlaneSegmentationV1 } from "./simple-roof-plane-segmentation-v1";
 
 export const HEIGHT_SURFACE_VISUALIZATION_SCHEMA_VERSION =
   "height-surface-visualization.v1" as const;
@@ -15,6 +16,18 @@ export type HeightSurfaceVisualizationV1 = {
   width: number;
   height: number;
   overlayPoints: string;
+  planes: Array<{
+    planeId: string;
+    overlayPoints: string;
+    pitchDegrees: number;
+    azimuthDegrees: number | null;
+    horizontalAreaSquareMeters: number;
+    surfaceAreaSquareMeters: number;
+  }> | null;
+  ridge: {
+    overlayPoints: string;
+    lengthMeters: number;
+  } | null;
   minHeightAboveTerrainM: number;
   maxHeightAboveTerrainM: number;
   attribution: "Kartverket · NLOD 2.0 + OpenStreetMap contributors · ODbL 1.0";
@@ -26,6 +39,38 @@ function clamp(value: number, min: number, max: number) {
 
 function valid(value: number | null): value is number {
   return value !== null && Number.isFinite(value);
+}
+
+function projectPoint(
+  surface: KartverketHeightSurfaceV1,
+  width: number,
+  height: number,
+  point: { eastingM: number; northingM: number },
+) {
+  const spanEastingM = Math.max(
+    surface.bbox.maxEastingM - surface.bbox.minEastingM,
+    surface.grid.cellWidthM,
+  );
+  const spanNorthingM = Math.max(
+    surface.bbox.maxNorthingM - surface.bbox.minNorthingM,
+    surface.grid.cellHeightM,
+  );
+  return {
+    x: ((point.eastingM - surface.bbox.minEastingM) / spanEastingM) * width,
+    y: ((surface.bbox.maxNorthingM - point.northingM) / spanNorthingM) * height,
+  };
+}
+
+function toOverlayPoints(
+  points: Array<{ eastingM: number; northingM: number }>,
+  surface: KartverketHeightSurfaceV1,
+  width: number,
+  height: number,
+) {
+  return points
+    .map((point) => projectPoint(surface, width, height, point))
+    .map((point) => `${point.x.toFixed(3)},${point.y.toFixed(3)}`)
+    .join(" ");
 }
 
 function sample(
@@ -45,8 +90,9 @@ function sample(
 export async function buildHeightSurfaceVisualizationV1(input: {
   surface: KartverketHeightSurfaceV1;
   candidate: BuildingFootprintCandidate;
+  segmentation?: SimpleRoofPlaneSegmentationV1;
 }): Promise<HeightSurfaceVisualizationV1> {
-  const { surface, candidate } = input;
+  const { surface, candidate, segmentation } = input;
   const { width, height, cellWidthM, cellHeightM } = surface.grid;
   const total = width * height;
   if (
@@ -139,20 +185,49 @@ export async function buildHeightSurfaceVisualizationV1(input: {
     .resize({ width: outputWidth, kernel: "cubic" })
     .png({ compressionLevel: 9, palette: true })
     .toBuffer();
-  const overlayPoints = candidate.polygon
-    .map(etrs89ToUtm33)
-    .map((point) => {
-      const x =
-        ((point.eastingM - surface.bbox.minEastingM) /
-          (surface.bbox.maxEastingM - surface.bbox.minEastingM)) *
-        width;
-      const y =
-        ((surface.bbox.maxNorthingM - point.northingM) /
-          (surface.bbox.maxNorthingM - surface.bbox.minNorthingM)) *
-        height;
-      return `${x.toFixed(3)},${y.toFixed(3)}`;
-    })
-    .join(" ");
+  const overlayPoints = toOverlayPoints(
+    candidate.polygon.map(etrs89ToUtm33),
+    surface,
+    width,
+    height,
+  );
+  const planes =
+    segmentation?.planes.map((plane) => ({
+      planeId: plane.planeId,
+      overlayPoints: toOverlayPoints(
+        plane.polygon.map((point) => ({
+          eastingM: point.xM,
+          northingM: point.yM,
+        })),
+        surface,
+        width,
+        height,
+      ),
+      pitchDegrees: plane.pitchDegrees,
+      azimuthDegrees: plane.azimuthDegrees,
+      horizontalAreaSquareMeters: plane.horizontalAreaSquareMeters,
+      surfaceAreaSquareMeters: plane.surfaceAreaSquareMeters,
+    })) ?? null;
+  const ridge = segmentation?.ridge
+    ? {
+        overlayPoints: toOverlayPoints(
+          [
+            {
+              eastingM: segmentation.ridge.from.xM,
+              northingM: segmentation.ridge.from.yM,
+            },
+            {
+              eastingM: segmentation.ridge.to.xM,
+              northingM: segmentation.ridge.to.yM,
+            },
+          ],
+          surface,
+          width,
+          height,
+        ),
+        lengthMeters: segmentation.ridge.lengthMeters,
+      }
+    : null;
 
   return {
     schemaVersion: HEIGHT_SURFACE_VISUALIZATION_SCHEMA_VERSION,
@@ -161,6 +236,8 @@ export async function buildHeightSurfaceVisualizationV1(input: {
     width,
     height,
     overlayPoints,
+    planes,
+    ridge,
     minHeightAboveTerrainM,
     maxHeightAboveTerrainM,
     attribution:

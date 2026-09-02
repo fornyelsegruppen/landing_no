@@ -112,9 +112,19 @@ const copy = {
     heightTitle: "Virkelig 1 m høydeoverflate",
     heightIntro:
       "Skyggerelieff er laget av Kartverkets åpne DOM minus DTM. Den gule konturen er valgt OSM-bygning; dette er høydedata, ikke et foto.",
+    heightStatus: "Status",
+    heightStatusPreview: "PREVIEW",
     heightRoofCells: "Takpunkter i konturen",
     heightMedian: "Median takhøyde",
     heightRange: "Robust høydeintervall",
+    heightPlaneCount: "Takflate-overlay",
+    heightSurfaceArea: "Reelt takflateareal",
+    heightPitches: "Takvinkler",
+    heightRidge: "Mønelinje",
+    heightPlaneLabel: "Takflate",
+    heightSlopeOverlayTitle: "Segmenterte takflater",
+    heightSlopeOverlayReady: "Samregistrert mot den virkelige høydeoverflaten",
+    heightSlopeOverlayPending: "Takflatene er ikke segmentert ennå",
     heightSource: "Kartverket Høydedata · NLOD 2.0",
     heightErrors: {
       INVALID_SELECTION: "Bygningen må velges på nytt.",
@@ -196,9 +206,19 @@ const copy = {
     heightTitle: "Tikras 1 m aukščio paviršius",
     heightIntro:
       "Reljefo vaizdas sukurtas iš atvirų Kartverket DOM minus DTM duomenų. Geltonas kontūras yra pasirinktas OSM pastatas; tai aukščio modelis, ne fotografija.",
+    heightStatus: "Statusas",
+    heightStatusPreview: "PREVIEW",
     heightRoofCells: "Stogo taškai kontūre",
     heightMedian: "Medianinis stogo aukštis",
     heightRange: "Patikimas aukščio intervalas",
+    heightPlaneCount: "Šlaitų sluoksniai",
+    heightSurfaceArea: "Tikras stogo paviršius",
+    heightPitches: "Nuolydžiai",
+    heightRidge: "Kraigo linija",
+    heightPlaneLabel: "Šlaitas",
+    heightSlopeOverlayTitle: "Segmentuoti stogo šlaitai",
+    heightSlopeOverlayReady: "Sulyginta su tikru aukščio paviršiumi",
+    heightSlopeOverlayPending: "Stogo šlaitai dar nesegmentuoti",
     heightSource: "Kartverket Høydedata · NLOD 2.0",
     heightErrors: {
       INVALID_SELECTION: "Pastatą reikia pasirinkti iš naujo.",
@@ -279,9 +299,19 @@ const copy = {
     heightTitle: "Real 1 m height surface",
     heightIntro:
       "The shaded surface is derived from open Kartverket DOM minus DTM data. The amber outline is the selected OSM building; this is elevation data, not a photograph.",
+    heightStatus: "Status",
+    heightStatusPreview: "PREVIEW",
     heightRoofCells: "Roof cells in footprint",
     heightMedian: "Median roof height",
     heightRange: "Robust height range",
+    heightPlaneCount: "Roof plane overlays",
+    heightSurfaceArea: "Real roof surface area",
+    heightPitches: "Roof pitches",
+    heightRidge: "Ridge line",
+    heightPlaneLabel: "Plane",
+    heightSlopeOverlayTitle: "Segmented roof planes",
+    heightSlopeOverlayReady: "Co-registered against the real height surface",
+    heightSlopeOverlayPending: "Roof planes are not segmented yet",
     heightSource: "Kartverket Høydedata · NLOD 2.0",
     heightErrors: {
       INVALID_SELECTION: "Select the building again.",
@@ -385,7 +415,18 @@ function formatMetric(locale: PanelLocale, value: number) {
   ).format(value);
 }
 
-function HeightAnalysisPanel({
+const planeOverlayPalette = [
+  { fill: "34,197,94", stroke: "#4ade80" },
+  { fill: "56,189,248", stroke: "#7dd3fc" },
+  { fill: "249,115,22", stroke: "#fb923c" },
+  { fill: "217,70,239", stroke: "#e879f9" },
+] as const;
+
+function overlayFill(rgb: string, opacity: number) {
+  return `rgba(${rgb},${opacity})`;
+}
+
+export function HeightAnalysisPanel({
   locale,
   state,
 }: {
@@ -393,11 +434,20 @@ function HeightAnalysisPanel({
   state: Extract<RoofFusionHeightAnalysisState, { kind: "success" }>;
 }) {
   const t = copy[locale];
+  const planes = state.visualization.planes ?? [];
+  const hasPlaneSegmentation = planes.length > 0;
+  const totalSurfaceAreaSquareMeters = planes.reduce(
+    (sum, plane) => sum + plane.surfaceAreaSquareMeters,
+    0,
+  );
   return (
     <section
       aria-label={t.heightTitle}
       className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] xl:col-span-2"
       data-roof-fusion-height-contract="valid-review-required"
+      data-roof-fusion-height-segmentation={
+        hasPlaneSegmentation ? "present" : "pending"
+      }
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--an-border)] p-4">
         <div>
@@ -422,8 +472,8 @@ function HeightAnalysisPanel({
         </strong>
       </div>
 
-      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)]">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,.95fr)]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
             <span className="text-[10px] text-[var(--an-subtle)]">
               {t.engineFootprint}
@@ -461,21 +511,102 @@ function HeightAnalysisPanel({
               {formatMetric(locale, state.summary.roofHeightP90M)} m
             </strong>
           </div>
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <span className="text-[10px] text-[var(--an-subtle)]">
+              {t.heightPlaneCount}
+            </span>
+            <strong className="mt-1 block text-lg">
+              {hasPlaneSegmentation ? planes.length : "—"}
+            </strong>
+          </div>
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <span className="text-[10px] text-[var(--an-subtle)]">
+              {t.heightSurfaceArea}
+            </span>
+            <strong className="mt-1 block text-lg">
+              {hasPlaneSegmentation
+                ? `${formatMetric(locale, totalSurfaceAreaSquareMeters)} m²`
+                : "—"}
+            </strong>
+          </div>
         </div>
 
-        <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
-          <strong className="text-xs">{t.blockersTitle}</strong>
-          <ul className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]">
-            {state.summary.blockers.map((blocker) => (
-              <li className="flex gap-2" key={blocker}>
-                <TriangleAlert
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"
-                />
-                {t.heightBlockers[blocker]}
-              </li>
-            ))}
-          </ul>
+        <div className="grid content-start gap-3">
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <strong className="text-xs">{t.heightStatus}</strong>
+            <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black uppercase">
+              <span className="rounded-full border border-sky-400/35 bg-sky-400/10 px-2 py-1 text-sky-200">
+                {t.heightStatusPreview}
+              </span>
+              <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[var(--an-amber)]">
+                {t.reviewRequired}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <strong className="text-xs">{t.heightSlopeOverlayTitle}</strong>
+            <p className="mt-2 text-[10px] text-[var(--an-subtle)]">
+              {hasPlaneSegmentation
+                ? t.heightSlopeOverlayReady
+                : t.heightSlopeOverlayPending}
+            </p>
+            {hasPlaneSegmentation ? (
+              <ul
+                aria-label={t.heightPitches}
+                className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]"
+              >
+                {planes.map((plane, index) => {
+                  const palette =
+                    planeOverlayPalette[index % planeOverlayPalette.length];
+                  return (
+                    <li
+                      className="flex items-center justify-between gap-3 rounded-lg border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 py-2"
+                      key={plane.planeId}
+                    >
+                      <span className="flex items-center gap-2 font-semibold text-[var(--an-text)]">
+                        <span
+                          aria-hidden="true"
+                          className="size-2.5 rounded-full"
+                          style={{ backgroundColor: palette.stroke }}
+                        />
+                        {t.heightPlaneLabel} {index + 1}
+                      </span>
+                      <span className="text-right text-[10px]">
+                        {formatMetric(locale, plane.pitchDegrees)}° ·{" "}
+                        {formatMetric(locale, plane.surfaceAreaSquareMeters)} m²
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-3 text-xs text-[var(--an-muted)]">
+                {t.heightBlockers.ROOF_PLANES_REQUIRED}
+              </p>
+            )}
+            {state.visualization.ridge ? (
+              <p className="mt-3 text-[10px] font-semibold text-[var(--an-subtle)]">
+                {t.heightRidge}:{" "}
+                {formatMetric(locale, state.visualization.ridge.lengthMeters)} m
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <strong className="text-xs">{t.blockersTitle}</strong>
+            <ul className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]">
+              {state.summary.blockers.map((blocker) => (
+                <li className="flex gap-2" key={blocker}>
+                  <TriangleAlert
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"
+                  />
+                  {t.heightBlockers[blocker]}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -542,6 +673,8 @@ export function RealAddressResult({
     heightState.kind === "success" && heightState.candidateId === selected?.id
       ? heightState
       : null;
+  const activePlanes = activeHeight?.visualization.planes ?? [];
+  const hasSegmentedPlanes = activePlanes.length > 0;
 
   if (!selected) return null;
 
@@ -562,7 +695,11 @@ export function RealAddressResult({
         </div>
         {activeHeight ? (
           <div
-            aria-label={t.heightTitle}
+            aria-label={
+              hasSegmentedPlanes
+                ? `${t.heightTitle} · ${activePlanes.length} ${t.heightPlaneCount.toLowerCase()} · ${t.reviewRequired}`
+                : t.heightTitle
+            }
             className="relative overflow-hidden bg-[#080d12] bg-cover bg-center"
             role="img"
             style={{
@@ -586,24 +723,71 @@ export function RealAddressResult({
               ].join(" ")}
             >
               {showOverlay ? (
-                <polygon
-                  fill={"rgba(244,182,63," + opacity / 100 + ")"}
-                  points={activeHeight.visualization.overlayPoints}
-                  stroke="#f4b63f"
-                  strokeLinejoin="round"
-                  strokeWidth={
-                    Math.max(
-                      activeHeight.visualization.width,
-                      activeHeight.visualization.height,
-                    ) / 125
-                  }
-                  vectorEffect="non-scaling-stroke"
-                />
+                <>
+                  <polygon
+                    fill={
+                      hasSegmentedPlanes
+                        ? "transparent"
+                        : "rgba(244,182,63," + opacity / 100 + ")"
+                    }
+                    points={activeHeight.visualization.overlayPoints}
+                    stroke="#f4b63f"
+                    strokeLinejoin="round"
+                    strokeWidth={
+                      Math.max(
+                        activeHeight.visualization.width,
+                        activeHeight.visualization.height,
+                      ) / 125
+                    }
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {activePlanes.map((plane, index) => {
+                    const palette =
+                      planeOverlayPalette[index % planeOverlayPalette.length];
+                    return (
+                      <polygon
+                        fill={overlayFill(palette.fill, opacity / 100)}
+                        key={plane.planeId}
+                        points={plane.overlayPoints}
+                        stroke={palette.stroke}
+                        strokeLinejoin="round"
+                        strokeWidth={
+                          Math.max(
+                            activeHeight.visualization.width,
+                            activeHeight.visualization.height,
+                          ) / 150
+                        }
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    );
+                  })}
+                  {activeHeight.visualization.ridge ? (
+                    <polyline
+                      fill="none"
+                      points={activeHeight.visualization.ridge.overlayPoints}
+                      stroke="#f8fafc"
+                      strokeLinecap="round"
+                      strokeWidth={
+                        Math.max(
+                          activeHeight.visualization.width,
+                          activeHeight.visualization.height,
+                        ) / 90
+                      }
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ) : null}
+                </>
               ) : null}
             </svg>
             <span className="pointer-events-none absolute top-3 left-3 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] font-black text-white">
               N ↑ · 1 m
             </span>
+            {hasSegmentedPlanes ? (
+              <span className="pointer-events-none absolute top-3 right-3 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-[9px] font-black text-white">
+                {activePlanes.length} · {t.heightStatusPreview} ·{" "}
+                {t.reviewRequired}
+              </span>
+            ) : null}
             <span className="pointer-events-none absolute right-3 bottom-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-[var(--an-border)] bg-black/70 px-2 py-1 text-right text-[9px] text-[var(--an-muted)]">
               {activeHeight.visualization.attribution}
             </span>

@@ -185,6 +185,7 @@ export default async function AdminNextRoofFusionUatPage() {
       const visualization = await buildHeightSurfaceVisualizationV1({
         surface,
         candidate,
+        segmentation: preview.segmentation ?? undefined,
       });
       return {
         kind: "success",
