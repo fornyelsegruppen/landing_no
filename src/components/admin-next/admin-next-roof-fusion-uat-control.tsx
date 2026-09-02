@@ -10,10 +10,12 @@ import {
   Ruler,
   Search,
   ShieldCheck,
+  TriangleAlert,
 } from "lucide-react";
 import { useActionState, useMemo, useState } from "react";
 import type { AddressCandidate } from "@/lib/providers/contracts";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
+import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 export type RoofFusionUatActionState =
@@ -41,6 +43,14 @@ export type RoofFusionAddressLookupState =
       kind: "success";
       address: AddressCandidate;
       candidates: BuildingFootprintCandidate[];
+      enginePreviews: Array<
+        | {
+            kind: "success";
+            candidateId: string;
+            summary: RoofFusionOsmFootprintPreviewSummaryV1;
+          }
+        | { kind: "error"; candidateId: string }
+      >;
     };
 
 const initialState: RoofFusionUatActionState = { kind: "idle" };
@@ -79,6 +89,25 @@ const copy = {
     imageryPending: "Ortofoto kobles til etter lisensiert tilgang",
     preliminary:
       "Dette er et gratis, foreløpig bygningsfotavtrykk – ikke ferdige takflater eller godkjent takareal.",
+    engineTitle: "Roof Fusion Preview-motor",
+    contractValid: "Motorkontrakt gyldig",
+    reviewRequired: "Manuell kontroll kreves",
+    notPricingReady: "IKKE KLAR FOR PRISING",
+    engineFootprint: "Motorens horisontale fotavtrykk",
+    enginePerimeter: "Beregnet omkrets",
+    areaParity: "Avvik fra OSM-arealet",
+    integrity: "Deterministisk integritet",
+    calculationHash: "Beregning",
+    snapshotHash: "Snapshot",
+    renderHash: "Visning",
+    blockersTitle: "Mangler før godkjent takmåling",
+    engineUnavailable:
+      "Denne konturen kunne ikke valideres av Roof Fusion-motoren. Velg en annen bygning.",
+    blockers: {
+      ROOF_PLANES_REQUIRED: "Faktiske takflater må identifiseres",
+      ROOF_PITCH_REQUIRED: "Takvinkel må måles eller bekreftes",
+      LICENSED_IMAGERY_REQUIRED: "Lisensiert ortofoto må kobles til",
+    },
     addressGuard: "Kun Preview · lagres ikke · ingen kundehandlinger",
     addressErrors: {
       INVALID_ADDRESS: "Skriv inn en fullstendig adresse på 4–180 tegn.",
@@ -122,6 +151,25 @@ const copy = {
     imageryPending: "Ortofoto bus prijungtas gavus licencijuotą prieigą",
     preliminary:
       "Tai nemokamas preliminarus pastato kontūras – dar ne galutiniai stogo šlaitai ar patvirtintas stogo plotas.",
+    engineTitle: "Roof Fusion Preview variklis",
+    contractValid: "Variklio kontraktas galioja",
+    reviewRequired: "Reikalinga rankinė peržiūra",
+    notPricingReady: "DAR NETINKA KAINODARAI",
+    engineFootprint: "Variklio horizontalus kontūras",
+    enginePerimeter: "Apskaičiuotas perimetras",
+    areaParity: "Skirtumas nuo OSM ploto",
+    integrity: "Deterministinė kontrolė",
+    calculationHash: "Skaičiavimas",
+    snapshotHash: "Snapshot",
+    renderHash: "Atvaizdavimas",
+    blockersTitle: "Ko trūksta iki patvirtinto stogo matavimo",
+    engineUnavailable:
+      "Šio kontūro Roof Fusion variklis nepatvirtino. Pasirinkite kitą pastatą.",
+    blockers: {
+      ROOF_PLANES_REQUIRED: "Reikia nustatyti tikrus stogo šlaitus",
+      ROOF_PITCH_REQUIRED: "Reikia išmatuoti arba patvirtinti nuolydį",
+      LICENSED_IMAGERY_REQUIRED: "Reikia prijungti licencijuotą ortofoto",
+    },
     addressGuard: "Tik Preview · neišsaugoma · be kliento veiksmų",
     addressErrors: {
       INVALID_ADDRESS: "Įveskite pilną 4–180 ženklų adresą.",
@@ -165,6 +213,25 @@ const copy = {
     imageryPending: "Orthophoto will be connected after licensed access",
     preliminary:
       "This is a free preliminary building footprint, not final roof planes or an approved roof area.",
+    engineTitle: "Roof Fusion Preview engine",
+    contractValid: "Engine contract valid",
+    reviewRequired: "Manual review required",
+    notPricingReady: "NOT READY FOR PRICING",
+    engineFootprint: "Engine horizontal footprint",
+    enginePerimeter: "Calculated perimeter",
+    areaParity: "Difference from OSM area",
+    integrity: "Deterministic integrity",
+    calculationHash: "Calculation",
+    snapshotHash: "Snapshot",
+    renderHash: "Render",
+    blockersTitle: "Missing before an approved roof measurement",
+    engineUnavailable:
+      "Roof Fusion could not validate this footprint. Select another building.",
+    blockers: {
+      ROOF_PLANES_REQUIRED: "Actual roof planes must be identified",
+      ROOF_PITCH_REQUIRED: "Roof pitch must be measured or confirmed",
+      LICENSED_IMAGERY_REQUIRED: "Licensed orthophoto must be connected",
+    },
     addressGuard: "Preview only · not stored · no customer actions",
     addressErrors: {
       INVALID_ADDRESS: "Enter a complete address between 4 and 180 characters.",
@@ -250,6 +317,9 @@ export function RealAddressResult({
   const selected =
     result.candidates.find((candidate) => candidate.id === selectedId) ??
     result.candidates[0];
+  const enginePreview = result.enginePreviews.find(
+    (preview) => preview.candidateId === selected?.id,
+  );
   const projected = useMemo(
     () => projectCandidates(result.address, result.candidates),
     [result.address, result.candidates],
@@ -386,6 +456,122 @@ export function RealAddressResult({
       <p className="rounded-xl border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] p-3 text-xs font-semibold text-[var(--an-amber)] xl:col-span-2">
         {t.preliminary}
       </p>
+      {enginePreview?.kind === "success" ? (
+        <section
+          aria-label={t.engineTitle}
+          className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] xl:col-span-2"
+          data-roof-fusion-engine-contract="valid-review-required"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--an-border)] p-4">
+            <div>
+              <h3 className="flex items-center gap-2 text-base font-black">
+                <ShieldCheck
+                  aria-hidden="true"
+                  className="size-5 text-emerald-300"
+                />
+                {t.engineTitle}
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase">
+                <span className="rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2 py-1 text-emerald-300">
+                  {t.contractValid}
+                </span>
+                <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[var(--an-amber)]">
+                  {t.reviewRequired}
+                </span>
+              </div>
+            </div>
+            <strong className="rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+              {t.notPricingReady}
+            </strong>
+          </div>
+
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)]">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                <span className="text-[10px] text-[var(--an-subtle)]">
+                  {t.engineFootprint}
+                </span>
+                <strong className="mt-1 block text-lg">
+                  {formatMetric(
+                    locale,
+                    enginePreview.summary.engineHorizontalAreaSquareMeters,
+                  )}{" "}
+                  m²
+                </strong>
+              </div>
+              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                <span className="text-[10px] text-[var(--an-subtle)]">
+                  {t.enginePerimeter}
+                </span>
+                <strong className="mt-1 block text-lg">
+                  {formatMetric(
+                    locale,
+                    enginePreview.summary.footprintPerimeterMeters,
+                  )}{" "}
+                  m
+                </strong>
+              </div>
+              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                <span className="text-[10px] text-[var(--an-subtle)]">
+                  {t.areaParity}
+                </span>
+                <strong className="mt-1 block text-lg">
+                  {formatMetric(locale, enginePreview.summary.areaDeltaPercent)}
+                  %
+                </strong>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+              <strong className="text-xs">{t.blockersTitle}</strong>
+              <ul className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]">
+                {enginePreview.summary.blockers.map((blocker) => (
+                  <li className="flex gap-2" key={blocker}>
+                    <TriangleAlert
+                      aria-hidden="true"
+                      className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"
+                    />
+                    {t.blockers[blocker]}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <details className="border-t border-[var(--an-border)] px-4 py-3 text-xs">
+            <summary className="cursor-pointer font-bold text-[var(--an-muted)]">
+              {t.integrity}
+            </summary>
+            <dl className="mt-3 grid gap-2 font-mono text-[10px] text-[var(--an-subtle)] sm:grid-cols-3">
+              <div>
+                <dt>{t.calculationHash}</dt>
+                <dd title={enginePreview.summary.calculationHash}>
+                  {enginePreview.summary.calculationHash.slice(0, 16)}…
+                </dd>
+              </div>
+              <div>
+                <dt>{t.snapshotHash}</dt>
+                <dd title={enginePreview.summary.snapshotHash}>
+                  {enginePreview.summary.snapshotHash.slice(0, 16)}…
+                </dd>
+              </div>
+              <div>
+                <dt>{t.renderHash}</dt>
+                <dd title={enginePreview.summary.renderHash}>
+                  {enginePreview.summary.renderHash.slice(0, 16)}…
+                </dd>
+              </div>
+            </dl>
+          </details>
+        </section>
+      ) : (
+        <p
+          className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
+          role="alert"
+        >
+          {t.engineUnavailable}
+        </p>
+      )}
     </div>
   );
 }

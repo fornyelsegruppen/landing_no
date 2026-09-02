@@ -64,6 +64,33 @@ describe("Admin Next Roof Fusion UAT control", () => {
               credits: "© OpenStreetMap contributors",
             },
           ],
+          enginePreviews: [
+            {
+              kind: "success" as const,
+              candidateId: "way/123",
+              summary: {
+                schemaVersion: "roof-fusion-osm-preview.v1" as const,
+                candidateId: "way/123",
+                contractStatus: "valid" as const,
+                reviewState: "review_required" as const,
+                qualityStatus: "review_required" as const,
+                measurementClass: "preliminary" as const,
+                pricingReady: false as const,
+                blockers: [
+                  "ROOF_PLANES_REQUIRED" as const,
+                  "ROOF_PITCH_REQUIRED" as const,
+                  "LICENSED_IMAGERY_REQUIRED" as const,
+                ],
+                engineHorizontalAreaSquareMeters: 120.01,
+                providerHorizontalAreaSquareMeters: 120,
+                areaDeltaPercent: 0.008,
+                footprintPerimeterMeters: 45.7,
+                calculationHash: "a".repeat(64),
+                snapshotHash: "b".repeat(64),
+                renderHash: "c".repeat(64),
+              },
+            },
+          ],
         },
       }),
     );
@@ -75,6 +102,14 @@ describe("Admin Next Roof Fusion UAT control", () => {
       "Ortofoto bus prijungtas gavus licencijuotą prieigą",
     );
     expect(html).toContain("dar ne galutiniai stogo šlaitai");
+    expect(html).toContain(
+      'data-roof-fusion-engine-contract="valid-review-required"',
+    );
+    expect(html).toContain("Variklio kontraktas galioja");
+    expect(html).toContain("DAR NETINKA KAINODARAI");
+    expect(html).toContain("Reikia nustatyti tikrus stogo šlaitus");
+    expect(html).toContain("120 m²");
+    expect(html).toContain("45,7 m");
     expect(html).not.toContain("Paruošta tvirtinti");
   });
 });
