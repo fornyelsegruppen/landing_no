@@ -13,7 +13,13 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import { type MouseEvent, useActionState, useMemo, useState } from "react";
+import {
+  type MouseEvent,
+  useActionState,
+  useCallback,
+  useMemo,
+  useState,
+} from "react";
 import type { AddressCandidate } from "@/lib/providers/contracts";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
 import type { RoofFusionHeightSurfacePreviewSummaryV1 } from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
@@ -74,6 +80,20 @@ export type RoofFusionHeightAnalysisState =
 const initialState: RoofFusionUatActionState = { kind: "idle" };
 const initialAddressState: RoofFusionAddressLookupState = { kind: "idle" };
 const initialHeightState: RoofFusionHeightAnalysisState = { kind: "idle" };
+
+export function selectActiveHeightState(
+  current: RoofFusionHeightAnalysisState,
+  lastSuccessful: Extract<
+    RoofFusionHeightAnalysisState,
+    { kind: "success" }
+  > | null,
+  candidateId: string | undefined,
+) {
+  if (current.kind === "success" && current.candidateId === candidateId) {
+    return current;
+  }
+  return lastSuccessful?.candidateId === candidateId ? lastSuccessful : null;
+}
 
 const copy = {
   nb: {
@@ -680,8 +700,21 @@ export function RealAddressResult({
   const [ridgePoints, setRidgePoints] = useState<
     Array<{ x: number; y: number }>
   >([]);
+  const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<
+    Extract<RoofFusionHeightAnalysisState, { kind: "success" }> | null
+  >(null);
+  const heightAnalysisActionWithHistory = useCallback(
+    async (previousState: RoofFusionHeightAnalysisState, formData: FormData) => {
+      const nextState = await heightAnalysisAction(previousState, formData);
+      if (nextState.kind === "success") {
+        setLastSuccessfulHeight(nextState);
+      }
+      return nextState;
+    },
+    [heightAnalysisAction],
+  );
   const [heightState, heightFormAction, heightPending] = useActionState(
-    heightAnalysisAction,
+    heightAnalysisActionWithHistory,
     initialHeightState,
   );
   const selected =
@@ -694,10 +727,11 @@ export function RealAddressResult({
     () => projectCandidates(result.address, result.candidates),
     [result.address, result.candidates],
   );
-  const activeHeight =
-    heightState.kind === "success" && heightState.candidateId === selected?.id
-      ? heightState
-      : null;
+  const activeHeight = selectActiveHeightState(
+    heightState,
+    lastSuccessfulHeight,
+    selected?.id,
+  );
   const activePlanes = activeHeight?.visualization.planes ?? [];
   const hasSegmentedPlanes = activePlanes.length > 0;
 

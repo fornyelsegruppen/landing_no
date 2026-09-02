@@ -5,9 +5,38 @@ import {
   AdminNextRoofFusionUatControl,
   HeightAnalysisPanel,
   RealAddressResult,
+  selectActiveHeightState,
 } from "./admin-next-roof-fusion-uat-control";
+import type { RoofFusionHeightAnalysisState } from "./admin-next-roof-fusion-uat-control";
 
 describe("Admin Next Roof Fusion UAT control", () => {
+  it("keeps the last valid surface visible when a manual correction fails", () => {
+    const previous = {
+      kind: "success",
+      candidateId: "way/123",
+      summary: {},
+      visualization: {},
+    } as unknown as Extract<
+      RoofFusionHeightAnalysisState,
+      { kind: "success" }
+    >;
+
+    expect(
+      selectActiveHeightState(
+        { kind: "error", code: "ROOF_NOT_DETECTED" },
+        previous,
+        "way/123",
+      ),
+    ).toBe(previous);
+    expect(
+      selectActiveHeightState(
+        { kind: "error", code: "ROOF_NOT_DETECTED" },
+        previous,
+        "way/other",
+      ),
+    ).toBeNull();
+  });
+
   it("renders an explicit, Preview-only synthetic preparation action", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUatControl, {
