@@ -16,6 +16,11 @@ import {
   buildRoofSourceRequestV1,
   roofSourceResultToSnapshotV1,
 } from "./source-adapter-v1";
+import {
+  segmentSimpleRoofPlanesV1,
+  SimpleRoofPlaneSegmentationError,
+  type SimpleRoofPlaneSegmentationV1,
+} from "./simple-roof-plane-segmentation-v1";
 
 export const ROOF_FUSION_HEIGHT_SURFACE_PREVIEW_SCHEMA_VERSION =
   "roof-fusion-height-surface-preview.v1" as const;
@@ -50,6 +55,18 @@ export type RoofFusionHeightSurfacePreviewSummaryV1 = {
   calculationHash: string;
   snapshotHash: string;
   renderHash: string;
+};
+
+export type RoofFusionHeightSurfacePreviewV1 = {
+  schemaVersion: typeof ROOF_FUSION_HEIGHT_SURFACE_PREVIEW_SCHEMA_VERSION;
+  surface: KartverketHeightSurfaceV1;
+  segmentation: SimpleRoofPlaneSegmentationV1 | null;
+  geometryInput: RoofGeometryInputV1;
+  calculation: ReturnType<typeof calculateRoofGeometryV1>;
+  request: ReturnType<typeof buildRoofSourceRequestV1>;
+  sourceResult: ReturnType<typeof roofGeometryCalculationToSourceResultV1>;
+  snapshot: ReturnType<typeof roofSourceResultToSnapshotV1>;
+  summary: RoofFusionHeightSurfacePreviewSummaryV1;
 };
 
 export class RoofFusionHeightSurfacePreviewError extends Error {
@@ -149,7 +166,7 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
   address: AddressCandidate;
   candidate: BuildingFootprintCandidate;
   surface: KartverketHeightSurfaceV1;
-}) {
+}): RoofFusionHeightSurfacePreviewV1 {
   const { address, candidate, surface } = input;
   if (
     surface.schemaVersion !== "kartverket-height-surface.v1" ||
@@ -227,6 +244,16 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
   const roofHeightMedianM = quantile(roofHeights, 0.5);
   const roofHeightP90M = quantile(roofHeights, 0.9);
   const groundElevationMedianM = quantile(groundElevations, 0.5);
+  let segmentation: SimpleRoofPlaneSegmentationV1 | null = null;
+  if (surface.quality.status === "usable") {
+    try {
+      segmentation = segmentSimpleRoofPlanesV1({ surface, candidate });
+    } catch (error) {
+      // The preview remains useful with its original, horizontal preliminary
+      // geometry when the intentionally narrow simple-roof model is not safe.
+      if (!(error instanceof SimpleRoofPlaneSegmentationError)) throw error;
+    }
+  }
   const fingerprint = canonicalSha256V1(
     {
       addressId: address.id,
@@ -245,17 +272,83 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
   const contourId = `contour-height-${fingerprint}`;
   const addressAnchor = etrs89ToUtm33(address);
   const uncertaintyM = uncertaintyFor(surface);
-  const vertices = projectedPolygon.map((point, index) => ({
-    vertexId: `v-${fingerprint}-${index + 1}`,
-    xM: point.x - addressAnchor.eastingM,
-    yM: point.y - addressAnchor.northingM,
-    zM: roofHeightMedianM,
-    uncertaintyM,
-    sourceRefs: [footprintSourceId, domSourceId, dtmSourceId],
-  }));
-  const edgeIds = vertices.map(
-    (_, index) => `edge-height-${fingerprint}-${index + 1}`,
-  );
+  const sourceRefs = [footprintSourceId, domSourceId, dtmSourceId];
+  const geometryFromSegmentation = segmentation
+    ? (() => {
+        const vertices: RoofGeometryInputV1["vertices"] = [];
+        const vertexIdsByCoordinate = new Map<string, string>();
+        const edgeIdsByVertexPair = new Map<string, string>();
+        const vertexIdFor = (point: { xM: number; yM: number; zM: number }) => {
+          const coordinateKey = [point.xM, point.yM, point.zM]
+            .map((value) => round(value, 6))
+            .join(":");
+          const existing = vertexIdsByCoordinate.get(coordinateKey);
+          if (existing) return existing;
+          const vertexId = `v-${fingerprint}-${vertices.length + 1}`;
+          vertexIdsByCoordinate.set(coordinateKey, vertexId);
+          vertices.push({
+            vertexId,
+            xM: round(point.xM - addressAnchor.eastingM, 6),
+            yM: round(point.yM - addressAnchor.northingM, 6),
+            zM: round(point.zM - groundElevationMedianM, 6),
+            uncertaintyM,
+            sourceRefs,
+          });
+          return vertexId;
+        };
+        const edgeIdFor = (fromVertexId: string, toVertexId: string) => {
+          const edgeKey = [fromVertexId, toVertexId].sort().join(":");
+          const existing = edgeIdsByVertexPair.get(edgeKey);
+          if (existing) return existing;
+          const edgeId = `edge-height-${fingerprint}-${edgeIdsByVertexPair.size + 1}`;
+          edgeIdsByVertexPair.set(edgeKey, edgeId);
+          return edgeId;
+        };
+        const surfaces: RoofGeometryInputV1["surfaces"] =
+          segmentation.planes.map((plane, planeIndex) => {
+            const vertexIds = plane.polygon.map(vertexIdFor);
+            return {
+              surfaceId: `${surfaceId}-${planeIndex + 1}`,
+              contourId: `${contourId}-${planeIndex + 1}`,
+              vertexIds,
+              edgeIds: vertexIds.map((fromVertexId, index) =>
+                edgeIdFor(
+                  fromVertexId,
+                  vertexIds[(index + 1) % vertexIds.length],
+                ),
+              ),
+              quality: "estimated",
+              sourceRefs,
+            };
+          });
+        return { vertices, surfaces };
+      })()
+    : null;
+  const vertices: RoofGeometryInputV1["vertices"] = geometryFromSegmentation
+    ? geometryFromSegmentation.vertices
+    : projectedPolygon.map((point, index) => ({
+        vertexId: `v-${fingerprint}-${index + 1}`,
+        xM: point.x - addressAnchor.eastingM,
+        yM: point.y - addressAnchor.northingM,
+        zM: roofHeightMedianM,
+        uncertaintyM,
+        sourceRefs,
+      }));
+  const surfaces: RoofGeometryInputV1["surfaces"] = geometryFromSegmentation
+    ? geometryFromSegmentation.surfaces
+    : [
+        {
+          surfaceId,
+          contourId,
+          vertexIds: vertices.map(({ vertexId }) => vertexId),
+          edgeIds: vertices.map(
+            (_, index) => `edge-height-${fingerprint}-${index + 1}`,
+          ),
+          quality: "estimated",
+          sourceRefs,
+        },
+      ];
+  const primarySurfaceId = surfaces[0].surfaceId;
   const heightObservationId = `obs-height-${fingerprint}`;
   const footprintObservationId = `obs-footprint-${fingerprint}`;
   const score = confidenceScore(candidate);
@@ -275,16 +368,7 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
       },
     },
     vertices,
-    surfaces: [
-      {
-        surfaceId,
-        contourId,
-        vertexIds: vertices.map(({ vertexId }) => vertexId),
-        edgeIds,
-        quality: "estimated",
-        sourceRefs: [footprintSourceId, domSourceId, dtmSourceId],
-      },
-    ],
+    surfaces,
     openings: [],
     obstacles: [],
     provenance: {
@@ -388,7 +472,7 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
         {
           observationId: footprintObservationId,
           kind: "surface_exists",
-          targetRef: surfaceId,
+          targetRef: primarySurfaceId,
           value: {
             geometryKind: "building_footprint",
             providerHorizontalAreaSquareMeters:
@@ -407,7 +491,7 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
         {
           observationId: heightObservationId,
           kind: "source_suitability",
-          targetRef: surfaceId,
+          targetRef: primarySurfaceId,
           value: {
             roofCells: roofHeights.length,
             footprintCells: footprintHeights.length,
@@ -444,8 +528,9 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
           actorType: "system",
           displayName: "Roof Fusion Høydedata Preview Engine",
         },
-        rationale:
-          "Open OSM plan geometry and national DOM/DTM elevations are accepted for preliminary roof-surface analysis; plane segmentation and pitch remain review gates",
+        rationale: segmentation
+          ? "Open OSM plan geometry and national DOM/DTM elevations support a simple-plane preview; all resulting roof metrics remain preliminary and require review"
+          : "Open OSM plan geometry and national DOM/DTM elevations are accepted for preliminary roof-surface analysis; plane segmentation and pitch remain review gates",
       },
     },
     measurement: {
@@ -455,8 +540,9 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
         level: "medium",
         score,
         basis: "derived",
-        rationale:
-          "Real height data is present, but the footprint is not yet segmented into verified roof planes",
+        rationale: segmentation
+          ? "Real height data supports a simple flat, mono, or gable plane model, but its measurements remain preliminary"
+          : "Real height data is present, but the footprint is not yet segmented into verified roof planes",
       },
     },
   };
@@ -504,7 +590,9 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
     qualityStatus: "review_required",
     measurementClass: "preliminary",
     pricingReady: false,
-    blockers: [...ROOF_FUSION_HEIGHT_SURFACE_PREVIEW_BLOCKERS],
+    blockers: segmentation
+      ? ["ROOF_SURFACE_RENDER_REQUIRED"]
+      : [...ROOF_FUSION_HEIGHT_SURFACE_PREVIEW_BLOCKERS],
     engineHorizontalAreaSquareMeters: round(
       exactValue(snapshot.totals.grossHorizontalArea),
     ),
@@ -537,6 +625,7 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
   return {
     schemaVersion: ROOF_FUSION_HEIGHT_SURFACE_PREVIEW_SCHEMA_VERSION,
     surface,
+    segmentation,
     geometryInput,
     calculation,
     request,

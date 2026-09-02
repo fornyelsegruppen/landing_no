@@ -34,7 +34,10 @@ const candidate: BuildingFootprintCandidate = {
   credits: "© OpenStreetMap contributors",
 };
 
-function fixtureSurface(heightAboveTerrainM = 8): KartverketHeightSurfaceV1 {
+function fixtureSurface(
+  heightAboveTerrainM = 8,
+  roofHeightAt?: (point: { x: number; y: number }) => number,
+): KartverketHeightSurfaceV1 {
   const projected = candidate.polygon.map(etrs89ToUtm33);
   const bbox = {
     minEastingM: Math.floor(
@@ -53,6 +56,17 @@ function fixtureSurface(heightAboveTerrainM = 8): KartverketHeightSurfaceV1 {
   const width = bbox.maxEastingM - bbox.minEastingM;
   const height = bbox.maxNorthingM - bbox.minNorthingM;
   const totalSamples = width * height;
+  const domElevationM: number[] = [];
+  const heightAboveTerrain: number[] = [];
+  for (let row = 0; row < height; row += 1) {
+    const y = bbox.maxNorthingM - (row + 0.5);
+    for (let column = 0; column < width; column += 1) {
+      const x = bbox.minEastingM + column + 0.5;
+      const roofHeight = roofHeightAt?.({ x, y }) ?? heightAboveTerrainM;
+      domElevationM.push(5 + roofHeight);
+      heightAboveTerrain.push(roofHeight);
+    }
+  }
   return {
     schemaVersion: "kartverket-height-surface.v1",
     provider: "Kartverket Nasjonal detaljert høydemodell WCS",
@@ -66,16 +80,16 @@ function fixtureSurface(heightAboveTerrainM = 8): KartverketHeightSurfaceV1 {
       rowOrder: "north_to_south",
     },
     values: {
-      domElevationM: Array(totalSamples).fill(13),
+      domElevationM,
       dtmElevationM: Array(totalSamples).fill(5),
-      heightAboveTerrainM: Array(totalSamples).fill(heightAboveTerrainM),
+      heightAboveTerrainM: heightAboveTerrain,
     },
     quality: {
       status: "usable",
       coverageRatio: 1,
       validSamples: totalSamples,
       totalSamples,
-      maxHeightAboveTerrainM: heightAboveTerrainM,
+      maxHeightAboveTerrainM: Math.max(...heightAboveTerrain),
       reasons: ["Synthetic matching DOM and DTM fixture"],
     },
     provenance: {
@@ -108,11 +122,7 @@ describe("Roof Fusion Høydedata surface Preview", () => {
       roofHeightMedianM: 8,
       roofHeightP10M: 8,
       roofHeightP90M: 8,
-      blockers: [
-        "ROOF_PLANES_REQUIRED",
-        "ROOF_PITCH_REQUIRED",
-        "ROOF_SURFACE_RENDER_REQUIRED",
-      ],
+      blockers: ["ROOF_SURFACE_RENDER_REQUIRED"],
     });
     expect(result.summary.roofCells).toBeGreaterThan(100);
     expect(result.summary.roofCoverageRatio).toBe(1);
@@ -154,5 +164,75 @@ describe("Roof Fusion Høydedata surface Preview", () => {
     });
     expect(left.summary.snapshotHash).toBe(right.summary.snapshotHash);
     expect(left.summary.calculationHash).toBe(right.summary.calculationHash);
+  });
+
+  it("uses a reliable Høydedata gable as canonical preliminary geometry", () => {
+    const projected = candidate.polygon.map(etrs89ToUtm33);
+    const centerX =
+      projected.reduce((sum, point) => sum + point.eastingM, 0) /
+      projected.length;
+    const result = buildRoofFusionHeightSurfacePreviewV1({
+      address,
+      candidate,
+      surface: fixtureSurface(
+        8,
+        (point) => 12 - Math.abs(point.x - centerX) * 0.5,
+      ),
+    });
+
+    expect(result.segmentation?.roofType).toBe("gable");
+    expect(result.geometryInput.surfaces).toHaveLength(2);
+    expect(result.calculation.trace.surfaces).toHaveLength(2);
+    expect(
+      result.calculation.trace.surfaces.every(
+        (plane) => plane.surfaceAreaM2 > plane.horizontalAreaM2,
+      ),
+    ).toBe(true);
+    expect(result.snapshot.geometry.edges).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "ridge" })]),
+    );
+    expect(result.summary.pricingReady).toBe(false);
+    expect(result.summary.reviewState).toBe("review_required");
+  });
+
+  it("uses the original preliminary fallback when Høydedata quality is limited", () => {
+    const surface = fixtureSurface();
+    surface.quality.status = "limited";
+    const result = buildRoofFusionHeightSurfacePreviewV1({
+      address,
+      candidate,
+      surface,
+    });
+
+    expect(result.segmentation).toBeNull();
+    expect(result.geometryInput.surfaces).toHaveLength(1);
+    expect(result.summary.pricingReady).toBe(false);
+    expect(result.summary.blockers).toEqual([
+      "ROOF_PLANES_REQUIRED",
+      "ROOF_PITCH_REQUIRED",
+      "ROOF_SURFACE_RENDER_REQUIRED",
+    ]);
+  });
+
+  it("uses the original preliminary fallback for a complex footprint", () => {
+    const complexCandidate: BuildingFootprintCandidate = {
+      ...candidate,
+      polygon: [
+        candidate.polygon[0],
+        candidate.polygon[1],
+        { latitude: 59.9114, longitude: 10.7494 },
+        candidate.polygon[2],
+        candidate.polygon[3],
+      ],
+    };
+    const result = buildRoofFusionHeightSurfacePreviewV1({
+      address,
+      candidate: complexCandidate,
+      surface: fixtureSurface(),
+    });
+
+    expect(result.segmentation).toBeNull();
+    expect(result.geometryInput.surfaces).toHaveLength(1);
+    expect(result.summary.pricingReady).toBe(false);
   });
 });
