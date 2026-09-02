@@ -37,6 +37,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function lerp(start: number, end: number, progress: number) {
+  return start + (end - start) * progress;
+}
+
 function valid(value: number | null): value is number {
   return value !== null && Number.isFinite(value);
 }
@@ -87,6 +91,63 @@ function sample(
   return valid(value) ? value : fallback;
 }
 
+function sampleBilinear(
+  values: Array<number | null>,
+  width: number,
+  height: number,
+  row: number,
+  column: number,
+  fallback: number,
+) {
+  const boundedRow = clamp(row, 0, height - 1);
+  const boundedColumn = clamp(column, 0, width - 1);
+
+  const north = Math.floor(boundedRow);
+  const west = Math.floor(boundedColumn);
+  const south = Math.min(north + 1, height - 1);
+  const east = Math.min(west + 1, width - 1);
+
+  const rowT = boundedRow - north;
+  const columnT = boundedColumn - west;
+
+  const northwest = sample(
+    values,
+    width,
+    height,
+    north,
+    west,
+    fallback,
+  );
+  const northeast = sample(
+    values,
+    width,
+    height,
+    north,
+    east,
+    fallback,
+  );
+  const southwest = sample(
+    values,
+    width,
+    height,
+    south,
+    west,
+    fallback,
+  );
+  const southeast = sample(
+    values,
+    width,
+    height,
+    south,
+    east,
+    fallback,
+  );
+
+  const northEdge = lerp(northwest, northeast, columnT);
+  const southEdge = lerp(southwest, southeast, columnT);
+  return lerp(northEdge, southEdge, rowT);
+}
+
 export async function buildHeightSurfaceVisualizationV1(input: {
   surface: KartverketHeightSurfaceV1;
   candidate: BuildingFootprintCandidate;
@@ -95,6 +156,7 @@ export async function buildHeightSurfaceVisualizationV1(input: {
   const { surface, candidate, segmentation } = input;
   const { width, height, cellWidthM, cellHeightM } = surface.grid;
   const total = width * height;
+
   if (
     width < 1 ||
     height < 1 ||
@@ -105,86 +167,138 @@ export async function buildHeightSurfaceVisualizationV1(input: {
   ) {
     throw new TypeError("Invalid Høydedata visualization grid");
   }
+
   const usableHeights = surface.values.heightAboveTerrainM.filter(valid);
   if (!usableHeights.length) {
     throw new TypeError("Høydedata visualization has no usable heights");
   }
+
   const minHeightAboveTerrainM = Math.min(...usableHeights);
   const maxHeightAboveTerrainM = Math.max(...usableHeights);
-  const pixels = Buffer.alloc(total * 4);
-  const light = { x: -0.5, y: 0.5, z: Math.SQRT1_2 };
+  const heightRange = maxHeightAboveTerrainM - minHeightAboveTerrainM;
 
-  for (let row = 0; row < height; row += 1) {
-    for (let column = 0; column < width; column += 1) {
-      const index = row * width + column;
-      const dom = surface.values.domElevationM[index];
-      const relativeHeight = surface.values.heightAboveTerrainM[index];
-      const offset = index * 4;
-      if (!valid(dom) || !valid(relativeHeight)) {
-        pixels[offset] = 8;
-        pixels[offset + 1] = 13;
-        pixels[offset + 2] = 18;
-        pixels[offset + 3] = 255;
+  const renderScale = Math.min(
+    32,
+    Math.max(4, Math.ceil(1024 / Math.max(width, height))),
+  );
+  const outputWidth = width * renderScale;
+  const outputHeight = height * renderScale;
+  const renderedPixels = Buffer.alloc(outputWidth * outputHeight * 4);
+
+  const sampleSpacingX = Math.max(cellWidthM / renderScale, 0.001);
+  const sampleSpacingY = Math.max(cellHeightM / renderScale, 0.001);
+  const scaleX = 1 / (2 * sampleSpacingX);
+  const scaleY = 1 / (2 * sampleSpacingY);
+  const light = { x: -0.45, y: 0.62, z: Math.SQRT1_2 };
+
+  for (let row = 0; row < outputHeight; row += 1) {
+    for (let column = 0; column < outputWidth; column += 1) {
+      const sourceRow = row / renderScale - 0.5;
+      const sourceColumn = column / renderScale - 0.5;
+
+      const nearestRow = clamp(Math.round(sourceRow), 0, height - 1);
+      const nearestColumn = clamp(Math.round(sourceColumn), 0, width - 1);
+      const nearestIndex = nearestRow * width + nearestColumn;
+      const nearestDom = surface.values.domElevationM[nearestIndex];
+      const nearestRelativeHeight =
+        surface.values.heightAboveTerrainM[nearestIndex];
+      const outputOffset = (row * outputWidth + column) * 4;
+      if (!valid(nearestDom) || !valid(nearestRelativeHeight)) {
+        renderedPixels[outputOffset] = 7;
+        renderedPixels[outputOffset + 1] = 11;
+        renderedPixels[outputOffset + 2] = 16;
+        renderedPixels[outputOffset + 3] = 255;
         continue;
       }
-      const west = sample(
+
+      const dom = sampleBilinear(
         surface.values.domElevationM,
         width,
         height,
-        row,
-        column - 1,
-        dom,
+        sourceRow,
+        sourceColumn,
+        nearestDom,
       );
-      const east = sample(
+      const relativeHeight = sampleBilinear(
+        surface.values.heightAboveTerrainM,
+        width,
+        height,
+        sourceRow,
+        sourceColumn,
+        nearestRelativeHeight,
+      );
+
+      const west = sampleBilinear(
         surface.values.domElevationM,
         width,
         height,
-        row,
-        column + 1,
+        sourceRow,
+        sourceColumn - 1 / renderScale,
         dom,
       );
-      const north = sample(
+      const east = sampleBilinear(
         surface.values.domElevationM,
         width,
         height,
-        row - 1,
-        column,
+        sourceRow,
+        sourceColumn + 1 / renderScale,
         dom,
       );
-      const south = sample(
+      const north = sampleBilinear(
         surface.values.domElevationM,
         width,
         height,
-        row + 1,
-        column,
+        sourceRow - 1 / renderScale,
+        sourceColumn,
         dom,
       );
-      const dzdx = (east - west) / Math.max(2 * cellWidthM, 0.001);
-      const dzdy = (north - south) / Math.max(2 * cellHeightM, 0.001);
-      const normalLength = Math.hypot(dzdx, dzdy, 1);
+      const south = sampleBilinear(
+        surface.values.domElevationM,
+        width,
+        height,
+        sourceRow + 1 / renderScale,
+        sourceColumn,
+        dom,
+      );
+
+      const slopeX = (east - west) * scaleX;
+      const slopeY = (north - south) * scaleY;
+      const localSmoothing = clamp(Math.hypot(slopeX, slopeY) * 0.25, 0, 0.22);
       const illumination = Math.max(
         0,
-        (-dzdx * light.x + -dzdy * light.y + light.z) / normalLength,
+        (-slopeX * light.x + -slopeY * light.y + light.z) /
+          Math.hypot(slopeX, slopeY, 1),
       );
-      const shade = 0.38 + illumination * 0.8;
-      const roofFactor = clamp((relativeHeight - 1.5) / 8, 0, 1);
-      const red = 18 + roofFactor * 112;
-      const green = 31 + roofFactor * 78;
-      const blue = 43 + roofFactor * 30;
-      pixels[offset] = Math.round(clamp(red * shade, 0, 255));
-      pixels[offset + 1] = Math.round(clamp(green * shade, 0, 255));
-      pixels[offset + 2] = Math.round(clamp(blue * shade, 0, 255));
-      pixels[offset + 3] = 255;
+      const shade = clamp(0.28 + illumination * 0.9 + localSmoothing, 0, 1.22);
+
+      const relief = clamp(
+        (relativeHeight - minHeightAboveTerrainM) / (heightRange || 1),
+        0,
+        1,
+      );
+      const baseRed = 22 + relief * 112 + localSmoothing * 70;
+      const baseGreen = 34 + relief * 126 + localSmoothing * 82;
+      const baseBlue = 48 + relief * 138 + localSmoothing * 94;
+
+      renderedPixels[outputOffset] = Math.round(
+        clamp(baseRed * shade, 0, 255),
+      );
+      renderedPixels[outputOffset + 1] = Math.round(
+        clamp(baseGreen * shade, 0, 255),
+      );
+      renderedPixels[outputOffset + 2] = Math.round(
+        clamp(baseBlue * shade, 0, 255),
+      );
+      renderedPixels[outputOffset + 3] = 255;
     }
   }
 
-  const outputWidth = Math.max(480, width * 8);
-  const image = await sharp(pixels, {
-    raw: { width, height, channels: 4 },
+  const image = await sharp(renderedPixels, {
+    raw: { width: outputWidth, height: outputHeight, channels: 4 },
   })
-    .resize({ width: outputWidth, kernel: "cubic" })
     .png({ compressionLevel: 9, palette: true })
     .toBuffer();
+
   const overlayPoints = toOverlayPoints(
     candidate.polygon.map(etrs89ToUtm33),
     surface,

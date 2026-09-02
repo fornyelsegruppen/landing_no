@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   etrs89ToUtm33,
@@ -146,13 +148,27 @@ function segmentationSurfaceFixture(
   };
 }
 
+const dataUrlPrefix = "data:image/png;base64,";
+
+function decodeDataUrl(dataUrl: string) {
+  return Buffer.from(dataUrl.slice(dataUrlPrefix.length), "base64");
+}
+
+function sha256(dataUrl: string) {
+  return createHash("sha256").update(decodeDataUrl(dataUrl)).digest("hex");
+}
+
 describe("Høydedata surface visualization", () => {
-  it("renders deterministic shaded relief and a co-registered footprint", async () => {
-    const result = await buildHeightSurfaceVisualizationV1({
+  it("renders a deterministic high-resolution relief with unchanged overlay geometry", async () => {
+    const first = await buildHeightSurfaceVisualizationV1({
       surface,
       candidate,
     });
-    expect(result).toMatchObject({
+    const second = await buildHeightSurfaceVisualizationV1({
+      surface,
+      candidate,
+    });
+    expect(first).toMatchObject({
       schemaVersion: "height-surface-visualization.v1",
       mimeType: "image/png",
       width: 4,
@@ -164,8 +180,66 @@ describe("Høydedata surface visualization", () => {
       attribution:
         "Kartverket · NLOD 2.0 + OpenStreetMap contributors · ODbL 1.0",
     });
-    expect(result.dataUrl).toMatch(/^data:image\/png;base64,/u);
-    expect(result.overlayPoints.split(" ")).toHaveLength(4);
+    expect(first.overlayPoints.split(" ")).toHaveLength(4);
+    expect(first.overlayPoints).toBe(second.overlayPoints);
+    expect(first.dataUrl).toBe(second.dataUrl);
+    expect(sha256(first.dataUrl)).toBe(sha256(second.dataUrl));
+
+    const metadata = await sharp(decodeDataUrl(first.dataUrl))
+      .metadata()
+      .then((details) => details);
+    expect(metadata.width).toBeGreaterThan(4);
+    expect(metadata.height).toBeGreaterThan(4);
+    const expectedScale = Math.min(
+      32,
+      Math.max(
+        4,
+        Math.ceil(
+          1024 / Math.max(surface.grid.width, surface.grid.height),
+        ),
+      ),
+    );
+    expect(metadata.width).toBe(surface.grid.width * expectedScale);
+    expect(metadata.height).toBe(surface.grid.height * expectedScale);
+
+    const rendered = await sharp(decodeDataUrl(first.dataUrl))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { data: renderedPixels, info: renderedInfo } = rendered;
+    let contrastScore = 0;
+    for (let row = 0; row < renderedInfo.height - 1; row += 1) {
+      for (let column = 0; column < renderedInfo.width - 1; column += 1) {
+        const idx = (row * renderedInfo.width + column) * 4;
+        const rightIdx = idx + 4;
+        const downIdx = idx + renderedInfo.width * 4;
+        const luminance = Math.round(
+          renderedPixels[idx] * 0.299 +
+            renderedPixels[idx + 1] * 0.587 +
+            renderedPixels[idx + 2] * 0.114,
+        );
+        const rightLuminance = Math.round(
+          renderedPixels[rightIdx] * 0.299 +
+            renderedPixels[rightIdx + 1] * 0.587 +
+            renderedPixels[rightIdx + 2] * 0.114,
+        );
+        const downLuminance = Math.round(
+          renderedPixels[downIdx] * 0.299 +
+            renderedPixels[downIdx + 1] * 0.587 +
+            renderedPixels[downIdx + 2] * 0.114,
+        );
+        contrastScore += Math.abs(luminance - rightLuminance);
+        if (row < renderedInfo.height - 1) {
+          contrastScore += Math.abs(luminance - downLuminance);
+        }
+      }
+    }
+    if (renderedInfo.height < 2 || renderedInfo.width < 2) {
+      throw new Error("Rendered visualization is too small");
+    }
+    expect(contrastScore).toBeGreaterThan(
+      renderedInfo.width * renderedInfo.height * 0.45,
+    );
   });
 
   it("projects optional roof-plane segmentation overlays and ridge onto the same surface", async () => {
