@@ -47,6 +47,7 @@ export default async function AdminNextRoofFusionUatPage() {
     "use server";
 
     assertRoofFusionPreviewEnabledV1(process.env);
+    const actionUser = await requireAdminUser();
     const caseReference = String(formData.get("caseReference") ?? "")
       .trim()
       .toUpperCase();
@@ -54,7 +55,7 @@ export default async function AdminNextRoofFusionUatPage() {
     if (!identity) notFound();
 
     const payload = await getPayload();
-    const authenticatedUser = user as PayloadRequest["user"];
+    const authenticatedUser = actionUser as PayloadRequest["user"];
     const authorization = new PayloadRoofFusionCaseAuthorizationV1(payload);
     await authorization.assertAdminCaseAccess(
       identity.roofFusionCaseId,
@@ -79,6 +80,7 @@ export default async function AdminNextRoofFusionUatPage() {
     "use server";
 
     assertRoofFusionPreviewEnabledV1(process.env);
+    await requireAdminUser();
     const query = String(formData.get("addressQuery") ?? "")
       .trim()
       .replace(/\s+/gu, " ");
@@ -144,6 +146,7 @@ export default async function AdminNextRoofFusionUatPage() {
     "use server";
 
     assertRoofFusionPreviewEnabledV1(process.env);
+    await requireAdminUser();
     const query = String(formData.get("addressQuery") ?? "")
       .trim()
       .replace(/\s+/gu, " ");
