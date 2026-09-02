@@ -7,6 +7,7 @@ const DEFAULT_ENDPOINT = "https://overpass-api.de/api/interpreter";
 const DEFAULT_MAP_ENDPOINT = "https://api.openstreetmap.org/api/0.6/map";
 const SEARCH_RADIUS_METERS = 60;
 const MAX_POLYGON_POINTS = 30;
+const LOOKUP_DEADLINE_MS = 8_000;
 const USER_AGENT = "Takfornyelse-roof-footprint/1.0 (post@takfornyelse.as)";
 
 const geometryPointSchema = z.object({
@@ -34,6 +35,21 @@ const elementSchema = z.object({
 const overpassResponseSchema = z.object({
   elements: z.array(elementSchema).default([]),
 });
+
+function assertNorwegianAddressPoint(point: GeoPoint) {
+  if (
+    !Number.isFinite(point.latitude) ||
+    !Number.isFinite(point.longitude) ||
+    point.latitude < 57 ||
+    point.latitude > 72 ||
+    point.longitude < 4 ||
+    point.longitude > 32
+  ) {
+    throw new TypeError(
+      "OpenStreetMap building lookup requires finite coordinates inside Norway",
+    );
+  }
+}
 
 export type BuildingFootprintCandidate = {
   id: string;
@@ -134,13 +150,59 @@ function normalizePolygon(
     points.pop();
   if (points.length <= MAX_POLYGON_POINTS) return points;
 
-  // OSM buildings can contain many facade details. Even sampling preserves the
-  // full ring extent while keeping the audited measurement schema bounded.
-  return Array.from(
-    { length: MAX_POLYGON_POINTS },
-    (_, index) =>
-      points[Math.floor((index * points.length) / MAX_POLYGON_POINTS)],
-  );
+  // Remove the least significant vertex at each step. Unlike uniform sampling,
+  // this keeps corners and other shape-defining facade details deterministic.
+  const simplified = [...points];
+  while (simplified.length > MAX_POLYGON_POINTS) {
+    let removeIndex = 0;
+    let smallestTriangle = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < simplified.length; index += 1) {
+      const previous =
+        simplified[(index + simplified.length - 1) % simplified.length];
+      const current = simplified[index];
+      const next = simplified[(index + 1) % simplified.length];
+      const triangle = Math.abs(
+        (current.longitude - previous.longitude) *
+          (next.latitude - previous.latitude) -
+          (current.latitude - previous.latitude) *
+            (next.longitude - previous.longitude),
+      );
+      if (triangle < smallestTriangle) {
+        smallestTriangle = triangle;
+        removeIndex = index;
+      }
+    }
+    simplified.splice(removeIndex, 1);
+  }
+  return simplified;
+}
+
+async function fetchWithDeadline(
+  fetcher: typeof fetch,
+  input: RequestInfo | URL,
+  init: RequestInit,
+  deadline: number,
+) {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error("OpenStreetMap lookup deadline exceeded");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), remaining);
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const deadlinePromise = new Promise<never>((_, reject) => {
+      deadlineTimer = setTimeout(
+        () => reject(new Error("OpenStreetMap lookup deadline exceeded")),
+        remaining,
+      );
+    });
+    return await Promise.race([
+      fetcher(input, { ...init, signal: controller.signal }),
+      deadlinePromise,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+  }
 }
 
 function rawPolygons(element: z.infer<typeof elementSchema>): RawPolygon[] {
@@ -249,6 +311,7 @@ export class OpenStreetMapBuildingProvider {
     fallbackEndpoint = process.env.OSM_OVERPASS_FALLBACK_ENDPOINT?.trim() || "",
     private readonly mapEndpoint = process.env.OSM_MAP_ENDPOINT?.trim() ||
       DEFAULT_MAP_ENDPOINT,
+    private readonly lookupDeadlineMs = LOOKUP_DEADLINE_MS,
   ) {
     this.endpoints = Array.from(
       new Set([endpoint, fallbackEndpoint].filter(Boolean)),
@@ -267,21 +330,27 @@ export class OpenStreetMapBuildingProvider {
   async findBuildings(
     addressPoint: GeoPoint,
   ): Promise<BuildingFootprintCandidate[]> {
+    assertNorwegianAddressPoint(addressPoint);
+    const deadline = Date.now() + this.lookupDeadlineMs;
     const query = `[out:json][timeout:7];(way["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude});relation["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude}););out tags geom;`;
     let parsed: z.infer<typeof overpassResponseSchema> | null = null;
     let lastError: unknown;
     for (const endpoint of this.endpoints) {
       try {
-        const response = await this.fetcher(endpoint, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "User-Agent": USER_AGENT,
+        const response = await fetchWithDeadline(
+          this.fetcher,
+          endpoint,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              "User-Agent": USER_AGENT,
+            },
+            body: new URLSearchParams({ data: query }),
           },
-          body: new URLSearchParams({ data: query }),
-          signal: AbortSignal.timeout(7_000),
-        });
+          deadline,
+        );
         if (!response.ok)
           throw new Error(
             `OpenStreetMap building lookup failed (${response.status})`,
@@ -305,20 +374,21 @@ export class OpenStreetMapBuildingProvider {
           addressPoint.longitude + longitudeDelta,
           addressPoint.latitude + latitudeDelta,
         ].join(",");
-        const response = await this.fetcher(
+        const response = await fetchWithDeadline(
+          this.fetcher,
           `${this.mapEndpoint}?bbox=${bbox}`,
           {
             headers: { Accept: "application/xml", "User-Agent": USER_AGENT },
-            signal: AbortSignal.timeout(10_000),
           },
+          deadline,
         );
         if (!response.ok)
           throw new Error(
             `OpenStreetMap map lookup failed (${response.status})`,
           );
-        parsed = overpassResponseSchema.parse(
-          parseOsmMapXml(await response.text()),
-        );
+        const mapResult = parseOsmMapXml(await response.text());
+        parsed = overpassResponseSchema.parse(mapResult);
+        if (parsed.elements.length === 0) return [];
       } catch (error) {
         lastError = error;
       }
