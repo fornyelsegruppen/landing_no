@@ -61,7 +61,7 @@
     "payload": "3.88.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.2.108",
-    "puppeteer-core": "24.32.0",
+    "puppeteer-core": "25.9.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "resend": "^6.17.2",
@@ -89,6 +89,6 @@
     "vitest": "^4.1.10"
   },
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22.12.0"
   }
 }
