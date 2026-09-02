@@ -6,6 +6,7 @@ import {
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
 import {
   segmentSimpleRoofPlanesV1,
+  segmentSimpleRoofPlanesWithRidgeV1,
   SimpleRoofPlaneSegmentationError,
 } from "./simple-roof-plane-segmentation-v1";
 
@@ -105,6 +106,70 @@ function surfaceFixture(
 }
 
 describe("simple Roof Fusion plane segmentation", () => {
+  it("fits two planes around an administrator-selected normalized ridge", () => {
+    const surface = surfaceFixture(
+      (point, center) => 12 - Math.abs(point.x - center.x) * 0.5,
+    );
+    const polygon = candidate.polygon.map(etrs89ToUtm33);
+    const normalize = (x: number, y: number) => ({
+      x:
+        (x - surface.bbox.minEastingM) /
+        (surface.bbox.maxEastingM - surface.bbox.minEastingM),
+      y:
+        (surface.bbox.maxNorthingM - y) /
+        (surface.bbox.maxNorthingM - surface.bbox.minNorthingM),
+    });
+
+    const result = segmentSimpleRoofPlanesWithRidgeV1({
+      candidate,
+      surface,
+      ridge: [
+        normalize(
+          (polygon[0].eastingM + polygon[1].eastingM) / 2,
+          (polygon[0].northingM + polygon[1].northingM) / 2,
+        ),
+        normalize(
+          (polygon[2].eastingM + polygon[3].eastingM) / 2,
+          (polygon[2].northingM + polygon[3].northingM) / 2,
+        ),
+      ],
+    });
+
+    expect(result.roofType).toBe("gable");
+    expect(result.planes).toHaveLength(2);
+    expect(result.ridge?.lengthMeters).toBeGreaterThan(15);
+    expect(result.fitRmseM).toBeLessThan(0.25);
+    expect(result.assumptions).toContain(
+      "An administrator selected one straight ridge in the Preview height surface",
+    );
+  });
+
+  it("fails closed for manual ridge points outside the footprint or below 2 metres", () => {
+    const surface = surfaceFixture(
+      (point, center) => 12 - Math.abs(point.x - center.x) * 0.5,
+    );
+    expect(() =>
+      segmentSimpleRoofPlanesWithRidgeV1({
+        candidate,
+        surface,
+        ridge: [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ],
+      }),
+    ).toThrow("inside or on the selected footprint");
+    expect(() =>
+      segmentSimpleRoofPlanesWithRidgeV1({
+        candidate,
+        surface,
+        ridge: [
+          { x: 0.5, y: 0.5 },
+          { x: 0.50001, y: 0.50001 },
+        ],
+      }),
+    ).toThrow("at least 2 metres long");
+  });
+
   it("detects a deterministic two-plane gable with ridge, pitch, and sloped area", () => {
     const result = segmentSimpleRoofPlanesV1({
       candidate,

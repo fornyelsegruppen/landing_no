@@ -18,7 +18,9 @@ import {
 } from "./source-adapter-v1";
 import {
   segmentSimpleRoofPlanesV1,
+  segmentSimpleRoofPlanesWithRidgeV1,
   SimpleRoofPlaneSegmentationError,
+  type NormalizedRoofRidgePointV1,
   type SimpleRoofPlaneSegmentationV1,
 } from "./simple-roof-plane-segmentation-v1";
 
@@ -166,6 +168,11 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
   address: AddressCandidate;
   candidate: BuildingFootprintCandidate;
   surface: KartverketHeightSurfaceV1;
+  /** A two-click, normalized height-surface override. Never persisted. */
+  manualRidge?: readonly [
+    NormalizedRoofRidgePointV1,
+    NormalizedRoofRidgePointV1,
+  ];
 }): RoofFusionHeightSurfacePreviewV1 {
   const { address, candidate, surface } = input;
   if (
@@ -245,7 +252,15 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
   const roofHeightP90M = quantile(roofHeights, 0.9);
   const groundElevationMedianM = quantile(groundElevations, 0.5);
   let segmentation: SimpleRoofPlaneSegmentationV1 | null = null;
-  if (surface.quality.status === "usable") {
+  if (input.manualRidge) {
+    // Do not fall back to automatic segmentation for a manual action: a
+    // rejected override must fail closed and leave the previous preview intact.
+    segmentation = segmentSimpleRoofPlanesWithRidgeV1({
+      surface,
+      candidate,
+      ridge: input.manualRidge,
+    });
+  } else if (surface.quality.status === "usable") {
     try {
       segmentation = segmentSimpleRoofPlanesV1({ surface, candidate });
     } catch (error) {

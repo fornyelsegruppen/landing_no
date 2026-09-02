@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import { useActionState, useMemo, useState } from "react";
+import { type MouseEvent, useActionState, useMemo, useState } from "react";
 import type { AddressCandidate } from "@/lib/providers/contracts";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
 import type { RoofFusionHeightSurfacePreviewSummaryV1 } from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
@@ -109,6 +109,13 @@ const copy = {
       "Dette er et gratis, foreløpig bygningsfotavtrykk – ikke ferdige takflater eller godkjent takareal.",
     heightAction: "Hent virkelig takflate",
     heightWorking: "Leser DOM og DTM …",
+    ridgeInstruction:
+      "Klikk to endepunkter på mønelinjen i høydeflaten for å korrigere Preview-modellen.",
+    ridgeReady:
+      "To mønepunkter er valgt. Korrigeringen kjøres på nytt mot kildedataene.",
+    ridgeSubmit: "Korriger med valgt møne",
+    ridgeWorking: "Kontrollerer møne og tilpasser flater …",
+    ridgeClear: "Tøm mønepunkter",
     heightTitle: "Virkelig 1 m høydeoverflate",
     heightIntro:
       "Skyggerelieff er laget av Kartverkets åpne DOM minus DTM. Den gule konturen er valgt OSM-bygning; dette er høydedata, ikke et foto.",
@@ -203,6 +210,13 @@ const copy = {
       "Tai nemokamas preliminarus pastato kontūras – dar ne galutiniai stogo šlaitai ar patvirtintas stogo plotas.",
     heightAction: "Gauti tikrą stogo paviršių",
     heightWorking: "Skaitomi DOM ir DTM…",
+    ridgeInstruction:
+      "Aukščio paviršiuje pažymėkite du kraigo galus, kad pakoreguotumėte Preview modelį.",
+    ridgeReady:
+      "Pažymėti du kraigo taškai. Korekcija bus iš naujo patikrinta su šaltinio duomenimis.",
+    ridgeSubmit: "Koreguoti pagal pažymėtą kraigą",
+    ridgeWorking: "Tikrinamas kraigas ir pritaikomi šlaitai…",
+    ridgeClear: "Išvalyti kraigo taškus",
     heightTitle: "Tikras 1 m aukščio paviršius",
     heightIntro:
       "Reljefo vaizdas sukurtas iš atvirų Kartverket DOM minus DTM duomenų. Geltonas kontūras yra pasirinktas OSM pastatas; tai aukščio modelis, ne fotografija.",
@@ -296,6 +310,13 @@ const copy = {
       "This is a free preliminary building footprint, not final roof planes or an approved roof area.",
     heightAction: "Fetch real roof surface",
     heightWorking: "Reading DOM and DTM…",
+    ridgeInstruction:
+      "Click two ridge endpoints on the height surface to correct the Preview model.",
+    ridgeReady:
+      "Two ridge points selected. The correction will be revalidated from source data.",
+    ridgeSubmit: "Correct with selected ridge",
+    ridgeWorking: "Validating ridge and fitting planes …",
+    ridgeClear: "Clear ridge points",
     heightTitle: "Real 1 m height surface",
     heightIntro:
       "The shaded surface is derived from open Kartverket DOM minus DTM data. The amber outline is the selected OSM building; this is elevation data, not a photograph.",
@@ -655,6 +676,9 @@ export function RealAddressResult({
   const [selectedId, setSelectedId] = useState(result.candidates[0]?.id ?? "");
   const [opacity, setOpacity] = useState(38);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [ridgePoints, setRidgePoints] = useState<
+    Array<{ x: number; y: number }>
+  >([]);
   const [heightState, heightFormAction, heightPending] = useActionState(
     heightAnalysisAction,
     initialHeightState,
@@ -675,6 +699,18 @@ export function RealAddressResult({
       : null;
   const activePlanes = activeHeight?.visualization.planes ?? [];
   const hasSegmentedPlanes = activePlanes.length > 0;
+
+  function selectRidgePoint(event: MouseEvent<HTMLButtonElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const point = {
+      x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
+    };
+    setRidgePoints((current) =>
+      current.length >= 2 ? [point] : [...current, point],
+    );
+  }
 
   if (!selected) return null;
 
@@ -711,9 +747,15 @@ export function RealAddressResult({
                 "url(" + activeHeight.visualization.dataUrl + ")",
             }}
           >
+            <button
+              aria-label={t.ridgeInstruction}
+              className="absolute inset-0 z-10 cursor-crosshair"
+              onClick={selectRidgePoint}
+              type="button"
+            />
             <svg
               aria-hidden="true"
-              className="absolute inset-0 size-full"
+              className="pointer-events-none absolute inset-0 size-full"
               preserveAspectRatio="none"
               viewBox={[
                 0,
@@ -776,6 +818,43 @@ export function RealAddressResult({
                       vectorEffect="non-scaling-stroke"
                     />
                   ) : null}
+                  {ridgePoints.length === 2 ? (
+                    <line
+                      stroke="#22d3ee"
+                      strokeDasharray="5 4"
+                      strokeWidth={
+                        Math.max(
+                          activeHeight.visualization.width,
+                          activeHeight.visualization.height,
+                        ) / 110
+                      }
+                      x1={ridgePoints[0].x * activeHeight.visualization.width}
+                      x2={ridgePoints[1].x * activeHeight.visualization.width}
+                      y1={ridgePoints[0].y * activeHeight.visualization.height}
+                      y2={ridgePoints[1].y * activeHeight.visualization.height}
+                    />
+                  ) : null}
+                  {ridgePoints.map((point, index) => (
+                    <circle
+                      cx={point.x * activeHeight.visualization.width}
+                      cy={point.y * activeHeight.visualization.height}
+                      fill="#22d3ee"
+                      key={`${point.x}:${point.y}:${index}`}
+                      r={
+                        Math.max(
+                          activeHeight.visualization.width,
+                          activeHeight.visualization.height,
+                        ) / 75
+                      }
+                      stroke="#082f49"
+                      strokeWidth={
+                        Math.max(
+                          activeHeight.visualization.width,
+                          activeHeight.visualization.height,
+                        ) / 180
+                      }
+                    />
+                  ))}
                 </>
               ) : null}
             </svg>
@@ -927,6 +1006,55 @@ export function RealAddressResult({
             {heightPending ? t.heightWorking : t.heightAction}
           </button>
         </form>
+        {activeHeight ? (
+          <form
+            action={heightFormAction}
+            className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-3"
+            data-roof-fusion-manual-ridge="two-click-preview"
+          >
+            <input
+              name="addressQuery"
+              type="hidden"
+              value={result.address.label}
+            />
+            <input name="candidateId" type="hidden" value={selected.id} />
+            {ridgePoints.length === 2 ? (
+              <>
+                <input
+                  name="ridgeFromX"
+                  type="hidden"
+                  value={ridgePoints[0].x}
+                />
+                <input
+                  name="ridgeFromY"
+                  type="hidden"
+                  value={ridgePoints[0].y}
+                />
+                <input name="ridgeToX" type="hidden" value={ridgePoints[1].x} />
+                <input name="ridgeToY" type="hidden" value={ridgePoints[1].y} />
+              </>
+            ) : null}
+            <p className="text-[10px] leading-4 text-[var(--an-muted)]">
+              {ridgePoints.length === 2 ? t.ridgeReady : t.ridgeInstruction}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-cyan-300/40 px-3 text-[10px] font-black text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={heightPending || ridgePoints.length !== 2}
+                type="submit"
+              >
+                {heightPending ? t.ridgeWorking : t.ridgeSubmit}
+              </button>
+              <button
+                className="min-h-10 rounded-lg border border-[var(--an-border)] px-3 text-[10px] font-bold"
+                onClick={() => setRidgePoints([])}
+                type="button"
+              >
+                {t.ridgeClear}
+              </button>
+            </div>
+          </form>
+        ) : null}
       </div>
       <p className="rounded-xl border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] p-3 text-xs font-semibold text-[var(--an-amber)] xl:col-span-2">
         {t.preliminary}

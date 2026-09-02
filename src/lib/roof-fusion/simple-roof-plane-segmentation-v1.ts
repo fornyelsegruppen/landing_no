@@ -36,6 +36,10 @@ export type SimpleRoofPlaneSegmentationV1 = {
   assumptions: string[];
 };
 
+/** Coordinates in the rendered height-surface frame: x runs west-to-east and
+ * y runs north-to-south. They are deliberately not projected coordinates. */
+export type NormalizedRoofRidgePointV1 = { x: number; y: number };
+
 export class SimpleRoofPlaneSegmentationError extends Error {
   constructor(
     readonly code:
@@ -474,6 +478,299 @@ function deterministicallyDownsample(samples: Sample[]) {
     (_, index) =>
       samples[Math.floor((index * samples.length) / MAX_MODEL_SAMPLES)],
   );
+}
+
+/**
+ * Fits the narrow two-plane model around an administrator-selected ridge.
+ * This is Preview-only input: callers must still resolve the address,
+ * footprint, and height surface themselves rather than trusting client state.
+ */
+export function segmentSimpleRoofPlanesWithRidgeV1(input: {
+  surface: KartverketHeightSurfaceV1;
+  candidate: BuildingFootprintCandidate;
+  ridge: readonly [NormalizedRoofRidgePointV1, NormalizedRoofRidgePointV1];
+}): SimpleRoofPlaneSegmentationV1 {
+  const { surface, candidate, ridge } = input;
+  const expectedSamples = surface.grid.width * surface.grid.height;
+  if (
+    surface.schemaVersion !== "kartverket-height-surface.v1" ||
+    surface.coordinateSystem !== "EPSG:25833" ||
+    surface.quality.status !== "usable" ||
+    !Number.isInteger(surface.grid.width) ||
+    !Number.isInteger(surface.grid.height) ||
+    surface.grid.width < 1 ||
+    surface.grid.height < 1 ||
+    !Number.isFinite(surface.grid.cellWidthM) ||
+    !Number.isFinite(surface.grid.cellHeightM) ||
+    surface.grid.cellWidthM <= 0 ||
+    surface.grid.cellHeightM <= 0 ||
+    !Number.isFinite(surface.bbox.minEastingM) ||
+    !Number.isFinite(surface.bbox.minNorthingM) ||
+    !Number.isFinite(surface.bbox.maxEastingM) ||
+    !Number.isFinite(surface.bbox.maxNorthingM) ||
+    surface.bbox.maxEastingM <= surface.bbox.minEastingM ||
+    surface.bbox.maxNorthingM <= surface.bbox.minNorthingM ||
+    surface.values.domElevationM.length !== expectedSamples ||
+    surface.values.heightAboveTerrainM.length !== expectedSamples
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "INVALID_INPUT",
+      "Høydedata surface does not match the manual ridge segmentation contract",
+    );
+  }
+  if (
+    ridge.some(
+      (point) =>
+        !Number.isFinite(point.x) ||
+        !Number.isFinite(point.y) ||
+        point.x < 0 ||
+        point.x > 1 ||
+        point.y < 0 ||
+        point.y > 1,
+    )
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "INVALID_INPUT",
+      "Manual ridge points must be normalized coordinates between 0 and 1",
+    );
+  }
+  const polygon = cleanPolygon(
+    candidate.polygon.map((point) => {
+      const projected = etrs89ToUtm33(point);
+      return { x: projected.eastingM, y: projected.northingM };
+    }),
+  );
+  if (
+    polygon.length < 3 ||
+    polygon.length > 8 ||
+    polygonArea(polygon) < 25 ||
+    !isConvex(polygon)
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "UNSUPPORTED_FOOTPRINT",
+      "Manual ridge fitting currently accepts simple, convex footprints",
+    );
+  }
+  const spanX = surface.bbox.maxEastingM - surface.bbox.minEastingM;
+  const spanY = surface.bbox.maxNorthingM - surface.bbox.minNorthingM;
+  const selectedRidge = ridge.map((point) => ({
+    x: surface.bbox.minEastingM + point.x * spanX,
+    y: surface.bbox.maxNorthingM - point.y * spanY,
+  })) as [Point2, Point2];
+  if (
+    !pointInPolygon(selectedRidge[0], polygon) ||
+    !pointInPolygon(selectedRidge[1], polygon)
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "INVALID_INPUT",
+      "Both manual ridge points must be inside or on the selected footprint",
+    );
+  }
+  const ridgeLength = Math.hypot(
+    selectedRidge[1].x - selectedRidge[0].x,
+    selectedRidge[1].y - selectedRidge[0].y,
+  );
+  if (ridgeLength < 2) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "INVALID_INPUT",
+      "The manual ridge must be at least 2 metres long",
+    );
+  }
+  const center = {
+    x: (selectedRidge[0].x + selectedRidge[1].x) / 2,
+    y: (selectedRidge[0].y + selectedRidge[1].y) / 2,
+  };
+  // projectedCoordinate's v axis follows (-sin(angle), cos(angle)).
+  const ridgeDirection = {
+    x: (selectedRidge[1].x - selectedRidge[0].x) / ridgeLength,
+    y: (selectedRidge[1].y - selectedRidge[0].y) / ridgeLength,
+  };
+  const angleRadians = Math.atan2(ridgeDirection.x, -ridgeDirection.y);
+  const raw: Array<Sample & { roofHeight: number }> = [];
+  let footprintSampleCount = 0;
+  for (let row = 0; row < surface.grid.height; row += 1) {
+    const y =
+      surface.bbox.maxNorthingM - (row + 0.5) * surface.grid.cellHeightM;
+    for (let column = 0; column < surface.grid.width; column += 1) {
+      const x =
+        surface.bbox.minEastingM + (column + 0.5) * surface.grid.cellWidthM;
+      if (!pointInPolygon({ x, y }, polygon)) continue;
+      footprintSampleCount += 1;
+      const index = row * surface.grid.width + column;
+      const z = surface.values.domElevationM[index];
+      const roofHeight = surface.values.heightAboveTerrainM[index];
+      if (
+        !finite(z) ||
+        !finite(roofHeight) ||
+        roofHeight < ROOF_MIN_HEIGHT_M ||
+        roofHeight > ROOF_MAX_HEIGHT_M
+      ) {
+        continue;
+      }
+      raw.push({ x, y, z, roofHeight });
+    }
+  }
+  if (
+    raw.length < MIN_ROOF_SAMPLES ||
+    footprintSampleCount < MIN_ROOF_SAMPLES
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "INSUFFICIENT_ROOF_SAMPLES",
+      "Too few elevated Høydedata cells support manual ridge fitting",
+    );
+  }
+  const heights = raw
+    .map((sample) => sample.roofHeight)
+    .sort((left, right) => left - right);
+  const lowerQuartile = quantile(heights, 0.25);
+  const upperQuartile = quantile(heights, 0.75);
+  const upperFence =
+    upperQuartile + Math.max(1.5, (upperQuartile - lowerQuartile) * 1.75);
+  const filteredSamples = raw
+    .filter((sample) => sample.roofHeight <= upperFence)
+    .map(({ x, y, z }) => ({ x, y, z }));
+  const roofCoverageRatio = filteredSamples.length / footprintSampleCount;
+  if (
+    filteredSamples.length < MIN_ROOF_SAMPLES ||
+    roofCoverageRatio < MIN_ROOF_COVERAGE_RATIO
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "INSUFFICIENT_ROOF_SAMPLES",
+      "Roof coverage after outlier filtering is too sparse for manual ridge fitting",
+    );
+  }
+  const samples = deterministicallyDownsample(filteredSamples);
+  const fit = robustFit(samples, (sample) => {
+    const { u, v } = projectedCoordinate(sample, center, angleRadians);
+    return [1, v, Math.max(0, -u), Math.max(0, u)];
+  });
+  if (!fit || fit.rmse > MAX_ACCEPTED_RMSE_M) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "MODEL_NOT_RELIABLE",
+      "The selected ridge does not support a reliable two-plane fit",
+    );
+  }
+  const retainedRatio = fit.retainedSamples / samples.length;
+  const [intercept, alongSlope, leftSlope, rightSlope] = fit.coefficients;
+  const leftPitch =
+    (Math.atan(Math.hypot(alongSlope, leftSlope)) * 180) / Math.PI;
+  const rightPitch =
+    (Math.atan(Math.hypot(alongSlope, rightSlope)) * 180) / Math.PI;
+  if (
+    retainedRatio < MIN_RETAINED_SAMPLE_RATIO ||
+    leftSlope >= -0.03 ||
+    rightSlope >= -0.03 ||
+    leftPitch < MIN_PITCH_DEGREES ||
+    leftPitch > MAX_PITCH_DEGREES ||
+    rightPitch < MIN_PITCH_DEGREES ||
+    rightPitch > MAX_PITCH_DEGREES
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "MODEL_NOT_RELIABLE",
+      "The selected ridge does not meet Preview retained-sample or pitch limits",
+    );
+  }
+  const leftPolygon = clipByRidge({
+    polygon,
+    center,
+    angleRadians,
+    ridgeOffset: 0,
+    keepLower: true,
+  });
+  const rightPolygon = clipByRidge({
+    polygon,
+    center,
+    angleRadians,
+    ridgeOffset: 0,
+    keepLower: false,
+  });
+  const fullRidge = ridgeEndpoints({
+    polygon,
+    center,
+    angleRadians,
+    ridgeOffset: 0,
+  });
+  const footprintArea = polygonArea(polygon);
+  if (
+    !fullRidge ||
+    leftPolygon.length < 3 ||
+    rightPolygon.length < 3 ||
+    polygonArea(leftPolygon) < footprintArea * 0.15 ||
+    polygonArea(rightPolygon) < footprintArea * 0.15
+  ) {
+    throw new SimpleRoofPlaneSegmentationError(
+      "MODEL_NOT_RELIABLE",
+      "The selected ridge does not split the footprint into two usable planes",
+    );
+  }
+  const cosine = Math.cos(angleRadians);
+  const sine = Math.sin(angleRadians);
+  const alongX = -sine;
+  const alongY = cosine;
+  const leftGradientX = alongSlope * alongX - leftSlope * cosine;
+  const leftGradientY = alongSlope * alongY - leftSlope * sine;
+  const rightGradientX = alongSlope * alongX + rightSlope * cosine;
+  const rightGradientY = alongSlope * alongY + rightSlope * sine;
+  const elevation = (point: Point2) => {
+    const { u, v } = projectedCoordinate(point, center, angleRadians);
+    return (
+      intercept +
+      alongSlope * v +
+      leftSlope * Math.max(0, -u) +
+      rightSlope * Math.max(0, u)
+    );
+  };
+  return {
+    schemaVersion: SIMPLE_ROOF_PLANE_SEGMENTATION_SCHEMA_VERSION,
+    roofType: "gable",
+    planes: [
+      planeFromPolygon({
+        planeId: "plane-1",
+        polygon: leftPolygon,
+        gradientX: leftGradientX,
+        gradientY: leftGradientY,
+        elevation,
+        rmse: fit.rmse,
+      }),
+      planeFromPolygon({
+        planeId: "plane-2",
+        polygon: rightPolygon,
+        gradientX: rightGradientX,
+        gradientY: rightGradientY,
+        elevation,
+        rmse: fit.rmse,
+      }),
+    ],
+    ridge: {
+      from: {
+        xM: round(fullRidge.from.x, 6),
+        yM: round(fullRidge.from.y, 6),
+        zM: round(elevation(fullRidge.from), 6),
+      },
+      to: {
+        xM: round(fullRidge.to.x, 6),
+        yM: round(fullRidge.to.y, 6),
+        zM: round(elevation(fullRidge.to), 6),
+      },
+      lengthMeters: round(fullRidge.lengthMeters),
+    },
+    sampleCount: samples.length,
+    footprintSampleCount,
+    roofCoverageRatio: round(roofCoverageRatio, 4),
+    fitRmseM: round(fit.rmse),
+    confidenceScore: confidenceScore({
+      fitRmseM: fit.rmse,
+      coverageRatio: roofCoverageRatio,
+      retainedRatio,
+    }),
+    assumptions: [
+      "The selected OSM footprint is a simple convex building outline",
+      "An administrator selected one straight ridge in the Preview height surface",
+      "Two planar slopes are fitted on opposite sides of that fixed ridge",
+      "DOM outliers are excluded with deterministic robust thresholds",
+      "Model fitting uses at most 600 deterministically selected roof cells",
+    ],
+  };
 }
 
 export function segmentSimpleRoofPlanesV1(input: {

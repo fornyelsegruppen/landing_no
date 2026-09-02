@@ -195,6 +195,55 @@ describe("Roof Fusion Høydedata surface Preview", () => {
     expect(result.summary.reviewState).toBe("review_required");
   });
 
+  it("re-fits a two-click ridge Preview correction without making it pricing-ready", () => {
+    const projected = candidate.polygon.map(etrs89ToUtm33);
+    const centerX =
+      projected.reduce((sum, point) => sum + point.eastingM, 0) /
+      projected.length;
+    const surface = fixtureSurface(
+      8,
+      (point) => 12 - Math.abs(point.x - centerX) * 0.5,
+    );
+    const normalize = (point: { eastingM: number; northingM: number }) => ({
+      x:
+        (point.eastingM - surface.bbox.minEastingM) /
+        (surface.bbox.maxEastingM - surface.bbox.minEastingM),
+      y:
+        (surface.bbox.maxNorthingM - point.northingM) /
+        (surface.bbox.maxNorthingM - surface.bbox.minNorthingM),
+    });
+    const result = buildRoofFusionHeightSurfacePreviewV1({
+      address,
+      candidate,
+      surface,
+      manualRidge: [
+        normalize({
+          eastingM: (projected[0].eastingM + projected[1].eastingM) / 2,
+          northingM: (projected[0].northingM + projected[1].northingM) / 2,
+        }),
+        normalize({
+          eastingM: (projected[2].eastingM + projected[3].eastingM) / 2,
+          northingM: (projected[2].northingM + projected[3].northingM) / 2,
+        }),
+      ],
+    });
+
+    expect(result.segmentation?.roofType).toBe("gable");
+    expect(result.segmentation?.ridge?.lengthMeters).toBeGreaterThan(15);
+    expect(result.geometryInput.surfaces).toHaveLength(2);
+    expect(result.segmentation?.ridge?.lengthMeters).toBeCloseTo(
+      result.calculation.trace.edges.find(
+        (edge) => edge.classification === "ridge",
+      )?.length2dM ?? -1,
+      3,
+    );
+    expect(result.summary).toMatchObject({
+      reviewState: "review_required",
+      pricingReady: false,
+      blockers: ["ROOF_SURFACE_RENDER_REQUIRED"],
+    });
+  });
+
   it("uses the original preliminary fallback when Høydedata quality is limited", () => {
     const surface = fixtureSurface();
     surface.quality.status = "limited";

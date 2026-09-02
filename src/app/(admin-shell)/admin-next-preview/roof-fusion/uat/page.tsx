@@ -29,6 +29,37 @@ import {
   PayloadRoofFusionCaseAuthorizationV1,
 } from "@/lib/roof-fusion/preview-read-adapters-v1";
 import { prepareRoofFusionPreviewUatGoldenV1 } from "@/lib/roof-fusion/preview-uat-golden-v1";
+import { SimpleRoofPlaneSegmentationError } from "@/lib/roof-fusion/simple-roof-plane-segmentation-v1";
+
+function manualRidgeFromFormV1(formData: FormData) {
+  const names = ["ridgeFromX", "ridgeFromY", "ridgeToX", "ridgeToY"] as const;
+  const values = names.map((name) => formData.get(name));
+  if (values.every((value) => value === null)) return undefined;
+  if (
+    values.some(
+      (value) =>
+        typeof value !== "string" ||
+        !/^(?:0|1|0?\.\d+|1\.0+)$/u.test(value.trim()),
+    )
+  ) {
+    return null;
+  }
+  const parsed = values.map((value) => Number(value)) as [
+    number,
+    number,
+    number,
+    number,
+  ];
+  if (
+    parsed.some((value) => !Number.isFinite(value) || value < 0 || value > 1)
+  ) {
+    return null;
+  }
+  return [
+    { x: parsed[0], y: parsed[1] },
+    { x: parsed[2], y: parsed[3] },
+  ] as const;
+}
 
 export default async function AdminNextRoofFusionUatPage() {
   if (process.env.VERCEL_ENV !== "preview") notFound();
@@ -151,10 +182,12 @@ export default async function AdminNextRoofFusionUatPage() {
       .trim()
       .replace(/\s+/gu, " ");
     const candidateId = String(formData.get("candidateId") ?? "").trim();
+    const manualRidge = manualRidgeFromFormV1(formData);
     if (
       query.length < 4 ||
       query.length > 180 ||
-      !/^(?:way|relation)\/[1-9][0-9]*$/u.test(candidateId)
+      !/^(?:way|relation)\/[1-9][0-9]*$/u.test(candidateId) ||
+      manualRidge === null
     ) {
       return { kind: "error", code: "INVALID_SELECTION" };
     }
@@ -181,6 +214,7 @@ export default async function AdminNextRoofFusionUatPage() {
         address,
         candidate,
         surface,
+        ...(manualRidge ? { manualRidge } : {}),
       });
       const visualization = await buildHeightSurfaceVisualizationV1({
         surface,
@@ -194,7 +228,10 @@ export default async function AdminNextRoofFusionUatPage() {
         visualization,
       };
     } catch (error) {
-      if (error instanceof RoofFusionHeightSurfacePreviewError) {
+      if (
+        error instanceof RoofFusionHeightSurfacePreviewError ||
+        error instanceof SimpleRoofPlaneSegmentationError
+      ) {
         return { kind: "error", code: "ROOF_NOT_DETECTED" };
       }
       if (error instanceof KartverketHeightDataError) {
