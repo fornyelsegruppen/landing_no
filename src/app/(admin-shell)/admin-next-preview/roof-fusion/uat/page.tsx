@@ -68,7 +68,6 @@ export default async function AdminNextRoofFusionUatPage() {
     "use server";
 
     assertRoofFusionPreviewEnabledV1(process.env);
-    await requireAdminUser();
     const query = String(formData.get("addressQuery") ?? "")
       .trim()
       .replace(/\s+/gu, " ");
