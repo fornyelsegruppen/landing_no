@@ -5,7 +5,9 @@ import {
   createAdminNextRoofFusionR4Adapter,
   loadAdminNextR4WithMissingCanonicalFallback,
   parseAdminNextR4CaseIdentityV1,
+  projectRoofSnapshotToR4,
 } from "@/lib/admin-next/r4-read-adapter";
+import { buildApprovedGableRoofFixtureV1 } from "@/lib/roof-fusion/gable-roof-fixture-v1";
 import { buildRoofFusionPreviewUatGoldenPlanV1 } from "@/lib/roof-fusion/preview-uat-golden-v1";
 
 const admin = {
@@ -127,5 +129,32 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
       status: "not_found",
       reason: "measurement_mismatch",
     });
+  });
+
+  it("separates horizontal, surface, and net area while leaving unknown pitch undefined", () => {
+    const snapshot = structuredClone(
+      buildApprovedGableRoofFixtureV1().approvedSnapshot,
+    );
+    const unknownPitch = {
+      ...snapshot.totals.verifiedGutterLength,
+      unit: "deg" as const,
+    };
+    snapshot.geometry.surfaces = snapshot.geometry.surfaces.map((surface) => ({
+      ...surface,
+      pitch: unknownPitch,
+    }));
+
+    const result = projectRoofSnapshotToR4(snapshot, null);
+
+    expect(result.horizontalAreaSquareMeters).toBe(80);
+    expect(result.surfaceAreaSquareMeters).toBeCloseTo(92.37604307, 8);
+    expect(result.areaSquareMeters).toBeCloseTo(90.990402424, 8);
+    expect(result.overallPitchDegrees).toBeUndefined();
+    expect(result.planes.every((surface) => surface.pitchDegrees === undefined)).toBe(
+      true,
+    );
+    expect(
+      result.primarySlopes.every((surface) => surface.pitchDegrees === undefined),
+    ).toBe(true);
   });
 });

@@ -11,7 +11,10 @@ import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-f
 
 export type AdminNextR4MeasurementView = NonNullable<
   AdminNextCaseWorkspaceView["measurementReview"]
->;
+> & {
+  horizontalAreaSquareMeters?: number;
+  surfaceAreaSquareMeters?: number;
+};
 export type AdminNextR4LoadResult =
   | { status: "ready"; source: "fixture" | "canonical"; value: AdminNextR4MeasurementView }
   | {
@@ -38,8 +41,8 @@ export const adminNextFixtureR4Adapter: AdminNextR4Adapter = {
   },
 };
 
-function midpoint(value: RoofMeasurementValueV1) {
-  return value.min === null || value.max === null ? 0 : (value.min + value.max) / 2;
+function midpoint(value: RoofMeasurementValueV1): number | undefined {
+  return value.min === null || value.max === null ? undefined : (value.min + value.max) / 2;
 }
 function confidence(snapshot: RoofSnapshotV1) {
   return Math.round((snapshot.measurement.confidence.score || 0) * 100);
@@ -48,19 +51,19 @@ function overallPitch(snapshot: RoofSnapshotV1) {
   const weighted = snapshot.geometry.surfaces.reduce(
     (result, surface) => {
       const area = midpoint(surface.netSurfaceArea);
-      return {
-        area: result.area + area,
-        pitchArea: result.pitchArea + midpoint(surface.pitch) * area,
-      };
+      const pitch = midpoint(surface.pitch);
+      return area === undefined || pitch === undefined
+        ? result
+        : { area: result.area + area, pitchArea: result.pitchArea + pitch * area };
     },
     { area: 0, pitchArea: 0 },
   );
-  return weighted.area ? weighted.pitchArea / weighted.area : 0;
+  return weighted.area ? weighted.pitchArea / weighted.area : undefined;
 }
 function perimeter(snapshot: RoofSnapshotV1, surfaceId: string) {
   return snapshot.geometry.edges
     .filter((edge) => edge.adjacentSurfaceIds.includes(surfaceId))
-    .reduce((sum, edge) => sum + midpoint(edge.length3d), 0);
+    .reduce((sum, edge) => sum + (midpoint(edge.length3d) ?? 0), 0);
 }
 
 export function projectRoofSnapshotToR4(
@@ -77,15 +80,17 @@ export function projectRoofSnapshotToR4(
   );
   const primarySlopes = snapshot.geometry.surfaces.slice(0, 4).map((surface, index) => ({
     id: (["S1", "S2", "S3", "S4"] as const)[index],
-    areaSquareMeters: midpoint(surface.netSurfaceArea),
+    areaSquareMeters: midpoint(surface.netSurfaceArea) ?? 0,
     pitchDegrees: midpoint(surface.pitch),
     perimeterMeters: perimeter(snapshot, surface.surfaceId),
   }));
-  const area = midpoint(snapshot.totals.netSurfaceArea);
+  const area = midpoint(snapshot.totals.netSurfaceArea) ?? 0;
   return {
     reference: snapshot.snapshotId,
     state: snapshot.state === "approved" && snapshot.quality.status === "pass" ? "verified" : "review_required",
     areaSquareMeters: area,
+    horizontalAreaSquareMeters: midpoint(snapshot.totals.grossHorizontalArea),
+    surfaceAreaSquareMeters: midpoint(snapshot.totals.grossSurfaceArea),
     overallPitchDegrees: overallPitch(snapshot),
     perimeterMeters: midpoint(snapshot.totals.footprintPerimeter),
     confidencePercent: confidence(snapshot),
@@ -100,7 +105,7 @@ export function projectRoofSnapshotToR4(
     },
     planes: snapshot.geometry.surfaces.map((surface) => ({
       id: surface.surfaceId,
-      areaSquareMeters: midpoint(surface.netSurfaceArea),
+      areaSquareMeters: midpoint(surface.netSurfaceArea) ?? 0,
       pitchDegrees: midpoint(surface.pitch),
       state: surface.quality === "verified" ? "verified" : "review",
     })),
@@ -150,7 +155,7 @@ export function projectRoofSnapshotToR4(
       qualityState: source.quality.status,
     })),
     deltaFromR3: {
-      areaSquareMeters: area - (previous ? midpoint(previous.totals.netSurfaceArea) : area),
+      areaSquareMeters: area - (previous ? (midpoint(previous.totals.netSurfaceArea) ?? area) : area),
       confidencePoints: confidence(snapshot) - (previous ? confidence(previous) : confidence(snapshot)),
       planeCount: snapshot.geometry.surfaces.length - (previous?.geometry.surfaces.length || snapshot.geometry.surfaces.length),
     },

@@ -20,6 +20,7 @@ import type { RoofFusionHeightSurfacePreviewSummaryV1 } from "@/lib/roof-fusion/
 import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import { RoofFusionTransientR4Drawer } from "@/components/admin-next/admin-next-r4-measurement-review";
 
 export type RoofFusionUatActionState =
   | { kind: "idle" }
@@ -714,6 +715,16 @@ export function RealAddressResult({
 
   if (!selected) return null;
 
+  const r4Planes = activeHeight?.visualization.planes ?? [];
+  const r4SurfaceAreaSquareMeters = r4Planes.length
+    ? r4Planes.reduce((sum, plane) => sum + plane.surfaceAreaSquareMeters, 0)
+    : undefined;
+  const r4PitchDegrees = r4Planes.length && r4SurfaceAreaSquareMeters
+    ? r4Planes.reduce(
+        (sum, plane) => sum + plane.pitchDegrees * plane.surfaceAreaSquareMeters,
+        0,
+      ) / r4SurfaceAreaSquareMeters
+    : undefined;
   return (
     <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
       <div className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-canvas)]">
@@ -1068,7 +1079,17 @@ export function RealAddressResult({
         </p>
       ) : null}
       {activeHeight ? (
-        <HeightAnalysisPanel locale={locale} state={activeHeight} />
+        <>
+          <HeightAnalysisPanel locale={locale} state={activeHeight} />
+          <RoofFusionTransientR4Drawer
+            locale={locale}
+            visualization={activeHeight.visualization}
+            horizontalAreaSquareMeters={activeHeight.summary.engineHorizontalAreaSquareMeters}
+            surfaceAreaSquareMeters={r4SurfaceAreaSquareMeters}
+            pitchDegrees={r4PitchDegrees}
+            snapshotHash={activeHeight.summary.snapshotHash}
+          />
+        </>
       ) : enginePreview?.kind === "success" ? (
         <section
           aria-label={t.engineTitle}

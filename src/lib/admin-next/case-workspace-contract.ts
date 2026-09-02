@@ -79,7 +79,7 @@ export type AdminNextCaseWorkspaceView = {
     planes: readonly {
       id: string;
       areaSquareMeters: number;
-      pitchDegrees: number;
+      pitchDegrees?: number;
       state: "verified" | "review";
     }[];
     reviewEdges: readonly {
@@ -108,7 +108,7 @@ export type AdminNextCaseWorkspaceView = {
     primarySlopes: readonly {
       id: "S1" | "S2" | "S3" | "S4";
       areaSquareMeters: number;
-      pitchDegrees: number;
+      pitchDegrees?: number;
       perimeterMeters: number;
     }[];
     photos: readonly {
