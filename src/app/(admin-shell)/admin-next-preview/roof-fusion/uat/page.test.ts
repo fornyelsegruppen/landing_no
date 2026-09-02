@@ -36,6 +36,7 @@ describe("Admin Next Roof Fusion UAT page", () => {
       locale: "lt",
     });
     expect(element.props.action).toBeTypeOf("function");
+    expect(element.props.addressLookupAction).toBeTypeOf("function");
   });
 
   it("does not exist in Production", async () => {
