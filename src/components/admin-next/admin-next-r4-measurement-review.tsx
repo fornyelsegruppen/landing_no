@@ -19,9 +19,10 @@ import {
   X,
 } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
-import type { AdminNextCaseWorkspaceView } from "@/lib/admin-next/case-workspace-contract";
+import type { AdminNextR4MeasurementView } from "@/lib/admin-next/r4-read-adapter";
+import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 
-type MeasurementReview = NonNullable<AdminNextCaseWorkspaceView["measurementReview"]>;
+type MeasurementReview = AdminNextR4MeasurementView;
 type Gate = MeasurementReview["verificationGates"][number];
 type MeasurementSource = "fixture" | "canonical";
 
@@ -75,6 +76,93 @@ const stateCopy = {
 
 function localeTag(locale: PanelLocale) {
   return locale === "lt" ? "lt-LT" : locale === "nb" ? "nb-NO" : "en-GB";
+}
+
+function metricLabel(locale: PanelLocale, kind: "horizontal" | "surface" | "net") {
+  if (locale === "lt") {
+    return kind === "horizontal" ? "Horizontalus bruto plotas" : kind === "surface" ? "Bruto paviršiaus plotas" : "Grynasis stogo plotas";
+  }
+  if (locale === "nb") {
+    return kind === "horizontal" ? "Horisontalt bruttoareal" : kind === "surface" ? "Brutto overflateareal" : "Netto takareal";
+  }
+  return kind === "horizontal" ? "Gross horizontal area" : kind === "surface" ? "Gross surface area" : "Net roof area";
+}
+
+function unknownLabel(locale: PanelLocale) {
+  return locale === "lt" ? "Nežinoma" : locale === "nb" ? "Ukjent" : "Unknown";
+}
+
+function transientCopy(locale: PanelLocale) {
+  if (locale === "lt") {
+    return {
+      title: "Matavimas R4",
+      locked: "Patvirtinimas užrakintas",
+      horizontal: "Horizontalus plotas",
+      surface: "Paviršiaus plotas",
+      pitch: "Nuolydis",
+      status: "Statusas",
+      confirm: "🔒 Patvirtinti R4 negalima",
+    };
+  }
+  if (locale === "nb") {
+    return {
+      title: "Måling R4",
+      locked: "Godkjenning er låst",
+      horizontal: "Horisontalt areal",
+      surface: "Overflateareal",
+      pitch: "Takvinkel",
+      status: "Status",
+      confirm: "🔒 R4 kan ikke godkjennes",
+    };
+  }
+  return {
+    title: "Measurement R4",
+    locked: "Approval locked",
+    horizontal: "Horizontal area",
+    surface: "Surface area",
+    pitch: "Pitch",
+    status: "Status",
+    confirm: "🔒 R4 confirmation locked",
+  };
+}
+
+export function RoofFusionTransientR4Drawer({
+  locale,
+  visualization,
+  horizontalAreaSquareMeters,
+  surfaceAreaSquareMeters,
+  pitchDegrees,
+  snapshotHash,
+}: {
+  locale: PanelLocale;
+  visualization: HeightSurfaceVisualizationV1;
+  horizontalAreaSquareMeters: number;
+  surfaceAreaSquareMeters?: number;
+  pitchDegrees?: number;
+  snapshotHash: string;
+}) {
+  const t = transientCopy(locale);
+  const pitch = pitchDegrees === undefined ? unknownLabel(locale) : `${number(locale, pitchDegrees)}°`;
+  return (
+    <aside aria-label="Matavimas R4 · Høydedata Preview" className="rounded-2xl border border-[var(--an-border-strong)] bg-[var(--an-surface)] p-4 shadow-2xl" data-r4-transient-drawer="hoydedata_preview">
+      <div className="flex items-start justify-between gap-3">
+        <div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[var(--an-amber)]">{t.title}</p><h2 className="mt-1 text-lg font-black">Høydedata Preview</h2><p className="mt-1 text-xs text-[var(--an-muted)]">DOM/DTM · PREVIEW · review_required</p></div>
+        <span className="rounded-full border border-red-400/40 bg-red-400/10 px-2 py-1 text-[9px] font-black text-red-200">{t.locked}</span>
+      </div>
+      <div className="relative mt-4 overflow-hidden rounded-xl border border-[var(--an-border)] bg-[#080d12]" style={{ aspectRatio: `${visualization.width} / ${visualization.height}` }}>
+        <img alt="Kartverket DOM minus DTM height surface" className="absolute inset-0 size-full object-cover" src={visualization.dataUrl} />
+        <svg aria-label="Co-registered roof plane overlay" className="absolute inset-0 size-full" preserveAspectRatio="none" viewBox={`0 0 ${visualization.width} ${visualization.height}`}>
+          <polygon fill="transparent" points={visualization.overlayPoints} stroke="#f4b63f" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+          {visualization.planes?.map((plane, index) => <polygon fill={["rgba(34,197,94,.34)", "rgba(56,189,248,.34)", "rgba(249,115,22,.34)", "rgba(217,70,239,.34)"][index % 4]} key={plane.planeId} points={plane.overlayPoints} stroke={["#4ade80", "#7dd3fc", "#fb923c", "#e879f9"][index % 4]} strokeWidth="2" vectorEffect="non-scaling-stroke" />)}
+          {visualization.ridge ? <polyline fill="none" points={visualization.ridge.overlayPoints} stroke="#fff" strokeWidth="3" vectorEffect="non-scaling-stroke" /> : null}
+        </svg>
+        <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-[9px] font-black text-white">N ↑</span>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-soft)] p-2"><dt className="text-[var(--an-subtle)]">{t.horizontal}</dt><dd className="mt-1 font-black">{number(locale, horizontalAreaSquareMeters)} m²</dd></div><div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-soft)] p-2"><dt className="text-[var(--an-subtle)]">{t.surface}</dt><dd className="mt-1 font-black">{surfaceAreaSquareMeters === undefined ? unknownLabel(locale) : `${number(locale, surfaceAreaSquareMeters)} m²`}</dd></div><div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-soft)] p-2"><dt className="text-[var(--an-subtle)]">{t.pitch}</dt><dd className="mt-1 font-black">{pitch}</dd></div><div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-soft)] p-2"><dt className="text-[var(--an-subtle)]">{t.status}</dt><dd className="mt-1 font-black text-[var(--an-amber)]">PREVIEW</dd></div></dl>
+      <p className="mt-3 text-[10px] text-[var(--an-subtle)]">{visualization.attribution} · snapshot {snapshotHash.slice(0, 16)}…</p>
+      <button aria-disabled="true" className="mt-4 inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] opacity-55" disabled type="button">{t.confirm}</button>
+    </aside>
+  );
 }
 
 function number(locale: PanelLocale, value: number) {
@@ -190,7 +278,7 @@ export function AdminNextR4MeasurementReview({ address, locale, caseReference, c
         attribution: photo.source,
         capturedAt: photo.capturedAt,
         previewHref: photo.previewHref,
-        licenseState: "authorized" as const,
+        licenseState: "unknown" as const,
         qualityState: "unknown" as const,
       }));
   const photoIds = new Set(photoCards.map((photo) => photo.id));
@@ -266,9 +354,11 @@ export function AdminNextR4MeasurementReview({ address, locale, caseReference, c
                   )}
                 </svg>
               </div>
-              <dl className="grid grid-cols-3 gap-2 xl:grid-cols-1">
-                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Ruler aria-hidden="true" className="size-4"/>{t.area}</dt><dd className="mt-2 text-lg font-bold">{number(locale, measurement.areaSquareMeters)} m²</dd></div>
-                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Gauge aria-hidden="true" className="size-4"/>{t.pitch}</dt><dd className="mt-2 text-lg font-bold">{number(locale, measurement.overallPitchDegrees ?? 0)}°</dd></div>
+              <dl className="grid grid-cols-2 gap-2 xl:grid-cols-1">
+                {measurement.horizontalAreaSquareMeters !== undefined ? <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Ruler aria-hidden="true" className="size-4"/>{metricLabel(locale, "horizontal")}</dt><dd className="mt-2 text-lg font-bold">{number(locale, measurement.horizontalAreaSquareMeters)} m²</dd></div> : null}
+                {measurement.surfaceAreaSquareMeters !== undefined ? <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Ruler aria-hidden="true" className="size-4"/>{metricLabel(locale, "surface")}</dt><dd className="mt-2 text-lg font-bold">{number(locale, measurement.surfaceAreaSquareMeters)} m²</dd></div> : null}
+                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Ruler aria-hidden="true" className="size-4"/>{metricLabel(locale, "net")}</dt><dd className="mt-2 text-lg font-bold">{number(locale, measurement.areaSquareMeters)} m²</dd></div>
+                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Gauge aria-hidden="true" className="size-4"/>{t.pitch}</dt><dd className="mt-2 text-lg font-bold">{measurement.overallPitchDegrees === undefined ? unknownLabel(locale) : `${number(locale, measurement.overallPitchDegrees)}°`}</dd></div>
                 <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3"><dt className="flex items-center gap-2 text-[10px] text-[var(--an-muted)]"><Target aria-hidden="true" className="size-4"/>{t.perimeter}</dt><dd className="mt-2 text-lg font-bold">{number(locale, measurement.perimeterMeters ?? 0)} m</dd></div>
               </dl>
               <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3" aria-labelledby="r4-delta-title">
@@ -277,7 +367,7 @@ export function AdminNextR4MeasurementReview({ address, locale, caseReference, c
                 <dl className="mt-3 grid gap-2 text-[10px]"><div className="flex justify-between"><dt>{t.deltaArea}</dt><dd className="font-bold text-[var(--an-amber)]">{signed(locale, measurement.deltaFromR3.areaSquareMeters, " m²")}</dd></div><div className="flex justify-between"><dt>{t.deltaConfidence}</dt><dd className="font-bold text-[var(--an-success)]">{signed(locale, measurement.deltaFromR3.confidencePoints, " pp")}</dd></div><div className="flex justify-between"><dt>{t.deltaPlanes}</dt><dd className="font-bold text-[var(--an-amber)]">{signed(locale, measurement.deltaFromR3.planeCount)}</dd></div></dl>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{measurement.primarySlopes.map((slope) => <article className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3" key={slope.id}><div className="flex items-center justify-between"><strong className="text-sm text-[var(--an-amber)]">{slope.id}</strong><span className="text-xs font-bold text-[var(--an-text)]">{number(locale, slope.areaSquareMeters)} m²</span></div><p className="mt-2 text-[10px] text-[var(--an-muted)]">{t.pitch} {number(locale, slope.pitchDegrees)}° · {t.perimeter} {number(locale, slope.perimeterMeters)} m</p></article>)}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{measurement.primarySlopes.map((slope) => <article className="rounded-xl border border-[var(--an-border)] bg-[var(--an-soft)] p-3" key={slope.id}><div className="flex items-center justify-between"><strong className="text-sm text-[var(--an-amber)]">{slope.id}</strong><span className="text-xs font-bold text-[var(--an-text)]">{number(locale, slope.areaSquareMeters)} m²</span></div><p className="mt-2 text-[10px] text-[var(--an-muted)]">{t.pitch} {slope.pitchDegrees === undefined ? unknownLabel(locale) : `${number(locale, slope.pitchDegrees)}°`} · {t.perimeter} {number(locale, slope.perimeterMeters)} m</p></article>)}</div>
           </section>
 
           <section className="an-elevated mt-4 rounded-2xl border p-4" aria-labelledby="r4-photos-title"><div className="flex items-center gap-2"><Camera aria-hidden="true" className="size-5 text-[var(--an-amber)]"/><h2 className="font-bold" id="r4-photos-title">{t.photos}</h2></div><div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{sourceCards.map((item,index) => <article className="overflow-hidden rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)]" key={item.id}><div className={`relative grid aspect-[16/9] place-items-center overflow-hidden ${index % 3 === 2 ? "bg-[linear-gradient(145deg,#3b3022,#111820)]" : "bg-[linear-gradient(145deg,#233546,#101821)]"}`}>{item.previewHref ? <Image alt={item.label} className="object-cover" fill sizes="(min-width: 640px) 180px, 50vw" src={item.previewHref} unoptimized/> : <Database aria-hidden="true" className="size-7 text-[var(--an-muted)]"/>}</div><div className="p-2"><div className="flex items-start justify-between gap-2"><strong className="block min-w-0 truncate text-[10px]">{item.label}</strong><CheckCircle2 aria-hidden="true" className={`size-3 shrink-0 ${item.qualityState === "usable" ? "text-[var(--an-success)]" : "text-[var(--an-amber)]"}`}/></div><span className="mt-1 block truncate text-[9px] text-[var(--an-subtle)]">{item.kind.replaceAll("_", " ")} · {dateTime(locale, item.capturedAt)}</span><span className={`mt-2 inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-bold ${item.licenseState === "authorized" && item.qualityState === "usable" ? "an-success" : "border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]"}`}>{item.licenseState === "authorized" ? t.authorized : item.licenseState} · {item.qualityState === "usable" ? t.usable : item.qualityState}</span></div></article>)}</div></section>

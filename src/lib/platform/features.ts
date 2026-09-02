@@ -146,17 +146,25 @@ export function readIntegrationStatus(
     imagery: {
       name: "imagery",
       readiness:
-        configured(environment, "NORGE_I_BILDER_TOKEN") &&
-        configured(environment, "MAP_TERMS_ACCEPTED_AT")
+        configured(environment, "NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE") &&
+        configured(environment, "NORGE_I_BILDER_CHROMIUM_PACK_URL") &&
+        configuredAny(environment, ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]) &&
+        configuredAny(environment, ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"])
           ? "ready"
           : "configuration_required",
       provider: "norge-i-bilder",
       missing: [
-        ...(!configured(environment, "NORGE_I_BILDER_TOKEN")
-          ? ["NORGE_I_BILDER_TOKEN"]
+        ...(!configured(environment, "NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE")
+          ? ["NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE"]
           : []),
-        ...(!configured(environment, "MAP_TERMS_ACCEPTED_AT")
-          ? ["MAP_TERMS_ACCEPTED_AT"]
+        ...(!configured(environment, "NORGE_I_BILDER_CHROMIUM_PACK_URL")
+          ? ["NORGE_I_BILDER_CHROMIUM_PACK_URL"]
+          : []),
+        ...(!configuredAny(environment, ["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"])
+          ? ["UPSTASH_REDIS_REST_URL or KV_REST_API_URL"]
+          : []),
+        ...(!configuredAny(environment, ["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"])
+          ? ["UPSTASH_REDIS_REST_TOKEN or KV_REST_API_TOKEN"]
           : []),
       ],
     },

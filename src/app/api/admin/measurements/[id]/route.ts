@@ -14,9 +14,9 @@ import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { overridePreparedLeadArea } from "@/lib/leads/automatic-package";
 import {
-  persistSchematicMeasurementEvidence,
-  verifySchematicMeasurementEvidence,
+  verifyMeasurementEvidence,
 } from "@/lib/measurements/persist-evidence";
+import { isNorgeIBilderScreenshotSource } from "@/lib/measurements/evidence-policy";
 import { measurementWorkflowMode } from "@/lib/measurements/workflow-mode";
 
 const actionSchema = z.discriminatedUnion("action", [
@@ -44,6 +44,17 @@ function idOf(value: unknown) {
   )
     return (value as { id: number }).id;
   throw new TypeError("Missing relationship");
+}
+function optionalIdOf(value: unknown) {
+  if (typeof value === "number") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof (value as { id?: unknown }).id === "number"
+  )
+    return (value as { id: number }).id;
+  return undefined;
 }
 function hasAuthorizedSource(blockingReasons: unknown) {
   return (
@@ -148,7 +159,7 @@ export async function POST(
     if (
       process.env.FEATURE_MEASUREMENT_EVIDENCE_V2 === "true" &&
       measurement.measurementMode !== "manual_no_visual" &&
-      !(await verifySchematicMeasurementEvidence(payload, measurement))
+      !(await verifyMeasurementEvidence(payload, measurement))
     ) {
       return NextResponse.json(
         {
@@ -249,56 +260,99 @@ export async function POST(
       data: createData as never,
     });
     try {
-      const planes = prepared.proposal.roofPlanes;
-      const selectedBuildingId = String(
-        measurement.buildingIdentifier || planes[0]?.id || "selected-building",
+      const shouldReuseRasterEvidence = isNorgeIBilderScreenshotSource(
+        measurement.evidenceSource,
       );
-      const storedCandidates = Array.isArray(measurement.candidateBuildings)
-        ? (measurement.candidateBuildings as Array<Record<string, unknown>>)
-        : [];
-      const candidates = storedCandidates
-        .map((candidate) =>
-          candidate.id === selectedBuildingId
-            ? { ...candidate, polygon: planes[0]?.polygon || candidate.polygon }
-            : candidate,
-        )
-        .filter(
-          (candidate) =>
-            typeof candidate.id === "string" &&
-            typeof candidate.label === "string" &&
-            Array.isArray(candidate.polygon),
-        ) as Array<{
-        id: string;
-        label: string;
-        polygon: Array<{ latitude: number; longitude: number }>;
-      }>;
-      if (!candidates.length && planes[0]?.polygon)
-        candidates.push({
-          id: selectedBuildingId,
-          label: "Valgt bygg",
-          polygon: planes[0].polygon,
-        });
-      if (
-        typeof created.latitude !== "number" ||
-        typeof created.longitude !== "number"
-      )
-        throw new Error(
-          "Measurement coordinates are required for schematic evidence",
+      if (shouldReuseRasterEvidence) {
+        const { verifyMeasurementEvidence } = await import(
+          "@/lib/measurements/persist-evidence"
         );
-      await persistSchematicMeasurementEvidence({
-        payload,
-        leadId,
-        measurementId: created.id,
-        address: created.normalizedAddress,
-        addressPoint: {
-          latitude: created.latitude,
-          longitude: created.longitude,
-        },
-        candidates,
-        selectedBuildingId,
-        source: created.evidenceSource || created.source,
-        attribution: created.evidenceAttribution || created.credits,
-      });
+        if (!(await verifyMeasurementEvidence(payload, measurement))) {
+          throw new Error(
+            "Approved screenshot evidence no longer matches its case-bound capture",
+          );
+        }
+        const evidenceSnapshotId = idOf(measurement.evidenceSnapshot);
+        if (!measurement.evidenceHash || !measurement.imageryCapturedAt) {
+          throw new Error(
+            "Approved screenshot evidence is incomplete on the previous measurement",
+          );
+        }
+        await payload.update({
+          collection: "roof-measurements",
+          id: created.id,
+          overrideAccess: true,
+          data: {
+            measurementMode: "schematic_with_context",
+            mapImage: optionalIdOf(measurement.mapImage),
+            evidenceSnapshot: evidenceSnapshotId,
+            evidenceHash: measurement.evidenceHash,
+            evidenceSource: measurement.evidenceSource,
+            evidenceAttribution: measurement.evidenceAttribution,
+            evidenceGeneratedAt: measurement.evidenceGeneratedAt,
+            imageryCapturedAt: measurement.imageryCapturedAt,
+          },
+        });
+      } else {
+        const { persistSchematicMeasurementEvidence } = await import(
+          "@/lib/measurements/persist-evidence"
+        );
+        const planes = prepared.proposal.roofPlanes;
+        const selectedBuildingId = String(
+          measurement.buildingIdentifier ||
+            planes[0]?.id ||
+            "selected-building",
+        );
+        const storedCandidates = Array.isArray(measurement.candidateBuildings)
+          ? (measurement.candidateBuildings as Array<Record<string, unknown>>)
+          : [];
+        const candidates = storedCandidates
+          .map((candidate) =>
+            candidate.id === selectedBuildingId
+              ? {
+                  ...candidate,
+                  polygon: planes[0]?.polygon || candidate.polygon,
+                }
+              : candidate,
+          )
+          .filter(
+            (candidate) =>
+              typeof candidate.id === "string" &&
+              typeof candidate.label === "string" &&
+              Array.isArray(candidate.polygon),
+          ) as Array<{
+          id: string;
+          label: string;
+          polygon: Array<{ latitude: number; longitude: number }>;
+        }>;
+        if (!candidates.length && planes[0]?.polygon)
+          candidates.push({
+            id: selectedBuildingId,
+            label: "Valgt bygg",
+            polygon: planes[0].polygon,
+          });
+        if (
+          typeof created.latitude !== "number" ||
+          typeof created.longitude !== "number"
+        )
+          throw new Error(
+            "Measurement coordinates are required for schematic evidence",
+          );
+        await persistSchematicMeasurementEvidence({
+          payload,
+          leadId,
+          measurementId: created.id,
+          address: created.normalizedAddress,
+          addressPoint: {
+            latitude: created.latitude,
+            longitude: created.longitude,
+          },
+          candidates,
+          selectedBuildingId,
+          source: created.evidenceSource || created.source,
+          attribution: created.evidenceAttribution || created.credits,
+        });
+      }
     } catch (error) {
       await payload
         .delete({

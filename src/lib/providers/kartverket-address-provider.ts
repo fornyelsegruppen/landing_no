@@ -64,18 +64,26 @@ export class KartverketAddressProvider implements MapProvider {
 export type ImageryAccess = {
   status: "ready" | "configuration_required";
   provider: "norge-i-bilder";
-  credits: "© norgeibilder.no";
+  credits: "©norgeibilder.no";
   reason?: string;
 };
 
 export function norgeIBilderAccess(): ImageryAccess {
-  if (process.env.NORGE_I_BILDER_TOKEN?.trim() && process.env.MAP_TERMS_ACCEPTED_AT?.trim()) {
-    return { status: "ready", provider: "norge-i-bilder", credits: "© norgeibilder.no" };
+  const hasDurableQuotaStore = Boolean(
+    (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL) &&
+      (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN),
+  );
+  if (
+    process.env.NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE?.trim() &&
+    process.env.NORGE_I_BILDER_CHROMIUM_PACK_URL?.trim() &&
+    hasDurableQuotaStore
+  ) {
+    return { status: "ready", provider: "norge-i-bilder", credits: "©norgeibilder.no" };
   }
   return {
     status: "configuration_required",
     provider: "norge-i-bilder",
-    credits: "© norgeibilder.no",
-    reason: "GeoID/Norge digitalt access agreement, token and recorded terms approval are required before orthophoto automation.",
+    credits: "©norgeibilder.no",
+    reason: "Written screenshot approval, the Chromium pack URL and durable capture quota storage are required before user-triggered capture.",
   };
 }

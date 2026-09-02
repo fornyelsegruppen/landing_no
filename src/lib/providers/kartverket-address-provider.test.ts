@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { KartverketAddressProvider, norgeIBilderAccess } from "./kartverket-address-provider";
 
 describe("Kartverket address provider", () => {
-  afterEach(() => { delete process.env.NORGE_I_BILDER_TOKEN; delete process.env.MAP_TERMS_ACCEPTED_AT; });
+  afterEach(() => {
+    delete process.env.NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE;
+    delete process.env.NORGE_I_BILDER_CHROMIUM_PACK_URL;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  });
 
   it("normalizes punctuation and official Matrikkelen address results", async () => {
     const fetcher = async (input: RequestInfo | URL) => {
@@ -25,10 +30,12 @@ describe("Kartverket address provider", () => {
     await expect(provider.searchAddress("valid query")).rejects.toThrow();
   });
 
-  it("blocks imagery until a licensed token is configured", () => {
+  it("blocks imagery until the approved server-capture controls are configured", () => {
     expect(norgeIBilderAccess().status).toBe("configuration_required");
-    process.env.NORGE_I_BILDER_TOKEN = "configured-in-host-only";
-    process.env.MAP_TERMS_ACCEPTED_AT = "2026-08-23T00:00:00Z";
-    expect(norgeIBilderAccess()).toMatchObject({ status: "ready", credits: "© norgeibilder.no" });
+    process.env.NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE = "KARTVERKET-2026-09-02";
+    process.env.NORGE_I_BILDER_CHROMIUM_PACK_URL = "https://storage.example/chromium-pack.tar";
+    process.env.UPSTASH_REDIS_REST_URL = "https://redis.example";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "configured-in-host-only";
+    expect(norgeIBilderAccess()).toMatchObject({ status: "ready", credits: "©norgeibilder.no" });
   });
 });

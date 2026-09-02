@@ -11,6 +11,20 @@ function response(elements: unknown[]) {
 }
 
 describe("OpenStreetMap building provider", () => {
+  it("fails closed for non-finite and non-Norwegian address points", async () => {
+    const fetcher = async () => response([]);
+    const provider = new OpenStreetMapBuildingProvider(fetcher as typeof fetch);
+    await expect(
+      provider.findBuildings({
+        latitude: Number.NaN,
+        longitude: center.longitude,
+      }),
+    ).rejects.toThrow("finite coordinates");
+    await expect(
+      provider.findBuildings({ latitude: 40, longitude: center.longitude }),
+    ).rejects.toThrow("inside Norway");
+  });
+
   it("selects and ranks a building that contains the address point", async () => {
     const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
       expect(init?.method).toBe("POST");
@@ -142,6 +156,79 @@ describe("OpenStreetMap building provider", () => {
       "https://primary.test",
       "https://fallback.test",
     ]);
+  });
+
+  it("applies one deadline across primary, fallback, and map attempts", async () => {
+    const calls: string[] = [];
+    const fetcher = async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return response([]);
+    };
+    const provider = new OpenStreetMapBuildingProvider(
+      fetcher as typeof fetch,
+      "https://primary.test",
+      "https://fallback.test",
+      "https://map.test",
+      20,
+    );
+    const started = Date.now();
+    await expect(provider.findBuildings(center)).rejects.toThrow(
+      "temporarily unavailable",
+    );
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("returns an explicit empty result for an empty XML map fallback", async () => {
+    const fetcher = async (input: RequestInfo | URL) => {
+      if (String(input).includes("overpass")) throw new Error("overpass down");
+      return new Response('<osm version="0.6"></osm>', { status: 200 });
+    };
+    const provider = new OpenStreetMapBuildingProvider(
+      fetcher as typeof fetch,
+      "https://overpass.test",
+      "",
+      "https://map.test",
+    );
+    await expect(provider.findBuildings(center)).resolves.toEqual([]);
+  });
+
+  it("simplifies detailed rings without dropping their defining corners", async () => {
+    const edge = Array.from({ length: 11 }, (_, index) => index / 10);
+    const geometry = [
+      ...edge.map((x) => ({ lat: 59.9, lon: 10.7 + x * 0.001 })),
+      ...edge.slice(1).map((y) => ({ lat: 59.9 + y * 0.001, lon: 10.701 })),
+      ...edge
+        .slice(1)
+        .reverse()
+        .map((x) => ({ lat: 59.901, lon: 10.7 + x * 0.001 })),
+      ...edge
+        .slice(1)
+        .reverse()
+        .map((y) => ({ lat: 59.9 + y * 0.001, lon: 10.7 })),
+      { lat: 59.9, lon: 10.7 },
+    ];
+    const fetcher = async () =>
+      response([
+        { type: "way", id: 777, tags: { building: "house" }, geometry },
+      ]);
+    const [candidate] = await new OpenStreetMapBuildingProvider(
+      fetcher as typeof fetch,
+    ).findBuildings(center);
+    expect(candidate.polygon).toHaveLength(30);
+    const rounded = candidate.polygon.map((point) => ({
+      latitude: Number(point.latitude.toFixed(4)),
+      longitude: Number(point.longitude.toFixed(4)),
+    }));
+    expect(rounded).toEqual(
+      expect.arrayContaining([
+        { latitude: 59.9, longitude: 10.7 },
+        { latitude: 59.9, longitude: 10.701 },
+        { latitude: 59.901, longitude: 10.701 },
+        { latitude: 59.901, longitude: 10.7 },
+      ]),
+    );
   });
 
   it("falls back to the core OpenStreetMap bbox endpoint when Overpass is unavailable", async () => {

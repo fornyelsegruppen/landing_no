@@ -9,7 +9,15 @@ import {
   manualAreaDeviationPercent,
   slopeBandForPreset,
 } from "@/lib/measurements/admin-workbench";
-import { persistSchematicMeasurementEvidence } from "@/lib/measurements/persist-evidence";
+import {
+  approvedNorgeIBilderCaptureMetadata,
+  attachApprovedRasterMeasurementEvidence,
+  persistSchematicMeasurementEvidence,
+} from "@/lib/measurements/persist-evidence";
+import {
+  assertNorgeIBilderScreenshotEvidence,
+  isNorgeIBilderScreenshotSource,
+} from "@/lib/measurements/evidence-policy";
 import {
   prepareMeasurement,
   roofProposalSchema,
@@ -123,6 +131,38 @@ async function priorMeasurement(payload: Payload, leadId: number) {
   return result.docs[0];
 }
 
+type LeadAddressFields = {
+  address?: string | null;
+  city?: string | null;
+  houseNumber?: string | null;
+  postal?: string | null;
+};
+
+/** Resolves the only address an approved capture may be bound to: its Lead. */
+async function resolveCurrentLeadAddress(lead: LeadAddressFields) {
+  const query = uniqueAddressParts([
+    lead.address,
+    lead.houseNumber,
+    lead.postal,
+    lead.city,
+  ]).join(" ");
+  if (query.length < 4) return { kind: "incomplete" as const };
+  try {
+    const candidates = await new KartverketAddressProvider().searchAddress(
+      query,
+    );
+    const address =
+      candidates.find((candidate) =>
+        lead.postal ? candidate.postalCode === lead.postal : true,
+      ) || candidates[0];
+    return address
+      ? { kind: "resolved" as const, address }
+      : { kind: "missing" as const };
+  } catch {
+    return { kind: "unavailable" as const };
+  }
+}
+
 async function createVisualMeasurement(input: {
   actorId: number;
   address: z.infer<typeof candidateSchema>;
@@ -156,7 +196,11 @@ async function createVisualMeasurement(input: {
   const prepared = prepareMeasurement({
     proposal: input.proposal,
     addressResolved: true,
-    sourceAuthorized: input.imageryLicensed,
+    // The capture lane itself establishes authorization. Client body fields
+    // never decide whether a Norge i bilder source is authorized.
+    sourceAuthorized:
+      isNorgeIBilderScreenshotSource(input.imagerySource) ||
+      input.imageryLicensed,
     hasApprovedPriceRule: rules.totalDocs > 0,
     requireApprovedPriceRule: input.requireApprovedPriceRule,
   });
@@ -167,6 +211,47 @@ async function createVisualMeasurement(input: {
   const prior = await priorMeasurement(input.payload, input.leadId);
   const version = (prior?.version ?? 0) + 1;
   const generatedAt = new Date();
+  const approvedRasterEvidence = isNorgeIBilderScreenshotSource(
+    input.imagerySource,
+  );
+  const mapMedia = input.mapImageId
+    ? await input.payload
+        .findByID({
+          collection: "private-media",
+          id: input.mapImageId,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .catch(() => null)
+    : null;
+  if (
+    mapMedia?.ownerType === "norge-i-bilder-capture" &&
+    !approvedRasterEvidence
+  ) {
+    throw new TypeError(
+      "Norge i bilder capture media must retain its approved screenshot source",
+    );
+  }
+  let approvedCapture: ReturnType<
+    typeof approvedNorgeIBilderCaptureMetadata
+  > | null = null;
+  if (approvedRasterEvidence) {
+    if (!input.mapImageId) {
+      throw new TypeError(
+        "Approved screenshot evidence requires one stored private measurement image",
+      );
+    }
+    if (!mapMedia) {
+      throw new TypeError(
+        "Approved screenshot evidence requires one stored private measurement image",
+      );
+    }
+    approvedCapture = approvedNorgeIBilderCaptureMetadata(
+      mapMedia,
+      `lead-${input.leadId}`,
+    );
+    assertNorgeIBilderScreenshotEvidence(approvedCapture);
+  }
   const measurement = await input.payload.create({
     collection: "roof-measurements",
     overrideAccess: true,
@@ -175,22 +260,24 @@ async function createVisualMeasurement(input: {
       lead: input.leadId,
       version,
       supersedes: prior?.id,
-      measurementMode: "schematic",
+      measurementMode: approvedRasterEvidence
+        ? "schematic_with_context"
+        : "schematic",
       normalizedAddress: input.address.label,
       addressSourceId: input.address.id,
       latitude: input.address.latitude,
       longitude: input.address.longitude,
       buildingIdentifier: prepared.proposal.buildingIdentifier ?? undefined,
-      source: input.imagerySource,
+      source: approvedCapture?.source ?? input.imagerySource,
       sourceUrl: input.imagerySourceUrl,
       license: input.license,
-      credits: input.credits,
-      imageryLicensed: input.imageryLicensed,
+      credits: approvedCapture?.attribution ?? input.credits,
+      imageryLicensed: approvedCapture ? true : input.imageryLicensed,
       capturedAt: generatedAt.toISOString(),
       mapImage: input.mapImageId,
       candidateBuildings: input.candidates,
-      evidenceSource: input.imagerySource,
-      evidenceAttribution: input.credits,
+      evidenceSource: approvedCapture?.source ?? input.imagerySource,
+      evidenceAttribution: approvedCapture?.attribution ?? input.credits,
       roofPlanes: prepared.proposal.roofPlanes,
       horizontalAreaTenths: prepared.calculation.horizontalAreaTenths,
       actualAreaMinTenths: prepared.calculation.actualAreaMinTenths,
@@ -201,24 +288,39 @@ async function createVisualMeasurement(input: {
       confidenceReasoning: prepared.proposal.confidenceReasoning,
       status: prepared.status,
       blockingReasons: prepared.gate.reasons,
+      imageryCapturedAt: approvedCapture?.capturedAt,
     },
   });
+  let persistedMeasurement = measurement;
   try {
-    await persistSchematicMeasurementEvidence({
-      payload: input.payload,
-      leadId: input.leadId,
-      measurementId: measurement.id,
-      address: input.address.label,
-      addressPoint: {
-        latitude: input.address.latitude,
-        longitude: input.address.longitude,
-      },
-      candidates: input.candidates,
-      selectedBuildingId: String(prepared.proposal.buildingIdentifier),
-      source: input.imagerySource,
-      attribution: input.credits,
-      generatedAt,
-    });
+    if (approvedRasterEvidence) {
+      const attached = await attachApprovedRasterMeasurementEvidence({
+        payload: input.payload,
+        measurementId: measurement.id,
+        expectedCaseId: `lead-${input.leadId}`,
+        mapImageId: input.mapImageId!,
+        source: approvedCapture!.source,
+        trainingProhibited: approvedCapture!.trainingProhibited,
+      });
+      persistedMeasurement = attached.measurement;
+    } else {
+      const attached = await persistSchematicMeasurementEvidence({
+        payload: input.payload,
+        leadId: input.leadId,
+        measurementId: measurement.id,
+        address: input.address.label,
+        addressPoint: {
+          latitude: input.address.latitude,
+          longitude: input.address.longitude,
+        },
+        candidates: input.candidates,
+        selectedBuildingId: String(prepared.proposal.buildingIdentifier),
+        source: input.imagerySource,
+        attribution: input.credits,
+        generatedAt,
+      });
+      persistedMeasurement = attached.measurement;
+    }
   } catch (error) {
     await input.payload
       .delete({
@@ -250,7 +352,7 @@ async function createVisualMeasurement(input: {
       nextActionAt: generatedAt.toISOString(),
     },
   });
-  return { measurement, gate: prepared.gate, prior };
+  return { measurement: persistedMeasurement, gate: prepared.gate, prior };
 }
 
 export async function GET(request: Request) {
@@ -615,13 +717,35 @@ export async function POST(request: Request) {
         credits: "© OpenStreetMap contributors",
       },
     ] satisfies BuildingFootprintCandidate[];
+    let address = parsed.data.address;
+    if (isNorgeIBilderScreenshotSource(parsed.data.imagerySource)) {
+      const resolved = await resolveCurrentLeadAddress(lead);
+      if (resolved.kind === "unavailable")
+        return NextResponse.json(
+          { error: "Case address could not be resolved" },
+          { status: 503 },
+        );
+      if (resolved.kind !== "resolved")
+        return NextResponse.json(
+          {
+            error:
+              resolved.kind === "incomplete"
+                ? "Case address is incomplete"
+                : "Case address could not be resolved",
+          },
+          { status: 409 },
+        );
+      // The client can display the capture address, but it cannot select a
+      // different address for a case-bound Norge i bilder screenshot.
+      address = resolved.address;
+    }
     result = await createVisualMeasurement({
       payload,
       actorId: user.id,
       expectedRevision: parsed.data.expectedRevision,
       lead,
       leadId: lead.id,
-      address: parsed.data.address,
+      address,
       candidates,
       proposal: parsed.data.proposal,
       imageryLicensed: parsed.data.imageryLicensed,
@@ -643,9 +767,25 @@ export async function POST(request: Request) {
       "buildingIdentifier",
       "roofPlanes",
       "candidateBuildings",
+      "mapImage",
+      "evidenceSnapshot",
       "evidenceHash",
+      "evidenceSource",
+      "evidenceAttribution",
+      "imageryCapturedAt",
     ],
-    metadata: { reason, supersedes: result.prior?.id },
+    metadata: {
+      reason,
+      supersedes: result.prior?.id,
+      evidenceSource: result.measurement.evidenceSource ?? null,
+      evidenceAttribution: result.measurement.evidenceAttribution ?? null,
+      imageryCapturedAt: result.measurement.imageryCapturedAt ?? null,
+      trainingProhibited: isNorgeIBilderScreenshotSource(
+        result.measurement.evidenceSource,
+      )
+        ? true
+        : null,
+    },
   });
   if (!commercialPackageEnabled) {
     return NextResponse.json(

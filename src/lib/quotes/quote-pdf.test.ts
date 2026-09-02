@@ -223,4 +223,87 @@ describe("quote PDF", () => {
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
   });
+
+  it("requires exact Norge i bilder attribution for approved screenshot evidence", async () => {
+    const evidencePng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl7nWQAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const quoteInput = {
+      quoteReference: "T-6-V1",
+      leadId: 6,
+      serviceKey: "takvask",
+      serviceDescription: "Takvask",
+      propertyAddress: "Testveien 6",
+      measurement: {
+        id: 6,
+        version: 1,
+        inputHash: "a".repeat(64),
+        horizontalAreaTenths: 1000,
+        actualAreaMinTenths: 1079,
+        actualAreaMaxTenths: 1179,
+        source: "Norge i bilder skjermdump",
+        credits: "©norgeibilder.no",
+        capturedAt: "2026-09-02T10:00:00Z",
+        assumptions: ["Kontrolleres på stedet"],
+        mode: "schematic_with_context" as const,
+        buildingIdentifier: "way/6",
+        evidenceMediaId: 66,
+        evidenceHash: "d".repeat(64),
+        evidenceSource: "norge-i-bilder-screenshot",
+        evidenceAttribution: "©norgeibilder.no",
+        imageryCapturedAt: "2026-09-02T10:00:00.000Z",
+        evidenceTrainingProhibited: true,
+        angleMinDegrees: 22,
+        angleMaxDegrees: 32,
+      },
+      pricing: {
+        calculationId: 6,
+        inputHash: "b".repeat(64),
+        ruleId: 1,
+        ruleVersion: 1,
+        unitPriceExVatOre: 13800,
+        subtotalExVatOre: 1627020,
+        vatBasisPoints: 2500,
+        vatOre: 406755,
+        totalIncVatOre: 2033775,
+        toleranceBasisPoints: 1000,
+        maximumTotalIncVatOre: 2237153,
+      },
+      termsVersion: "legal-v1",
+      validUntil: "2099-09-01T00:00:00Z",
+    };
+
+    await expect(
+      Promise.resolve().then(() =>
+        buildQuoteSnapshot({
+          ...quoteInput,
+          measurement: {
+            ...quoteInput.measurement,
+            evidenceAttribution: "© Kartverket",
+          },
+        }),
+      ),
+    ).rejects.toThrow(/©norgeibilder\.no/i);
+
+    const quote = buildQuoteSnapshot(quoteInput);
+    const contract = buildContractSnapshot({
+      contractReference: "K-6-V1",
+      quote,
+      customer: { name: "Test Kunde", address: "Testveien 6" },
+      terms: {
+        version: "legal-v1",
+        text: "Avtalevilkår.",
+        withdrawalInstructions: "Informasjon om angrerett.",
+        withdrawalFormUrl: "https://example.test/form",
+      },
+    });
+
+    const bytes = await buildQuoteContractPdf({
+      contract,
+      measurementEvidence: { data: evidencePng, mimeType: "image/png" },
+    });
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+  });
 });
