@@ -13,6 +13,7 @@ import { getPayload } from "@/lib/payload";
 import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
 import { OpenStreetMapBuildingProvider } from "@/lib/providers/osm-building-provider";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
+import { buildRoofFusionOsmFootprintPreviewV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import {
   assertRoofFusionPreviewEnabledV1,
   PayloadRoofFusionCaseAuthorizationV1,
@@ -95,10 +96,31 @@ export default async function AdminNextRoofFusionUatPage() {
         };
       }
 
+      const retrievedAt = new Date().toISOString();
+      const enginePreviews = candidates.map((candidate) => {
+        try {
+          return {
+            kind: "success" as const,
+            candidateId: candidate.id,
+            summary: buildRoofFusionOsmFootprintPreviewV1({
+              address,
+              candidate,
+              retrievedAt,
+            }).summary,
+          };
+        } catch {
+          return {
+            kind: "error" as const,
+            candidateId: candidate.id,
+          };
+        }
+      });
+
       return {
         kind: "success",
         address,
         candidates,
+        enginePreviews,
       };
     } catch {
       return { kind: "error", code: "PROVIDER_UNAVAILABLE" };
