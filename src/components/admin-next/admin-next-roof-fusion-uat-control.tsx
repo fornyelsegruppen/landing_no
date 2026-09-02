@@ -15,6 +15,7 @@ import {
 import { useActionState, useMemo, useState } from "react";
 import type { AddressCandidate } from "@/lib/providers/contracts";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
+import type { NorgeIBilderPublicAccessV1 } from "@/lib/providers/norge-i-bilder-ortofoto-v1";
 import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
@@ -87,6 +88,9 @@ const copy = {
     opacity: "Geometriens gjennomsiktighet",
     overlay: "Vis geometrilag",
     imageryPending: "Ortofoto kobles til etter lisensiert tilgang",
+    imageryConfigured: "Norge i bilder-tilgang er konfigurert",
+    imageryConfigurationRequired:
+      "Ortofoto-integrasjonen er klar · venter på GeoID-tilgang",
     preliminary:
       "Dette er et gratis, foreløpig bygningsfotavtrykk – ikke ferdige takflater eller godkjent takareal.",
     engineTitle: "Roof Fusion Preview-motor",
@@ -149,6 +153,9 @@ const copy = {
     opacity: "Geometrijos permatomumas",
     overlay: "Rodyti geometrijos sluoksnį",
     imageryPending: "Ortofoto bus prijungtas gavus licencijuotą prieigą",
+    imageryConfigured: "Norge i bilder prieiga sukonfigūruota",
+    imageryConfigurationRequired:
+      "Ortofoto integracija paruošta · laukiama GeoID prieigos",
     preliminary:
       "Tai nemokamas preliminarus pastato kontūras – dar ne galutiniai stogo šlaitai ar patvirtintas stogo plotas.",
     engineTitle: "Roof Fusion Preview variklis",
@@ -211,6 +218,9 @@ const copy = {
     opacity: "Geometry opacity",
     overlay: "Show geometry layer",
     imageryPending: "Orthophoto will be connected after licensed access",
+    imageryConfigured: "Norge i bilder access is configured",
+    imageryConfigurationRequired:
+      "Orthophoto integration is ready · waiting for GeoID access",
     preliminary:
       "This is a free preliminary building footprint, not final roof planes or an approved roof area.",
     engineTitle: "Roof Fusion Preview engine",
@@ -304,9 +314,11 @@ function formatMetric(locale: PanelLocale, value: number) {
 }
 
 export function RealAddressResult({
+  imageryAccess,
   locale,
   result,
 }: {
+  imageryAccess: NorgeIBilderPublicAccessV1;
   locale: PanelLocale;
   result: Extract<RoofFusionAddressLookupState, { kind: "success" }>;
 }) {
@@ -338,8 +350,17 @@ export function RealAddressResult({
               {result.address.longitude.toFixed(6)} · Kartverket
             </span>
           </div>
-          <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[9px] font-bold text-[var(--an-amber)]">
-            {t.imageryPending}
+          <span
+            className={
+              imageryAccess.status === "ready"
+                ? "rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2 py-1 text-[9px] font-bold text-emerald-300"
+                : "rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[9px] font-bold text-[var(--an-amber)]"
+            }
+            data-norge-i-bilder-access={imageryAccess.status}
+          >
+            {imageryAccess.status === "ready"
+              ? t.imageryConfigured
+              : t.imageryConfigurationRequired}
           </span>
         </div>
         <div className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3">
@@ -580,6 +601,7 @@ export function AdminNextRoofFusionUatControl({
   action,
   addressLookupAction,
   defaultCaseReference = "TF-13",
+  imageryAccess,
   locale,
 }: {
   action: (
@@ -591,6 +613,7 @@ export function AdminNextRoofFusionUatControl({
     formData: FormData,
   ) => Promise<RoofFusionAddressLookupState>;
   defaultCaseReference?: string;
+  imageryAccess: NorgeIBilderPublicAccessV1;
   locale: PanelLocale;
 }) {
   const t = copy[locale];
@@ -765,6 +788,7 @@ export function AdminNextRoofFusionUatControl({
         </p>
         {addressState.kind === "success" ? (
           <RealAddressResult
+            imageryAccess={imageryAccess}
             key={`${addressState.address.id}:${addressState.candidates.map((candidate) => candidate.id).join(",")}`}
             locale={locale}
             result={addressState}

@@ -13,10 +13,15 @@ Det er etablert en versjonert, revisjonssikker måle- og prisflyt. Kartverket no
 - Adresseoppslag bruker Kartverkets åpne Adresse REST-API mot Matrikkelen. Tjenesten krever ikke registrering og data oppdateres normalt daglig: [Kartverkets brukerveiledning](https://www.kartverket.no/api-og-data/eiendomsdata/brukarrettleiing-adresse-api).
 - Åpne Kartverket-produkter er normalt CC BY 4.0 og skal krediteres `© Kartverket`: [vilkår for bruk](https://www.kartverket.no/api-og-data/vilkar-for-bruk).
 - Flyfoto og detaljerte kart har særvilkår. Skjermbilder fra Norgeskart/Norge i bilder kan brukes med korrekt kreditering, men automatisert WMS/WMTS-tilgang behandles separat.
-- Nye Norge i bilder WMS/WMTS-tjenester krever token og tilgang gjennom GeoID/Norge digitalt eller egen avtale: [Norge i bilder-tjenester](https://www.geonorge.no/nib).
+- Nye Norge i bilder WMS/WMTS-tjenester krever token og tilgang gjennom GeoID/Norge digitalt eller egen avtale. WMS-Ortofoto flyttes til `https://services.norgeibilder.no/wms/ortofoto`, og den gamle WMS-tjenesten skal stenges 30. september 2026: [Norge i bilder-tjenester](https://www.geonorge.no/nib).
 - OpenStreetMap-data kan gjenbrukes under ODbL med synlig kreditering. Den offentlige Overpass-tjenesten brukes bare til lavvolum-oppslag, og endepunktet kan byttes med `OSM_OVERPASS_ENDPOINT`: [OpenStreetMap copyright and license](https://www.openstreetmap.org/copyright).
 
-Systemet bruker derfor aldri skjult nettleserautomatisering eller scraping som produksjonsavhengighet. Gratisløpet bruker Kartverket-adresse og OSM-bygningskontur uten ortofoto. Automatisk ortofoto er fortsatt `configuration_required` til `NORGE_I_BILDER_TOKEN` og datert `MAP_TERMS_ACCEPTED_AT` finnes i hostingens secret/config-lager.
+Systemet bruker derfor aldri skjult nettleserautomatisering eller scraping som produksjonsavhengighet. Gratisløpet bruker Kartverket-adresse og OSM-bygningskontur uten ortofoto. Automatisk ortofoto er `configuration_required` inntil hostingens secret/config-lager har en datert `MAP_TERMS_ACCEPTED_AT`, en gyldig `NORGE_I_BILDER_WMS_LAYER` og én av to serverbaserte autentiseringsmodeller:
+
+- et kortlevd `NORGE_I_BILDER_TOKEN` med en fremtidig `NORGE_I_BILDER_TOKEN_EXPIRES_AT`; eller
+- `NORGE_I_BILDER_GEOID_USERNAME`, `NORGE_I_BILDER_GEOID_PASSWORD` og en HTTPS `NORGE_I_BILDER_HTTP_REFERER`, slik at serveren kan hente et refererbundet token med én times levetid gjennom det offisielle `/token/tilecache`-API-et.
+
+Påloggingsdata og tile-token serialiseres aldri til klienten. WMS-kallet sender tokenet i `X-Esri-Authorization`-headeren, ikke i URL-en. Adapteren validerer bounding box, bildetype og en størrelsesgrense på 5 MB. Inntil disse vilkårene er oppfylt viser Admin Next tydelig at løsningen venter på GeoID-tilgang, og beholder lisensiert ortofoto som en obligatorisk blokkering for endelig Roof Fusion-godkjenning.
 
 ## Gratis automatisk måleutkast (24. august 2026)
 
@@ -70,21 +75,21 @@ OSM-konturen er en bygningsprojeksjon, ikke en garanti for eksakt takutstikk, ti
 
 ## Verifikasjon og Gate 6
 
-| Kontroll | Resultat |
-|---|---|
-| Full Vitest-regresjon | 64 filer, 185 tester bestått før siste dokumentasjonsendring; avsluttende regresjon kjøres på commit-punktet |
-| Obligatoriske faktorer 22/27/32/36/40/45° | Bestått |
-| Flere takflater og én sluttavrunding | Bestått |
-| Selv-kryssende/ugyldig polygon | Avvist |
-| Høy/middels/lav confidence | Riktig draft/review/blokkert |
-| Lav confidence via collection-API | Blokkert i hook og test |
-| Samme låste input | Identisk hash og prisresultat |
-| Penger/mva. uten flyttallsfeil | Bestått |
-| AI med oppdiktet tall | Avvist |
-| Godkjent måling/prisregel endres i samme versjon | Avvist |
-| Migrasjoner up/down | Bestått |
-| TypeScript | Bestått |
-| Produksjonsbuild | Bestått; 57 statiske sider og nye måle-API-ruter kompilert |
+| Kontroll                                         | Resultat                                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Full Vitest-regresjon                            | 64 filer, 185 tester bestått før siste dokumentasjonsendring; avsluttende regresjon kjøres på commit-punktet |
+| Obligatoriske faktorer 22/27/32/36/40/45°        | Bestått                                                                                                      |
+| Flere takflater og én sluttavrunding             | Bestått                                                                                                      |
+| Selv-kryssende/ugyldig polygon                   | Avvist                                                                                                       |
+| Høy/middels/lav confidence                       | Riktig draft/review/blokkert                                                                                 |
+| Lav confidence via collection-API                | Blokkert i hook og test                                                                                      |
+| Samme låste input                                | Identisk hash og prisresultat                                                                                |
+| Penger/mva. uten flyttallsfeil                   | Bestått                                                                                                      |
+| AI med oppdiktet tall                            | Avvist                                                                                                       |
+| Godkjent måling/prisregel endres i samme versjon | Avvist                                                                                                       |
+| Migrasjoner up/down                              | Bestått                                                                                                      |
+| TypeScript                                       | Bestått                                                                                                      |
+| Produksjonsbuild                                 | Bestått; 57 statiske sider og nye måle-API-ruter kompilert                                                   |
 
 Gate 6 er teknisk bestått. Produksjonsflagget for automatisk takmåling forblir avslått til punktene nedenfor er gjennomført i staging.
 

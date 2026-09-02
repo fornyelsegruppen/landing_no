@@ -13,6 +13,14 @@ describe("Admin Next Roof Fusion UAT control", () => {
         action: async () => ({ kind: "idle" as const }),
         addressLookupAction: async () => ({ kind: "idle" as const }),
         defaultCaseReference: "TF-13",
+        imageryAccess: {
+          schemaVersion: "norge-i-bilder-access.v1" as const,
+          status: "configuration_required" as const,
+          provider: "norge-i-bilder" as const,
+          credits: "© norgeibilder.no" as const,
+          credentialMode: null,
+          missing: ["NORGE_I_BILDER_TOKEN"],
+        },
         locale: "lt",
       }),
     );
@@ -31,6 +39,14 @@ describe("Admin Next Roof Fusion UAT control", () => {
   it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {
     const html = renderToStaticMarkup(
       createElement(RealAddressResult, {
+        imageryAccess: {
+          schemaVersion: "norge-i-bilder-access.v1" as const,
+          status: "configuration_required" as const,
+          provider: "norge-i-bilder" as const,
+          credits: "© norgeibilder.no" as const,
+          credentialMode: null,
+          missing: ["NORGE_I_BILDER_TOKEN"],
+        },
         locale: "lt",
         result: {
           kind: "success" as const,
@@ -99,7 +115,10 @@ describe("Admin Next Roof Fusion UAT control", () => {
     expect(html).toContain("120 m²");
     expect(html).toContain("© OpenStreetMap contributors");
     expect(html).toContain(
-      "Ortofoto bus prijungtas gavus licencijuotą prieigą",
+      "Ortofoto integracija paruošta · laukiama GeoID prieigos",
+    );
+    expect(html).toContain(
+      'data-norge-i-bilder-access="configuration_required"',
     );
     expect(html).toContain("dar ne galutiniai stogo šlaitai");
     expect(html).toContain(

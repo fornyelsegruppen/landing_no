@@ -1,22 +1,34 @@
 import { z } from "zod";
-import type { AddressCandidate, MapProvider, ProviderHealth } from "./contracts";
+import type {
+  AddressCandidate,
+  MapProvider,
+  ProviderHealth,
+} from "./contracts";
+import {
+  readNorgeIBilderPublicAccessV1,
+  type NorgeIBilderPublicAccessV1,
+} from "./norge-i-bilder-ortofoto-v1";
 
 const responseSchema = z.object({
-  adresser: z.array(z.object({
-    adressetekst: z.string(),
-    postnummer: z.string(),
-    poststed: z.string(),
-    kommunenummer: z.string(),
-    gardsnummer: z.number().int(),
-    bruksnummer: z.number().int(),
-    festenummer: z.number().int().optional().default(0),
-    undernummer: z.number().int().nullable().optional(),
-    representasjonspunkt: z.object({
-      epsg: z.string(),
-      lat: z.number(),
-      lon: z.number(),
-    }),
-  })).default([]),
+  adresser: z
+    .array(
+      z.object({
+        adressetekst: z.string(),
+        postnummer: z.string(),
+        poststed: z.string(),
+        kommunenummer: z.string(),
+        gardsnummer: z.number().int(),
+        bruksnummer: z.number().int(),
+        festenummer: z.number().int().optional().default(0),
+        undernummer: z.number().int().nullable().optional(),
+        representasjonspunkt: z.object({
+          epsg: z.string(),
+          lat: z.number(),
+          lon: z.number(),
+        }),
+      }),
+    )
+    .default([]),
 });
 
 export class KartverketAddressProvider implements MapProvider {
@@ -29,7 +41,8 @@ export class KartverketAddressProvider implements MapProvider {
     return {
       status: "ready",
       provider: "kartverket-address-rest-v1",
-      detail: "Official Matrikkelen address distribution; normally updated daily.",
+      detail:
+        "Official Matrikkelen address distribution; normally updated daily.",
     };
   }
 
@@ -44,10 +57,14 @@ export class KartverketAddressProvider implements MapProvider {
     url.searchParams.set("side", "0");
 
     const response = await this.fetcher(url, {
-      headers: { Accept: "application/json", "User-Agent": "Takfornyelse-address-validation/1.0" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Takfornyelse-address-validation/1.0",
+      },
       signal: AbortSignal.timeout(8_000),
     });
-    if (!response.ok) throw new Error(`Kartverket address lookup failed (${response.status})`);
+    if (!response.ok)
+      throw new Error(`Kartverket address lookup failed (${response.status})`);
     const parsed = responseSchema.parse(await response.json());
     return parsed.adresser.map((address) => ({
       id: `${address.kommunenummer}-${address.gardsnummer}-${address.bruksnummer}-${address.festenummer}-${address.undernummer ?? 0}-${address.adressetekst}`,
@@ -61,21 +78,8 @@ export class KartverketAddressProvider implements MapProvider {
   }
 }
 
-export type ImageryAccess = {
-  status: "ready" | "configuration_required";
-  provider: "norge-i-bilder";
-  credits: "© norgeibilder.no";
-  reason?: string;
-};
+export type ImageryAccess = NorgeIBilderPublicAccessV1;
 
 export function norgeIBilderAccess(): ImageryAccess {
-  if (process.env.NORGE_I_BILDER_TOKEN?.trim() && process.env.MAP_TERMS_ACCEPTED_AT?.trim()) {
-    return { status: "ready", provider: "norge-i-bilder", credits: "© norgeibilder.no" };
-  }
-  return {
-    status: "configuration_required",
-    provider: "norge-i-bilder",
-    credits: "© norgeibilder.no",
-    reason: "GeoID/Norge digitalt access agreement, token and recorded terms approval are required before orthophoto automation.",
-  };
+  return readNorgeIBilderPublicAccessV1();
 }

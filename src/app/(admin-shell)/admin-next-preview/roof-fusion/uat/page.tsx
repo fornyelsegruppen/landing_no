@@ -11,6 +11,7 @@ import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
+import { readNorgeIBilderPublicAccessV1 } from "@/lib/providers/norge-i-bilder-ortofoto-v1";
 import { OpenStreetMapBuildingProvider } from "@/lib/providers/osm-building-provider";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
 import { buildRoofFusionOsmFootprintPreviewV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
@@ -132,6 +133,7 @@ export default async function AdminNextRoofFusionUatPage() {
       action={prepareR4Uat}
       addressLookupAction={lookupRealAddress}
       defaultCaseReference="TF-13"
+      imageryAccess={readNorgeIBilderPublicAccessV1()}
       locale={user.interfaceLanguage}
     />
   );

@@ -1,3 +1,5 @@
+import { readNorgeIBilderPublicAccessV1 } from "@/lib/providers/norge-i-bilder-ortofoto-v1";
+
 export const featureFlagNames = [
   "aiDrafts",
   "roofMeasurement",
@@ -106,6 +108,7 @@ export function readIntegrationStatus(
     configured(environment, "GOOGLE_SEARCH_CONSOLE_CREDENTIALS") ||
     configured(environment, "SEO_IMPORT_BUCKET");
   const cronReady = configured(environment, "CRON_SECRET");
+  const imageryAccess = readNorgeIBilderPublicAccessV1(environment);
 
   return {
     ai: {
@@ -145,20 +148,9 @@ export function readIntegrationStatus(
     },
     imagery: {
       name: "imagery",
-      readiness:
-        configured(environment, "NORGE_I_BILDER_TOKEN") &&
-        configured(environment, "MAP_TERMS_ACCEPTED_AT")
-          ? "ready"
-          : "configuration_required",
+      readiness: imageryAccess.status,
       provider: "norge-i-bilder",
-      missing: [
-        ...(!configured(environment, "NORGE_I_BILDER_TOKEN")
-          ? ["NORGE_I_BILDER_TOKEN"]
-          : []),
-        ...(!configured(environment, "MAP_TERMS_ACCEPTED_AT")
-          ? ["MAP_TERMS_ACCEPTED_AT"]
-          : []),
-      ],
+      missing: imageryAccess.missing,
     },
     signature: {
       name: "signature",
