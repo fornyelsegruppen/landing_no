@@ -7,6 +7,7 @@ import {
   Layers3,
   LoaderCircle,
   MapPin,
+  Mountain,
   Ruler,
   Search,
   ShieldCheck,
@@ -15,6 +16,8 @@ import {
 import { useActionState, useMemo, useState } from "react";
 import type { AddressCandidate } from "@/lib/providers/contracts";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
+import type { RoofFusionHeightSurfacePreviewSummaryV1 } from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
+import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
@@ -53,8 +56,23 @@ export type RoofFusionAddressLookupState =
       >;
     };
 
+export type RoofFusionHeightAnalysisState =
+  | { kind: "idle" }
+  | {
+      kind: "error";
+      code:
+        "INVALID_SELECTION" | "HEIGHT_DATA_UNAVAILABLE" | "ROOF_NOT_DETECTED";
+    }
+  | {
+      kind: "success";
+      candidateId: string;
+      summary: RoofFusionHeightSurfacePreviewSummaryV1;
+      visualization: HeightSurfaceVisualizationV1;
+    };
+
 const initialState: RoofFusionUatActionState = { kind: "idle" };
 const initialAddressState: RoofFusionAddressLookupState = { kind: "idle" };
+const initialHeightState: RoofFusionHeightAnalysisState = { kind: "idle" };
 
 const copy = {
   nb: {
@@ -71,7 +89,7 @@ const copy = {
     failure: "UAT-klargjøringen mislyktes. Ingen produksjonsdata ble endret.",
     guard: "Kun Preview · eksplisitt adminhandling · idempotent",
     addressEyebrow: "Gratis realadressekontroll",
-    addressTitle: "Finn riktig bygning før ortofoto kobles til",
+    addressTitle: "Finn bygningen og les den frie høydemodellen",
     addressIntro:
       "Kartverket løser adressen og OpenStreetMap viser faktiske bygningskonturer. Oppslaget lagres ikke og oppretter ingen måling.",
     addressLabel: "Adresse med husnummer og poststed",
@@ -86,9 +104,30 @@ const copy = {
     source: "Åpne OSM-kilden",
     opacity: "Geometriens gjennomsiktighet",
     overlay: "Vis geometrilag",
-    imageryPending: "Ortofoto kobles til etter lisensiert tilgang",
+    imageryPending: "Velg bygning og hent fri 1 m høydemodell",
     preliminary:
       "Dette er et gratis, foreløpig bygningsfotavtrykk – ikke ferdige takflater eller godkjent takareal.",
+    heightAction: "Hent virkelig takflate",
+    heightWorking: "Leser DOM og DTM …",
+    heightTitle: "Virkelig 1 m høydeoverflate",
+    heightIntro:
+      "Skyggerelieff er laget av Kartverkets åpne DOM minus DTM. Den gule konturen er valgt OSM-bygning; dette er høydedata, ikke et foto.",
+    heightRoofCells: "Takpunkter i konturen",
+    heightMedian: "Median takhøyde",
+    heightRange: "Robust høydeintervall",
+    heightSource: "Kartverket Høydedata · NLOD 2.0",
+    heightErrors: {
+      INVALID_SELECTION: "Bygningen må velges på nytt.",
+      HEIGHT_DATA_UNAVAILABLE:
+        "Kartverkets høydedata er midlertidig utilgjengelige for denne konturen.",
+      ROOF_NOT_DETECTED:
+        "Høydemodellen viser ikke en sammenhengende takflate. Bruk manuell kontroll.",
+    },
+    heightBlockers: {
+      ROOF_PLANES_REQUIRED: "Takflatene må fortsatt segmenteres",
+      ROOF_PITCH_REQUIRED: "Takvinklene må fortsatt beregnes og kontrolleres",
+      ROOF_SURFACE_RENDER_REQUIRED: "Høydevisningen må godkjennes i UAT",
+    },
     engineTitle: "Roof Fusion Preview-motor",
     contractValid: "Motorkontrakt gyldig",
     reviewRequired: "Manuell kontroll kreves",
@@ -133,7 +172,7 @@ const copy = {
     failure: "UAT paruošimas nepavyko. Production duomenys nepakeisti.",
     guard: "Tik Preview · aiškus admin veiksmas · idempotentinis",
     addressEyebrow: "Nemokamas realaus adreso patikrinimas",
-    addressTitle: "Rasti tikrą pastatą prieš prijungiant ortofoto",
+    addressTitle: "Rasti pastatą ir nuskaityti nemokamą aukščių modelį",
     addressIntro:
       "Kartverket suranda adresą, o OpenStreetMap parodo realius pastatų kontūrus. Paieška neišsaugoma ir nesukuria matavimo.",
     addressLabel: "Adresas su namo numeriu ir miestu",
@@ -148,9 +187,31 @@ const copy = {
     source: "Atidaryti OSM šaltinį",
     opacity: "Geometrijos permatomumas",
     overlay: "Rodyti geometrijos sluoksnį",
-    imageryPending: "Ortofoto bus prijungtas gavus licencijuotą prieigą",
+    imageryPending:
+      "Pasirinkite pastatą ir gaukite nemokamą 1 m aukščių modelį",
     preliminary:
       "Tai nemokamas preliminarus pastato kontūras – dar ne galutiniai stogo šlaitai ar patvirtintas stogo plotas.",
+    heightAction: "Gauti tikrą stogo paviršių",
+    heightWorking: "Skaitomi DOM ir DTM…",
+    heightTitle: "Tikras 1 m aukščio paviršius",
+    heightIntro:
+      "Reljefo vaizdas sukurtas iš atvirų Kartverket DOM minus DTM duomenų. Geltonas kontūras yra pasirinktas OSM pastatas; tai aukščio modelis, ne fotografija.",
+    heightRoofCells: "Stogo taškai kontūre",
+    heightMedian: "Medianinis stogo aukštis",
+    heightRange: "Patikimas aukščio intervalas",
+    heightSource: "Kartverket Høydedata · NLOD 2.0",
+    heightErrors: {
+      INVALID_SELECTION: "Pastatą reikia pasirinkti iš naujo.",
+      HEIGHT_DATA_UNAVAILABLE:
+        "Šiam kontūrui Kartverket aukščio duomenys laikinai nepasiekiami.",
+      ROOF_NOT_DETECTED:
+        "Aukščio modelyje nėra vientiso stogo paviršiaus. Reikia rankinės peržiūros.",
+    },
+    heightBlockers: {
+      ROOF_PLANES_REQUIRED: "Dar reikia suskaidyti tikrus stogo šlaitus",
+      ROOF_PITCH_REQUIRED: "Dar reikia apskaičiuoti ir patikrinti nuolydžius",
+      ROOF_SURFACE_RENDER_REQUIRED: "Aukščio vaizdą reikia patvirtinti UAT",
+    },
     engineTitle: "Roof Fusion Preview variklis",
     contractValid: "Variklio kontraktas galioja",
     reviewRequired: "Reikalinga rankinė peržiūra",
@@ -195,7 +256,7 @@ const copy = {
     failure: "UAT preparation failed. No Production data was changed.",
     guard: "Preview only · explicit admin action · idempotent",
     addressEyebrow: "Free real-address check",
-    addressTitle: "Find the real building before imagery is connected",
+    addressTitle: "Find the building and read the free height model",
     addressIntro:
       "Kartverket resolves the address and OpenStreetMap returns real building footprints. The lookup is not stored and creates no measurement.",
     addressLabel: "Address with house number and city",
@@ -210,9 +271,30 @@ const copy = {
     source: "Open the OSM source",
     opacity: "Geometry opacity",
     overlay: "Show geometry layer",
-    imageryPending: "Orthophoto will be connected after licensed access",
+    imageryPending: "Select a building and fetch the free 1 m height model",
     preliminary:
       "This is a free preliminary building footprint, not final roof planes or an approved roof area.",
+    heightAction: "Fetch real roof surface",
+    heightWorking: "Reading DOM and DTM…",
+    heightTitle: "Real 1 m height surface",
+    heightIntro:
+      "The shaded surface is derived from open Kartverket DOM minus DTM data. The amber outline is the selected OSM building; this is elevation data, not a photograph.",
+    heightRoofCells: "Roof cells in footprint",
+    heightMedian: "Median roof height",
+    heightRange: "Robust height range",
+    heightSource: "Kartverket Høydedata · NLOD 2.0",
+    heightErrors: {
+      INVALID_SELECTION: "Select the building again.",
+      HEIGHT_DATA_UNAVAILABLE:
+        "Kartverket height data is temporarily unavailable for this footprint.",
+      ROOF_NOT_DETECTED:
+        "The height model does not show a continuous roof surface. Use manual review.",
+    },
+    heightBlockers: {
+      ROOF_PLANES_REQUIRED: "Actual roof planes still need segmentation",
+      ROOF_PITCH_REQUIRED: "Roof pitches still need calculation and review",
+      ROOF_SURFACE_RENDER_REQUIRED: "The height view must pass UAT review",
+    },
     engineTitle: "Roof Fusion Preview engine",
     contractValid: "Engine contract valid",
     reviewRequired: "Manual review required",
@@ -303,10 +385,138 @@ function formatMetric(locale: PanelLocale, value: number) {
   ).format(value);
 }
 
+function HeightAnalysisPanel({
+  locale,
+  state,
+}: {
+  locale: PanelLocale;
+  state: Extract<RoofFusionHeightAnalysisState, { kind: "success" }>;
+}) {
+  const t = copy[locale];
+  return (
+    <section
+      aria-label={t.heightTitle}
+      className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] xl:col-span-2"
+      data-roof-fusion-height-contract="valid-review-required"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--an-border)] p-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-black">
+            <Mountain aria-hidden="true" className="size-5 text-emerald-300" />
+            {t.heightTitle}
+          </h3>
+          <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--an-muted)]">
+            {t.heightIntro}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase">
+            <span className="rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2 py-1 text-emerald-300">
+              {t.contractValid}
+            </span>
+            <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[var(--an-amber)]">
+              {t.reviewRequired}
+            </span>
+          </div>
+        </div>
+        <strong className="rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+          {t.notPricingReady}
+        </strong>
+      </div>
+
+      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)]">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <span className="text-[10px] text-[var(--an-subtle)]">
+              {t.engineFootprint}
+            </span>
+            <strong className="mt-1 block text-lg">
+              {formatMetric(
+                locale,
+                state.summary.engineHorizontalAreaSquareMeters,
+              )}{" "}
+              m²
+            </strong>
+          </div>
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <span className="text-[10px] text-[var(--an-subtle)]">
+              {t.heightRoofCells}
+            </span>
+            <strong className="mt-1 block text-lg">
+              {state.summary.roofCells}/{state.summary.footprintCells}
+            </strong>
+          </div>
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <span className="text-[10px] text-[var(--an-subtle)]">
+              {t.heightMedian}
+            </span>
+            <strong className="mt-1 block text-lg">
+              {formatMetric(locale, state.summary.roofHeightMedianM)} m
+            </strong>
+          </div>
+          <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+            <span className="text-[10px] text-[var(--an-subtle)]">
+              {t.heightRange}
+            </span>
+            <strong className="mt-1 block text-lg">
+              {formatMetric(locale, state.summary.roofHeightP10M)}–
+              {formatMetric(locale, state.summary.roofHeightP90M)} m
+            </strong>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+          <strong className="text-xs">{t.blockersTitle}</strong>
+          <ul className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]">
+            {state.summary.blockers.map((blocker) => (
+              <li className="flex gap-2" key={blocker}>
+                <TriangleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"
+                />
+                {t.heightBlockers[blocker]}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <details className="border-t border-[var(--an-border)] px-4 py-3 text-xs">
+        <summary className="cursor-pointer font-bold text-[var(--an-muted)]">
+          {t.integrity} · {t.heightSource}
+        </summary>
+        <dl className="mt-3 grid gap-2 font-mono text-[10px] text-[var(--an-subtle)] sm:grid-cols-3">
+          <div>
+            <dt>{t.calculationHash}</dt>
+            <dd title={state.summary.calculationHash}>
+              {state.summary.calculationHash.slice(0, 16)}…
+            </dd>
+          </div>
+          <div>
+            <dt>{t.snapshotHash}</dt>
+            <dd title={state.summary.snapshotHash}>
+              {state.summary.snapshotHash.slice(0, 16)}…
+            </dd>
+          </div>
+          <div>
+            <dt>{t.renderHash}</dt>
+            <dd title={state.summary.renderHash}>
+              {state.summary.renderHash.slice(0, 16)}…
+            </dd>
+          </div>
+        </dl>
+      </details>
+    </section>
+  );
+}
+
 export function RealAddressResult({
+  heightAnalysisAction,
   locale,
   result,
 }: {
+  heightAnalysisAction: (
+    previousState: RoofFusionHeightAnalysisState,
+    formData: FormData,
+  ) => Promise<RoofFusionHeightAnalysisState>;
   locale: PanelLocale;
   result: Extract<RoofFusionAddressLookupState, { kind: "success" }>;
 }) {
@@ -314,6 +524,10 @@ export function RealAddressResult({
   const [selectedId, setSelectedId] = useState(result.candidates[0]?.id ?? "");
   const [opacity, setOpacity] = useState(38);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [heightState, heightFormAction, heightPending] = useActionState(
+    heightAnalysisAction,
+    initialHeightState,
+  );
   const selected =
     result.candidates.find((candidate) => candidate.id === selectedId) ??
     result.candidates[0];
@@ -324,6 +538,10 @@ export function RealAddressResult({
     () => projectCandidates(result.address, result.candidates),
     [result.address, result.candidates],
   );
+  const activeHeight =
+    heightState.kind === "success" && heightState.candidateId === selected?.id
+      ? heightState
+      : null;
 
   if (!selected) return null;
 
@@ -342,44 +560,94 @@ export function RealAddressResult({
             {t.imageryPending}
           </span>
         </div>
-        <div className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3">
-          <svg
-            aria-label={t.candidateLabel}
-            className="h-auto w-full"
+        {activeHeight ? (
+          <div
+            aria-label={t.heightTitle}
+            className="relative overflow-hidden bg-[#080d12] bg-cover bg-center"
             role="img"
-            viewBox="0 0 620 330"
+            style={{
+              aspectRatio:
+                String(activeHeight.visualization.width) +
+                " / " +
+                String(activeHeight.visualization.height),
+              backgroundImage:
+                "url(" + activeHeight.visualization.dataUrl + ")",
+            }}
           >
-            {showOverlay
-              ? projected.candidates.map((candidate) => {
-                  const active = candidate.id === selected.id;
-                  return (
-                    <polygon
-                      fill={
-                        active
-                          ? `rgba(244,182,63,${opacity / 100})`
-                          : "rgba(111,132,151,.10)"
-                      }
-                      key={candidate.id}
-                      points={candidate.points}
-                      stroke={active ? "#f4b63f" : "#6f8497"}
-                      strokeWidth={active ? 4 : 2}
-                    />
-                  );
-                })
-              : null}
-            <circle
-              cx={projected.addressPoint.x}
-              cy={projected.addressPoint.y}
-              fill="#ef4444"
-              r="7"
-              stroke="#fff"
-              strokeWidth="3"
-            />
-          </svg>
-          <span className="pointer-events-none absolute right-4 bottom-4 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] text-[var(--an-muted)]">
-            © OpenStreetMap contributors · ODbL 1.0
-          </span>
-        </div>
+            <svg
+              aria-hidden="true"
+              className="absolute inset-0 size-full"
+              preserveAspectRatio="none"
+              viewBox={[
+                0,
+                0,
+                activeHeight.visualization.width,
+                activeHeight.visualization.height,
+              ].join(" ")}
+            >
+              {showOverlay ? (
+                <polygon
+                  fill={"rgba(244,182,63," + opacity / 100 + ")"}
+                  points={activeHeight.visualization.overlayPoints}
+                  stroke="#f4b63f"
+                  strokeLinejoin="round"
+                  strokeWidth={
+                    Math.max(
+                      activeHeight.visualization.width,
+                      activeHeight.visualization.height,
+                    ) / 125
+                  }
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : null}
+            </svg>
+            <span className="pointer-events-none absolute top-3 left-3 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] font-black text-white">
+              N ↑ · 1 m
+            </span>
+            <span className="pointer-events-none absolute right-3 bottom-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-[var(--an-border)] bg-black/70 px-2 py-1 text-right text-[9px] text-[var(--an-muted)]">
+              {activeHeight.visualization.attribution}
+            </span>
+          </div>
+        ) : (
+          <div className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3">
+            <svg
+              aria-label={t.candidateLabel}
+              className="h-auto w-full"
+              role="img"
+              viewBox="0 0 620 330"
+            >
+              {showOverlay
+                ? projected.candidates.map((candidate) => {
+                    const active = candidate.id === selected.id;
+                    return (
+                      <polygon
+                        fill={
+                          active
+                            ? `rgba(244,182,63,${opacity / 100})`
+                            : "rgba(111,132,151,.10)"
+                        }
+                        key={candidate.id}
+                        points={candidate.points}
+                        stroke={active ? "#f4b63f" : "#6f8497"}
+                        strokeWidth={active ? 4 : 2}
+                      />
+                    );
+                  })
+                : null}
+              <circle
+                cx={projected.addressPoint.x}
+                cy={projected.addressPoint.y}
+                fill="#ef4444"
+                r="7"
+                stroke="#fff"
+                strokeWidth="3"
+              />
+            </svg>
+            <span className="pointer-events-none absolute right-4 bottom-4 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] text-[var(--an-muted)]">
+              © OpenStreetMap contributors · ODbL 1.0
+            </span>
+          </div>
+        )}
         <div className="grid gap-3 border-t border-[var(--an-border)] p-4 sm:grid-cols-2">
           <label className="grid gap-2 text-xs font-bold">
             {t.opacity}: {opacity}%
@@ -452,11 +720,44 @@ export function RealAddressResult({
           {t.source}
           <ExternalLink aria-hidden="true" className="size-4" />
         </a>
+        <form action={heightFormAction}>
+          <input
+            name="addressQuery"
+            type="hidden"
+            value={result.address.label}
+          />
+          <input name="candidateId" type="hidden" value={selected.id} />
+          <button
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
+            disabled={heightPending}
+            type="submit"
+          >
+            {heightPending ? (
+              <LoaderCircle
+                aria-hidden="true"
+                className="size-4 animate-spin"
+              />
+            ) : (
+              <Mountain aria-hidden="true" className="size-4" />
+            )}
+            {heightPending ? t.heightWorking : t.heightAction}
+          </button>
+        </form>
       </div>
       <p className="rounded-xl border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] p-3 text-xs font-semibold text-[var(--an-amber)] xl:col-span-2">
         {t.preliminary}
       </p>
-      {enginePreview?.kind === "success" ? (
+      {heightState.kind === "error" ? (
+        <p
+          className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
+          role="alert"
+        >
+          {t.heightErrors[heightState.code]}
+        </p>
+      ) : null}
+      {activeHeight ? (
+        <HeightAnalysisPanel locale={locale} state={activeHeight} />
+      ) : enginePreview?.kind === "success" ? (
         <section
           aria-label={t.engineTitle}
           className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] xl:col-span-2"
@@ -580,6 +881,7 @@ export function AdminNextRoofFusionUatControl({
   action,
   addressLookupAction,
   defaultCaseReference = "TF-13",
+  heightAnalysisAction,
   locale,
 }: {
   action: (
@@ -590,6 +892,10 @@ export function AdminNextRoofFusionUatControl({
     previousState: RoofFusionAddressLookupState,
     formData: FormData,
   ) => Promise<RoofFusionAddressLookupState>;
+  heightAnalysisAction: (
+    previousState: RoofFusionHeightAnalysisState,
+    formData: FormData,
+  ) => Promise<RoofFusionHeightAnalysisState>;
   defaultCaseReference?: string;
   locale: PanelLocale;
 }) {
@@ -765,6 +1071,7 @@ export function AdminNextRoofFusionUatControl({
         </p>
         {addressState.kind === "success" ? (
           <RealAddressResult
+            heightAnalysisAction={heightAnalysisAction}
             key={`${addressState.address.id}:${addressState.candidates.map((candidate) => candidate.id).join(",")}`}
             locale={locale}
             result={addressState}

@@ -3,6 +3,7 @@ import type { PayloadRequest } from "payload";
 import {
   AdminNextRoofFusionUatControl,
   type RoofFusionAddressLookupState,
+  type RoofFusionHeightAnalysisState,
   type RoofFusionUatActionState,
 } from "@/components/admin-next/admin-next-roof-fusion-uat-control";
 import { parseAdminNextR4CaseIdentityV1 } from "@/lib/admin-next/r4-read-adapter";
@@ -11,7 +12,16 @@ import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
+import {
+  KartverketHeightDataError,
+  KartverketHeightDataProvider,
+} from "@/lib/providers/kartverket-hoydedata-provider";
 import { OpenStreetMapBuildingProvider } from "@/lib/providers/osm-building-provider";
+import {
+  buildRoofFusionHeightSurfacePreviewV1,
+  RoofFusionHeightSurfacePreviewError,
+} from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
+import { buildHeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
 import { buildRoofFusionOsmFootprintPreviewV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import {
@@ -127,11 +137,75 @@ export default async function AdminNextRoofFusionUatPage() {
     }
   }
 
+  async function analyzeHeightSurface(
+    _previousState: RoofFusionHeightAnalysisState,
+    formData: FormData,
+  ): Promise<RoofFusionHeightAnalysisState> {
+    "use server";
+
+    assertRoofFusionPreviewEnabledV1(process.env);
+    const query = String(formData.get("addressQuery") ?? "")
+      .trim()
+      .replace(/\s+/gu, " ");
+    const candidateId = String(formData.get("candidateId") ?? "").trim();
+    if (
+      query.length < 4 ||
+      query.length > 180 ||
+      !/^(?:way|relation)\/[1-9][0-9]*$/u.test(candidateId)
+    ) {
+      return { kind: "error", code: "INVALID_SELECTION" };
+    }
+
+    try {
+      // Re-resolve both public sources server-side. The client-selected ID is
+      // accepted only when it still belongs to this address lookup.
+      const addresses = await new KartverketAddressProvider().searchAddress(
+        query,
+      );
+      const address = addresses[0];
+      if (!address) return { kind: "error", code: "INVALID_SELECTION" };
+      const candidates =
+        await new OpenStreetMapBuildingProvider().findBuildings({
+          latitude: address.latitude,
+          longitude: address.longitude,
+        });
+      const candidate = candidates.find((item) => item.id === candidateId);
+      if (!candidate) return { kind: "error", code: "INVALID_SELECTION" };
+      const surface = await new KartverketHeightDataProvider().getSurface({
+        polygon: candidate.polygon,
+      });
+      const preview = buildRoofFusionHeightSurfacePreviewV1({
+        address,
+        candidate,
+        surface,
+      });
+      const visualization = await buildHeightSurfaceVisualizationV1({
+        surface,
+        candidate,
+      });
+      return {
+        kind: "success",
+        candidateId,
+        summary: preview.summary,
+        visualization,
+      };
+    } catch (error) {
+      if (error instanceof RoofFusionHeightSurfacePreviewError) {
+        return { kind: "error", code: "ROOF_NOT_DETECTED" };
+      }
+      if (error instanceof KartverketHeightDataError) {
+        return { kind: "error", code: "HEIGHT_DATA_UNAVAILABLE" };
+      }
+      return { kind: "error", code: "HEIGHT_DATA_UNAVAILABLE" };
+    }
+  }
+
   return (
     <AdminNextRoofFusionUatControl
       action={prepareR4Uat}
       addressLookupAction={lookupRealAddress}
       defaultCaseReference="TF-13"
+      heightAnalysisAction={analyzeHeightSurface}
       locale={user.interfaceLanguage}
     />
   );

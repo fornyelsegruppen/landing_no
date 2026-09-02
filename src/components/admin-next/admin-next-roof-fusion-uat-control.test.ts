@@ -12,6 +12,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
       createElement(AdminNextRoofFusionUatControl, {
         action: async () => ({ kind: "idle" as const }),
         addressLookupAction: async () => ({ kind: "idle" as const }),
+        heightAnalysisAction: async () => ({ kind: "idle" as const }),
         defaultCaseReference: "TF-13",
         locale: "lt",
       }),
@@ -31,6 +32,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
   it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {
     const html = renderToStaticMarkup(
       createElement(RealAddressResult, {
+        heightAnalysisAction: async () => ({ kind: "idle" as const }),
         locale: "lt",
         result: {
           kind: "success" as const,
@@ -98,9 +100,8 @@ describe("Admin Next Roof Fusion UAT control", () => {
     expect(html).toContain("Storgata 1, 0155 Oslo");
     expect(html).toContain("120 m²");
     expect(html).toContain("© OpenStreetMap contributors");
-    expect(html).toContain(
-      "Ortofoto bus prijungtas gavus licencijuotą prieigą",
-    );
+    expect(html).toContain("gaukite nemokamą 1 m aukščių modelį");
+    expect(html).toContain("Gauti tikrą stogo paviršių");
     expect(html).toContain("dar ne galutiniai stogo šlaitai");
     expect(html).toContain(
       'data-roof-fusion-engine-contract="valid-review-required"',
