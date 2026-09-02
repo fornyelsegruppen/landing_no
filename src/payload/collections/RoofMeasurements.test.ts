@@ -176,4 +176,58 @@ describe("approved roof measurement immutability", () => {
       } as never),
     ).rejects.toThrow(/approved price rule/);
   });
+
+  it("rejects approving a Norge i bilder screenshot measurement when exact attribution is missing", async () => {
+    vi.stubEnv("FEATURE_MEASUREMENT_EVIDENCE_V2", "true");
+    const req = {
+      user: { id: 1, active: true, role: "admin" },
+      payload: {
+        findByID: async (...args: unknown[]) => {
+          const [input] = args as [{ collection: string }];
+          if (input.collection === "leads") return { inquiryType: "takvask" };
+          return {
+            filename: "norge.png",
+            mimeType: "image/png",
+            classification: "measurement",
+          };
+        },
+        count: async () => ({ totalDocs: 1 }),
+      },
+    };
+
+    await expect(
+      enforceMeasurementApproval({
+        operation: "update",
+        data: { status: "approved" },
+        originalDoc: {
+          status: "review_required",
+          lead: 2,
+          addressSourceId: "official-1",
+          imageryLicensed: true,
+          buildingIdentifier: "building",
+          confidence: "high",
+          confidenceReasoning: "Approved building.",
+          measurementMode: "schematic_with_context",
+          evidenceSnapshot: 91,
+          evidenceHash: "a".repeat(64),
+          evidenceSource: "norge-i-bilder-screenshot",
+          evidenceAttribution: "© Kartverket",
+          imageryCapturedAt: "2026-09-02T10:00:00.000Z",
+          roofPlanes: [
+            {
+              id: "a",
+              polygon: [
+                { latitude: 60, longitude: 10 },
+                { latitude: 60, longitude: 10.001 },
+                { latitude: 60.001, longitude: 10 },
+              ],
+              angleMinDegrees: 22,
+              angleMaxDegrees: 32,
+            },
+          ],
+        },
+        req,
+      } as never),
+    ).rejects.toThrow(/©norgeibilder\.no/i);
+  });
 });

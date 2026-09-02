@@ -16,10 +16,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
       candidateId: "way/123",
       summary: {},
       visualization: {},
-    } as unknown as Extract<
-      RoofFusionHeightAnalysisState,
-      { kind: "success" }
-    >;
+    } as unknown as Extract<RoofFusionHeightAnalysisState, { kind: "success" }>;
 
     expect(
       selectActiveHeightState(
@@ -62,6 +59,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
   it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {
     const html = renderToStaticMarkup(
       createElement(RealAddressResult, {
+        caseReference: "TF-13",
         heightAnalysisAction: async () => ({ kind: "idle" as const }),
         locale: "lt",
         result: {

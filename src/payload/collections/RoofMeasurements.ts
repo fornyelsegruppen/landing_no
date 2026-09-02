@@ -2,7 +2,11 @@ import type { CollectionBeforeChangeHook, CollectionConfig } from "payload";
 import { adminOnly } from "../access/roles";
 import { prepareMeasurement } from "@/lib/measurements/proposal";
 import { measurementSnapshotHash } from "@/lib/measurements/geometry";
-import { verifySchematicMeasurementEvidence } from "@/lib/measurements/persist-evidence";
+import { verifyMeasurementEvidence } from "@/lib/measurements/persist-evidence";
+import {
+  assertNorgeIBilderScreenshotEvidence,
+  isNorgeIBilderScreenshotSource,
+} from "@/lib/measurements/evidence-policy";
 import { measurementWorkflowMode } from "@/lib/measurements/workflow-mode";
 
 const lockedFields = [
@@ -20,6 +24,7 @@ const lockedFields = [
   "evidenceSource",
   "evidenceAttribution",
   "evidenceGeneratedAt",
+  "imageryCapturedAt",
   "manualAreaSource",
   "manualAreaReason",
 ] as const;
@@ -152,15 +157,23 @@ export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({
       `Measurement approval blocked: ${prepared.gate.reasons.join(", ")}`,
     );
   if (process.env.FEATURE_MEASUREMENT_EVIDENCE_V2 === "true") {
+    if (isNorgeIBilderScreenshotSource(merged.evidenceSource)) {
+      assertNorgeIBilderScreenshotEvidence({
+        source: merged.evidenceSource,
+        attribution: merged.evidenceAttribution,
+        capturedAt: merged.imageryCapturedAt,
+        trainingProhibited: true,
+      });
+    }
     if (
       !relationId(merged.evidenceSnapshot) ||
       !/^[a-f0-9]{64}$/i.test(String(merged.evidenceHash || ""))
     ) {
       throw new Error(
-        "Visual measurement approval requires an immutable schematic evidence file and hash",
+        "Visual measurement approval requires an immutable approved evidence file and hash",
       );
     }
-    if (!(await verifySchematicMeasurementEvidence(req.payload, merged)))
+    if (!(await verifyMeasurementEvidence(req.payload, merged)))
       throw new Error(
         "Visual measurement evidence does not match its stored hash",
       );

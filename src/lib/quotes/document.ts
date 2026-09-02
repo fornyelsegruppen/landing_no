@@ -1,5 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
 import { z } from "zod";
+import {
+  NORGE_I_BILDER_EXACT_ATTRIBUTION,
+  assertNorgeIBilderScreenshotEvidence,
+  isNorgeIBilderScreenshotSource,
+} from "@/lib/measurements/evidence-policy";
 import { siteConfig } from "@/lib/site";
 
 function stable(value: unknown): string {
@@ -31,7 +36,10 @@ export const quoteSnapshotSchema = z.object({
     buildingIdentifier: z.string().optional(),
     evidenceMediaId: z.number().int().positive().optional(),
     evidenceHash: z.string().length(64).optional(),
+    evidenceSource: z.string().optional(),
     evidenceAttribution: z.string().optional(),
+    imageryCapturedAt: z.string().optional(),
+    evidenceTrainingProhibited: z.boolean().optional(),
     angleMinDegrees: z.number().min(0).max(89).optional(),
     angleMaxDegrees: z.number().min(0).max(89).optional(),
     approvedByName: z.string().optional(),
@@ -59,6 +67,19 @@ export function buildQuoteSnapshot(input: QuoteSnapshotInput): QuoteSnapshot {
   if (snapshot.measurement.actualAreaMinTenths > snapshot.measurement.actualAreaMaxTenths) throw new TypeError("Minimum area cannot exceed maximum area");
   const expectedDeposit = Math.round(snapshot.pricing.totalIncVatOre * snapshot.pricing.depositBasisPoints / 10000);
   if (snapshot.pricing.depositAmountIncVatOre !== expectedDeposit) throw new TypeError("Deposit amount does not match the selected percentage");
+  if (isNorgeIBilderScreenshotSource(snapshot.measurement.evidenceSource)) {
+    assertNorgeIBilderScreenshotEvidence({
+      source: snapshot.measurement.evidenceSource,
+      attribution: snapshot.measurement.evidenceAttribution,
+      capturedAt: snapshot.measurement.imageryCapturedAt,
+      trainingProhibited: snapshot.measurement.evidenceTrainingProhibited,
+    });
+    if (snapshot.measurement.mode !== "schematic_with_context") {
+      throw new TypeError(
+        "Approved Norge i bilder screenshot evidence requires schematic_with_context mode",
+      );
+    }
+  }
   return snapshot;
 }
 
@@ -81,7 +102,9 @@ export function quoteDisplayModel(snapshotInput: unknown) {
     depositAmountIncVatNok: snapshot.pricing.depositAmountIncVatOre / 100,
     assumptions: snapshot.measurement.assumptions,
     source: snapshot.measurement.source,
-    credits: snapshot.measurement.credits,
+    credits: isNorgeIBilderScreenshotSource(snapshot.measurement.evidenceSource)
+      ? NORGE_I_BILDER_EXACT_ATTRIBUTION
+      : snapshot.measurement.credits,
     validUntil: snapshot.validUntil,
     termsVersion: snapshot.termsVersion,
     measurementReference: `TM-${snapshot.leadId}-V${snapshot.measurement.version}`,

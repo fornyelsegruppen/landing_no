@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import type { Payload } from "payload";
+import {
+  assertNorgeIBilderScreenshotEvidence,
+  isNorgeIBilderScreenshotSource,
+} from "@/lib/measurements/evidence-policy";
 import { readPrivateMediaContent } from "@/lib/private-media-content";
 import { configureServerFonts } from "@/lib/server-fontconfig";
 import type { ContractSnapshot, QuoteSnapshot } from "./document";
@@ -31,6 +35,14 @@ export async function loadPdfMeasurementEvidence(
   if (!measurementNeedsVisualEvidence(value)) return undefined;
   if (!measurement.evidenceMediaId || !measurement.evidenceHash)
     throw new Error("Visual measurement snapshot is incomplete");
+  if (isNorgeIBilderScreenshotSource(measurement.evidenceSource)) {
+    assertNorgeIBilderScreenshotEvidence({
+      source: measurement.evidenceSource,
+      attribution: measurement.evidenceAttribution,
+      capturedAt: measurement.imageryCapturedAt,
+      trainingProhibited: measurement.evidenceTrainingProhibited,
+    });
+  }
   const media = await payload.findByID({
     collection: "private-media",
     id: measurement.evidenceMediaId,
@@ -41,6 +53,14 @@ export async function loadPdfMeasurementEvidence(
   const actualHash = createHash("sha256").update(file.data).digest("hex");
   if (actualHash !== measurement.evidenceHash)
     throw new Error("Visual measurement evidence hash mismatch");
+  if (
+    isNorgeIBilderScreenshotSource(measurement.evidenceSource) &&
+    !["image/png", "image/jpeg"].includes(file.contentType)
+  ) {
+    throw new Error(
+      "Approved Norge i bilder screenshot evidence must be PNG or JPEG",
+    );
+  }
   if (file.contentType === "image/svg+xml") {
     if (!configureServerFonts()) {
       throw new Error("Bundled PDF font is unavailable");

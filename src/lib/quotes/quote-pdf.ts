@@ -1,4 +1,9 @@
 import { rgb, type PDFImage } from "pdf-lib";
+import {
+  NORGE_I_BILDER_EXACT_ATTRIBUTION,
+  assertNorgeIBilderScreenshotEvidence,
+  isNorgeIBilderScreenshotSource,
+} from "@/lib/measurements/evidence-policy";
 import { createBrandedPdf, PDF_MARGIN, pdfSafe } from "@/lib/pdf/branded-pdf";
 import { formatNorwayDateTime } from "@/lib/norway-time";
 import { withdrawalFormCopy } from "@/content/withdrawal";
@@ -180,8 +185,20 @@ export async function buildQuoteContractPdf(input: {
         "Visual measurement evidence is required for this contract snapshot",
       );
     }
+    if (isNorgeIBilderScreenshotSource(measurement.evidenceSource)) {
+      assertNorgeIBilderScreenshotEvidence({
+        source: measurement.evidenceSource,
+        attribution: measurement.evidenceAttribution,
+        capturedAt: measurement.imageryCapturedAt,
+        trainingProhibited: measurement.evidenceTrainingProhibited,
+      });
+    }
     pdf.text(
-      `Målekilde og attribusjon: ${measurement.evidenceAttribution || model.credits}.`,
+      `Målekilde og attribusjon: ${
+        isNorgeIBilderScreenshotSource(measurement.evidenceSource)
+          ? NORGE_I_BILDER_EXACT_ATTRIBUTION
+          : measurement.evidenceAttribution || model.credits
+      }.`,
     );
   } else {
     pdf.field("Målemetode", "Manuelt kontrollert takareal uten kartvedlegg");

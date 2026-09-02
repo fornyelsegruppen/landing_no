@@ -99,7 +99,13 @@ export async function createQuoteDraft(
       buildingIdentifier: measurement.buildingIdentifier || undefined,
       evidenceMediaId: optionalId(measurement.evidenceSnapshot),
       evidenceHash: measurement.evidenceHash || undefined,
+      evidenceSource: measurement.evidenceSource || undefined,
       evidenceAttribution: measurement.evidenceAttribution || measurement.credits,
+      imageryCapturedAt: measurement.imageryCapturedAt || undefined,
+      evidenceTrainingProhibited:
+        measurement.evidenceSource === "norge-i-bilder-screenshot"
+          ? true
+          : undefined,
       angleMinDegrees: roofAngle(measurement, "min"),
       angleMaxDegrees: roofAngle(measurement, "max"),
       approvedAt: measurement.approvedAt || undefined,
@@ -233,7 +239,13 @@ export async function refreshDraftDocumentSnapshots(payload: Payload, input: { q
     buildingIdentifier: measurement.buildingIdentifier || undefined,
     evidenceMediaId,
     evidenceHash: measurement.evidenceHash || undefined,
+    evidenceSource: measurement.evidenceSource || undefined,
     evidenceAttribution: measurement.evidenceAttribution || measurement.credits,
+    imageryCapturedAt: measurement.imageryCapturedAt || undefined,
+    evidenceTrainingProhibited:
+      measurement.evidenceSource === "norge-i-bilder-screenshot"
+        ? true
+        : undefined,
     angleMinDegrees: roofAngle(measurement, "min"),
     angleMaxDegrees: roofAngle(measurement, "max"),
     approvedByName: administrator.displayName || administrator.email,

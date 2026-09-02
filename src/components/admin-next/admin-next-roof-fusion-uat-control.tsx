@@ -27,6 +27,10 @@ import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-s
 import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { RoofFusionTransientR4Drawer } from "@/components/admin-next/admin-next-r4-measurement-review";
+import {
+  NorgeIBilderCaptureControl,
+  type NorgeIBilderCaptureApi,
+} from "@/components/admin-next/norgeibilder-capture-control";
 
 export type RoofFusionUatActionState =
   | { kind: "idle" }
@@ -682,10 +686,16 @@ export function HeightAnalysisPanel({
 }
 
 export function RealAddressResult({
+  captureApi,
+  caseReference,
+  leadId,
   heightAnalysisAction,
   locale,
   result,
 }: {
+  captureApi?: NorgeIBilderCaptureApi;
+  caseReference: string;
+  leadId?: number;
   heightAnalysisAction: (
     previousState: RoofFusionHeightAnalysisState,
     formData: FormData,
@@ -700,11 +710,15 @@ export function RealAddressResult({
   const [ridgePoints, setRidgePoints] = useState<
     Array<{ x: number; y: number }>
   >([]);
-  const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<
-    Extract<RoofFusionHeightAnalysisState, { kind: "success" }> | null
-  >(null);
+  const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<Extract<
+    RoofFusionHeightAnalysisState,
+    { kind: "success" }
+  > | null>(null);
   const heightAnalysisActionWithHistory = useCallback(
-    async (previousState: RoofFusionHeightAnalysisState, formData: FormData) => {
+    async (
+      previousState: RoofFusionHeightAnalysisState,
+      formData: FormData,
+    ) => {
       const nextState = await heightAnalysisAction(previousState, formData);
       if (nextState.kind === "success") {
         setLastSuccessfulHeight(nextState);
@@ -753,12 +767,14 @@ export function RealAddressResult({
   const r4SurfaceAreaSquareMeters = r4Planes.length
     ? r4Planes.reduce((sum, plane) => sum + plane.surfaceAreaSquareMeters, 0)
     : undefined;
-  const r4PitchDegrees = r4Planes.length && r4SurfaceAreaSquareMeters
-    ? r4Planes.reduce(
-        (sum, plane) => sum + plane.pitchDegrees * plane.surfaceAreaSquareMeters,
-        0,
-      ) / r4SurfaceAreaSquareMeters
-    : undefined;
+  const r4PitchDegrees =
+    r4Planes.length && r4SurfaceAreaSquareMeters
+      ? r4Planes.reduce(
+          (sum, plane) =>
+            sum + plane.pitchDegrees * plane.surfaceAreaSquareMeters,
+          0,
+        ) / r4SurfaceAreaSquareMeters
+      : undefined;
   return (
     <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
       <div className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-canvas)]">
@@ -1118,7 +1134,9 @@ export function RealAddressResult({
           <RoofFusionTransientR4Drawer
             locale={locale}
             visualization={activeHeight.visualization}
-            horizontalAreaSquareMeters={activeHeight.summary.engineHorizontalAreaSquareMeters}
+            horizontalAreaSquareMeters={
+              activeHeight.summary.engineHorizontalAreaSquareMeters
+            }
             surfaceAreaSquareMeters={r4SurfaceAreaSquareMeters}
             pitchDegrees={r4PitchDegrees}
             snapshotHash={activeHeight.summary.snapshotHash}
@@ -1240,6 +1258,13 @@ export function RealAddressResult({
           {t.engineUnavailable}
         </p>
       )}
+      <NorgeIBilderCaptureControl
+        api={captureApi}
+        caseReference={caseReference}
+        leadId={leadId}
+        address={result.address}
+        selectedFootprint={selected.polygon}
+      />
     </div>
   );
 }
@@ -1247,6 +1272,7 @@ export function RealAddressResult({
 export function AdminNextRoofFusionUatControl({
   action,
   addressLookupAction,
+  captureApi,
   defaultCaseReference = "TF-13",
   heightAnalysisAction,
   locale,
@@ -1259,6 +1285,7 @@ export function AdminNextRoofFusionUatControl({
     previousState: RoofFusionAddressLookupState,
     formData: FormData,
   ) => Promise<RoofFusionAddressLookupState>;
+  captureApi?: NorgeIBilderCaptureApi;
   heightAnalysisAction: (
     previousState: RoofFusionHeightAnalysisState,
     formData: FormData,
@@ -1268,6 +1295,9 @@ export function AdminNextRoofFusionUatControl({
 }) {
   const t = copy[locale];
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [caseReference, setCaseReference] = useState(defaultCaseReference);
+  const leadIdMatch = /^TF-([1-9][0-9]*)$/.exec(caseReference.trim());
+  const leadId = leadIdMatch ? Number(leadIdMatch[1]) : undefined;
   const [addressState, addressFormAction, addressPending] = useActionState(
     addressLookupAction,
     initialAddressState,
@@ -1315,7 +1345,8 @@ export function AdminNextRoofFusionUatControl({
             <input
               autoCapitalize="characters"
               className="min-h-12 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-4 font-mono text-[var(--an-text)] outline-none focus:border-[var(--an-amber)]"
-              defaultValue={defaultCaseReference}
+              value={caseReference}
+              onChange={(event) => setCaseReference(event.target.value)}
               id="roof-fusion-uat-case"
               name="caseReference"
               pattern="TF-[1-9][0-9]*"
@@ -1438,6 +1469,9 @@ export function AdminNextRoofFusionUatControl({
         </p>
         {addressState.kind === "success" ? (
           <RealAddressResult
+            captureApi={captureApi}
+            caseReference={caseReference}
+            leadId={leadId}
             heightAnalysisAction={heightAnalysisAction}
             key={`${addressState.address.id}:${addressState.candidates.map((candidate) => candidate.id).join(",")}`}
             locale={locale}
