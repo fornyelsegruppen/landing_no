@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { PayloadRequest } from "payload";
 import {
   AdminNextRoofFusionUatControl,
+  type RoofFusionAddressLookupState,
   type RoofFusionUatActionState,
 } from "@/components/admin-next/admin-next-roof-fusion-uat-control";
 import { parseAdminNextR4CaseIdentityV1 } from "@/lib/admin-next/r4-read-adapter";
@@ -9,6 +10,8 @@ import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
+import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
+import { OpenStreetMapBuildingProvider } from "@/lib/providers/osm-building-provider";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
 import {
   assertRoofFusionPreviewEnabledV1,
@@ -58,9 +61,55 @@ export default async function AdminNextRoofFusionUatPage() {
     };
   }
 
+  async function lookupRealAddress(
+    _previousState: RoofFusionAddressLookupState,
+    formData: FormData,
+  ): Promise<RoofFusionAddressLookupState> {
+    "use server";
+
+    assertRoofFusionPreviewEnabledV1(process.env);
+    await requireAdminUser();
+    const query = String(formData.get("addressQuery") ?? "")
+      .trim()
+      .replace(/\s+/gu, " ");
+    if (query.length < 4 || query.length > 180) {
+      return { kind: "error", code: "INVALID_ADDRESS" };
+    }
+
+    try {
+      const addresses = await new KartverketAddressProvider().searchAddress(
+        query,
+      );
+      const address = addresses[0];
+      if (!address) return { kind: "error", code: "ADDRESS_NOT_FOUND" };
+
+      const candidates =
+        await new OpenStreetMapBuildingProvider().findBuildings({
+          latitude: address.latitude,
+          longitude: address.longitude,
+        });
+      if (!candidates.length) {
+        return {
+          kind: "error",
+          code: "BUILDING_NOT_FOUND",
+          resolvedAddress: address.label,
+        };
+      }
+
+      return {
+        kind: "success",
+        address,
+        candidates,
+      };
+    } catch {
+      return { kind: "error", code: "PROVIDER_UNAVAILABLE" };
+    }
+  }
+
   return (
     <AdminNextRoofFusionUatControl
       action={prepareR4Uat}
+      addressLookupAction={lookupRealAddress}
       defaultCaseReference="TF-13"
       locale={user.interfaceLanguage}
     />

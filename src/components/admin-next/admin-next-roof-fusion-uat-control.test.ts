@@ -1,13 +1,17 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AdminNextRoofFusionUatControl } from "./admin-next-roof-fusion-uat-control";
+import {
+  AdminNextRoofFusionUatControl,
+  RealAddressResult,
+} from "./admin-next-roof-fusion-uat-control";
 
 describe("Admin Next Roof Fusion UAT control", () => {
   it("renders an explicit, Preview-only synthetic preparation action", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUatControl, {
         action: async () => ({ kind: "idle" as const }),
+        addressLookupAction: async () => ({ kind: "idle" as const }),
         defaultCaseReference: "TF-13",
         locale: "lt",
       }),
@@ -18,5 +22,59 @@ describe("Admin Next Roof Fusion UAT control", () => {
     expect(html).toContain("Paruošti R4 UAT");
     expect(html).toContain("TF-13");
     expect(html).toContain("Production duomenys neliečiami");
+    expect(html).toContain('data-roof-fusion-address="lookup-only"');
+    expect(html).toContain('name="addressQuery"');
+    expect(html).toContain("Rasti pastatą");
+    expect(html).toContain("Paieška neišsaugoma ir nesukuria matavimo");
+  });
+
+  it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {
+    const html = renderToStaticMarkup(
+      createElement(RealAddressResult, {
+        locale: "lt",
+        result: {
+          kind: "success" as const,
+          address: {
+            id: "0301-1-1-0-0-Storgata 1",
+            label: "Storgata 1, 0155 Oslo",
+            postalCode: "0155",
+            city: "Oslo",
+            latitude: 59.9127,
+            longitude: 10.7461,
+            source: "Kartverket",
+          },
+          candidates: [
+            {
+              id: "way/123",
+              label: "house · 120 m²",
+              polygon: [
+                { latitude: 59.9126, longitude: 10.746 },
+                { latitude: 59.9126, longitude: 10.7462 },
+                { latitude: 59.9128, longitude: 10.7462 },
+                { latitude: 59.9128, longitude: 10.746 },
+              ],
+              horizontalAreaSquareMeters: 120,
+              distanceToAddressMeters: 0,
+              containsAddress: true,
+              confidence: "high",
+              confidenceReasoning: "Address point is inside the footprint",
+              source: "OpenStreetMap building footprint via Overpass API",
+              sourceUrl: "https://www.openstreetmap.org/way/123",
+              license: "Open Database License (ODbL) 1.0",
+              credits: "© OpenStreetMap contributors",
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(html).toContain("Storgata 1, 0155 Oslo");
+    expect(html).toContain("120 m²");
+    expect(html).toContain("© OpenStreetMap contributors");
+    expect(html).toContain(
+      "Ortofoto bus prijungtas gavus licencijuotą prieigą",
+    );
+    expect(html).toContain("dar ne galutiniai stogo šlaitai");
+    expect(html).not.toContain("Paruošta tvirtinti");
   });
 });
