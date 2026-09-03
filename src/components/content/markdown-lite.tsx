@@ -7,7 +7,7 @@ type Props = {
 };
 
 export type MarkdownBlock =
-  | { type: "heading"; level: 2 | 3; content: string }
+  | { type: "heading"; level: 2 | 3 | 4; content: string }
   | { type: "paragraph"; content: string }
   | { type: "unordered-list"; items: string[] }
   | { type: "ordered-list"; items: string[] }
@@ -46,12 +46,12 @@ export function parseMarkdownBlocks(content: string): MarkdownBlock[] {
       continue;
     }
 
-    const heading = line.match(/^(#{2,3})\s+(.+)$/);
+    const heading = line.match(/^(#{2,4})\s+(.+)$/);
     if (heading) {
       flush();
       blocks.push({
         type: "heading",
-        level: heading[1]?.length === 3 ? 3 : 2,
+        level: heading[1]?.length === 4 ? 4 : heading[1]?.length === 3 ? 3 : 2,
         content: heading[2] || "",
       });
       continue;
@@ -122,6 +122,17 @@ export function MarkdownLite({ content, locale = "no" }: Props) {
   return (
     <div className="space-y-5">
       {blocks.map((block, index) => {
+        if (block.type === "heading" && block.level === 4) {
+          return (
+            <h4
+              key={index}
+              className="text-foreground pt-2 text-lg font-semibold tracking-tight"
+            >
+              {inlineMarkdown(block.content, locale)}
+            </h4>
+          );
+        }
+
         if (block.type === "heading" && block.level === 3) {
           return (
             <h3

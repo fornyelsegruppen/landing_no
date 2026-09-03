@@ -178,4 +178,25 @@ Standard inkluderer impregnering som redusere fuktopptak på egnet takstein. Et 
       ]),
     );
   });
+
+  it("blocks the awkward prose and third-person CTA found in post 6", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}
+
+Når man vurderer å friske opp boligens øverste flater, dukker spørsmålet om timing naturlig opp. For at en takvask og påfølgende behandlinger skal få gode vilkår, må klimaet spille på lag. Lang soltid tørker opp taket raskt, mens høsten gir nedfall i form av blader.
+
+For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gjerne sende bilder.`,
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "unnatural_norwegian",
+        "internal_instruction_leak",
+      ]),
+    );
+  });
 });

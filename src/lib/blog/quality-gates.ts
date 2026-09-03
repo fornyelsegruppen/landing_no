@@ -141,7 +141,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til/i.test(
+    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader/i.test(
       allText,
     )
   ) {
@@ -202,7 +202,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /be\s+om\s+postnummer[^.]{0,240}(uten\s+å\s+love|teknisk\s+konklusjon)/i.test(
+    /be\s+om\s+postnummer[^.]{0,240}(uten\s+å\s+love|teknisk\s+konklusjon)|for\s+å\s+forberede\s+vurderingen\s+kan\s+kunden\s+oppgi/i.test(
       allText,
     )
   ) {

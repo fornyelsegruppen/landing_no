@@ -21,7 +21,7 @@ describe("Markdown block parsing", () => {
   it("keeps headings separate when generated Markdown omits blank lines", () => {
     expect(
       parseMarkdownBlocks(
-        "## Kort svar\nDette er et eget avsnitt.\n- Første punkt\n- Andre punkt\n### Neste del\nMer tekst.",
+        "## Kort svar\nDette er et eget avsnitt.\n- Første punkt\n- Andre punkt\n### Neste del\nMer tekst.\n#### Vår\nSesongtekst.",
       ),
     ).toEqual([
       { type: "heading", level: 2, content: "Kort svar" },
@@ -29,6 +29,8 @@ describe("Markdown block parsing", () => {
       { type: "unordered-list", items: ["Første punkt", "Andre punkt"] },
       { type: "heading", level: 3, content: "Neste del" },
       { type: "paragraph", content: "Mer tekst." },
+      { type: "heading", level: 4, content: "Vår" },
+      { type: "paragraph", content: "Sesongtekst." },
     ]);
   });
 

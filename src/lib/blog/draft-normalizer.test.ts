@@ -10,7 +10,11 @@ describe("generated article normalizer", () => {
 * Standard: Impregnering som styrker taksteinen.
 * Premium: Dypere beskyttelse og maling.
 
-Tak med høyt monterte flater krever ekstra omtanke under utførelsen. Impregnering som redusere fuktopptak omtales forsiktig. Taket har organisk materiale som mose og sot. Be om postnummer, valgfri adresse og gjerne bilder, uten å love endelig teknisk konklusjon eller pris.`,
+Tak med høyt monterte flater krever ekstra omtanke under utførelsen. Impregnering som redusere fuktopptak omtales forsiktig. Taket har organisk materiale som mose og sot. Be om postnummer, valgfri adresse og gjerne bilder, uten å love endelig teknisk konklusjon eller pris.
+
+Når man vurderer å friske opp boligens øverste flater, dukker spørsmålet om timing naturlig opp. For at en takvask og påfølgende behandlinger skal få gode vilkår, må klimaet spille på lag. Lang soltid og varmere luft tørker opp taket raskt. Mange opplever at høsten bringer mye fuktighet og nedfall i form av blader.
+
+For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gjerne sende bilder. Dette er bakgrunnsinformasjon, ikke en teknisk konklusjon eller et bindende pristilbud.`,
     });
 
     const result = normalizeGeneratedArticleDraft(input) as ReturnType<
@@ -32,8 +36,17 @@ Tak med høyt monterte flater krever ekstra omtanke under utførelsen. Impregner
     expect(result.content).toContain(
       "For å forberede vurderingen kan du oppgi postnummer",
     );
+    expect(result.content).toContain(
+      "Når du vurderer å vaske taket, er tidspunktet viktig.",
+    );
+    expect(result.content).toContain(
+      "Lange, varme dager kan bidra til at taket tørker raskere.",
+    );
+    expect(result.content).toContain(
+      "Be om en gratis og uforpliktende vurdering.",
+    );
     expect(result.content).not.toMatch(
-      /styrker taksteinen|som redusere\b|høyt monterte|organisk materiale|uten å love/i,
+      /styrker taksteinen|som redusere\b|høyt monterte|organisk materiale|uten å love|boligens øverste|lang soltid|kan kunden oppgi/i,
     );
   });
 

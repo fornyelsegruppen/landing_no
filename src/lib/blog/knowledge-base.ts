@@ -1,4 +1,4 @@
-export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-03-v4";
+export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-03-v5";
 
 export const approvedPackageDefinitions = {
   Basic:
@@ -68,7 +68,7 @@ export const approvedBlogKnowledge = {
     "Ikke oppfordre boligeiere til å gå opp på taket. Ved lekkasje, snølast, konstruksjonsrisiko eller usikkerhet skal fagperson vurdere saken.",
   cta: "Be om en gratis og uforpliktende vurdering.",
   leadInformation:
-    "For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gjerne sende bilder. Dette er bakgrunnsinformasjon, ikke en teknisk konklusjon eller et bindende pristilbud.",
+    "Oppgi gjerne postnummer og valgfri adresse, og send gjerne bilder av taket. Bildene hjelper oss å forberede vurderingen, men er ikke en teknisk konklusjon eller et bindende pristilbud.",
   forbiddenClaims: [
     "Norges beste",
     "billigst i markedet",

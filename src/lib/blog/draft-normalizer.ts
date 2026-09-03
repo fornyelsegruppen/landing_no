@@ -15,6 +15,22 @@ const approvedNorwegianReplacements: Array<[RegExp, string]> = [
     "mose, lav, alger og smuss",
   ],
   [
+    /Når\s+man\s+vurderer\s+å\s+friske\s+opp\s+boligens\s+øverste\s+flater,\s*dukker\s+spørsmålet\s+om\s+timing\s+naturlig\s+opp\./gi,
+    "Når du vurderer å vaske taket, er tidspunktet viktig.",
+  ],
+  [
+    /For\s+at\s+en\s+takvask\s+og\s+påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår,\s*må\s+klimaet\s+spille\s+på\s+lag\./gi,
+    "For at takvask og eventuell etterbehandling skal kunne gjennomføres under gode forhold, må været være egnet.",
+  ],
+  [
+    /Lang\s+soltid\s+og\s+varmere\s+luft\s+tørker\s+opp\s+taket\s+raskt\./gi,
+    "Lange, varme dager kan bidra til at taket tørker raskere.",
+  ],
+  [
+    /Mange\s+opplever\s+at\s+høsten\s+bringer\s+mye\s+fuktighet\s+og\s+nedfall\s+i\s+form\s+av\s+blader\./gi,
+    "Høsten byr ofte på høyere luftfuktighet og løv som samler seg på taket og i takrennene.",
+  ],
+  [
     /impregnering\s+som\s+(styrker|forsterker)\s+taksteinen/gi,
     "impregnering som reduserer fuktopptak på egnet takstein",
   ],
@@ -25,6 +41,10 @@ const approvedNorwegianReplacements: Array<[RegExp, string]> = [
   [
     /Be\s+om\s+postnummer,\s*valgfri\s+adresse\s+og\s+gjerne\s+bilder,\s*uten\s+å\s+love\s+endelig\s+teknisk\s+konklusjon\s+eller\s+pris\.?/g,
     "For å forberede vurderingen kan du oppgi postnummer, valgfri adresse og gjerne sende bilder.",
+  ],
+  [
+    /For\s+å\s+forberede\s+vurderingen\s+kan\s+kunden\s+oppgi\s+postnummer,\s*valgfri\s+adresse\s+og\s+gjerne\s+sende\s+bilder\.\s*Dette\s+er\s+bakgrunnsinformasjon,\s*ikke\s+en\s+teknisk\s+konklusjon\s+eller\s+et\s+bindende\s+pristilbud\./gi,
+    "Be om en gratis og uforpliktende vurdering. Oppgi gjerne postnummer og valgfri adresse, og send gjerne bilder av taket. Bildene hjelper oss å forberede vurderingen, men er ikke en teknisk konklusjon eller et bindende pristilbud.",
   ],
 ];
 
