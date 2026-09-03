@@ -1,12 +1,20 @@
 import type { AiProvider } from "@/lib/providers/contracts";
-import { generatedArticleSchema, type GeneratedArticle } from "./article-schema";
+import {
+  generatedArticleSchema,
+  type GeneratedArticle,
+} from "./article-schema";
 import { blogKnowledgeVersion } from "./knowledge-base";
-import { buildBlogArticlePrompt, buildBlogSystemPrompt, blogPromptVersion } from "./prompt";
+import {
+  buildBlogArticlePrompt,
+  buildBlogSystemPrompt,
+  blogPromptVersion,
+} from "./prompt";
 import {
   evaluateArticleQuality,
   type ArticleQualityResult,
 } from "./quality-gates";
 import type { ExistingTopic, TopicCandidate } from "./topic-engine";
+import { normalizeGeneratedArticleDraft } from "./draft-normalizer";
 
 export class ArticleQualityBlockedError extends Error {
   constructor(readonly quality: ArticleQualityResult) {
@@ -41,9 +49,10 @@ export async function generateBlogDraft(input: {
     schemaName: blogPromptVersion,
     correlationId: input.correlationId,
   });
-  const parsed = generatedArticleSchema.safeParse(generated.data);
+  const normalized = normalizeGeneratedArticleDraft(generated.data);
+  const parsed = generatedArticleSchema.safeParse(normalized);
   const quality = evaluateArticleQuality(
-    parsed.success ? parsed.data : generated.data,
+    parsed.success ? parsed.data : normalized,
     input.topic,
     input.existing,
     input.now,

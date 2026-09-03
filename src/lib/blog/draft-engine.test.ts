@@ -24,7 +24,9 @@ describe("AI blog draft engine", () => {
       correlationId: "phase4-test-second",
     });
     expect([first, second].every((draft) => draft.quality.passed)).toBe(true);
-    expect([first, second].every((draft) => draft.article.content.length > 700)).toBe(true);
+    expect(
+      [first, second].every((draft) => draft.article.content.length > 700),
+    ).toBe(true);
   });
 
   it("never returns a blocked provider output as a draft", async () => {
@@ -36,5 +38,34 @@ describe("AI blog draft engine", () => {
         correlationId: "phase4-test-blocked",
       }),
     ).rejects.toBeInstanceOf(ArticleQualityBlockedError);
+  });
+
+  it("normalizes approved Norwegian and package copy before deterministic QA", async () => {
+    const base = validGeneratedArticle();
+    const result = await generateBlogDraft({
+      provider: new DeterministicAiProvider(
+        validGeneratedArticle({
+          content: `${base.content}
+
+## Pakker
+
+* Basic: Standard overflatebehandling.
+* Standard: Impregnering som styrker taksteinen.
+* Premium: Dypere beskyttelse og maling.
+
+Impregnering som redusere fuktopptak krever kontroll. Be om postnummer, valgfri adresse og gjerne bilder, uten å love endelig teknisk konklusjon eller pris.`,
+        }),
+      ),
+      topic: validTopic,
+      existing: [],
+      correlationId: "phase4-test-normalized",
+    });
+
+    expect(result.quality.passed).toBe(true);
+    expect(result.article.content).toContain(
+      "Standard fra 138 kr/m² + mva: alt i Basic",
+    );
+    expect(result.article.content).toContain("som reduserer fuktopptak");
+    expect(result.article.content).not.toContain("uten å love");
   });
 });

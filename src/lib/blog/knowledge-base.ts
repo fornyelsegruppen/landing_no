@@ -1,5 +1,14 @@
 export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-03-v4";
 
+export const approvedPackageDefinitions = {
+  Basic:
+    "Basic fra 99 kr/m² + mva: taksjekk, mosebehandling og skånsom takvask.",
+  Standard:
+    "Standard fra 138 kr/m² + mva: alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
+  Premium:
+    "Premium fra 337 kr/m² + mva: alt i Standard, samt profesjonell takmaling og valg av passende takfarge.",
+} as const;
+
 export const approvedBlogKnowledge = {
   company: "Takfornyelse, en del av Fornyelse Gruppen AS",
   voice: ["rolig", "konkret", "ryddig", "hjelpsom", "faglig ydmyk"],
@@ -9,11 +18,7 @@ export const approvedBlogKnowledge = {
     "Standard fra 138 kr/m² + mva",
     "Premium fra 337 kr/m² + mva",
   ],
-  packageDefinitions: [
-    "Basic: taksjekk, mosebehandling og skånsom takvask.",
-    "Standard: alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
-    "Premium: alt i Standard, samt profesjonell takmaling og valg av passende takfarge.",
-  ],
+  packageDefinitions: Object.values(approvedPackageDefinitions),
   internalPaths: [
     "/takvask",
     "/takvask-og-impregnering",

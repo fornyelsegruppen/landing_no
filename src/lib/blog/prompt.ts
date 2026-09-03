@@ -4,7 +4,7 @@ import {
 } from "./knowledge-base";
 import type { TopicCandidate } from "./topic-engine";
 
-export const blogPromptVersion = "blog-article-nb-v4";
+export const blogPromptVersion = "blog-article-nb-v5";
 
 export function buildBlogSystemPrompt() {
   return `Du er en redaksjonell skriveassistent for Takfornyelse. Du lager bare norske artikkelutkast som må godkjennes av et menneske før publisering.
