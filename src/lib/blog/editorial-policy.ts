@@ -19,9 +19,17 @@ export type EditorialPost = {
   titleEn?: string | null;
   titleNo?: string | null;
   publishedAt?: string | null;
-  qualityChecks?: { passed?: boolean | null } | null;
+  qualityChecks?:
+    | { passed?: boolean | null; [key: string]: unknown }
+    | string
+    | number
+    | boolean
+    | unknown[]
+    | null;
   qualityScore?: number | null;
-  [key: string]: unknown;
+  sources?: Array<{
+    url?: string | null;
+  }> | null;
 };
 
 type EditorialPreparationOptions = {
@@ -54,10 +62,22 @@ function qualityInputChanged(
   incoming: EditorialPost,
 ) {
   if (!original) return false;
+  const originalFields = original as Record<string, unknown>;
+  const incomingFields = incoming as Record<string, unknown>;
   return qualityInputFields.some(
     (field) =>
-      Object.prototype.hasOwnProperty.call(incoming, field) &&
-      JSON.stringify(incoming[field]) !== JSON.stringify(original[field]),
+      Object.prototype.hasOwnProperty.call(incomingFields, field) &&
+      JSON.stringify(incomingFields[field]) !==
+        JSON.stringify(originalFields[field]),
+  );
+}
+
+function qualityChecksPassed(value: EditorialPost["qualityChecks"]): boolean {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    value.passed === true,
   );
 }
 
@@ -87,6 +107,63 @@ function present(value: string | null | undefined) {
   return Boolean(value?.trim());
 }
 
+export function isPreciseSourceUrl(url: string | null | undefined) {
+  try {
+    const parsed = new URL(url || "");
+    return (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      parsed.pathname !== "/" &&
+      parsed.pathname !== ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function publicationReadinessErrors(post: EditorialPost): string[] {
+  const errors: string[] = [];
+  const alreadyPublished =
+    post._status === "published" && post.editorialStatus === "published";
+
+  if (
+    post.editorialStatus !== "approved" &&
+    post.editorialStatus !== "scheduled" &&
+    !alreadyPublished
+  ) {
+    errors.push("Innlegget må være godkjent før publisering");
+  }
+
+  if (!present(post.reviewerName)) {
+    errors.push("Faglig kontrollør mangler");
+  }
+
+  if (!post.reviewedAt) {
+    errors.push("Kontrolldato mangler");
+  }
+
+  if (
+    post.aiAssisted === true &&
+    (!qualityChecksPassed(post.qualityChecks) || (post.qualityScore || 0) < 75)
+  ) {
+    errors.push("AI-utkastet må bestå kvalitetskontrollen før publisering");
+  }
+
+  const preciseSourceCount = (post.sources || []).filter((source) =>
+    isPreciseSourceUrl(source?.url),
+  ).length;
+  if (preciseSourceCount < 1) {
+    errors.push("Minst én presis kilde må være lagt inn før publisering");
+  }
+
+  return errors;
+}
+
+export function assertPostPublishable(post: EditorialPost) {
+  const errors = publicationReadinessErrors(post);
+  if (errors.length) throw new TypeError(errors.join("; "));
+  return true;
+}
+
 export function availablePostLocales(post: EditorialPost): ("no" | "en")[] {
   const locales: ("no" | "en")[] = [];
   if (present(post.titleNo) && present(post.contentNo)) locales.push("no");
@@ -110,15 +187,7 @@ export function validateEditorialPost(post: EditorialPost): string[] {
 
   if (post._status === "published") {
     if (!present(post.authorName)) errors.push("Forfatter mangler");
-    if (!present(post.reviewerName)) errors.push("Faglig kontrollør mangler");
-    if (!post.reviewedAt) errors.push("Kontrolldato mangler");
-    if (
-      post.editorialStatus !== "approved" &&
-      post.editorialStatus !== "scheduled" &&
-      post.editorialStatus !== "published"
-    ) {
-      errors.push("Innlegget er ikke redaksjonelt godkjent");
-    }
+    errors.push(...publicationReadinessErrors(post));
   }
 
   return errors;
@@ -147,7 +216,7 @@ export function prepareEditorialPost(
 export function prepareAdminPublication(
   original: EditorialPost | null | undefined,
   incoming: EditorialPost,
-  reviewerName: string,
+  _reviewerName: string,
   now: Date = new Date(),
   options: EditorialPreparationOptions = {},
 ) {
@@ -161,7 +230,8 @@ export function prepareAdminPublication(
 
   if (
     merged.aiAssisted === true &&
-    (merged.qualityChecks?.passed !== true || (merged.qualityScore || 0) < 75)
+    (!qualityChecksPassed(merged.qualityChecks) ||
+      (merged.qualityScore || 0) < 75)
   ) {
     throw new TypeError(
       "AI-utkastet må bestå kvalitetskontrollen før publisering",
@@ -171,13 +241,9 @@ export function prepareAdminPublication(
   const reviewed = {
     ...prepared,
     authorName: merged.authorName?.trim() || "Takfornyelse",
-    reviewerName: merged.reviewerName?.trim() || reviewerName,
-    reviewedAt: merged.reviewedAt || now.toISOString(),
-    editorialStatus: ["approved", "scheduled", "published"].includes(
-      merged.editorialStatus || "",
-    )
-      ? merged.editorialStatus
-      : ("approved" as const),
+    reviewerName: merged.reviewerName,
+    reviewedAt: merged.reviewedAt,
+    editorialStatus: merged.editorialStatus,
   };
 
   return prepareEditorialPost(original, reviewed, now, {

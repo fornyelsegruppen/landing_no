@@ -14,6 +14,9 @@ type Props = {
   id: number;
   locale: PanelLocale;
   primaryKeyword?: string;
+  publishEligible?: boolean;
+  qualityPassed?: boolean;
+  qualityScore?: number | null;
   reviewerName: string;
   seoDescriptionNo?: string;
   seoTitleNo?: string;
@@ -25,6 +28,7 @@ export function BlogEditor(props: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const publishDisabled = busy || !props.publishEligible;
   const [form, setForm] = useState({
     titleNo: props.titleNo,
     excerptNo: props.excerptNo || "",
@@ -202,7 +206,7 @@ export function BlogEditor(props: Props) {
           </button>
           <button
             className="bg-accent text-accent-foreground min-h-11 rounded-xl px-4 font-bold"
-            disabled={busy}
+            disabled={publishDisabled}
             onClick={() => void act("publish")}
             type="button"
           >
@@ -222,6 +226,15 @@ export function BlogEditor(props: Props) {
             {notice}
           </p>
         ) : null}
+        <p className="text-muted-foreground mt-3 text-sm">
+          {props.publishEligible
+            ? copy.publishHintReady
+            : copy.publishHintBlocked}
+          {typeof props.qualityScore === "number"
+            ? ` ${copy.quality}: ${props.qualityScore}.`
+            : ""}
+          {props.qualityPassed === false ? ` ${copy.qualityFailed}.` : ""}
+        </p>
       </section>
     </div>
   );

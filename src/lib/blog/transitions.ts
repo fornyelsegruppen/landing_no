@@ -45,18 +45,8 @@ export function assertBlogAction(
     }
   }
   if (action === "publish") {
-    if (
-      !["ai_qa", "human_review", "approved", "scheduled", "published"].includes(
-        input.status,
-      )
-    ) {
-      throw new TypeError("Only reviewed articles can be published");
-    }
-    if (
-      !["approved", "scheduled", "published"].includes(input.status) &&
-      (!input.qualityPassed || (input.qualityScore || 0) < 75)
-    ) {
-      throw new TypeError("The deterministic quality gate has not passed");
+    if (!["approved", "scheduled", "published"].includes(input.status)) {
+      throw new TypeError("Only approved articles can be published");
     }
     if (!input.reviewerName?.trim()) {
       throw new TypeError("Reviewer name is required");

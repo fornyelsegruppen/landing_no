@@ -15,6 +15,11 @@ describe("manual article publishing and measured lead flow", () => {
       editorialStatus: "draft" as const,
       titleNo: "Hva påvirker prisen på takvask?",
       contentNo: "## Tilstand\n\nPris avhenger av takets tilstand.",
+      sources: [
+        {
+          url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+        },
+      ],
     };
     expect(validateEditorialPost(draft)).toEqual([]);
     expect(safePreviewPath("no", "/no/blogg/takvask-pris")).toBe(
@@ -30,6 +35,11 @@ describe("manual article publishing and measured lead flow", () => {
         authorName: "Takfornyelse",
         reviewerName: "Faglig ansvarlig",
         reviewedAt: "2026-08-23T10:00:00.000Z",
+        sources: [
+          {
+            url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+          },
+        ],
       },
       new Date("2026-08-23T12:00:00.000Z"),
     );

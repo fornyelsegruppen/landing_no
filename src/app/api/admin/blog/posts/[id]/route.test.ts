@@ -72,6 +72,13 @@ describe("admin blog post actions", () => {
       titleNo: "Tidligere kontrollert tittel",
       contentNo: "Tidligere kontrollert innhold",
       editorialStatus: "approved",
+      sources: [
+        {
+          label: "Arbeidstilsynet",
+          url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+          publisher: "Arbeidstilsynet",
+        },
+      ],
       qualityScore: 92,
       qualityChecks: { passed: true },
       reviewerName: "Tidligere kontrollør",
@@ -160,12 +167,19 @@ describe("admin blog post actions", () => {
   it("preserves explicit manual administrator publication", async () => {
     mocks.findByID.mockResolvedValue({
       id: 9,
-      editorialStatus: "ai_qa",
+      editorialStatus: "approved",
       qualityScore: 92,
       qualityChecks: { passed: true },
       authorName: "Takfornyelse",
-      reviewerName: null,
-      reviewedAt: null,
+      sources: [
+        {
+          label: "Arbeidstilsynet",
+          url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+          publisher: "Arbeidstilsynet",
+        },
+      ],
+      reviewerName: "Tidligere kontrollør",
+      reviewedAt: "2026-08-29T10:00:00.000Z",
       _status: "draft",
     });
 
@@ -178,9 +192,94 @@ describe("admin blog post actions", () => {
         data: expect.objectContaining({
           _status: "published",
           editorialStatus: "approved",
-          reviewerName: "Kari",
+          reviewerName: "Tidligere kontrollør",
+          reviewedAt: "2026-08-29T10:00:00.000Z",
         }),
       }),
     );
+  });
+
+  it("blocks publish until a separate approve step has happened", async () => {
+    mocks.findByID.mockResolvedValue({
+      id: 9,
+      editorialStatus: "human_review",
+      qualityScore: 92,
+      qualityChecks: { passed: true },
+      authorName: "Takfornyelse",
+      sources: [
+        {
+          label: "Arbeidstilsynet",
+          url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+          publisher: "Arbeidstilsynet",
+        },
+      ],
+      reviewerName: "Kari",
+      reviewedAt: "2026-08-29T10:00:00.000Z",
+      _status: "draft",
+    });
+
+    const response = await POST(request({ action: "publish" }), context);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "Only approved articles can be published",
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks publish when the article has only homepage sources", async () => {
+    mocks.findByID.mockResolvedValue({
+      id: 9,
+      editorialStatus: "approved",
+      qualityScore: 92,
+      qualityChecks: { passed: true },
+      authorName: "Takfornyelse",
+      sources: [
+        {
+          label: "SINTEF",
+          url: "https://www.sintef.no/",
+          publisher: "SINTEF",
+        },
+      ],
+      reviewerName: "Kari",
+      reviewedAt: "2026-08-29T10:00:00.000Z",
+      _status: "draft",
+    });
+
+    const response = await POST(request({ action: "publish" }), context);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "Minst én presis kilde må være lagt inn før publisering",
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks publish when no persisted approval record exists yet", async () => {
+    mocks.findByID.mockResolvedValue({
+      id: 9,
+      editorialStatus: "approved",
+      qualityScore: 92,
+      qualityChecks: { passed: true },
+      authorName: "Takfornyelse",
+      sources: [
+        {
+          label: "Arbeidstilsynet",
+          url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+          publisher: "Arbeidstilsynet",
+        },
+      ],
+      reviewerName: null,
+      reviewedAt: null,
+      _status: "draft",
+    });
+
+    const response = await POST(request({ action: "publish" }), context);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "Reviewer name is required",
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

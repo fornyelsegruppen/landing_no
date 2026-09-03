@@ -22,7 +22,7 @@ describe("editorial admin actions", () => {
     ).toBe(true);
   });
 
-  it("requires approval before scheduling and allows passed review to publish", () => {
+  it("requires approval before scheduling and before publish", () => {
     expect(() =>
       assertBlogAction(
         {
@@ -36,7 +36,7 @@ describe("editorial admin actions", () => {
         new Date("2026-01-01T00:00:00.000Z"),
       ),
     ).toThrow(/Only approved/);
-    expect(
+    expect(() =>
       assertBlogAction(
         {
           status: "ai_qa",
@@ -46,17 +46,17 @@ describe("editorial admin actions", () => {
         },
         "publish",
       ),
-    ).toBe(true);
-    expect(() =>
+    ).toThrow(/Only approved/);
+    expect(
       assertBlogAction(
         {
-          status: "ai_qa",
-          qualityPassed: false,
+          status: "approved",
+          qualityPassed: true,
           qualityScore: 90,
           reviewerName: "Kari",
         },
         "publish",
       ),
-    ).toThrow(/quality gate/);
+    ).toBe(true);
   });
 });

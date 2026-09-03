@@ -15,6 +15,11 @@ const original = {
   titleNo: "Kontrollert tittel",
   contentNo: "Tidligere kontrollert innhold",
   authorName: "Takfornyelse",
+  sources: [
+    {
+      url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+    },
+  ],
   aiAssisted: true,
   qualityScore: 94,
   qualityChecks: { passed: true },
@@ -101,5 +106,66 @@ describe("Posts technical editor quality policy", () => {
       qualityScore: 91,
       qualityChecks: { passed: true },
     });
+  });
+
+  it("blocks direct published writes until the article has been explicitly approved", () => {
+    expect(() =>
+      beforeChangeHook()({
+        context: {},
+        data: { _status: "published" },
+        operation: "update",
+        originalDoc: { ...original, editorialStatus: "human_review" },
+        req: {
+          user: {
+            active: true,
+            displayName: "Administrator",
+            role: "admin",
+          },
+        },
+      } as never),
+    ).toThrow(/godkjent før publisering/);
+  });
+
+  it("blocks direct published writes when only homepage sources exist", () => {
+    expect(() =>
+      beforeChangeHook()({
+        context: {},
+        data: { _status: "published" },
+        operation: "update",
+        originalDoc: {
+          ...original,
+          sources: [{ url: "https://www.sintef.no/" }],
+        },
+        req: {
+          user: {
+            active: true,
+            displayName: "Administrator",
+            role: "admin",
+          },
+        },
+      } as never),
+    ).toThrow(/Minst én presis kilde/);
+  });
+
+  it("does not synthesize approval metadata during a direct admin publish", () => {
+    expect(() =>
+      beforeChangeHook()({
+        context: {},
+        data: { _status: "published" },
+        operation: "update",
+        originalDoc: {
+          ...original,
+          reviewerName: null,
+          reviewedAt: null,
+        },
+        req: {
+          user: {
+            active: true,
+            displayName: "Administrator",
+            role: "admin",
+          },
+        },
+      } as never),
+    ).toThrow(/Faglig kontrollør mangler/);
   });
 });

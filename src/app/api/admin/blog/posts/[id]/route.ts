@@ -7,6 +7,7 @@ import {
   assertBlogAction,
   type BlogEditorialStatus,
 } from "@/lib/blog/transitions";
+import { assertPostPublishable } from "@/lib/blog/editorial-policy";
 import { assertFeatureReady } from "@/lib/platform/features";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { regeneratePayloadBlogPost } from "@/lib/blog/payload-blog-engine";
@@ -178,9 +179,11 @@ export async function POST(
         ? (post.qualityChecks as { passed?: boolean })
         : {};
     const reviewerName =
-      parsed.data.reviewerName ||
-      post.reviewerName ||
-      reviewerNameForUser(user);
+      parsed.data.action === "approve"
+        ? parsed.data.reviewerName ||
+          post.reviewerName ||
+          reviewerNameForUser(user)
+        : post.reviewerName;
     assertBlogAction(
       {
         status: post.editorialStatus as BlogEditorialStatus,
@@ -192,6 +195,12 @@ export async function POST(
       parsed.data.action,
       parsed.data.scheduledAt,
     );
+    if (parsed.data.action === "publish") {
+      assertPostPublishable({
+        ...post,
+        reviewerName,
+      });
+    }
 
     if (parsed.data.action === "regenerate") {
       assertFeatureReady("aiDrafts");
@@ -243,7 +252,7 @@ export async function POST(
                 editorialStatus: "approved" as const,
                 authorName: post.authorName?.trim() || "Takfornyelse",
                 reviewerName,
-                reviewedAt: post.reviewedAt || now,
+                reviewedAt: post.reviewedAt,
               };
     const updated = await payload.update({
       collection: "posts",
