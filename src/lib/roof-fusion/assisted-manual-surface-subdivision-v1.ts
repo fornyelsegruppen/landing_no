@@ -91,6 +91,8 @@ const MAX_PLANE_RMSE_M = 1.2;
 const MAX_SHARED_EDGE_Z_DELTA_M = 0.75;
 const MIN_HEIGHT_ABOVE_TERRAIN_M = 1.5;
 const MIN_SAMPLES = 6;
+const MAX_CONSTRAINED_SYSTEM_DIMENSION = 256;
+const LINEAR_SOLVER_RELATIVE_EPS = 1e-11;
 
 function round(value: number, decimals = 6) {
   const factor = 10 ** decimals;
@@ -266,6 +268,178 @@ function fitPlane(points: Point3[]): Plane | null {
   };
 }
 
+type SharedPlaneConstraint = {
+  leftFaceIndex: number;
+  rightFaceIndex: number;
+  point: Point2;
+};
+
+function independentConstraintRows(rows: number[][]) {
+  const basis: number[][] = [];
+  for (const row of rows) {
+    const residual = [...row];
+    const inputNorm = Math.hypot(...residual);
+    if (!Number.isFinite(inputNorm) || inputNorm <= LINEAR_SOLVER_RELATIVE_EPS)
+      continue;
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (const existing of basis) {
+        const projection = residual.reduce(
+          (sum, value, index) => sum + value * existing[index],
+          0,
+        );
+        residual.forEach((value, index) => {
+          residual[index] = value - projection * existing[index];
+        });
+      }
+    }
+    const residualNorm = Math.hypot(...residual);
+    if (residualNorm <= inputNorm * LINEAR_SOLVER_RELATIVE_EPS) continue;
+    basis.push(residual.map((value) => value / residualNorm));
+  }
+  return basis;
+}
+
+function solveLinearSystem(matrixValue: number[][], rightHandSide: number[]) {
+  const size = rightHandSide.length;
+  if (
+    size === 0 ||
+    matrixValue.length !== size ||
+    matrixValue.some((row) => row.length !== size)
+  )
+    return null;
+  const matrix = matrixValue.map((row, index) => [
+    ...row,
+    rightHandSide[index],
+  ]);
+  const scale = Math.max(
+    1,
+    ...matrixValue.flatMap((row) => row.map((value) => Math.abs(value))),
+  );
+  for (let column = 0; column < size; column += 1) {
+    let pivot = column;
+    for (let row = column + 1; row < size; row += 1) {
+      if (Math.abs(matrix[row][column]) > Math.abs(matrix[pivot][column]))
+        pivot = row;
+    }
+    if (
+      !Number.isFinite(matrix[pivot][column]) ||
+      Math.abs(matrix[pivot][column]) <= scale * LINEAR_SOLVER_RELATIVE_EPS
+    )
+      return null;
+    [matrix[column], matrix[pivot]] = [matrix[pivot], matrix[column]];
+    const divisor = matrix[column][column];
+    for (let index = column; index <= size; index += 1)
+      matrix[column][index] /= divisor;
+    for (let row = 0; row < size; row += 1) {
+      if (row === column) continue;
+      const multiplier = matrix[row][column];
+      if (multiplier === 0) continue;
+      for (let index = column; index <= size; index += 1)
+        matrix[row][index] -= multiplier * matrix[column][index];
+    }
+  }
+  const solution = matrix.map((row) => row[size]);
+  return solution.every(Number.isFinite) ? solution : null;
+}
+
+/**
+ * Fits every face in one roof mass as one least-squares network. Equality at
+ * both endpoints makes two linear planes identical along their complete
+ * shared edge. Redundant junction constraints are removed deterministically
+ * before the bounded KKT system is solved.
+ */
+function fitPlanesWithSharedEdges(
+  samplesByFace: Point3[][],
+  constraints: SharedPlaneConstraint[],
+): Plane[] | null {
+  if (!samplesByFace.length) return null;
+  if (!constraints.length) {
+    const planes = samplesByFace.map(fitPlane);
+    return planes.every((plane): plane is Plane => plane !== null)
+      ? planes
+      : null;
+  }
+  const allPoints = [
+    ...samplesByFace.flat(),
+    ...constraints.map((constraint) => constraint.point),
+  ];
+  const minX = Math.min(...allPoints.map((point) => point.xM));
+  const maxX = Math.max(...allPoints.map((point) => point.xM));
+  const minY = Math.min(...allPoints.map((point) => point.yM));
+  const maxY = Math.max(...allPoints.map((point) => point.yM));
+  const originX = (minX + maxX) / 2;
+  const originY = (minY + maxY) / 2;
+  const coordinateScale = Math.max(maxX - minX, maxY - minY, 1);
+  const variableCount = samplesByFace.length * 3;
+  if (variableCount + constraints.length > MAX_CONSTRAINED_SYSTEM_DIMENSION)
+    return null;
+  const normalizedPoint = (point: Point2) => [
+    (point.xM - originX) / coordinateScale,
+    (point.yM - originY) / coordinateScale,
+    1,
+  ];
+  const constraintRows = constraints.map((constraint) => {
+    const row = Array<number>(variableCount).fill(0);
+    const point = normalizedPoint(constraint.point);
+    for (let coordinate = 0; coordinate < 3; coordinate += 1) {
+      row[constraint.leftFaceIndex * 3 + coordinate] = point[coordinate];
+      row[constraint.rightFaceIndex * 3 + coordinate] = -point[coordinate];
+    }
+    return row;
+  });
+  const independentRows = independentConstraintRows(constraintRows);
+  const systemSize = variableCount + independentRows.length;
+
+  const matrix = Array.from({ length: systemSize }, () =>
+    Array<number>(systemSize).fill(0),
+  );
+  const rightHandSide = Array<number>(systemSize).fill(0);
+  samplesByFace.forEach((samples, faceIndex) => {
+    const offset = faceIndex * 3;
+    for (const sample of samples) {
+      const point = normalizedPoint(sample);
+      for (let row = 0; row < 3; row += 1) {
+        rightHandSide[offset + row] += point[row] * sample.zM;
+        for (let column = 0; column < 3; column += 1)
+          matrix[offset + row][offset + column] += point[row] * point[column];
+      }
+    }
+  });
+  independentRows.forEach((row, constraintIndex) => {
+    const target = variableCount + constraintIndex;
+    row.forEach((value, variableIndex) => {
+      matrix[variableIndex][target] = value;
+      matrix[target][variableIndex] = value;
+    });
+  });
+  const solution = solveLinearSystem(matrix, rightHandSide);
+  if (!solution) return null;
+  return samplesByFace.map((samples, faceIndex) => {
+    const offset = faceIndex * 3;
+    const normalizedA = solution[offset];
+    const normalizedB = solution[offset + 1];
+    const normalizedC = solution[offset + 2];
+    const a = normalizedA / coordinateScale;
+    const b = normalizedB / coordinateScale;
+    const c = normalizedC - a * originX - b * originY;
+    const rmseM = Math.sqrt(
+      samples.reduce((sum, sample) => {
+        const point = normalizedPoint(sample);
+        const fitted =
+          normalizedA * point[0] + normalizedB * point[1] + normalizedC;
+        return sum + (sample.zM - fitted) ** 2;
+      }, 0) / samples.length,
+    );
+    return {
+      a: round(a, 9),
+      b: round(b, 9),
+      c: round(c, 9),
+      rmseM: round(rmseM),
+      sampleCount: samples.length,
+    };
+  });
+}
+
 function samplePolygon(
   polygon: Point2[],
   height: KartverketHeightSurfaceV1,
@@ -318,6 +492,13 @@ function polygonStrictlyContained(inner: Point2[], outer: Point2[]) {
 
 function edgeKey(a: string, b: string) {
   return [a, b].sort(compareCanonicalStringsV1).join("\u0000");
+}
+
+function faceContainsEdge(face: string[], a: string, b: string) {
+  return face.some(
+    (id, index) =>
+      edgeKey(id, face[(index + 1) % face.length]) === edgeKey(a, b),
+  );
 }
 
 function roofEdgeId(a: string, b: string) {
@@ -763,7 +944,6 @@ export function subdivideAssistedManualRoofSurfacesV1(
           opening.vertexIds.map((id) => points.get(id)!),
         ),
       );
-      const plane = fitPlane(samples);
       const surfaceId = `surface-${mass.massId}-${index + 1}`;
       if (samples.length < MIN_SAMPLES)
         issues.push(
@@ -774,7 +954,7 @@ export function subdivideAssistedManualRoofSurfacesV1(
             surfaceId,
           ),
         );
-      else if (!plane || plane.rmseM > MAX_PLANE_RMSE_M)
+      else if (!fitPlane(samples))
         issues.push(
           issue(
             internalSkeleton.length
@@ -787,11 +967,85 @@ export function subdivideAssistedManualRoofSurfacesV1(
             surfaceId,
           ),
         );
-      return { face, polygon, plane, surfaceId };
+      return { face, polygon, samples, surfaceId };
+    });
+    if (issues.length) continue;
+
+    const sharedConstraints: SharedPlaneConstraint[] = [];
+    const internalGraphEdges = graphEdges
+      .filter((edge) => edge.kind !== "eave")
+      .sort((left, right) =>
+        compareCanonicalStringsV1(
+          `${edgeKey(left.a, left.b)}\u0000${left.kind}`,
+          `${edgeKey(right.a, right.b)}\u0000${right.kind}`,
+        ),
+      );
+    for (const edge of internalGraphEdges) {
+      const owners = faces
+        .map((face, index) =>
+          faceContainsEdge(face, edge.a, edge.b) ? index : -1,
+        )
+        .filter((index) => index >= 0);
+      if (owners.length !== 2) {
+        issues.push(
+          issue(
+            "FACE_TOPOLOGY_INVALID",
+            "Every internal skeleton edge must be shared by exactly two surfaces.",
+            mass.massId,
+            ...edge.sourceIds,
+          ),
+        );
+        continue;
+      }
+      const [leftFaceIndex, rightFaceIndex] = owners.sort(
+        (left, right) => left - right,
+      );
+      for (const vertexId of [edge.a, edge.b].sort(compareCanonicalStringsV1))
+        sharedConstraints.push({
+          leftFaceIndex,
+          rightFaceIndex,
+          point: points.get(vertexId)!,
+        });
+    }
+    if (issues.length) continue;
+    const planes = fitPlanesWithSharedEdges(
+      preliminary.map((candidate) => candidate.samples),
+      sharedConstraints,
+    );
+    if (!planes) {
+      issues.push(
+        issue(
+          internalSkeleton.length
+            ? "UNSTABLE_HEIGHT_PLANE"
+            : "MISSING_OR_AMBIGUOUS_SKELETON",
+          internalSkeleton.length
+            ? "The globally constrained skeleton planes could not be fitted safely."
+            : "The mass is not a stable single plane and has no explicit internal skeleton; review must supply subdivision hints.",
+          mass.massId,
+          ...preliminary.map((candidate) => candidate.surfaceId),
+        ),
+      );
+      continue;
+    }
+    planes.forEach((plane, index) => {
+      if (plane.rmseM > MAX_PLANE_RMSE_M)
+        issues.push(
+          issue(
+            internalSkeleton.length
+              ? "UNSTABLE_HEIGHT_PLANE"
+              : "MISSING_OR_AMBIGUOUS_SKELETON",
+            internalSkeleton.length
+              ? `A globally constrained skeleton face RMSE ${plane.rmseM} m exceeds the safe ${MAX_PLANE_RMSE_M} m tolerance.`
+              : "The mass is not a stable single plane and has no explicit internal skeleton; review must supply subdivision hints.",
+            mass.massId,
+            preliminary[index].surfaceId,
+          ),
+        );
     });
     if (issues.length) continue;
     for (const candidate of preliminary) {
       const faceIndex = preliminary.indexOf(candidate);
+      const plane = planes[faceIndex];
       const openingIds = openings
         .filter((opening) => openingOwner.get(opening.openingId) === faceIndex)
         .map((opening) => opening.openingId);
@@ -803,18 +1057,14 @@ export function subdivideAssistedManualRoofSurfacesV1(
           roofEdgeId(id, candidate.face[(index + 1) % candidate.face.length]),
         ),
         horizontalAreaM2: round(Math.abs(signedArea(candidate.polygon)), 6),
-        plane: candidate.plane!,
+        plane,
         vertices: candidate.face.map((id) => {
           const point = points.get(id)!;
           return {
             vertexId: id,
             xM: point.xM,
             yM: point.yM,
-            zM: round(
-              candidate.plane!.a * point.xM +
-                candidate.plane!.b * point.yM +
-                candidate.plane!.c,
-            ),
+            zM: round(plane.a * point.xM + plane.b * point.yM + plane.c),
           };
         }),
         openingIds,

@@ -5,6 +5,7 @@ import {
   type AssistedManualRoofGeometryV1,
 } from "./assisted-manual-roof-geometry-v1";
 import { subdivideAssistedManualRoofSurfacesV1 } from "./assisted-manual-surface-subdivision-v1";
+import lyngveienR11HeightSurfaceFixture from "./__fixtures__/lyngveien-r11-height-surface-v1.json";
 
 type Vertex = { vertexId: string; xM: number; yM: number };
 
@@ -106,6 +107,84 @@ const rectangle: Vertex[] = [
   { vertexId: "ne", xM: 10, yM: 8 },
   { vertexId: "nw", xM: 0, yM: 8 },
 ];
+
+function lyngveienR11Geometry() {
+  return geometry(
+    [
+      {
+        vertexId: "outline-v1",
+        xM: 265_000.228931666,
+        yM: 6_647_341.539549207,
+      },
+      {
+        vertexId: "outline-v2",
+        xM: 264_998.19608876936,
+        yM: 6_647_343.098084413,
+      },
+      {
+        vertexId: "outline-v3",
+        xM: 264_991.61536772177,
+        yM: 6_647_334.538394307,
+      },
+      {
+        vertexId: "outline-v4",
+        xM: 264_995.0981552443,
+        yM: 6_647_331.871532905,
+      },
+      {
+        vertexId: "outline-v5",
+        xM: 264_997.0425831289,
+        yM: 6_647_334.39443424,
+      },
+      {
+        vertexId: "outline-v6",
+        xM: 265_000.1833120874,
+        yM: 6_647_331.994985003,
+      },
+      {
+        vertexId: "outline-v7",
+        xM: 265_005.8285141126,
+        yM: 6_647_339.341153542,
+      },
+      {
+        vertexId: "outline-v8",
+        xM: 265_001.23855610105,
+        yM: 6_647_342.860039433,
+      },
+      {
+        vertexId: "ridge-from",
+        xM: 264_996.3779425371,
+        yM: 6_647_340.733181206,
+      },
+      { vertexId: "ridge-to", xM: 265_003.2220317294, yM: 6_647_335.949307015 },
+    ],
+    [
+      {
+        massId: "lyngveien",
+        vertexIds: [
+          "outline-v1",
+          "outline-v2",
+          "outline-v3",
+          "outline-v4",
+          "outline-v5",
+          "outline-v6",
+          "outline-v7",
+          "outline-v8",
+        ],
+      },
+    ],
+    [
+      {
+        edgeId: "r11-ridge",
+        roofMassId: "lyngveien",
+        fromVertexId: "ridge-from",
+        toVertexId: "ridge-to",
+        type: "ridge",
+        provenance: "manual",
+      },
+    ],
+  );
+}
 
 describe("assisted manual surface subdivision v1", () => {
   it("creates two deterministic gable surfaces with one explicit shared ridge", () => {
@@ -262,6 +341,106 @@ describe("assisted manual surface subdivision v1", () => {
     expect(result.issues).toEqual([]);
   });
 
+  it("globally constrains the exact Lyngveien r11 height planes along their shared ridge", () => {
+    const input = lyngveienR11Geometry();
+    const height = structuredClone(
+      lyngveienR11HeightSurfaceFixture,
+    ) as KartverketHeightSurfaceV1;
+
+    expect(height.grid).toMatchObject({ width: 31, height: 29 });
+    expect(height.provenance.domContentSha256).toBe(
+      "664aa8a6f029bd0f3b8ca3b2caa8fe5692b202014e734625440285a171f2128f",
+    );
+    expect(height.provenance.dtmContentSha256).toBe(
+      "0ac08fb0765b78c82198970560893816152e7568eecc257448218130d2defac8",
+    );
+
+    const first = subdivideAssistedManualRoofSurfacesV1(input, height);
+    const reordered = structuredClone(input);
+    reordered.vertices.reverse();
+    const second = subdivideAssistedManualRoofSurfacesV1(
+      reordered,
+      structuredClone(height),
+    );
+
+    expect(first).toEqual(second);
+    expect(first.status).toBe("ready");
+    expect(first.issues).toEqual([]);
+    expect(first.surfaces).toHaveLength(2);
+    expect(
+      first.surfaces
+        .map((surface) => surface.plane.sampleCount)
+        .sort((a, b) => a - b),
+    ).toEqual([33, 55]);
+    expect(
+      first.surfaces
+        .map((surface) => surface.plane.rmseM)
+        .sort((a, b) => a - b),
+    ).toEqual([0.483295, 0.950852]);
+    const ridge = first.edges.find((edge) =>
+      edge.sourceSkeletonEdgeIds.includes("r11-ridge"),
+    )!;
+    const ridgeSurfaces = ridge.surfaceIds.map((surfaceId) =>
+      first.surfaces.find((surface) => surface.surfaceId === surfaceId)!,
+    );
+    for (const vertexId of ["ridge-from", "ridge-to"]) {
+      const sharedElevations = first.surfaces.map(
+        (surface) =>
+          surface.vertices.find((vertex) => vertex.vertexId === vertexId)!.zM,
+      );
+      expect(new Set(sharedElevations).size).toBe(1);
+      const point = input.vertices.find(
+        (vertex) => vertex.vertexId === vertexId,
+      )!;
+      const fittedElevations = ridgeSurfaces.map(
+        (surface) =>
+          surface.plane.a * point.xM +
+          surface.plane.b * point.yM +
+          surface.plane.c,
+      );
+      expect(Math.abs(fittedElevations[0] - fittedElevations[1])).toBeLessThan(
+        0.01,
+      );
+    }
+  });
+
+  it("blocks a constrained plane network when each face exceeds the RMSE limit", () => {
+    const input = geometry(
+      [
+        ...rectangle,
+        { vertexId: "ridge-s", xM: 5, yM: 0 },
+        { vertexId: "ridge-n", xM: 5, yM: 8 },
+      ],
+      [{ massId: "main", vertexIds: ["sw", "se", "ne", "nw"] }],
+      [
+        {
+          edgeId: "ridge",
+          roofMassId: "main",
+          fromVertexId: "ridge-s",
+          toVertexId: "ridge-n",
+          type: "ridge",
+          provenance: "manual",
+        },
+      ],
+    );
+    const result = subdivideAssistedManualRoofSurfacesV1(
+      input,
+      heightSurface((x) => (x < 5 ? 10 : 20)),
+    );
+
+    expect(result.status).toBe("blocked");
+    expect(result.surfaces).toEqual([]);
+    expect(result.issues).toHaveLength(2);
+    expect(
+      result.issues.every((item) => item.code === "UNSTABLE_HEIGHT_PLANE"),
+    ).toBe(true);
+    expect(
+      result.issues.every((item) =>
+        item.message.includes("globally constrained"),
+      ),
+    ).toBe(true);
+  });
+
   it("still rejects a boundary-to-boundary chord that leaves a concave mass", () => {
     const input = geometry(
       [
@@ -359,7 +538,15 @@ describe("assisted manual surface subdivision v1", () => {
       return 10 - ((x - 7) * 2) / 3;
     });
     const result = subdivideAssistedManualRoofSurfacesV1(input, surface);
+    const reordered = structuredClone(input);
+    reordered.vertices.reverse();
+    reordered.skeletonEdges.reverse();
+    const repeated = subdivideAssistedManualRoofSurfacesV1(
+      reordered,
+      structuredClone(surface),
+    );
 
+    expect(result).toEqual(repeated);
     expect(result.status).toBe("ready");
     expect(result.surfaces).toHaveLength(4);
     expect(result.edges.filter((edge) => edge.kind !== "eave")).toHaveLength(5);
