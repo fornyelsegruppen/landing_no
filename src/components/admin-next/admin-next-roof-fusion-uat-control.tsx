@@ -81,7 +81,9 @@ export type RoofFusionHeightAnalysisState =
         | "INVALID_SELECTION"
         | "SOURCE_VALIDATION_UNAVAILABLE"
         | "HEIGHT_DATA_UNAVAILABLE"
-        | "ROOF_NOT_DETECTED";
+        | "ROOF_NOT_DETECTED"
+        | "HEIGHT_PROCESSING_FAILED";
+      correlationId?: string;
     }
   | {
       kind: "success";
@@ -175,6 +177,8 @@ const copy = {
         "Adresse- eller OSM-kilden kunne ikke valideres nå. Høydedata ble ikke lest; prøv igjen.",
       HEIGHT_DATA_UNAVAILABLE:
         "Kartverkets høydedata er midlertidig utilgjengelige for denne konturen.",
+      HEIGHT_PROCESSING_FAILED:
+        "Høydesvaret kunne ikke behandles sikkert. Prøv igjen eller bruk manuell kontroll.",
       ROOF_NOT_DETECTED:
         "Høydemodellen viser ikke en sammenhengende takflate. Bruk manuell kontroll.",
     },
@@ -278,6 +282,8 @@ const copy = {
         "Adreso arba OSM šaltinio dabar nepavyko patikrinti. Høydedata dar nebuvo skaitomi; bandykite dar kartą.",
       HEIGHT_DATA_UNAVAILABLE:
         "Šiam kontūrui Kartverket aukščio duomenys laikinai nepasiekiami.",
+      HEIGHT_PROCESSING_FAILED:
+        "Aukščio atsako nepavyko saugiai apdoroti. Bandykite dar kartą arba naudokite rankinę peržiūrą.",
       ROOF_NOT_DETECTED:
         "Aukščio modelyje nėra vientiso stogo paviršiaus. Reikia rankinės peržiūros.",
     },
@@ -380,6 +386,8 @@ const copy = {
         "The address or OSM source could not be revalidated. Høydedata was not read; try again.",
       HEIGHT_DATA_UNAVAILABLE:
         "Kartverket height data is temporarily unavailable for this footprint.",
+      HEIGHT_PROCESSING_FAILED:
+        "The height response could not be processed safely. Try again or use manual review.",
       ROOF_NOT_DETECTED:
         "The height model does not show a continuous roof surface. Use manual review.",
     },
@@ -1187,6 +1195,11 @@ export function RealAddressResult({
           role="alert"
         >
           {t.heightErrors[heightState.code]}
+          {heightState.correlationId ? (
+            <span className="mt-1 block font-mono text-[10px] font-normal">
+              ID: {heightState.correlationId}
+            </span>
+          ) : null}
         </p>
       ) : null}
       {activeHeight ? (

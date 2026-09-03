@@ -16,6 +16,16 @@ const DEFAULT_RESOLUTION_METERS = 1;
 const MAX_GRID_SIDE_PIXELS = 256;
 const MAX_RESPONSE_BYTES = 2_000_000;
 const MIN_COVERAGE_RATIO = 0.8;
+const COVERAGE_ATTEMPT_TIMEOUT_MS = 12_000;
+const MAX_COVERAGE_ATTEMPTS = 2;
+
+function isRetriableTransportError(error: unknown) {
+  return (
+    error instanceof TypeError ||
+    (error instanceof Error &&
+      (error.name === "AbortError" || error.name === "TimeoutError"))
+  );
+}
 
 export type Wgs84Point = {
   latitude: number;
@@ -281,6 +291,10 @@ export class KartverketHeightDataProvider {
     retrievedAt?: string;
     paddingM?: number;
     resolutionM?: number;
+    /** Preview UAT must never reuse a prior HTTP cache entry. */
+    cacheMode?: "default" | "no-store";
+    /** Absolute action budget shared by the independently retried DOM/DTM reads. */
+    deadlineAtMs?: number;
   }): Promise<KartverketHeightSurfaceV1> {
     if (input.polygon.length < 3 || input.polygon.length > 500) {
       throw new KartverketHeightDataError(
@@ -347,38 +361,83 @@ export class KartverketHeightDataProvider {
         width,
         height,
       });
-      let response: Response;
-      try {
-        response = await this.fetcher(url, {
-          headers: {
-            Accept: "image/tiff",
-            "User-Agent": "Takfornyelse-Roof-Fusion-Preview/1.0",
-          },
-          signal: AbortSignal.timeout(12_000),
-          cache: "force-cache",
-          next: { revalidate: 3_600 },
-        } as RequestInit & { next: { revalidate: number } });
-      } catch (error) {
+      let body: Uint8Array | undefined;
+      let lastRetriableFailure = "request failed";
+      for (let attempt = 1; attempt <= MAX_COVERAGE_ATTEMPTS; attempt += 1) {
+        const remainingMs = input.deadlineAtMs
+          ? input.deadlineAtMs - Date.now()
+          : COVERAGE_ATTEMPT_TIMEOUT_MS;
+        if (remainingMs <= 0) break;
+        let response: Response;
+        try {
+          response = await this.fetcher(url, {
+            headers: {
+              Accept: "image/tiff",
+              "User-Agent": "Takfornyelse-Roof-Fusion-Preview/1.0",
+            },
+            signal: AbortSignal.timeout(
+              Math.max(1, Math.min(COVERAGE_ATTEMPT_TIMEOUT_MS, remainingMs)),
+            ),
+            ...(input.cacheMode === "no-store"
+              ? { cache: "no-store" as const }
+              : {
+                  cache: "force-cache" as const,
+                  next: { revalidate: 3_600 },
+                }),
+          } as RequestInit & { next?: { revalidate: number } });
+        } catch (error) {
+          if (!isRetriableTransportError(error)) {
+            throw new KartverketHeightDataError(
+              "PROVIDER_UNAVAILABLE",
+              "Kartverket Høydedata request failed without retry",
+            );
+          }
+          lastRetriableFailure =
+            error instanceof Error ? error.name : "network failure";
+          if (attempt < MAX_COVERAGE_ATTEMPTS) continue;
+          break;
+        }
+        if (
+          response.status === 429 ||
+          (response.status >= 500 && response.status <= 599)
+        ) {
+          lastRetriableFailure = `HTTP ${response.status}`;
+          if (attempt < MAX_COVERAGE_ATTEMPTS) continue;
+          break;
+        }
+        const contentType = response.headers.get("content-type") ?? "";
+        const contentLength = Number(response.headers.get("content-length"));
+        if (
+          !response.ok ||
+          !contentType.toLowerCase().startsWith("image/tiff") ||
+          (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES)
+        ) {
+          throw new KartverketHeightDataError(
+            response.ok ? "INVALID_PROVIDER_RESPONSE" : "PROVIDER_UNAVAILABLE",
+            `Kartverket Høydedata returned ${response.status} ${contentType || "without a content type"}`,
+          );
+        }
+        try {
+          body = new Uint8Array(await response.arrayBuffer());
+          break;
+        } catch (error) {
+          if (!isRetriableTransportError(error)) {
+            throw new KartverketHeightDataError(
+              "PROVIDER_UNAVAILABLE",
+              "Kartverket Høydedata response read failed without retry",
+            );
+          }
+          lastRetriableFailure =
+            error instanceof Error ? error.name : "response read failure";
+          if (attempt >= MAX_COVERAGE_ATTEMPTS) break;
+        }
+      }
+      if (!body) {
         throw new KartverketHeightDataError(
           "PROVIDER_UNAVAILABLE",
-          `Kartverket Høydedata request failed${
-            error instanceof Error ? `: ${error.message}` : ""
-          }`,
+          `Kartverket Høydedata request failed after bounded retry (${lastRetriableFailure})`,
         );
       }
-      const contentType = response.headers.get("content-type") ?? "";
-      const contentLength = Number(response.headers.get("content-length"));
-      if (
-        !response.ok ||
-        !contentType.toLowerCase().startsWith("image/tiff") ||
-        (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES)
-      ) {
-        throw new KartverketHeightDataError(
-          response.ok ? "INVALID_PROVIDER_RESPONSE" : "PROVIDER_UNAVAILABLE",
-          `Kartverket Høydedata returned ${response.status} ${contentType || "without a content type"}`,
-        );
-      }
-      const body = new Uint8Array(await response.arrayBuffer());
       if (body.byteLength === 0 || body.byteLength > MAX_RESPONSE_BYTES) {
         throw new KartverketHeightDataError(
           "INVALID_PROVIDER_RESPONSE",
