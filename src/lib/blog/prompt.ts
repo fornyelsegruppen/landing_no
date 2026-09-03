@@ -41,7 +41,8 @@ KRAV:
 - 900–1400 ord nyttig norsk fagtekst.
 - Kort svar tidlig, logisk H2/H3-struktur, trygg egenkontroll fra bakken og tydelig grense for faglig vurdering.
 - Prisdrivere bare når relevant. Bruk kun godkjente pakkepriser ordrett med forbehold.
-- Minst én relevant intern tjenestelenke fra internalPaths, 2–5 FAQ og minst én presis dyplenke til en reell offentlig kildeside. Ikke bruk bare utgiverens forside som kilde.
+- Minst én relevant intern tjenestelenke fra internalPaths, 2–5 FAQ og minst én relevant kilde fra officialDeepSourceCatalogue.
+- Når du bruker en offentlig kilde, kopier URL-feltet fra officialDeepSourceCatalogue ordrett inn i sources.url. Ikke finn på, forkort, normaliser eller rekonstruer URL-er, og bruk aldri bare en utgiver- eller hjemmeside-URL. Velg bare katalogkilder som faktisk støtter artikkelens påstand.
 - Ikke bruk rå kundehenvendelser, adresser, telefon, e-post eller andre personopplysninger.
 - Gjør alle fakta som ikke fremgår av godkjent kunnskap eller kilden til et kontrollpunkt.`;
 }
