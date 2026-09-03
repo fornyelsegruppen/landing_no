@@ -31,6 +31,13 @@ describe("scheduled post publishing cron", () => {
         {
           id: 8,
           editorialStatus: "scheduled",
+          sources: [
+            {
+              label: "Arbeidstilsynet",
+              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+              publisher: "Arbeidstilsynet",
+            },
+          ],
           reviewerName: "Kari",
           reviewedAt: "2026-08-27T08:00:00.000Z",
         },
@@ -98,5 +105,37 @@ describe("scheduled post publishing cron", () => {
         data: { _status: "published" },
       }),
     );
+  });
+
+  it("keeps scheduled posts in attention when publishability checks fail", async () => {
+    mocks.find.mockResolvedValue({
+      docs: [
+        {
+          id: 8,
+          editorialStatus: "scheduled",
+          sources: [
+            {
+              label: "SINTEF",
+              url: "https://www.sintef.no/",
+              publisher: "SINTEF",
+            },
+          ],
+          reviewerName: "Kari",
+          reviewedAt: "2026-08-27T08:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await GET(
+      new Request("https://www.takfornyelse.as/api/cron/publish-posts"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      published: [],
+      attention: [8],
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });
