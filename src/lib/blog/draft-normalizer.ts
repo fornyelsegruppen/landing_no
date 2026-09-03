@@ -10,6 +10,11 @@ const approvedNorwegianReplacements: Array<[RegExp, string]> = [
   [/som\s+redusere\s+fuktopptak/gi, "som reduserer fuktopptak"],
   [/høyt\s+monterte\s+flater/gi, "vanskelig tilgjengelige takflater"],
   [/streng\s+regulering\s+knyttet\s+til/gi, "tydelige sikkerhetskrav for"],
+  [/taket\s+må\s+ha\s+andre\s+tiltak/gi, "taket trenger andre tiltak"],
+  [/\bindikasjonar\b/gi, "indikasjoner"],
+  [/\btaket\s+har\s+det\s+vanskelig\b/gi, "taket kan være i dårlig stand"],
+  [/\bsamt\s+sende\s+gjerne\b/gi, "og gjerne sende"],
+  [/\bKunden\s+får\s+alltid\s+et\b/g, "Du får alltid et"],
   [
     /organisk\s+materiale\s+som\s+mose\s+og\s+sot/gi,
     "mose, lav, alger og smuss",

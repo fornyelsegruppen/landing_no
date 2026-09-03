@@ -50,6 +50,24 @@ For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gje
     );
   });
 
+  it("normalizes the remaining Bokmål and CTA defects from post 7", () => {
+    const input = validGeneratedArticle({
+      title: "Tegn på at taket må ha andre tiltak",
+      content:
+        "Det finnes flere tydelige indikasjonar. Se etter tegn på at taket har det vanskelig. Du kan oppgi postnummer, samt sende gjerne bilder. Kunden får alltid et skriftlig tilbud.",
+    });
+
+    const result = normalizeGeneratedArticleDraft(input) as ReturnType<
+      typeof validGeneratedArticle
+    >;
+
+    expect(result.title).toBe("Tegn på at taket trenger andre tiltak");
+    expect(result.content).toContain("tydelige indikasjoner");
+    expect(result.content).toContain("taket kan være i dårlig stand");
+    expect(result.content).toContain("og gjerne sende bilder");
+    expect(result.content).toContain("Du får alltid et skriftlig tilbud");
+  });
+
   it("leaves unrelated prose unchanged", () => {
     const input = validGeneratedArticle();
     expect(normalizeGeneratedArticleDraft(input)).toEqual(input);

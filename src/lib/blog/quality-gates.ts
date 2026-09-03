@@ -141,7 +141,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader/i.test(
+    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne/i.test(
       allText,
     )
   ) {
@@ -160,6 +160,37 @@ export function evaluateArticleQuality(
       "material_category_error",
       "blocker",
       "Sot skal ikke beskrives som organisk materiale.",
+    );
+  }
+  if (/takstein\w*[^.]{0,120}\bbæreevne\b/i.test(allText)) {
+    add(
+      issues,
+      "facts",
+      "unsupported_roof_tile_load_claim",
+      "blocker",
+      "Taksteinens bæreevne skal ikke brukes som vurderingskriterium uten en presis fagkilde.",
+    );
+  }
+  if (
+    /overflatebehandling[^.]{0,180}(sikre|ivareta)[^.]{0,80}(tett|tette)\s+funksjon/i.test(
+      allText,
+    )
+  ) {
+    add(
+      issues,
+      "facts",
+      "roof_system_function_claim",
+      "blocker",
+      "Maling eller annen overflatebehandling skal ikke beskrives som det som sikrer takets tette funksjon.",
+    );
+  }
+  if (/\buunngåelig\s+takskifte\b/i.test(allText)) {
+    add(
+      issues,
+      "facts",
+      "overstated_replacement_claim",
+      "blocker",
+      "Behov for takskifte krever faglig vurdering og skal ikke fremstilles som uunngåelig.",
     );
   }
   if (

@@ -199,4 +199,25 @@ For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gje
       ]),
     );
   });
+
+  it("blocks the language and unsupported roof-function claims found in post 7", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}
+
+Det finnes flere tydelige indikasjonar på at taket har det vanskelig. Du kan oppgi postnummer, samt sende gjerne bilder. Taksteinen har mistet sin opprinnelige form og bæreevne. Hvis overflatebehandling ikke lenger kan sikre denne tette funksjonen, er et uunngåelig takskifte eneste løsning.`,
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "unnatural_norwegian",
+        "unsupported_roof_tile_load_claim",
+        "roof_system_function_claim",
+        "overstated_replacement_claim",
+      ]),
+    );
+  });
 });
