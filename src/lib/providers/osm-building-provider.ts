@@ -6,9 +6,14 @@ import type { ProviderHealth } from "./contracts";
 const DEFAULT_ENDPOINT = "https://overpass-api.de/api/interpreter";
 const DEFAULT_MAP_ENDPOINT = "https://api.openstreetmap.org/api/0.6/map";
 const SEARCH_RADIUS_METERS = 60;
+const MAX_MAP_BBOX_SPAN_DEGREES = 0.01;
 const MAX_POLYGON_POINTS = 30;
 const LOOKUP_DEADLINE_MS = 8_000;
-const USER_AGENT = "Takfornyelse-roof-footprint/1.0 (post@takfornyelse.as)";
+const OVERPASS_BUDGET_RATIO = 0.4;
+const MAX_OVERPASS_BUDGET_MS = 3_000;
+const MAX_MAP_FALLBACK_BUDGET_MS = 4_500;
+const USER_AGENT =
+  "Takfornyelse-roof-footprint/1.0 (+https://takfornyelse.no; contact: post@takfornyelse.as)";
 
 const geometryPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -177,28 +182,25 @@ function normalizePolygon(
   return simplified;
 }
 
-async function fetchWithDeadline(
-  fetcher: typeof fetch,
-  input: RequestInfo | URL,
-  init: RequestInit,
+async function runWithDeadline<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
   deadline: number,
-) {
+  phase: "Overpass" | "map fallback",
+): Promise<T> {
   const remaining = deadline - Date.now();
-  if (remaining <= 0) throw new Error("OpenStreetMap lookup deadline exceeded");
+  if (remaining <= 0)
+    throw new Error(`OpenStreetMap ${phase} deadline exceeded`);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), remaining);
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const deadlinePromise = new Promise<never>((_, reject) => {
       deadlineTimer = setTimeout(
-        () => reject(new Error("OpenStreetMap lookup deadline exceeded")),
+        () => reject(new Error(`OpenStreetMap ${phase} deadline exceeded`)),
         remaining,
       );
     });
-    return await Promise.race([
-      fetcher(input, { ...init, signal: controller.signal }),
-      deadlinePromise,
-    ]);
+    return await Promise.race([operation(controller.signal), deadlinePromise]);
   } finally {
     clearTimeout(timer);
     if (deadlineTimer) clearTimeout(deadlineTimer);
@@ -331,31 +333,46 @@ export class OpenStreetMapBuildingProvider {
     addressPoint: GeoPoint,
   ): Promise<BuildingFootprintCandidate[]> {
     assertNorwegianAddressPoint(addressPoint);
-    const deadline = Date.now() + this.lookupDeadlineMs;
-    const query = `[out:json][timeout:7];(way["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude});relation["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude}););out tags geom;`;
+    const startedAtMs = Date.now();
+    const actionDeadlineAtMs = startedAtMs + this.lookupDeadlineMs;
+    const overpassDeadlineAtMs = Math.min(
+      actionDeadlineAtMs,
+      startedAtMs +
+        Math.max(
+          1,
+          Math.min(
+            MAX_OVERPASS_BUDGET_MS,
+            Math.floor(this.lookupDeadlineMs * OVERPASS_BUDGET_RATIO),
+          ),
+        ),
+    );
+    const query = `[out:json][timeout:3];(way["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude});relation["building"](around:${SEARCH_RADIUS_METERS},${addressPoint.latitude},${addressPoint.longitude}););out tags geom;`;
     let parsed: z.infer<typeof overpassResponseSchema> | null = null;
     let lastError: unknown;
     for (const endpoint of this.endpoints) {
       try {
-        const response = await fetchWithDeadline(
-          this.fetcher,
-          endpoint,
-          {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-              "User-Agent": USER_AGENT,
-            },
-            body: new URLSearchParams({ data: query }),
+        parsed = await runWithDeadline(
+          async (signal) => {
+            const response = await this.fetcher(endpoint, {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                "Content-Type":
+                  "application/x-www-form-urlencoded;charset=UTF-8",
+                "User-Agent": USER_AGENT,
+              },
+              body: new URLSearchParams({ data: query }),
+              signal,
+            });
+            if (!response.ok)
+              throw new Error(
+                `OpenStreetMap building lookup failed (${response.status})`,
+              );
+            return overpassResponseSchema.parse(await response.json());
           },
-          deadline,
+          overpassDeadlineAtMs,
+          "Overpass",
         );
-        if (!response.ok)
-          throw new Error(
-            `OpenStreetMap building lookup failed (${response.status})`,
-          );
-        parsed = overpassResponseSchema.parse(await response.json());
         break;
       } catch (error) {
         lastError = error;
@@ -368,25 +385,40 @@ export class OpenStreetMapBuildingProvider {
           SEARCH_RADIUS_METERS /
           (111_320 *
             Math.max(Math.cos((addressPoint.latitude * Math.PI) / 180), 0.1));
-        const bbox = [
+        const bboxCoordinates = [
           addressPoint.longitude - longitudeDelta,
           addressPoint.latitude - latitudeDelta,
           addressPoint.longitude + longitudeDelta,
           addressPoint.latitude + latitudeDelta,
-        ].join(",");
-        const response = await fetchWithDeadline(
-          this.fetcher,
-          `${this.mapEndpoint}?bbox=${bbox}`,
-          {
-            headers: { Accept: "application/xml", "User-Agent": USER_AGENT },
+        ];
+        if (
+          bboxCoordinates[2] - bboxCoordinates[0] > MAX_MAP_BBOX_SPAN_DEGREES ||
+          bboxCoordinates[3] - bboxCoordinates[1] > MAX_MAP_BBOX_SPAN_DEGREES
+        ) {
+          throw new Error("OpenStreetMap map fallback bbox is too large");
+        }
+        const bbox = bboxCoordinates.join(",");
+        const mapResult = await runWithDeadline(
+          async (signal) => {
+            const response = await this.fetcher(
+              `${this.mapEndpoint}?bbox=${bbox}`,
+              {
+                headers: {
+                  Accept: "application/xml",
+                  "User-Agent": USER_AGENT,
+                },
+                signal,
+              },
+            );
+            if (!response.ok)
+              throw new Error(
+                `OpenStreetMap map lookup failed (${response.status})`,
+              );
+            return parseOsmMapXml(await response.text());
           },
-          deadline,
+          Math.min(actionDeadlineAtMs, Date.now() + MAX_MAP_FALLBACK_BUDGET_MS),
+          "map fallback",
         );
-        if (!response.ok)
-          throw new Error(
-            `OpenStreetMap map lookup failed (${response.status})`,
-          );
-        const mapResult = parseOsmMapXml(await response.text());
         parsed = overpassResponseSchema.parse(mapResult);
         if (parsed.elements.length === 0) return [];
       } catch (error) {
