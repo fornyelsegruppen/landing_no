@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   captureMatchesSelectedAddress,
   NorgeIBilderCaptureControl,
+  NorgeIBilderCaptureViewport,
   normalizeOrthoOverlayPoints,
   type NorgeIBilderCaptureResult,
 } from "./norgeibilder-capture-control";
@@ -74,6 +75,47 @@ describe("Norge i bilder capture control", () => {
     expect(html).toContain("©norgeibilder.no");
     expect(html).not.toContain("Naudoti vaizdą");
     expect(html).not.toContain("masinis");
+  });
+
+  it("renders zoom and pan controls on the captured ortho card and transforms image and overlay together", () => {
+    const html = renderToStaticMarkup(
+      createElement(NorgeIBilderCaptureViewport, {
+        attribution: "©norgeibilder.no",
+        geoReference,
+        imageUrl: "/api/admin/media/91",
+        overlayOpacity: 42,
+        overlayPoints: "100,50 900,50 900,450",
+      }),
+    );
+
+    expect(html).toContain("data-norgeibilder-capture-viewport-controls");
+    expect(html).toContain("Mastelis −");
+    expect(html).toContain("Mastelis +");
+    expect(html).toContain("100%");
+    expect(html).toContain("Talpinti");
+    expect(html).toContain("Perstumti");
+
+    const transformedLayerStart = html.indexOf(
+      "data-norgeibilder-capture-viewport-content",
+    );
+    const transformedLayerEnd = html.indexOf("</div>", transformedLayerStart);
+    const transformedLayer = html.slice(
+      transformedLayerStart,
+      transformedLayerEnd,
+    );
+    expect(transformedLayer).toContain(
+      'data-norgeibilder-capture-viewport-scale="1"',
+    );
+    expect(transformedLayer).toContain("transform:translate(0%, 0%) scale(1)");
+    expect(transformedLayer).toContain('src="/api/admin/media/91"');
+    expect(transformedLayer).toContain(
+      "data-norgeibilder-capture-viewport-overlay",
+    );
+    expect(html).toContain("aspect-ratio:1000 / 500");
+    expect(html).toContain("max-width:960px");
+    expect(
+      html.indexOf("©norgeibilder.no", transformedLayerEnd),
+    ).toBeGreaterThan(transformedLayerEnd);
   });
 
   it("keeps the default server capture path available when no adapter is injected", () => {
