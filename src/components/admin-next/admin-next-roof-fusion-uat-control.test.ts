@@ -5,11 +5,21 @@ import {
   AdminNextRoofFusionUatControl,
   HeightAnalysisPanel,
   RealAddressResult,
+  roofFusionHeightErrorMessage,
   selectActiveHeightState,
 } from "./admin-next-roof-fusion-uat-control";
 import type { RoofFusionHeightAnalysisState } from "./admin-next-roof-fusion-uat-control";
 
 describe("Admin Next Roof Fusion UAT control", () => {
+  it("does not mislabel an address/OSM revalidation outage as Høydedata failure", () => {
+    expect(
+      roofFusionHeightErrorMessage("lt", "SOURCE_VALIDATION_UNAVAILABLE"),
+    ).toContain("Høydedata dar nebuvo skaitomi");
+    expect(
+      roofFusionHeightErrorMessage("lt", "SOURCE_VALIDATION_UNAVAILABLE"),
+    ).not.toContain("aukščio duomenys laikinai nepasiekiami");
+  });
+
   it("keeps the last valid surface visible when a manual correction fails", () => {
     const previous = {
       kind: "success",

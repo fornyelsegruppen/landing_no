@@ -78,7 +78,10 @@ export type RoofFusionHeightAnalysisState =
   | {
       kind: "error";
       code:
-        "INVALID_SELECTION" | "HEIGHT_DATA_UNAVAILABLE" | "ROOF_NOT_DETECTED";
+        | "INVALID_SELECTION"
+        | "SOURCE_VALIDATION_UNAVAILABLE"
+        | "HEIGHT_DATA_UNAVAILABLE"
+        | "ROOF_NOT_DETECTED";
     }
   | {
       kind: "success";
@@ -168,6 +171,8 @@ const copy = {
     heightSource: "Kartverket Høydedata · NLOD 2.0",
     heightErrors: {
       INVALID_SELECTION: "Bygningen må velges på nytt.",
+      SOURCE_VALIDATION_UNAVAILABLE:
+        "Adresse- eller OSM-kilden kunne ikke valideres nå. Høydedata ble ikke lest; prøv igjen.",
       HEIGHT_DATA_UNAVAILABLE:
         "Kartverkets høydedata er midlertidig utilgjengelige for denne konturen.",
       ROOF_NOT_DETECTED:
@@ -269,6 +274,8 @@ const copy = {
     heightSource: "Kartverket Høydedata · NLOD 2.0",
     heightErrors: {
       INVALID_SELECTION: "Pastatą reikia pasirinkti iš naujo.",
+      SOURCE_VALIDATION_UNAVAILABLE:
+        "Adreso arba OSM šaltinio dabar nepavyko patikrinti. Høydedata dar nebuvo skaitomi; bandykite dar kartą.",
       HEIGHT_DATA_UNAVAILABLE:
         "Šiam kontūrui Kartverket aukščio duomenys laikinai nepasiekiami.",
       ROOF_NOT_DETECTED:
@@ -369,6 +376,8 @@ const copy = {
     heightSource: "Kartverket Høydedata · NLOD 2.0",
     heightErrors: {
       INVALID_SELECTION: "Select the building again.",
+      SOURCE_VALIDATION_UNAVAILABLE:
+        "The address or OSM source could not be revalidated. Høydedata was not read; try again.",
       HEIGHT_DATA_UNAVAILABLE:
         "Kartverket height data is temporarily unavailable for this footprint.",
       ROOF_NOT_DETECTED:
@@ -410,6 +419,13 @@ const copy = {
     },
   },
 } as const;
+
+export function roofFusionHeightErrorMessage(
+  locale: PanelLocale,
+  code: Extract<RoofFusionHeightAnalysisState, { kind: "error" }>["code"],
+) {
+  return copy[locale].heightErrors[code];
+}
 
 type ProjectedCandidate = {
   id: string;

@@ -192,21 +192,31 @@ export default async function AdminNextRoofFusionUatPage() {
       return { kind: "error", code: "INVALID_SELECTION" };
     }
 
+    // Re-resolve both public sources server-side. The client-selected ID is
+    // accepted only when it still belongs to this address lookup. A timeout
+    // here happens before Høydedata is read and must not be labeled as a
+    // height-provider failure.
+    let addresses;
     try {
-      // Re-resolve both public sources server-side. The client-selected ID is
-      // accepted only when it still belongs to this address lookup.
-      const addresses = await new KartverketAddressProvider().searchAddress(
-        query,
-      );
-      const address = addresses[0];
-      if (!address) return { kind: "error", code: "INVALID_SELECTION" };
-      const candidates =
-        await new OpenStreetMapBuildingProvider().findBuildings({
-          latitude: address.latitude,
-          longitude: address.longitude,
-        });
-      const candidate = candidates.find((item) => item.id === candidateId);
-      if (!candidate) return { kind: "error", code: "INVALID_SELECTION" };
+      addresses = await new KartverketAddressProvider().searchAddress(query);
+    } catch {
+      return { kind: "error", code: "SOURCE_VALIDATION_UNAVAILABLE" };
+    }
+    const address = addresses[0];
+    if (!address) return { kind: "error", code: "INVALID_SELECTION" };
+    let candidates;
+    try {
+      candidates = await new OpenStreetMapBuildingProvider().findBuildings({
+        latitude: address.latitude,
+        longitude: address.longitude,
+      });
+    } catch {
+      return { kind: "error", code: "SOURCE_VALIDATION_UNAVAILABLE" };
+    }
+    const candidate = candidates.find((item) => item.id === candidateId);
+    if (!candidate) return { kind: "error", code: "INVALID_SELECTION" };
+
+    try {
       const surface = await new KartverketHeightDataProvider().getSurface({
         polygon: candidate.polygon,
       });
