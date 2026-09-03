@@ -153,3 +153,9 @@ pointer activation records endpoints, captured lines use a visible fixed pixel
 stroke, and pending/final endpoint markers remain screen-stable. This closes
 the interaction defect only; it does not by itself close multi-plane
 calculation wiring.
+
+Live Preview UAT on deployment `dpl_DdpHzgG351tnf84YCM7rgs26yLvS` confirmed
+that a ridge remains visible after the second endpoint at 331% zoom and the
+skeleton stage does not reset. Visual follow-up remains: reduce the apparent
+ridge thickness at high CSS-transformed zoom so the line does not obscure roof
+detail while keeping it clearly visible at 100%.
