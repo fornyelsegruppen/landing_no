@@ -44,6 +44,18 @@ and no article was approved, scheduled or published by this canary.
   persisted reviewer/date, deterministic quality and a precise article-level
   source. Both homepage-only sources were visibly marked, Pexels provenance
   remained visible, and the `Publikuoti` button was disabled.
+- PR `#20` added a deterministic catalogue of six verified DiBK,
+  Arbeidstilsynet and SINTEF deep links to the approved generation knowledge.
+  The model is instructed to copy a relevant catalogue URL verbatim instead of
+  inventing, shortening or replacing it with a publisher homepage.
+- PR `#20` merge SHA `8e8cb17ca22fbb651ea707fa124667f8e376b46b`
+  passed exact-merge Quality run `33706596917`, including lint, typecheck,
+  unit/API, migration, PostgreSQL build, authenticated browser smoke and
+  backup/restore checks.
+- Preview deployment `dpl_UjAhF8tKarHoAZHdSM3dUJfmt6nh` completed successfully
+  and now serves the stable UAT alias. Switching the alias invalidated the
+  current administrator session, so the post-fix live draft canary is waiting
+  for the owner to sign in again; authentication was not automated.
 - No approve, schedule or publish action was triggered during this check.
 
 ## What this proves
@@ -63,6 +75,14 @@ and no article was approved, scheduled or published by this canary.
 
 - Cron-triggered draft generation and same-slot duplicate protection were not
   exercised by this manual canary.
+- Vercel cron configuration is Production-scoped; the current repository has
+  no safe Preview ad-hoc scheduler path. The canary must not bypass
+  `CRON_SECRET` or expose it in a browser. A real scheduler canary therefore
+  needs an explicit owner-controlled Vercel invocation/environment decision.
+- A fresh post-PR-`#20` manual draft still needs to confirm that the live model
+  actually returns a relevant catalogue deep link. The deterministic prompt
+  and its regression tests are proven, but model behavior is not claimed until
+  that UAT draft exists.
 - Article facts, language quality, internal links and commercial wording still
   require human editorial review before approval.
 - `SEO_PILOT_REFERENCE`, Search Console setup and all Production feature/config
@@ -70,8 +90,9 @@ and no article was approved, scheduled or published by this canary.
 
 ## Next safe milestone
 
-Run one authenticated Preview scheduler canary with
-`FEATURE_SEO_AUTO_PUBLISH=false`, verify idempotent duplicate handling, and
-record that the generated article remains unpublished. This requires no
-Production activation but must not be represented as complete until the actual
-scheduler result is observed.
+After the owner signs in again, create one manual Preview draft and confirm that
+it remains unpublished and contains at least one relevant catalogue deep link.
+Then decide an owner-controlled scheduler-canary route through Vercel. Keep
+`FEATURE_SEO_AUTO_PUBLISH=false`; do not represent scheduler idempotency as
+live-proven until an authorized real run and same-slot duplicate check are
+observed.
