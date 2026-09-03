@@ -724,6 +724,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
 
     await captureLine(350, 650);
     expect(renderedLines()).toHaveLength(3);
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).toBeNull();
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
     await act(async () => {

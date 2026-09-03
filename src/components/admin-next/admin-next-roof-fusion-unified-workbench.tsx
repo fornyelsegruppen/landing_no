@@ -589,6 +589,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const handleCanvasPointerDown = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
+      if (event.isPrimary && event.button === 0) {
+        // A genuine new pointer gesture makes any unsynthesized click from the
+        // previous gesture stale. Its own pointerup will arm suppression again.
+        suppressCanvasClickRef.current = false;
+      }
       if (
         viewport.scale <= MIN_ROOF_FUSION_ZOOM ||
         !event.isPrimary ||
@@ -633,9 +638,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         // Zoomed pointer activation is completed on pointerup because a
         // preventDefault/pointer-capture sequence may not synthesize click.
         suppressCanvasClickRef.current = true;
-        window.setTimeout(() => {
-          suppressCanvasClickRef.current = false;
-        }, 250);
       }
       panGestureMovedRef.current = false;
       setPanGesture(null);
