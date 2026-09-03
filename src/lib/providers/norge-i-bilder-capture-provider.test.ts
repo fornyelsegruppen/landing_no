@@ -19,6 +19,16 @@ async function png(width = 32, height = 18) {
   );
 }
 
+const actualVisibleExtent = {
+  crs: "EPSG:25833" as const,
+  bounds: {
+    minEastingM: 262338.294,
+    minNorthingM: 6649146.086,
+    maxEastingM: 262434.294,
+    maxNorthingM: 6649200.086,
+  },
+};
+
 function fixture(input?: {
   url?: string;
   captures?: BrowserCaptureResult[];
@@ -68,6 +78,7 @@ function fixture(input?: {
                 kind: "captured",
                 image: await png(),
                 contentType: "image/png",
+                actualVisibleExtent,
               }
             );
           },
@@ -109,6 +120,7 @@ describe("Norge i bilder server capture policy", () => {
       attempts: 1,
       geoReference: {
         crs: "EPSG:25833",
+        extentTrust: "actual-visible-extent",
         bounds: {
           minEastingM: 262338.294,
           minNorthingM: 6649146.086,
@@ -130,6 +142,24 @@ describe("Norge i bilder server capture policy", () => {
       trainingProhibited: true,
       coordinates: request.target,
     });
+  });
+
+  it("stores a contextual screenshot but omits overlay registration without an observed ArcGIS extent", async () => {
+    const { provider, saved } = fixture({
+      captures: [
+        {
+          kind: "captured",
+          image: await png(),
+          contentType: "image/png",
+        },
+      ],
+    });
+
+    await expect(provider.capture(request)).resolves.toMatchObject({
+      mediaId: "private-media-42",
+      geoReference: undefined,
+    });
+    expect(saved).toHaveLength(1);
   });
 
   it("retries only tile-readiness failures and stores only the final successful frame", async () => {

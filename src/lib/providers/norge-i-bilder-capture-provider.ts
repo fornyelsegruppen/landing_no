@@ -52,9 +52,20 @@ export type NorgeIBilderEpsg25833Bounds = {
 /** Maps pixel coordinates in the final, cropped image to its source extent. */
 export type NorgeIBilderGeoReference = {
   crs: "EPSG:25833";
+  /**
+   * Only a browser-observed ArcGIS extent may register an image for geometry
+   * overlay. URL query bounds are merely a navigation hint and must never be
+   * used as if they describe the final rendered canvas.
+   */
+  extentTrust: "actual-visible-extent";
   bounds: NorgeIBilderEpsg25833Bounds;
   imageWidth: number;
   imageHeight: number;
+};
+
+export type NorgeIBilderActualVisibleExtent = {
+  crs: "EPSG:25833";
+  bounds: NorgeIBilderEpsg25833Bounds;
 };
 
 export type BrowserCaptureResult =
@@ -64,6 +75,12 @@ export type BrowserCaptureResult =
       kind: "captured";
       image: Uint8Array;
       contentType: "image/png" | "image/jpeg" | "image/webp";
+      /**
+       * The ArcGIS view extent observed from the rendered interactive page.
+       * Omit it when the browser cannot prove the captured canvas extent;
+       * the screenshot remains contextual evidence but is not overlay-safe.
+       */
+      actualVisibleExtent?: NorgeIBilderActualVisibleExtent;
     };
 
 export interface NorgeIBilderUrlBuilder {
@@ -284,7 +301,8 @@ export class NorgeIBilderCaptureProvider {
     attribution: typeof NORGE_I_BILDER_ATTRIBUTION;
     source: typeof NORGE_I_BILDER_SCREENSHOT_SOURCE;
     attempts: number;
-    geoReference: NorgeIBilderGeoReference;
+    /** Absent unless the browser proved the final canvas' visible extent. */
+    geoReference?: NorgeIBilderGeoReference;
   }> {
     assertRequest(input);
     const interactiveCapture = this.dependencies.urlBuilder.build({
@@ -363,11 +381,13 @@ export class NorgeIBilderCaptureProvider {
           attribution: NORGE_I_BILDER_ATTRIBUTION,
           source: NORGE_I_BILDER_SCREENSHOT_SOURCE,
           attempts: attempt,
-          geoReference: {
-            crs: "EPSG:25833",
-            bounds: interactiveCapture.bounds,
-            ...imageDimensions,
-          },
+          geoReference: capture.actualVisibleExtent
+            ? {
+                ...capture.actualVisibleExtent,
+                extentTrust: "actual-visible-extent",
+                ...imageDimensions,
+              }
+            : undefined,
         };
       }
       throw new NorgeIBilderCaptureError(

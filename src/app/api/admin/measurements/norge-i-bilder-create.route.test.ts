@@ -228,4 +228,26 @@ describe("POST /api/admin/measurements Norge i bilder capture integration", () =
       }),
     );
   });
+
+  it("rejects a low-confidence AI proposal before persisting a review version", async () => {
+    const response = await POST(
+      new Request("https://preview.example/api/admin/measurements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          proposal: { ...body.proposal, confidence: "low" },
+        }),
+      }),
+    );
+    const problem = await response?.json();
+
+    expect(response?.status).toBe(409);
+    expect(problem).toMatchObject({
+      code: "MEASUREMENT_PROPOSAL_LOW_CONFIDENCE",
+      reasons: ["confidence_low"],
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.attach).not.toHaveBeenCalled();
+  });
 });

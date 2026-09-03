@@ -467,6 +467,20 @@ export async function POST(request: Request) {
       { status: 409 },
     );
   }
+  if (
+    parsed.data.action === "create" &&
+    parsed.data.proposal.confidence === "low"
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Low-confidence roof analysis must be corrected or analyzed again before creating a measurement",
+        code: "MEASUREMENT_PROPOSAL_LOW_CONFIDENCE",
+        reasons: ["confidence_low"],
+      },
+      { status: 409 },
+    );
+  }
   const correlationId = correlationIdFromHeaders(request.headers);
   if (parsed.data.action !== "create") {
     const activeQuotes = await payload.find({
