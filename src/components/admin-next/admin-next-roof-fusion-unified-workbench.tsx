@@ -108,7 +108,10 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   initialStage?: RoofFusionStage;
   initialLayers?: Partial<Record<RoofFusionLayer, boolean>>;
   onStageChange?: (stage: RoofFusionStage) => void;
-  onPrimaryAction?: (stage: RoofFusionStage) => void;
+  /** Return false (or resolve false) to keep the current stage. */
+  onPrimaryAction?: (
+    stage: RoofFusionStage,
+  ) => void | boolean | Promise<void | boolean>;
   onOutlineChange?: (points: readonly RoofFusionPoint[]) => void;
   onLineCapture?: (line: RoofFusionLine) => void;
   onLayerVisibilityChange?: (layer: RoofFusionLayer, visible: boolean) => void;
@@ -361,6 +364,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [lineMode, setLineMode] = useState<RoofFusionLineKind | null>(null);
   const [pendingLinePoint, setPendingLinePoint] =
     useState<RoofFusionPoint | null>(null);
+  const [primaryActionPending, setPrimaryActionPending] = useState(false);
   const [lineCaptureProblem, setLineCaptureProblem] = useState<string | null>(
     null,
   );
@@ -728,13 +732,25 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     [blockers, stage, stageBlockers],
   );
 
-  const handlePrimaryAction = useCallback(() => {
-    if (activeBlockers.length) return;
-    onPrimaryAction?.(stage);
-    const currentIndex = ROOF_FUSION_STAGES.indexOf(stage);
-    const nextStage = ROOF_FUSION_STAGES[currentIndex + 1];
-    if (nextStage) goToStage(nextStage);
-  }, [activeBlockers.length, goToStage, onPrimaryAction, stage]);
+  const handlePrimaryAction = useCallback(async () => {
+    if (activeBlockers.length || primaryActionPending) return;
+    setPrimaryActionPending(true);
+    try {
+      const shouldAdvance = await onPrimaryAction?.(stage);
+      if (shouldAdvance === false) return;
+      const currentIndex = ROOF_FUSION_STAGES.indexOf(stage);
+      const nextStage = ROOF_FUSION_STAGES[currentIndex + 1];
+      if (nextStage) goToStage(nextStage);
+    } finally {
+      setPrimaryActionPending(false);
+    }
+  }, [
+    activeBlockers.length,
+    goToStage,
+    onPrimaryAction,
+    primaryActionPending,
+    stage,
+  ]);
 
   const displayLines = [
     ...draftLines,
@@ -1349,8 +1365,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             <button
               className="min-h-12 w-full rounded-xl bg-[#e8a317] px-4 py-3 text-sm font-bold text-[#101318] shadow-lg shadow-[#e8a317]/10 transition hover:bg-[#f0b12e] disabled:cursor-not-allowed disabled:opacity-45"
               data-roof-fusion-primary-action={stage}
-              disabled={activeBlockers.length > 0}
-              onClick={handlePrimaryAction}
+              disabled={activeBlockers.length > 0 || primaryActionPending}
+              onClick={() => void handlePrimaryAction()}
               type="button"
             >
               {primaryActionLabel}

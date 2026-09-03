@@ -12,6 +12,7 @@ import {
 } from "@/lib/roof-fusion/workbench-height-adapter-v1";
 import { PayloadRoofFusionWorkbenchDraftRepositoryV1 } from "@/lib/roof-fusion/workbench-draft-repository-v1";
 import { userIsAdmin } from "@/payload/access/roles";
+import { RoofSourceIntegrityError } from "@/lib/roof-fusion/source-adapter-v1";
 
 const identifier = z
   .string()
@@ -48,6 +49,25 @@ function errorResponse(error: unknown) {
   if (error instanceof RoofFusionWorkbenchHeightAdapterErrorV1) {
     return NextResponse.json(
       { error: error.message, code: error.code },
+      { status: 422 },
+    );
+  }
+  if (error instanceof RoofSourceIntegrityError) {
+    return NextResponse.json(
+      {
+        error:
+          "Stogo skaičiavimo šaltinių tapatybė nesutampa. Perkraukite išsaugotą reviziją ir bandykite dar kartą.",
+        code: "SOURCE_INTEGRITY_INVALID",
+      },
+      { status: 422 },
+    );
+  }
+  if (error instanceof z.ZodError) {
+    return NextResponse.json(
+      {
+        error: "Aukščio skaičiavimas nesudarė galiojančio peržiūros rezultato.",
+        code: "HEIGHT_CALCULATION_INVALID",
+      },
       { status: 422 },
     );
   }

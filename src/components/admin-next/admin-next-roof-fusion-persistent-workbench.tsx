@@ -111,6 +111,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   horizontalAreaSquareMeters,
   orthoImageAlt,
   sourceOutline,
+  sourceFootprintId,
 }: {
   actorId: string;
   capture: NorgeIBilderCaptureResult;
@@ -119,6 +120,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   horizontalAreaSquareMeters: number;
   orthoImageAlt: string;
   sourceOutline: readonly RoofFusionPoint[];
+  sourceFootprintId?: string;
 }) {
   const [outline, setOutline] =
     useState<readonly RoofFusionPoint[]>(sourceOutline);
@@ -251,6 +253,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
           idempotencyKey: `workbench:${caseId}:r${revision}:${nonce}`,
           createdAt: new Date().toISOString(),
           sourceOutline,
+          sourceFootprintId,
           approvedOutline: outline,
           lines,
           evidence: {
@@ -293,6 +296,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     lines,
     outline,
     sourceOutline,
+    sourceFootprintId,
     loadState,
     unsupportedLatest,
   ]);
@@ -307,7 +311,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       !capture.rawContentHash ||
       !capture.capturedAt
     )
-      return;
+      return false;
     setHeightState("running");
     setProblem(null);
     try {
@@ -345,11 +349,13 @@ export function AdminNextRoofFusionPersistentWorkbench({
         );
       setHeightResult(body);
       setHeightState("idle");
+      return body.status !== "blocked";
     } catch (error) {
       setHeightState("error");
       setProblem(
         error instanceof Error ? error.message : "Skaičiavimas nepavyko",
       );
+      return false;
     }
   }, [capture, caseId, confirmed, dirty, heightSurface]);
 
@@ -470,8 +476,9 @@ export function AdminNextRoofFusionPersistentWorkbench({
     </div>
   );
 
-  function primaryAction(stage: RoofFusionStage) {
-    if (stage === "slopes") void calculate();
+  async function primaryAction(stage: RoofFusionStage) {
+    if (stage === "slopes") return calculate();
+    return true;
   }
 
   return (

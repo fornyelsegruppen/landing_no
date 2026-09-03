@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
       super(message);
     }
   },
+  sourceIntegrityError: class extends Error {},
 }));
 
 const storedDraft = {
@@ -50,6 +52,9 @@ vi.mock("@/lib/roof-fusion/workbench-draft-repository-v1", () => ({
 vi.mock("@/lib/roof-fusion/workbench-height-adapter-v1", () => ({
   invokeWorkbenchHeightAdapterV1: mocks.invoke,
   RoofFusionWorkbenchHeightAdapterErrorV1: mocks.adapterError,
+}));
+vi.mock("@/lib/roof-fusion/source-adapter-v1", () => ({
+  RoofSourceIntegrityError: mocks.sourceIntegrityError,
 }));
 
 import { POST } from "./route";
@@ -159,6 +164,36 @@ describe("POST /api/admin/roof-fusion/workbench-height-adapter", () => {
       });
     },
   );
+
+  it("maps source-integrity failures to a stable sanitized code", async () => {
+    mocks.readDraft.mockResolvedValue(storedDraft);
+    mocks.invoke.mockImplementation(() => {
+      throw new mocks.sourceIntegrityError(
+        "Duplicate declared roof source records: secret-provider-id",
+      );
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "SOURCE_INTEGRITY_INVALID" });
+    expect(body.error).not.toContain("secret-provider-id");
+  });
+
+  it("maps invalid calculated output to a stable code", async () => {
+    mocks.readDraft.mockResolvedValue(storedDraft);
+    mocks.invoke.mockImplementation(() => {
+      throw new z.ZodError([]);
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "HEIGHT_CALCULATION_INVALID",
+    });
+  });
 
   it("fails closed for a caller that is not an administrator", async () => {
     mocks.isAdmin.mockReturnValue(false);

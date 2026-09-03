@@ -129,10 +129,16 @@ function distance(a: Point2, b: Point2) {
 }
 
 function signedArea(points: Point2[]) {
+  const origin = points[0];
+  if (!origin) return 0;
   return (
     points.reduce((sum, point, index) => {
       const next = points[(index + 1) % points.length];
-      return sum + point.xM * next.yM - next.xM * point.yM;
+      const x = point.xM - origin.xM;
+      const y = point.yM - origin.yM;
+      const nextX = next.xM - origin.xM;
+      const nextY = next.yM - origin.yM;
+      return sum + x * nextY - nextX * y;
     }, 0) / 2
   );
 }

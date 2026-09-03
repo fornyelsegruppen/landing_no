@@ -292,10 +292,25 @@ export async function buildWorkbenchDraftFromUiV1(input: {
   idempotencyKey: string;
   createdAt: string;
   sourceOutline: readonly NormalizedWorkbenchPointV1[];
+  /** Stable provider identity for the footprint (for example OSM way/123). */
+  sourceFootprintId?: string;
   approvedOutline: readonly NormalizedWorkbenchPointV1[];
   lines: readonly NormalizedWorkbenchLineV1[];
   evidence: DraftEvidenceV1;
 }): Promise<RoofFusionWorkbenchDraftV1> {
+  const sourceFootprintPoints = canonicalRing(
+    input.sourceOutline.map((point) =>
+      projectPoint(point, input.evidence.georeference),
+    ),
+    (point) => `${point.xM}\u0000${point.yM}`,
+  );
+  const sourceFootprintContentHash = await canonicalSha256(
+    sourceFootprintPoints,
+    "takfornyelse:workbench-source-footprint:v1",
+  );
+  const sourceFootprintId =
+    input.sourceFootprintId ??
+    `workbench-footprint:${sourceFootprintContentHash.slice(0, 32)}`;
   const outlineVertices = input.approvedOutline.map((point, index) => ({
     vertexId: `outline-v${index + 1}`,
     ...projectPoint(point, input.evidence.georeference),
@@ -346,11 +361,9 @@ export async function buildWorkbenchDraftFromUiV1(input: {
     vertices,
     sourceFootprint: {
       footprintId: "source-footprint-1",
-      sourceId: input.evidence.sourceId,
-      sourceContentHash: input.evidence.sourceContentHash,
-      points: input.sourceOutline.map((point) =>
-        projectPoint(point, input.evidence.georeference),
-      ),
+      sourceId: sourceFootprintId,
+      sourceContentHash: sourceFootprintContentHash,
+      points: sourceFootprintPoints,
     },
     roofMasses: [
       {

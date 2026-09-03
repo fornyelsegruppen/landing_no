@@ -7,6 +7,7 @@ import type { RoofFusionWorkbenchDraftV1 } from "@/lib/roof-fusion/workbench-dra
 import { buildWorkbenchDraftFromUiV1 } from "@/lib/roof-fusion/workbench-ui-client-v1";
 import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
+import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
 
 const geoReference = {
   crs: "EPSG:25833" as const,
@@ -54,6 +55,43 @@ const capture: NorgeIBilderCaptureResult = {
   geoReference,
 };
 
+const heightSurface = {
+  schemaVersion: "kartverket-height-surface.v1",
+  provider: "Kartverket Nasjonal detaljert høydemodell WCS",
+  coordinateSystem: "EPSG:25833",
+  bbox: geoReference.bounds,
+  grid: {
+    width: 1,
+    height: 1,
+    cellWidthM: 20,
+    cellHeightM: 10,
+    rowOrder: "north_to_south",
+  },
+  values: {
+    domElevationM: [110],
+    dtmElevationM: [100],
+    heightAboveTerrainM: [10],
+  },
+  quality: {
+    status: "usable",
+    coverageRatio: 1,
+    validSamples: 1,
+    totalSamples: 1,
+    maxHeightAboveTerrainM: 10,
+    reasons: ["Fixture"],
+  },
+  provenance: {
+    retrievedAt: "2026-09-03T08:00:00.000Z",
+    domCoverageId: "nhm_dom_topo_25833",
+    dtmCoverageId: "nhm_dtm_topo_25833",
+    domContentSha256: "b".repeat(64),
+    dtmContentSha256: "c".repeat(64),
+    resolutionM: 1,
+    license: "Norsk lisens for offentlige data (NLOD) 2.0",
+    attribution: "Kartverket",
+  },
+} satisfies KartverketHeightSurfaceV1;
+
 async function flushAsyncWork() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -63,8 +101,12 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
   let root: Root;
   let container: HTMLDivElement;
   let latest: RoofFusionWorkbenchDraftV1 | null;
+  let heightResponse: "error" | "blocked" | "review";
 
-  const renderWorkbench = (activeCapture = capture) =>
+  const renderWorkbench = (
+    activeCapture = capture,
+    activeHeightSurface?: KartverketHeightSurfaceV1,
+  ) =>
     createElement(AdminNextRoofFusionPersistentWorkbench, {
       actorId: "7",
       capture: activeCapture,
@@ -72,6 +114,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       horizontalAreaSquareMeters: 142,
       orthoImageAlt: "Test roof",
       sourceOutline,
+      heightSurface: activeHeightSurface,
     });
 
   const stage = () =>
@@ -218,6 +261,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       revision: 1,
       sourceOutline,
     });
+    heightResponse = "error";
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -245,6 +289,42 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
                 headers: { "content-type": "application/json" },
                 status: 404,
               });
+        }
+        if (url === "/api/admin/roof-fusion/workbench-height-adapter") {
+          return heightResponse === "error"
+            ? new Response(
+                JSON.stringify({
+                  code: "SOURCE_INTEGRITY_INVALID",
+                  error: "Šaltinių tapatybė nesutampa.",
+                }),
+                {
+                  headers: { "content-type": "application/json" },
+                  status: 422,
+                },
+              )
+            : new Response(
+                JSON.stringify({
+                  status:
+                    heightResponse === "blocked"
+                      ? "blocked"
+                      : "review_required",
+                  pricingReady: false,
+                  summary: {
+                    blockers:
+                      heightResponse === "blocked"
+                        ? ["[SKELETON_DANGLING_ENDPOINT] Pataisykite kraigą."]
+                        : ["Peržiūra privaloma"],
+                  },
+                  metrics:
+                    heightResponse === "review"
+                      ? { averageSlopeDegrees: 27 }
+                      : {},
+                }),
+                {
+                  headers: { "content-type": "application/json" },
+                  status: 200,
+                },
+              );
         }
         throw new Error(`Unexpected request: ${url}`);
       }),
@@ -274,6 +354,40 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
     ).toBe("ridge");
+  });
+
+  it("keeps the slopes stage on calculation failure and advances only after success", async () => {
+    await act(async () => {
+      root.render(renderWorkbench(capture, heightSurface));
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="slopes"]');
+
+    await act(async () => {
+      buttonWithText("Apskaičiuoti nuolydžius")!.click();
+      await flushAsyncWork();
+    });
+
+    expect(stage()).toBe("slopes");
+    expect(container.textContent).toContain("Šaltinių tapatybė nesutampa");
+
+    heightResponse = "blocked";
+    await act(async () => {
+      buttonWithText("Apskaičiuoti nuolydžius")!.click();
+      await flushAsyncWork();
+    });
+
+    expect(stage()).toBe("slopes");
+    expect(container.textContent).toContain("SKELETON_DANGLING_ENDPOINT");
+
+    heightResponse = "review";
+    await act(async () => {
+      buttonWithText("Apskaičiuoti nuolydžius")!.click();
+      await flushAsyncWork();
+    });
+
+    expect(stage()).toBe("review");
+    expect(container.textContent).toContain("27°");
   });
 
   it("snaps a near valley endpoint at 100% and preserves pending on far/zero rejection", async () => {

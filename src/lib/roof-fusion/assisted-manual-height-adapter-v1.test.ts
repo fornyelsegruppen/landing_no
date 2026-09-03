@@ -81,12 +81,12 @@ function makeGeoReference(): NorgeIBilderGeoReference {
   return {
     crs: "EPSG:25833",
     extentTrust: "actual-visible-extent",
-      bounds: {
-        minEastingM: 100,
-        minNorthingM: 100,
-        maxEastingM: 145,
-        maxNorthingM: 140,
-      },
+    bounds: {
+      minEastingM: 100,
+      minNorthingM: 100,
+      maxEastingM: 145,
+      maxNorthingM: 140,
+    },
     imageWidth: 1600,
     imageHeight: 1200,
   };
@@ -169,15 +169,52 @@ describe("assisted manual height adapter v1", () => {
   it("adapts one approved roof mass into a calculable preliminary snapshot", () => {
     const result = adaptAssistedManualRoofGeometryToSnapshotV1(baseInput());
 
+    expect(result.summary.blockers).toEqual([]);
     expect(result.geometryInput).not.toBeNull();
     expect(result.sourceResult.status).toBe("complete");
     expect(result.snapshot.state).toBe("review_required");
     expect(result.snapshot.measurement.class).toBe("preliminary");
     expect(result.snapshot.geometry.surfaces).toHaveLength(1);
-    expect(result.snapshot.geometry.surfaces[0].grossSurfaceArea.min).toBeGreaterThan(
+    expect(
+      result.snapshot.geometry.surfaces[0].grossSurfaceArea.min,
+    ).toBeGreaterThan(
       result.snapshot.geometry.surfaces[0].grossHorizontalArea.min ?? 0,
     );
     expect(result.summary.pricingReady).toBe(false);
+  });
+
+  it("fits a preliminary plane at real EPSG:25833 coordinate magnitudes", () => {
+    const input = baseInput();
+    const eastingOffset = 500_000;
+    const northingOffset = 6_640_000;
+    input.geometry.vertices = input.geometry.vertices.map((vertex) => ({
+      ...vertex,
+      xM: vertex.xM + eastingOffset,
+      yM: vertex.yM + northingOffset,
+    }));
+    input.geometry.sourceFootprint.points =
+      input.geometry.sourceFootprint.points.map((point) => ({
+        xM: point.xM + eastingOffset,
+        yM: point.yM + northingOffset,
+      }));
+    input.heightSurface.bbox = {
+      minEastingM: 100 + eastingOffset,
+      minNorthingM: 100 + northingOffset,
+      maxEastingM: 145 + eastingOffset,
+      maxNorthingM: 140 + northingOffset,
+    };
+    input.orthophoto.geoReference.bounds = {
+      minEastingM: 100 + eastingOffset,
+      minNorthingM: 100 + northingOffset,
+      maxEastingM: 145 + eastingOffset,
+      maxNorthingM: 140 + northingOffset,
+    };
+
+    const result = adaptAssistedManualRoofGeometryToSnapshotV1(input);
+
+    expect(result.summary.blockers).toEqual([]);
+    expect(result.geometryInput).not.toBeNull();
+    expect(result.summary.status).toBe("review_required");
   });
 
   it("supports L-shaped and multiple roof masses as separate calculable surfaces", () => {
@@ -211,11 +248,9 @@ describe("assisted manual height adapter v1", () => {
     const result = adaptAssistedManualRoofGeometryToSnapshotV1(input);
 
     expect(result.sourceResult.status).toBe("complete");
-    expect(result.snapshot.geometry.surfaces.map((surface) => surface.surfaceId)).toEqual([
-      "surface-annex-east",
-      "surface-annex-north",
-      "surface-main",
-    ]);
+    expect(
+      result.snapshot.geometry.surfaces.map((surface) => surface.surfaceId),
+    ).toEqual(["surface-annex-east", "surface-annex-north", "surface-main"]);
   });
 
   it("subtracts openings from the fitted roof surface area", () => {
@@ -231,12 +266,12 @@ describe("assisted manual height adapter v1", () => {
     const [surface] = result.snapshot.geometry.surfaces;
 
     expect(result.snapshot.geometry.openings).toHaveLength(1);
-    expect((surface.netSurfaceArea.min ?? 0)).toBeLessThan(
+    expect(surface.netSurfaceArea.min ?? 0).toBeLessThan(
       surface.grossSurfaceArea.min ?? 0,
     );
   });
 
-  it("keeps ridge and valley hints as review evidence and returns a partial review result", () => {
+  it("fails closed with a stable topology reason for an incomplete skeleton", () => {
     const input = baseInput();
     input.geometry.skeletonEdges.push(
       {
@@ -259,8 +294,33 @@ describe("assisted manual height adapter v1", () => {
 
     const result = adaptAssistedManualRoofGeometryToSnapshotV1(input);
 
+    expect(result.sourceResult.status).toBe("failed");
+    expect(result.snapshot.state).toBe("blocked");
+    expect(result.summary.blockers.join(" ")).toMatch(
+      /\[(SKELETON_DANGLING_ENDPOINT|SKELETON_EDGE_CROSSES_EDGE|SKELETON_DOES_NOT_SUBDIVIDE)\]/,
+    );
+  });
+
+  it("uses a boundary-to-boundary ridge to fit two reviewable surfaces", () => {
+    const input = baseInput();
+    input.geometry.vertices.push(
+      { vertexId: "ridge-west", xM: 108, yM: 120 },
+      { vertexId: "ridge-east", xM: 132, yM: 120 },
+    );
+    input.geometry.skeletonEdges.push({
+      edgeId: "ridge-main",
+      roofMassId: "main",
+      fromVertexId: "ridge-west",
+      toVertexId: "ridge-east",
+      type: "ridge",
+      provenance: "manual",
+    });
+
+    const result = adaptAssistedManualRoofGeometryToSnapshotV1(input);
+
     expect(result.sourceResult.status).toBe("partial");
     expect(result.snapshot.state).toBe("review_required");
+    expect(result.geometryInput?.surfaces).toHaveLength(2);
     expect(result.sourceResult.issues.map((issue) => issue.code)).toContain(
       "ASSISTED_SKELETON_REVIEW_REQUIRED",
     );
@@ -268,8 +328,9 @@ describe("assisted manual height adapter v1", () => {
     expect(
       result.geometryInput?.provenance.observations.some(
         (observation) =>
-          observation.targetRef === "surface-main" &&
-          (observation.value as { edgeId?: string }).edgeId === "ridge-main",
+          (observation.value as { edgeId?: string }).edgeId === "ridge-main" &&
+          (observation.value as { surfaceIds?: string[] }).surfaceIds
+            ?.length === 2,
       ),
     ).toBe(true);
   });

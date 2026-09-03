@@ -4,7 +4,10 @@ import {
   assistedManualRoofGeometryV1Schema,
   canonicalAssistedManualRoofGeometryV1,
 } from "./assisted-manual-roof-geometry-v1";
-import { canonicalSha256V1, canonicalizeJsonValueV1 } from "./canonicalization-v1";
+import {
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+} from "./canonicalization-v1";
 
 export const ROOF_FUSION_WORKBENCH_DRAFT_SCHEMA_VERSION =
   "roof-fusion-workbench-draft.v1" as const;
@@ -42,10 +45,18 @@ const georeferenceSchema = z
   .strict()
   .superRefine((value, context) => {
     if (value.bounds.maxEastingM <= value.bounds.minEastingM) {
-      context.addIssue({ code: "custom", message: "Georeference east bounds are invalid", path: ["bounds"] });
+      context.addIssue({
+        code: "custom",
+        message: "Georeference east bounds are invalid",
+        path: ["bounds"],
+      });
     }
     if (value.bounds.maxNorthingM <= value.bounds.minNorthingM) {
-      context.addIssue({ code: "custom", message: "Georeference north bounds are invalid", path: ["bounds"] });
+      context.addIssue({
+        code: "custom",
+        message: "Georeference north bounds are invalid",
+        path: ["bounds"],
+      });
     }
   });
 
@@ -67,7 +78,12 @@ export const roofFusionWorkbenchDraftV1Schema = z
         sourceId: identifier,
         sourceContentHash: sha256,
         attribution: z.string().trim().min(1).max(500),
-        imageId: z.union([z.string().trim().min(1).max(160), z.number().int().positive()]).optional(),
+        imageId: z
+          .union([
+            z.string().trim().min(1).max(160),
+            z.number().int().positive(),
+          ])
+          .optional(),
         georeference: georeferenceSchema,
       })
       .strict(),
@@ -76,32 +92,50 @@ export const roofFusionWorkbenchDraftV1Schema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.source.sourceId !== value.geometry.sourceFootprint.sourceId) {
-      context.addIssue({ code: "custom", message: "Draft source ID does not match source footprint", path: ["source", "sourceId"] });
-    }
-    if (value.source.sourceContentHash !== value.geometry.sourceFootprint.sourceContentHash) {
-      context.addIssue({ code: "custom", message: "Draft source hash does not match source footprint", path: ["source", "sourceContentHash"] });
-    }
+    // `source` is the captured orthophoto while `geometry.sourceFootprint`
+    // identifies the independently sourced footprint. Legacy drafts may alias
+    // the two; the height bridge upgrades that identity without mutating the
+    // persisted revision/hash.
     if (value.state === "blocked" && value.blockers.length === 0) {
-      context.addIssue({ code: "custom", message: "Blocked draft must explain its blockers", path: ["blockers"] });
+      context.addIssue({
+        code: "custom",
+        message: "Blocked draft must explain its blockers",
+        path: ["blockers"],
+      });
     }
     const expectedGeometryHash = canonicalSha256V1(
       canonicalAssistedManualRoofGeometryV1(value.geometry),
       "takfornyelse:assisted-manual-roof-geometry:v1",
     );
     if (value.geometryHash !== expectedGeometryHash) {
-      context.addIssue({ code: "custom", message: "Draft geometry hash does not match geometry", path: ["geometryHash"] });
+      context.addIssue({
+        code: "custom",
+        message: "Draft geometry hash does not match geometry",
+        path: ["geometryHash"],
+      });
     }
     if (value.draftHash !== workbenchDraftHashV1(value)) {
-      context.addIssue({ code: "custom", message: "Draft hash does not match draft contents", path: ["draftHash"] });
+      context.addIssue({
+        code: "custom",
+        message: "Draft hash does not match draft contents",
+        path: ["draftHash"],
+      });
     }
   });
 
-export type RoofFusionWorkbenchDraftV1 = z.infer<typeof roofFusionWorkbenchDraftV1Schema>;
-export type RoofFusionWorkbenchDraftReferenceV1 = Pick<RoofFusionWorkbenchDraftV1, "draftId" | "revision" | "draftHash" | "state">;
+export type RoofFusionWorkbenchDraftV1 = z.infer<
+  typeof roofFusionWorkbenchDraftV1Schema
+>;
+export type RoofFusionWorkbenchDraftReferenceV1 = Pick<
+  RoofFusionWorkbenchDraftV1,
+  "draftId" | "revision" | "draftHash" | "state"
+>;
 
-export function workbenchDraftHashV1(value: Omit<RoofFusionWorkbenchDraftV1, "draftHash">) {
-  const { draftHash: _ignored, ...content } = value as RoofFusionWorkbenchDraftV1;
+export function workbenchDraftHashV1(
+  value: Omit<RoofFusionWorkbenchDraftV1, "draftHash">,
+) {
+  const { draftHash: _ignored, ...content } =
+    value as RoofFusionWorkbenchDraftV1;
   void _ignored;
   return canonicalSha256V1(
     canonicalizeJsonValueV1(content),

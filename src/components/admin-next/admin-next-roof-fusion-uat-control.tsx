@@ -858,6 +858,7 @@ export function RealAddressResult({
             key={`${selected.id}:${captureResult?.capturedAt ?? "capture"}`}
             orthoImageAlt={`Stogo vaizdas ${result.address.label}`}
             sourceOutline={normalizedSourceOutline}
+            sourceFootprintId={`osm:${selected.id}`}
           />
         </div>
       ) : null}

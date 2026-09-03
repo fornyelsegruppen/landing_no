@@ -6,7 +6,10 @@ import {
   canonicalAssistedManualRoofGeometryV1,
   type AssistedManualRoofGeometryV1,
 } from "./assisted-manual-roof-geometry-v1";
-import { canonicalSha256V1, canonicalizeJsonValueV1 } from "./canonicalization-v1";
+import {
+  canonicalSha256V1,
+  canonicalizeJsonValueV1,
+} from "./canonicalization-v1";
 import {
   calculateRoofGeometryV1,
   roofGeometryInputHashV1,
@@ -21,6 +24,7 @@ import {
   type RoofSourceResultV1,
 } from "./source-adapter-v1";
 import type { RoofSnapshotV1 } from "./roof-snapshot-v1";
+import { subdivideAssistedManualRoofSurfacesV1 } from "./assisted-manual-surface-subdivision-v1";
 
 export const ASSISTED_MANUAL_HEIGHT_ADAPTER_INPUT_SCHEMA_VERSION =
   "assisted-manual-height-adapter-input.v1" as const;
@@ -46,13 +50,17 @@ const actorSchema = z
 
 const assistedManualHeightAdapterInputV1Schema = z
   .object({
-    schemaVersion: z.literal(ASSISTED_MANUAL_HEIGHT_ADAPTER_INPUT_SCHEMA_VERSION),
+    schemaVersion: z.literal(
+      ASSISTED_MANUAL_HEIGHT_ADAPTER_INPUT_SCHEMA_VERSION,
+    ),
     requestId: identifier,
     caseId: identifier,
     targetSnapshotId: identifier,
     previousSnapshotId: identifier.optional(),
     propertyId: identifier.optional(),
-    legacyMeasurementId: z.union([z.string(), z.number().int().positive()]).optional(),
+    legacyMeasurementId: z
+      .union([z.string(), z.number().int().positive()])
+      .optional(),
     idempotencyKey: z.string().trim().min(8).max(300),
     requestedAt: z.string().datetime({ offset: true }),
     generatedAt: z.string().datetime({ offset: true }),
@@ -100,7 +108,16 @@ export type AssistedManualHeightAdapterResultV1 = {
 
 type Point2 = { xM: number; yM: number };
 type Point3 = Point2 & { zM: number };
-type PlaneModel = { a: number; b: number; c: number; rmseM: number; sampleCount: number };
+type PlaneModel = {
+  a: number;
+  b: number;
+  /** Elevation at the local fitting origin. */
+  c: number;
+  originX: number;
+  originY: number;
+  rmseM: number;
+  sampleCount: number;
+};
 
 const MIN_ROOF_SAMPLES = 6;
 const MAX_PLANE_RMSE_M = 1.2;
@@ -146,11 +163,17 @@ function pointInPolygon(point: Point2, polygon: Point2[]) {
 }
 
 function polygonArea(polygon: Point2[]) {
+  const origin = polygon[0];
+  if (!origin) return 0;
   return (
     Math.abs(
       polygon.reduce((sum, point, index) => {
         const next = polygon[(index + 1) % polygon.length];
-        return sum + point.xM * next.yM - next.xM * point.yM;
+        const x = point.xM - origin.xM;
+        const y = point.yM - origin.yM;
+        const nextX = next.xM - origin.xM;
+        const nextY = next.yM - origin.yM;
+        return sum + x * nextY - nextX * y;
       }, 0),
     ) / 2
   );
@@ -169,7 +192,10 @@ function projectToImage(point: Point2, reference: NorgeIBilderGeoReference) {
   };
 }
 
-function isPointInsideOrtho(point: Point2, reference: NorgeIBilderGeoReference) {
+function isPointInsideOrtho(
+  point: Point2,
+  reference: NorgeIBilderGeoReference,
+) {
   if (
     reference.extentTrust !== "actual-visible-extent" ||
     reference.crs !== "EPSG:25833" ||
@@ -189,7 +215,10 @@ function isPointInsideOrtho(point: Point2, reference: NorgeIBilderGeoReference) 
   );
 }
 
-function isPointInsideHeightSurface(point: Point2, surface: KartverketHeightSurfaceV1) {
+function isPointInsideHeightSurface(
+  point: Point2,
+  surface: KartverketHeightSurfaceV1,
+) {
   return (
     point.xM >= surface.bbox.minEastingM &&
     point.xM <= surface.bbox.maxEastingM &&
@@ -203,12 +232,17 @@ function solve3x3(matrix: number[][], values: number[]) {
   for (let column = 0; column < 3; column += 1) {
     let pivot = column;
     for (let row = column + 1; row < 3; row += 1) {
-      if (Math.abs(augmented[row][column]) > Math.abs(augmented[pivot][column])) {
+      if (
+        Math.abs(augmented[row][column]) > Math.abs(augmented[pivot][column])
+      ) {
         pivot = row;
       }
     }
     if (Math.abs(augmented[pivot][column]) < 1e-9) return null;
-    [augmented[column], augmented[pivot]] = [augmented[pivot], augmented[column]];
+    [augmented[column], augmented[pivot]] = [
+      augmented[pivot],
+      augmented[column],
+    ];
     const divisor = augmented[column][column];
     for (let cell = column; cell <= 3; cell += 1) {
       augmented[column][cell] /= divisor;
@@ -226,6 +260,10 @@ function solve3x3(matrix: number[][], values: number[]) {
 
 function fitPlane(points: Point3[]): PlaneModel | null {
   if (points.length < 3) return null;
+  const originX =
+    points.reduce((sum, point) => sum + point.xM, 0) / points.length;
+  const originY =
+    points.reduce((sum, point) => sum + point.yM, 0) / points.length;
   let sx = 0;
   let sy = 0;
   let sz = 0;
@@ -235,14 +273,16 @@ function fitPlane(points: Point3[]): PlaneModel | null {
   let sxz = 0;
   let syz = 0;
   for (const point of points) {
-    sx += point.xM;
-    sy += point.yM;
+    const x = point.xM - originX;
+    const y = point.yM - originY;
+    sx += x;
+    sy += y;
     sz += point.zM;
-    sxx += point.xM * point.xM;
-    syy += point.yM * point.yM;
-    sxy += point.xM * point.yM;
-    sxz += point.xM * point.zM;
-    syz += point.yM * point.zM;
+    sxx += x * x;
+    syy += y * y;
+    sxy += x * y;
+    sxz += x * point.zM;
+    syz += y * point.zM;
   }
   const solved = solve3x3(
     [
@@ -255,13 +295,15 @@ function fitPlane(points: Point3[]): PlaneModel | null {
   if (!solved) return null;
   const [a, b, c] = solved;
   const squaredError = points.reduce((sum, point) => {
-    const predicted = a * point.xM + b * point.yM + c;
+    const predicted = a * (point.xM - originX) + b * (point.yM - originY) + c;
     return sum + (point.zM - predicted) ** 2;
   }, 0);
   return {
     a: round(a, 9),
     b: round(b, 9),
     c: round(c, 9),
+    originX,
+    originY,
     rmseM: round(Math.sqrt(squaredError / points.length), 6),
     sampleCount: points.length,
   };
@@ -317,7 +359,10 @@ function sourceFingerprint(input: AssistedManualHeightAdapterInputV1) {
   ).slice(0, 20);
 }
 
-function buildBlockedResult(input: AssistedManualHeightAdapterInputV1, blockers: string[]) {
+function buildBlockedResult(
+  input: AssistedManualHeightAdapterInputV1,
+  blockers: string[],
+) {
   const fingerprint = sourceFingerprint(input);
   const request = buildRoofSourceRequestV1({
     schemaVersion: "roof-source-request.v1",
@@ -603,6 +648,24 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
     return buildBlockedResult(input, georegistrationBlockers);
   }
 
+  const subdivision = geometry.skeletonEdges.length
+    ? subdivideAssistedManualRoofSurfacesV1(geometry, input.heightSurface)
+    : null;
+  if (subdivision && subdivision.status !== "ready") {
+    return buildBlockedResult(
+      input,
+      subdivision.issues.map(
+        (item) =>
+          `[${item.code}] Rankinis kraigas ar slėnis nesudaro saugaus uždaro stogo paviršių padalijimo. Pataisykite linijos galus arba pridėkite trūkstamą liniją.`,
+      ),
+    );
+  }
+  if (subdivision && geometry.obstacles.length) {
+    return buildBlockedResult(input, [
+      "[OBSTACLE_SURFACE_OWNERSHIP_REQUIRED] Kliūtys negali būti automatiškai priskirtos kraigo padalytiems paviršiams; reikalinga peržiūra.",
+    ]);
+  }
+
   const manualSourceId = "src-assisted-manual";
   const sources = buildSuccessfulSources(input, manualSourceId);
   const sourceRefs = [
@@ -613,7 +676,10 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
     manualSourceId,
   ];
   const sourceVertexMap = new Map(
-    input.geometry.vertices.map((vertex) => [vertex.vertexId, { xM: vertex.xM, yM: vertex.yM }]),
+    input.geometry.vertices.map((vertex) => [
+      vertex.vertexId,
+      { xM: vertex.xM, yM: vertex.yM },
+    ]),
   );
   const observations: RoofGeometryInputV1["provenance"]["observations"] = [];
   const vertices: RoofGeometryInputV1["vertices"] = [];
@@ -623,10 +689,41 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
   const issues: RoofSourceResultV1["issues"] = [];
   const blockers: string[] = [];
 
-  for (const mass of geometry.roofMasses) {
-    const polygon = mass.vertexIds.map((vertexId) => {
-      const point = sourceVertexMap.get(vertexId);
-      if (!point) throw new TypeError(`Missing assisted manual vertex ${vertexId}`);
+  const calculationMasses = subdivision
+    ? subdivision.surfaces.map((surface) => ({
+        mass: geometry.roofMasses.find(
+          (item) => item.massId === surface.roofMassId,
+        )!,
+        surfaceId: surface.surfaceId,
+        vertexIds: surface.vertexIds,
+        fittedVertices: surface.vertices,
+        edgeIds: surface.edgeIds,
+        openingIds: surface.openingIds,
+      }))
+    : geometry.roofMasses.map((mass) => ({
+        mass,
+        surfaceId: `surface-${mass.massId}`,
+        vertexIds: mass.vertexIds,
+        fittedVertices: undefined,
+        edgeIds: undefined,
+        openingIds: geometry.openings
+          .filter((item) => item.roofMassId === mass.massId)
+          .map((item) => item.openingId),
+      }));
+
+  for (const calculationMass of calculationMasses) {
+    const { mass, surfaceId, vertexIds } = calculationMass;
+    const fittedVertexMap = new Map(
+      calculationMass.fittedVertices?.map((vertex) => [
+        vertex.vertexId,
+        vertex,
+      ]),
+    );
+    const polygon = vertexIds.map((vertexId) => {
+      const point =
+        fittedVertexMap.get(vertexId) ?? sourceVertexMap.get(vertexId);
+      if (!point)
+        throw new TypeError(`Missing assisted manual vertex ${vertexId}`);
       return point;
     });
     const samples = sampleRoofPoints(polygon, input.heightSurface);
@@ -641,32 +738,50 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
         `Roof mass ${mass.massId} does not fit a stable Høydedata plane within the safe RMSE limit.`,
       ]);
     }
-    const localVertexIdFor = (vertexId: string) => `v-${mass.massId}-${vertexId}`;
-    const zFor = (point: Point2) => round(plane.a * point.xM + plane.b * point.yM + plane.c, 6);
-    const massVertexIds = mass.vertexIds.map((vertexId) => {
-      const point = sourceVertexMap.get(vertexId)!;
-      vertices.push({
-        vertexId: localVertexIdFor(vertexId),
-        xM: round(point.xM, 6),
-        yM: round(point.yM, 6),
-        zM: zFor(point),
-        uncertaintyM: round(Math.max(0.25, plane.rmseM + 0.15), 6),
-        sourceRefs,
-      });
-      return localVertexIdFor(vertexId);
+    const localVertexIdFor = (vertexId: string) =>
+      subdivision ? `v-subdivision-${vertexId}` : `v-${surfaceId}-${vertexId}`;
+    const zFor = (point: Point2) =>
+      round(
+        plane.a * (point.xM - plane.originX) +
+          plane.b * (point.yM - plane.originY) +
+          plane.c,
+        6,
+      );
+    const massVertexIds = vertexIds.map((vertexId) => {
+      const point =
+        fittedVertexMap.get(vertexId) ?? sourceVertexMap.get(vertexId)!;
+      const geometryVertexId = localVertexIdFor(vertexId);
+      if (!vertices.some((vertex) => vertex.vertexId === geometryVertexId)) {
+        vertices.push({
+          vertexId: geometryVertexId,
+          xM: round(point.xM, 6),
+          yM: round(point.yM, 6),
+          zM:
+            "zM" in point && typeof point.zM === "number"
+              ? round(point.zM, 6)
+              : zFor(point),
+          uncertaintyM: round(Math.max(0.25, plane.rmseM + 0.15), 6),
+          sourceRefs,
+        });
+      }
+      return geometryVertexId;
     });
     surfaces.push({
-      surfaceId: `surface-${mass.massId}`,
-      contourId: `contour-${mass.massId}`,
+      surfaceId,
+      contourId: `contour-${surfaceId}`,
       vertexIds: massVertexIds,
-      edgeIds: massVertexIds.map((vertexId, index) => `edge-${mass.massId}-${index + 1}`),
+      edgeIds:
+        calculationMass.edgeIds ??
+        massVertexIds.map(
+          (_vertexId, index) => `edge-${surfaceId}-${index + 1}`,
+        ),
       quality: "estimated",
       sourceRefs,
     });
     observations.push({
-      observationId: `obs-mass-${mass.massId}`,
+      observationId: `obs-mass-${surfaceId}`,
       kind: "surface_exists",
-      targetRef: `surface-${mass.massId}`,
+      targetRef: surfaceId,
       value: {
         approvedAt: mass.approvedAt,
         sampleCount: plane.sampleCount,
@@ -676,7 +791,8 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
       status: "accepted",
       sourceRefs: [manualSourceId, "src-height-dom", "src-height-dtm"],
       confidence: {
-        level: plane.rmseM <= 0.45 ? "high" : plane.rmseM <= 0.8 ? "medium" : "low",
+        level:
+          plane.rmseM <= 0.45 ? "high" : plane.rmseM <= 0.8 ? "medium" : "low",
         score: round(Math.max(0.4, 1 - plane.rmseM / 2), 6),
         basis: "derived",
         rationale:
@@ -688,7 +804,9 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
       ],
     });
 
-    for (const opening of geometry.openings.filter((item) => item.roofMassId === mass.massId)) {
+    for (const opening of geometry.openings.filter((item) =>
+      calculationMass.openingIds.includes(item.openingId),
+    )) {
       const openingVertexIds = opening.vertexIds.map((vertexId) => {
         const point = sourceVertexMap.get(vertexId)!;
         const geometryVertexId = `v-${opening.openingId}-${vertexId}`;
@@ -704,7 +822,7 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
       });
       openings.push({
         openingId: opening.openingId,
-        surfaceId: `surface-${mass.massId}`,
+        surfaceId,
         contourId: `contour-${opening.openingId}`,
         vertexIds: openingVertexIds,
         kind: opening.kind,
@@ -713,7 +831,9 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
       });
     }
 
-    for (const obstacle of geometry.obstacles.filter((item) => item.roofMassId === mass.massId)) {
+    for (const obstacle of geometry.obstacles.filter(
+      (item) => item.roofMassId === mass.massId,
+    )) {
       const obstacleVertexIds = obstacle.vertexIds.map((vertexId) => {
         const point = sourceVertexMap.get(vertexId)!;
         const geometryVertexId = `v-${obstacle.obstacleId}-${vertexId}`;
@@ -729,7 +849,7 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
       });
       obstacles.push({
         obstacleId: obstacle.obstacleId,
-        surfaceId: `surface-${mass.massId}`,
+        surfaceId,
         contourId: `contour-${obstacle.obstacleId}`,
         vertexIds: obstacleVertexIds,
         kind: obstacle.kind,
@@ -741,20 +861,24 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
 
   if (geometry.skeletonEdges.length > 0) {
     blockers.push(
-      "Manual ridge, valley, hip, and eave hints were preserved, but they still require explicit plane subdivision review before pricing.",
+      "Manual ridge, valley, hip, and eave hints were used for explicit plane subdivision; the resulting shared topology still requires review before pricing.",
     );
     issues.push(
       sourceIssue(
         "ASSISTED_SKELETON_REVIEW_REQUIRED",
         "warning",
-        "Skeleton edges are preserved as review evidence, but this adapter currently calculates one fitted plane per approved roof mass.",
+        "Skeleton edges were used to subdivide the approved mass into fitted surfaces and are preserved as review evidence.",
       ),
     );
     for (const edge of geometry.skeletonEdges) {
+      const subdivisionEdge = subdivision?.edges.find((item) =>
+        item.sourceSkeletonEdgeIds.includes(edge.edgeId),
+      );
       observations.push({
         observationId: `obs-skeleton-${edge.edgeId}`,
         kind: "edge_type",
-        targetRef: `surface-${edge.roofMassId}`,
+        targetRef:
+          subdivisionEdge?.surfaceIds[0] ?? `surface-${edge.roofMassId}`,
         value: {
           edgeId: edge.edgeId,
           roofMassId: edge.roofMassId,
@@ -762,6 +886,7 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
           provenance: edge.provenance,
           fromVertexId: edge.fromVertexId,
           toVertexId: edge.toVertexId,
+          surfaceIds: subdivisionEdge?.surfaceIds ?? [],
         },
         status: "accepted",
         sourceRefs: [manualSourceId],
@@ -770,16 +895,18 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
           score: 0.75,
           basis: "human_assessed",
           rationale:
-            "The administrator explicitly captured this edge type, but it is not yet promoted into shared 3D surface boundaries by this adapter.",
+            "The administrator explicitly captured this edge type and it was used as a shared boundary for deterministic Høydedata plane fitting.",
         },
         reasons: [
-          "Preserved for review and later surface subdivision.",
+          "Used for explicit surface subdivision and preserved for review.",
         ],
       });
     }
   }
 
-  const acceptedObservationIds = observations.map((observation) => observation.observationId);
+  const acceptedObservationIds = observations.map(
+    (observation) => observation.observationId,
+  );
   const geometryInput: RoofGeometryInputV1 = {
     schemaVersion: ROOF_GEOMETRY_INPUT_SCHEMA_VERSION,
     calculationId: `calc-assisted-${sourceFingerprint(input)}`,
@@ -805,7 +932,7 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
         decidedBy: input.actor,
         rationale:
           geometry.skeletonEdges.length > 0
-            ? "Approved roof masses and trusted Høydedata were converted into preliminary calculable planes; internal skeleton hints remain review evidence only."
+            ? "Approved roof masses were explicitly subdivided by the captured skeleton before trusted Høydedata planes were fitted."
             : "Approved roof masses and trusted Høydedata were converted into preliminary calculable planes with no internal skeleton hints pending.",
       },
     },
@@ -818,7 +945,7 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
         basis: "derived",
         rationale:
           geometry.skeletonEdges.length > 0
-            ? "Areas and pitches are preliminary because internal roof skeleton hints still await explicit 3D subdivision."
+            ? "Areas and pitches are preliminary because the manual skeleton subdivision and shared topology still require human review."
             : "Areas and pitches are preliminary because they derive from one fitted plane per approved roof mass.",
       },
     },
