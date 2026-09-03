@@ -68,6 +68,24 @@ For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gje
     expect(result.content).toContain("Du får alltid et skriftlig tilbud");
   });
 
+  it("normalizes the language defects found in post 8", () => {
+    const input = validGeneratedArticle({
+      content:
+        "Avhengig av hva en befant viser, velges metode. Type begroing: Sterkt begrodd med mose, lav eller alger krever omtanke. Vurder takets faktiske tåleevne og boligens ytre vern mot nedbør.",
+    });
+
+    const result = normalizeGeneratedArticleDraft(input) as ReturnType<
+      typeof validGeneratedArticle
+    >;
+
+    expect(result.content).toContain("hva en befaring viser");
+    expect(result.content).toContain(
+      "Type og omfang av begroing: Tak som er sterkt begrodd",
+    );
+    expect(result.content).toContain("takets faktiske tilstand");
+    expect(result.content).toContain("og taket.");
+  });
+
   it("leaves unrelated prose unchanged", () => {
     const input = validGeneratedArticle();
     expect(normalizeGeneratedArticleDraft(input)).toEqual(input);

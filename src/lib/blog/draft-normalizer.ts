@@ -14,6 +14,13 @@ const approvedNorwegianReplacements: Array<[RegExp, string]> = [
   [/\bindikasjonar\b/gi, "indikasjoner"],
   [/\btaket\s+har\s+det\s+vanskelig\b/gi, "taket kan være i dårlig stand"],
   [/\bsamt\s+sende\s+gjerne\b/gi, "og gjerne sende"],
+  [/\bhva\s+en\s+befant\s+viser\b/gi, "hva en befaring viser"],
+  [/\btakets\s+faktiske\s+tåleevne\b/gi, "takets faktiske tilstand"],
+  [/\bboligens\s+ytre\s+vern\s+mot\s+nedbør\b/gi, "taket"],
+  [
+    /Type\s+begroing:\s*Sterkt\s+begrodd\s+med\s+mose,\s*lav\s+eller\s+alger/gi,
+    "Type og omfang av begroing: Tak som er sterkt begrodd med mose, lav eller alger",
+  ],
   [/\bKunden\s+får\s+alltid\s+et\b/g, "Du får alltid et"],
   [
     /organisk\s+materiale\s+som\s+mose\s+og\s+sot/gi,

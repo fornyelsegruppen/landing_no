@@ -141,7 +141,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne/i.test(
+    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne|hva\s+en\s+befant\s+viser|takets\s+faktiske\s+tåleevne|boligens\s+ytre\s+vern\s+mot\s+nedbør|type\s+begroing:\s*sterkt\s+begrodd/i.test(
       allText,
     )
   ) {
@@ -271,6 +271,18 @@ export function evaluateArticleQuality(
   }
 
   const contentWords = words(article.content);
+  const markdownHeadingCount = (
+    article.content.match(/^#{2,3}\s+\S.+$/gm) || []
+  ).length;
+  if (markdownHeadingCount < 2) {
+    add(
+      issues,
+      "seo",
+      "missing_markdown_structure",
+      "blocker",
+      "Artikkelen må ha minst to mellomtitler markert som H2 eller H3 i Markdown.",
+    );
+  }
   if (contentWords.length < 700) {
     add(
       issues,

@@ -46,7 +46,7 @@ ${JSON.stringify(existingTitles.slice(0, 100))}
 
 KRAV:
 - 900–1400 ord nyttig norsk fagtekst.
-- Kort svar tidlig, logisk H2/H3-struktur, trygg egenkontroll fra bakken og tydelig grense for faglig vurdering. Sett en tom linje etter hver Markdown-overskrift og før hver punktliste.
+- Kort svar tidlig, trygg egenkontroll fra bakken og tydelig grense for faglig vurdering. Hver mellomtittel skal starte med nøyaktig «## » eller «### »; ikke skriv nakne mellomtitler som vanlige tekstlinjer. Sett en tom linje etter hver Markdown-overskrift og før hver punktliste.
 - Prisdrivere bare når relevant. Bruk kun godkjente pakkepriser ordrett med forbehold.
 - Minst én relevant intern tjenestelenke fra internalPaths, 2–5 FAQ og minst én presis dyplenke til en reell offentlig kildeside. Kilden må faktisk underbygge en navngitt påstand i artikkelen. Bruk de konkrete authoritativeSources når de passer, og bruk aldri en generell forskriftsindeks som dokumentasjon for pris, malingens heft eller behandlingseffekt.
 - Ikke bruk rå kundehenvendelser, adresser, telefon, e-post eller andre personopplysninger.

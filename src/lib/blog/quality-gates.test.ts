@@ -220,4 +220,23 @@ Det finnes flere tydelige indikasjonar på at taket har det vanskelig. Du kan op
       ]),
     );
   });
+
+  it("blocks missing Markdown headings and the language defects found in post 8", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content.replace(/^#{2,3}\s+/gm, "")}
+
+Kort svar uten Markdown-overskrift. Avhengig av hva en befant viser, vurderes type begroing: Sterkt begrodd med mose, lav eller alger. Vurder takets faktiske tåleevne og boligens ytre vern mot nedbør.`,
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "unnatural_norwegian",
+        "missing_markdown_structure",
+      ]),
+    );
+  });
 });
