@@ -51,6 +51,11 @@ describe("blog editorial policy", () => {
           authorName: "Fagperson",
           reviewerName: "Kontrollør",
           reviewedAt: "2026-08-23T10:00:00.000Z",
+          sources: [
+            {
+              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+            },
+          ],
         },
         new Date("2026-08-23T12:00:00.000Z"),
       ),
@@ -60,8 +65,8 @@ describe("blog editorial policy", () => {
     });
   });
 
-  it("lets an administrator review and publish a passed AI draft in one action", () => {
-    expect(
+  it("blocks one-click administrator publish before explicit approval", () => {
+    expect(() =>
       prepareAdminPublication(
         {
           _status: "draft",
@@ -72,31 +77,37 @@ describe("blog editorial policy", () => {
           aiAssisted: true,
           qualityScore: 92,
           qualityChecks: { passed: true },
+          sources: [
+            {
+              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+            },
+          ],
         },
         { _status: "published" },
         "Administrator",
         new Date("2026-08-24T10:00:00.000Z"),
       ),
-    ).toMatchObject({
-      _status: "published",
-      editorialStatus: "published",
-      reviewerName: "Administrator",
-      reviewedAt: "2026-08-24T10:00:00.000Z",
-      publishedAt: "2026-08-24T10:00:00.000Z",
-    });
+    ).toThrow(/godkjent før publisering/);
   });
 
-  it("still blocks one-click publication when AI quality checks failed", () => {
+  it("still blocks publication when an approved AI draft failed quality gates", () => {
     expect(() =>
       prepareAdminPublication(
         {
           _status: "draft",
-          editorialStatus: "ai_qa",
+          editorialStatus: "approved",
           titleNo: "Norsk",
           contentNo: "Innhold",
           aiAssisted: true,
           qualityScore: 60,
           qualityChecks: { passed: false },
+          reviewerName: "Administrator",
+          reviewedAt: "2026-08-24T09:00:00.000Z",
+          sources: [
+            {
+              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+            },
+          ],
         },
         { _status: "published" },
         "Administrator",
@@ -119,6 +130,11 @@ describe("blog editorial policy", () => {
           reviewerName: "Tidligere kontrollør",
           reviewedAt: "2026-08-29T10:00:00.000Z",
           scheduledAt: "2026-09-01T08:00:00.000Z",
+          sources: [
+            {
+              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+            },
+          ],
         },
         {
           _status: "published",
@@ -151,11 +167,48 @@ describe("blog editorial policy", () => {
           reviewerName: "Kontrollør",
           reviewedAt: "2026-08-23T10:00:00.000Z",
           publishedAt: "2026-08-23T12:00:00.000Z",
+          sources: [
+            {
+              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+            },
+          ],
         },
         { contentNo: "Oppdatert" },
         new Date("2026-08-24T12:00:00.000Z"),
       ),
     ).toMatchObject({ publishedAt: "2026-08-23T12:00:00.000Z" });
+  });
+
+  it("blocks publication when only homepage sources are present", () => {
+    expect(() =>
+      prepareEditorialPost(null, {
+        _status: "published",
+        editorialStatus: "approved",
+        titleNo: "Norsk",
+        contentNo: "Innhold",
+        authorName: "Fagperson",
+        reviewerName: "Kontrollør",
+        reviewedAt: "2026-08-23T10:00:00.000Z",
+        sources: [{ url: "https://www.sintef.no/" }],
+      }),
+    ).toThrow(/Minst én presis kilde/);
+  });
+
+  it("blocks publication when approval metadata is missing", () => {
+    expect(() =>
+      prepareEditorialPost(null, {
+        _status: "published",
+        editorialStatus: "approved",
+        titleNo: "Norsk",
+        contentNo: "Innhold",
+        authorName: "Fagperson",
+        sources: [
+          {
+            url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
+          },
+        ],
+      }),
+    ).toThrow(/Faglig kontrollør mangler/);
   });
 
   it("blocks scheduling before approval", () => {

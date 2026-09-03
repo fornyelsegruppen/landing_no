@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { BlogEditor } from "@/components/admin-v2/blog-editor";
+import { BlogReviewPanel } from "@/components/admin-v2/blog-review-panel";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
+import { blogPublishEligibility } from "@/lib/admin-v2/blog-review";
 import { statusLabel } from "@/lib/admin-v2/labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
@@ -36,6 +38,37 @@ export default async function BlogArticleAdminPage({
     post.heroImage && typeof post.heroImage === "object"
       ? post.heroImage
       : null;
+  const qualityChecks =
+    post.qualityChecks &&
+    typeof post.qualityChecks === "object" &&
+    !Array.isArray(post.qualityChecks)
+      ? post.qualityChecks
+      : null;
+  const reviewInput = {
+    aiAssisted: post.aiAssisted === true,
+    qualityChecks: qualityChecks
+      ? {
+          passed:
+            "passed" in qualityChecks ? qualityChecks.passed === true : null,
+          issues:
+            "issues" in qualityChecks && Array.isArray(qualityChecks.issues)
+              ? qualityChecks.issues
+              : [],
+        }
+      : null,
+    qualityScore:
+      typeof post.qualityScore === "number" ? post.qualityScore : null,
+    reviewedAt: post.reviewedAt || null,
+    reviewerName: publicReviewerName(post.reviewerName),
+    reviewFlags: Array.isArray(post.reviewFlags) ? post.reviewFlags : [],
+    scheduledAt: post.scheduledAt || null,
+    sources: Array.isArray(post.sources) ? post.sources : [],
+    status: post.editorialStatus,
+    stockImage:
+      post.stockImage && typeof post.stockImage === "object"
+        ? post.stockImage
+        : null,
+  };
   const preview = `/api/preview?locale=no&path=${encodeURIComponent(`/no/blogg/${post.slug}`)}`;
 
   return (
@@ -84,6 +117,11 @@ export default async function BlogArticleAdminPage({
         id={post.id}
         locale={user.interfaceLanguage}
         primaryKeyword={post.primaryKeyword || undefined}
+        publishEligible={blogPublishEligibility(reviewInput)}
+        qualityPassed={qualityChecks?.passed === true}
+        qualityScore={
+          typeof post.qualityScore === "number" ? post.qualityScore : null
+        }
         reviewerName={
           publicReviewerName(post.reviewerName) || reviewerNameForUser(user)
         }
@@ -92,6 +130,7 @@ export default async function BlogArticleAdminPage({
         status={post.editorialStatus}
         titleNo={post.titleNo}
       />
+      <BlogReviewPanel locale={user.interfaceLanguage} {...reviewInput} />
       <details className="text-muted-foreground rounded-2xl border border-white/10 p-4 text-sm">
         <summary className="cursor-pointer font-bold">
           {copy.blogAdmin.technical}

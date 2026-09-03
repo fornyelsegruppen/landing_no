@@ -3,6 +3,7 @@ import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
 import { cronRequestAuthorized } from "@/lib/security/cron-auth";
 import { assertBlogAction } from "@/lib/blog/transitions";
+import { assertPostPublishable } from "@/lib/blog/editorial-policy";
 import {
   assertFeatureReady,
   FeatureUnavailableError,
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
           },
           "publish",
         );
+        assertPostPublishable(post);
         await payload.update({
           collection: "posts",
           id: post.id,

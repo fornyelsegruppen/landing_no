@@ -35,7 +35,7 @@ describe("blog quality gates", () => {
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "high_overlap" }));
   });
 
-  it("blocks invented internal routes and warns about homepage-only sources", () => {
+  it("blocks invented internal routes and homepage-only sources", () => {
     const result = evaluateArticleQuality(
       validGeneratedArticle({
         internalLinks: [{ href: "/tjenester/takvask", anchor: "takvask", reason: "Tjeneste" }],
@@ -47,7 +47,8 @@ describe("blog quality gates", () => {
     expect(result.passed).toBe(false);
     expect(result.issues).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "invalid_internal_link", severity: "blocker" }),
-      expect.objectContaining({ code: "source_homepage_only", severity: "warning" }),
+      expect.objectContaining({ code: "source_homepage_only", severity: "blocker" }),
+      expect.objectContaining({ code: "missing_precise_source", severity: "blocker" }),
     ]));
   });
 });
