@@ -2,7 +2,7 @@
 
 ## Decision
 
-- `STATUS`: `MANUAL_PREVIEW_CANARY_AND_IMAGE_PASS`
+- `STATUS`: `MANUAL_PREVIEW_CANARY_IMAGE_AND_PUBLISH_GATE_PASS`
 - `SCHEDULER_CANARY`: `PENDING`
 - `AUTO_PUBLISH`: `NOT_USED`
 - `PRODUCTION`: `NO_GO`
@@ -34,6 +34,17 @@ and no article was approved, scheduled or published by this canary.
 - The repeated stock-image action then completed successfully. The draft
   preview displayed a roof image with visible photographer `Jan van der Wolf`
   and Pexels source links.
+- Commit `29c46e8` added a shared fail-closed publication invariant, an Admin V2
+  review panel and an explicit approve-before-publish transition. The full
+  `300` file / `1,299` test suite, TypeScript and ESLint completed without
+  errors; the final review-panel refinement passed `5/5` focused tests.
+- Vercel Preview deployment `dpl_Fw1ct4qXuANZQ1ioksvfEYpXk8ue` built
+  successfully and was assigned to the stable UAT alias.
+- Live UAT on draft `3` showed four explicit publication blockers: approval,
+  persisted reviewer/date, deterministic quality and a precise article-level
+  source. Both homepage-only sources were visibly marked, Pexels provenance
+  remained visible, and the `Publikuoti` button was disabled.
+- No approve, schedule or publish action was triggered during this check.
 
 ## What this proves
 
@@ -44,6 +55,9 @@ and no article was approved, scheduled or published by this canary.
 - Pexels enrichment, persisted image rendering and public-preview attribution
   work after the blank-field request fix.
 - Human approval remains a separate operator action.
+- Admin V2, the scheduled publisher and direct Payload writes now use the same
+  server-side publication requirements. AI-assisted content additionally needs
+  a passed quality result with score `>=75` and at least one precise source URL.
 
 ## What remains unproven
 

@@ -3,6 +3,7 @@ import {
   type GeneratedArticle,
 } from "./article-schema";
 import { approvedBlogKnowledge } from "./knowledge-base";
+import { isPreciseSourceUrl } from "./editorial-policy";
 import { topicOverlap, type ExistingTopic, type TopicCandidate } from "./topic-engine";
 
 export type QualityIssue = {
@@ -122,14 +123,12 @@ export function evaluateArticleQuality(
   if (article.internalLinks.some((link) => !allowedInternalPaths.has(link.href))) {
     add(issues, "seo", "invalid_internal_link", "blocker", "Utkastet foreslår en intern lenke som ikke finnes i godkjent ruteliste.");
   }
-  if (article.sources.some((source) => {
-    try {
-      return new URL(source.url).pathname === "/";
-    } catch {
-      return true;
-    }
-  })) {
-    add(issues, "facts", "source_homepage_only", "warning", "Minst én kilde peker bare til utgiverens forside og må erstattes med en presis kildeside.");
+  const preciseSourceCount = article.sources.filter((source) => isPreciseSourceUrl(source.url)).length;
+  if (preciseSourceCount < 1) {
+    add(issues, "facts", "missing_precise_source", "blocker", "Minst én presis kildeside må være oppgitt før artikkelen kan gå videre.");
+  }
+  if (article.sources.some((source) => !isPreciseSourceUrl(source.url))) {
+    add(issues, "facts", "source_homepage_only", "blocker", "Kilder som bare peker til en hjemmeside eller ugyldig URL må erstattes med presise kildesider.");
   }
   if (!lower.includes(topic.primaryKeyword.toLocaleLowerCase("nb-NO").split(" ")[0] || "")) {
     add(issues, "seo", "topic_mismatch", "warning", "Artikkelen kan ha svak kobling til primærtemaet.");
