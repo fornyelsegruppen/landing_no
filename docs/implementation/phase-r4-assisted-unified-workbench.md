@@ -1,0 +1,125 @@
+# R4 assisted unified roof workbench
+
+Status: implementation in progress on Preview only.
+
+## Outcome
+
+An administrator completes the complete R4 measurement in one window. A clear
+Norge i bilder orthophoto is the default human-facing surface. Original OSM,
+Høydedata, proposed geometry, approved geometry, roof planes, skeleton edges
+and obstacles are co-registered layers in the same viewport. Technical raster
+views remain available but hidden by default.
+
+The workflow is assisted rather than falsely autonomous: automatic proposals
+reduce work, while a deterministic manual path can complete complex roofs when
+source resolution or model confidence is insufficient.
+
+## Non-negotiable data rules
+
+1. Original source geometry and provenance are immutable.
+2. Administrator edits create a separate versioned roof/eaves geometry in
+   EPSG:25833.
+3. Roof footprint and roof/eaves outline are distinct concepts.
+4. A complex property may contain multiple roof masses.
+5. Each mass may contain ridge, valley, hip and eave edges plus obstacles.
+6. Every calculated plane retains its source, confidence and manual changes.
+7. Low-confidence or invalid topology remains blocked in both UI and API.
+8. Norge i bilder is used only under the approved user-triggered screenshot
+   contract with `©norgeibilder.no`; no WMS/WMTS or model training.
+
+## Guided interaction
+
+The workbench exposes one active task and one primary action at a time:
+
+1. **Address and source check** — verify the case-bound address, orthophoto
+   source/vintage and coordinate registration. The visible ArcGIS camera
+   extent, not the planned deep-link bounds, must georeference the captured
+   pixels; when that extent cannot be verified, the photo remains contextual
+   evidence and coordinate overlays are disabled.
+2. **Roof outline** — adjust only incorrect roof/eaves vertices; add/remove a
+   vertex, undo/redo, or reset to the source footprint.
+3. **Roof masses and skeleton** — confirm separate roof masses and place the
+   smallest useful set of ridge endpoints. The engine proposes valleys, hips
+   and junctions; the administrator corrects only ambiguous edges.
+4. **Slopes and planes** — fit DOM-minus-DTM samples per plane, exclude
+   outliers, and calculate each non-overlapping 3D surface. A verified manual
+   pitch from drawing or site remains available when the height grid is too
+   coarse.
+5. **Review** — show area and pitch on the corresponding visible plane, list
+   only unresolved blockers, and unlock R4 approval only when all gates pass.
+
+## Delivery slices
+
+### R4-UW1: canonical assisted geometry
+
+- versioned EPSG:25833 schema;
+- source footprint, approved eaves outline, multiple roof masses;
+- typed skeleton edges and obstacles;
+- topology validation and stable issue codes;
+- deterministic snapshot/hash compatibility.
+
+### R4-UW2: unified client workbench
+
+- orthophoto-first canvas;
+- co-registered layer toggles;
+- pointer/touch outline editing;
+- two-click ridge/valley capture;
+- guided stages, undo/reset and confidence/blocker feedback;
+- responsive Admin Next visual language.
+
+### R4-UW3: calculation adapters
+
+- convert approved outline and skeleton to non-overlapping plane polygons;
+- sample Høydedata separately per plane;
+- fit pitch and calculate 3D area per plane;
+- support L-shaped and multi-mass roofs without double counting;
+- explicit manual-pitch fallback with provenance.
+
+### R4-UW4: persistence and safety
+
+- store manual edits as a new measurement revision;
+- server-side revalidation of geometry and trusted source bindings;
+- audit actor, timestamp, changed fields and reason;
+- fail closed for low confidence, invalid topology or stale case/source state;
+- preserve the existing no-send Preview boundary.
+
+### R4-UW5: integration and UAT
+
+- replace the expanding separate Preview blocks with the unified workbench;
+- bind existing OSM, Norge i bilder and Høydedata results without rebuilding
+  their providers;
+- render the canonical R4 review drawer from the same snapshot;
+- verify the final interaction against the agreed dark measurement design.
+
+## Delivery order
+
+1. Correct and test image-to-coordinate registration before judging or
+   manually correcting the source outline.
+2. Deliver an honest vertical slice of the unified Preview workbench using the
+   real case image and immutable source outline.
+3. Connect approved-outline edits and typed skeleton edges to the canonical
+   assisted geometry contract.
+4. Implement multi-mass plane fitting and the Høydedata/manual-pitch fallback.
+5. Add revision persistence and server-side revalidation, then pass the three
+   protected UAT archetypes before any Production activation decision.
+
+## Acceptance matrix
+
+All three archetypes must pass in protected Preview:
+
+1. simple convex gable roof — automatic path;
+2. L-shaped roof — corrected outline plus multiple masses/ridges;
+3. compound roof with extensions — assisted skeleton plus per-plane review.
+
+For every archetype:
+
+- the address and exact roof are visually identifiable;
+- outline handles map back to stable EPSG:25833 coordinates;
+- original source and edited geometry remain distinguishable;
+- plane polygons do not overlap or escape the approved roof outline;
+- horizontal and 3D areas are deterministic and reproducible;
+- low-confidence planes identify the exact required administrator action;
+- no quote, customer notification or Production mutation occurs;
+- focused tests, full typecheck, lint and regression suite pass.
+
+Production activation is a separate explicit gate after protected Preview UAT.

@@ -2,6 +2,8 @@ import type { GeoPoint } from "@/lib/measurements/types";
 
 export type GeoReference = {
   crs: "EPSG:25833";
+  /** Planned URL bounds are never sufficient for an image overlay. */
+  extentTrust: "actual-visible-extent";
   bounds: {
     minEastingM: number;
     minNorthingM: number;
@@ -19,6 +21,7 @@ export function projectWgs84ToOrthoPixels(
 ) {
   if (
     points.length < 3 ||
+    ref.extentTrust !== "actual-visible-extent" ||
     !Number.isFinite(ref.imageWidth) ||
     !Number.isFinite(ref.imageHeight) ||
     ref.imageWidth <= 0 ||
