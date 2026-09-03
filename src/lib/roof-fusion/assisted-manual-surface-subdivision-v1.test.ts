@@ -174,6 +174,131 @@ describe("assisted manual surface subdivision v1", () => {
     ).toBe(true);
   });
 
+  it("treats epsilon-close snapped ridge endpoints as boundary touches", () => {
+    const input = geometry(
+      [
+        ...rectangle,
+        { vertexId: "ridge-s", xM: 5, yM: -5e-10 },
+        { vertexId: "ridge-n", xM: 5, yM: 8 + 5e-10 },
+      ],
+      [{ massId: "main", vertexIds: ["sw", "se", "ne", "nw"] }],
+      [
+        {
+          edgeId: "ridge",
+          roofMassId: "main",
+          fromVertexId: "ridge-s",
+          toVertexId: "ridge-n",
+          type: "ridge",
+          provenance: "manual",
+        },
+      ],
+    );
+
+    const result = subdivideAssistedManualRoofSurfacesV1(
+      input,
+      heightSurface((x) => 10 - Math.abs(x - 5) * 0.4),
+    );
+
+    expect(result.status).toBe("ready");
+    expect(result.surfaces).toHaveLength(2);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("subdivides the valid snapped Lyngveien r9 chord after EPSG projection", () => {
+    const originX = 264_990;
+    const originY = 6_647_330;
+    const projectedVertices = [
+      ["outline-v1", 265_000.228931666, 6_647_341.539549207],
+      ["outline-v2", 264_998.19608876936, 6_647_343.098084413],
+      ["outline-v3", 264_991.61536772177, 6_647_334.538394307],
+      ["outline-v4", 264_995.0981552443, 6_647_331.871532905],
+      ["outline-v5", 264_997.0425831289, 6_647_334.39443424],
+      ["outline-v6", 265_000.1833120874, 6_647_331.994985003],
+      ["outline-v7", 265_005.8285141126, 6_647_339.341153542],
+      ["outline-v8", 265_001.23855610105, 6_647_342.860039433],
+      ["ridge-from", 264_996.3779425371, 6_647_340.733181206],
+      ["ridge-to", 265_003.2220317294, 6_647_335.949307015],
+    ] as const;
+    const input = geometry(
+      projectedVertices.map(([vertexId, xM, yM]) => ({
+        vertexId,
+        xM: xM - originX,
+        yM: yM - originY,
+      })),
+      [
+        {
+          massId: "lyngveien",
+          vertexIds: [
+            "outline-v1",
+            "outline-v2",
+            "outline-v3",
+            "outline-v4",
+            "outline-v5",
+            "outline-v6",
+            "outline-v7",
+            "outline-v8",
+          ],
+        },
+      ],
+      [
+        {
+          edgeId: "r9-ridge",
+          roofMassId: "lyngveien",
+          fromVertexId: "ridge-from",
+          toVertexId: "ridge-to",
+          type: "ridge",
+          provenance: "manual",
+        },
+      ],
+    );
+
+    const result = subdivideAssistedManualRoofSurfacesV1(
+      input,
+      heightSurface((x, y) => 10 + x * 0.01 + y * 0.02),
+    );
+
+    expect(result.status).toBe("ready");
+    expect(result.surfaces).toHaveLength(2);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("still rejects a boundary-to-boundary chord that leaves a concave mass", () => {
+    const input = geometry(
+      [
+        { vertexId: "a", xM: 0, yM: 0 },
+        { vertexId: "b", xM: 10, yM: 0 },
+        { vertexId: "c", xM: 10, yM: 4 },
+        { vertexId: "d", xM: 6, yM: 4 },
+        { vertexId: "e", xM: 6, yM: 8 },
+        { vertexId: "f", xM: 0, yM: 8 },
+        { vertexId: "right", xM: 10, yM: 2 },
+        { vertexId: "top", xM: 3, yM: 8 },
+      ],
+      [{ massId: "concave", vertexIds: ["a", "b", "c", "d", "e", "f"] }],
+      [
+        {
+          edgeId: "invalid-ridge",
+          roofMassId: "concave",
+          fromVertexId: "right",
+          toVertexId: "top",
+          type: "ridge",
+          provenance: "manual",
+        },
+      ],
+    );
+
+    const result = subdivideAssistedManualRoofSurfacesV1(
+      input,
+      heightSurface(() => 10),
+    );
+
+    expect(result.status).toBe("blocked");
+    expect(result.issues.map((item) => item.code)).toContain(
+      "SKELETON_EDGE_OUTSIDE_MASS",
+    );
+    expect(result.surfaces).toEqual([]);
+  });
+
   it("creates four hip surfaces around an explicit ridge-and-hip graph", () => {
     const input = geometry(
       [

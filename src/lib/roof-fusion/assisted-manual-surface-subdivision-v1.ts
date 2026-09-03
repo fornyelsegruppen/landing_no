@@ -168,7 +168,9 @@ function properIntersection(a: Point2, b: Point2, c: Point2, d: Point2) {
   const abD = cross(a, b, d);
   const cdA = cross(c, d, a);
   const cdB = cross(c, d, b);
-  return abC * abD < -EPS && cdA * cdB < -EPS;
+  const strictlyOpposite = (left: number, right: number) =>
+    (left > EPS && right < -EPS) || (left < -EPS && right > EPS);
+  return strictlyOpposite(abC, abD) && strictlyOpposite(cdA, cdB);
 }
 
 function collinearOverlap(a: Point2, b: Point2, c: Point2, d: Point2) {
