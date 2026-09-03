@@ -12,6 +12,12 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  assertWorkbenchSkeletonLineLengthV1,
+  constrainWorkbenchPointToOutlineV1,
+  WorkbenchSkeletonEndpointErrorV1,
+  WorkbenchSkeletonZeroLengthErrorV1,
+} from "@/lib/roof-fusion/workbench-ui-client-v1";
 
 /** Coordinates are normalized to the image surface (0..1). */
 export type RoofFusionPoint = Readonly<{ x: number; y: number }>;
@@ -341,6 +347,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [lineMode, setLineMode] = useState<RoofFusionLineKind | null>(null);
   const [pendingLinePoint, setPendingLinePoint] =
     useState<RoofFusionPoint | null>(null);
+  const [lineCaptureProblem, setLineCaptureProblem] = useState<string | null>(
+    null,
+  );
   const [lineSequence, setLineSequence] = useState(1);
   const [draftLines, setDraftLines] = useState<readonly RoofFusionLine[]>(
     () => lines,
@@ -427,15 +436,40 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         return;
       }
       if (stage !== "skeleton" || !lineMode) return;
+      let constrainedPoint: RoofFusionPoint;
+      try {
+        constrainedPoint = constrainWorkbenchPointToOutlineV1(
+          point,
+          draftOutline,
+        );
+      } catch (error) {
+        setLineCaptureProblem(
+          error instanceof WorkbenchSkeletonEndpointErrorV1
+            ? error.message
+            : "SKELETON_ENDPOINT_OUTSIDE_MASS: Pasirinkite tašką patvirtinto kontūro viduje.",
+        );
+        return;
+      }
+      setLineCaptureProblem(null);
       if (!pendingLinePoint) {
-        setPendingLinePoint(point);
+        setPendingLinePoint(constrainedPoint);
+        return;
+      }
+      try {
+        assertWorkbenchSkeletonLineLengthV1(pendingLinePoint, constrainedPoint);
+      } catch (error) {
+        setLineCaptureProblem(
+          error instanceof WorkbenchSkeletonZeroLengthErrorV1
+            ? error.message
+            : "SKELETON_ZERO_LENGTH: Pasirinkite kitą antrą tašką.",
+        );
         return;
       }
       const capturedLine: RoofFusionLine = {
         id: `manual-line-${lineSequence}`,
         kind: lineMode,
         start: pendingLinePoint,
-        end: point,
+        end: constrainedPoint,
       };
       setDraftLines((current) => [...current, capturedLine]);
       setLineSequence((current) => current + 1);
@@ -638,6 +672,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       }
       setLineMode(null);
       setPendingLinePoint(null);
+      setLineCaptureProblem(null);
       setAddingVertex(false);
       onStageChange?.(nextStage);
     },
@@ -1102,6 +1137,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   onClick={() => {
                     setLineMode((current) => (current === kind ? null : kind));
                     setPendingLinePoint(null);
+                    setLineCaptureProblem(null);
                   }}
                   type="button"
                 >
@@ -1115,6 +1151,15 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     : "Pasirinkite pirmą tašką"
                   : ""}
               </span>
+              {lineCaptureProblem ? (
+                <span
+                  className="basis-full text-xs text-[#ffadad]"
+                  data-roof-fusion-line-problem
+                  role="alert"
+                >
+                  {lineCaptureProblem}
+                </span>
+              ) : null}
             </div>
           )}
         </div>

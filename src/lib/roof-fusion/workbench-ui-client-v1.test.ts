@@ -62,6 +62,53 @@ describe("Roof Fusion workbench UI persistence contract", () => {
     expect(value.source.georeference.extentTrust).toBe("actual-visible-extent");
   });
 
+  it("constrains near-boundary skeleton endpoints to the approved mass before server parsing", async () => {
+    const value = await draft([
+      {
+        id: "ridge-ui",
+        kind: "ridge",
+        start: { x: 0.099_999_999, y: 0.5 },
+        end: { x: 0.900_000_001, y: 0.5 },
+      },
+    ]);
+
+    expect(() => parseRoofFusionWorkbenchDraftV1(value)).not.toThrow();
+    expect(value.geometry.vertices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ xM: 500_002, yM: 6_640_005 }),
+        expect.objectContaining({ xM: 500_018, yM: 6_640_005 }),
+      ]),
+    );
+  });
+
+  it("rejects a skeleton endpoint far outside the approved mass with the semantic code", async () => {
+    await expect(
+      draft([
+        {
+          id: "ridge-ui",
+          kind: "ridge",
+          start: { x: 0.02, y: 0.5 },
+          end: { x: 0.9, y: 0.5 },
+        },
+      ]),
+    ).rejects.toMatchObject({
+      code: "SKELETON_ENDPOINT_OUTSIDE_MASS",
+    });
+  });
+
+  it("rejects a zero-length skeleton after endpoint constraints before POST", async () => {
+    await expect(
+      draft([
+        {
+          id: "ridge-ui",
+          kind: "ridge",
+          start: { x: 0.5, y: 0.5 },
+          end: { x: 0.501, y: 0.5 },
+        },
+      ]),
+    ).rejects.toMatchObject({ code: "SKELETON_ZERO_LENGTH" });
+  });
+
   it("saves with CAS and proves persistence by reloading the exact draft hash", async () => {
     const value = await draft();
     const fetcher = vi

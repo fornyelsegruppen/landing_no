@@ -13,6 +13,130 @@ export type NormalizedWorkbenchLineV1 = {
   end: NormalizedWorkbenchPointV1;
 };
 
+const WORKBENCH_POINT_EPSILON = 1e-10;
+export const WORKBENCH_ENDPOINT_SNAP_TOLERANCE = 0.005;
+export const WORKBENCH_MIN_SKELETON_LENGTH = 0.002;
+
+export class WorkbenchSkeletonEndpointErrorV1 extends Error {
+  readonly code = "SKELETON_ENDPOINT_OUTSIDE_MASS";
+
+  constructor() {
+    super(
+      "SKELETON_ENDPOINT_OUTSIDE_MASS: Kraigo arba slėnio taškas yra už patvirtinto kontūro. Patikslinkite kontūrą arba pasirinkite tašką jo viduje.",
+    );
+    this.name = "WorkbenchSkeletonEndpointErrorV1";
+  }
+}
+
+export class WorkbenchSkeletonZeroLengthErrorV1 extends Error {
+  readonly code = "SKELETON_ZERO_LENGTH";
+
+  constructor() {
+    super(
+      "SKELETON_ZERO_LENGTH: Antras kraigo arba slėnio taškas turi skirtis nuo pirmojo.",
+    );
+    this.name = "WorkbenchSkeletonZeroLengthErrorV1";
+  }
+}
+
+export function assertWorkbenchSkeletonLineLengthV1(
+  start: NormalizedWorkbenchPointV1,
+  end: NormalizedWorkbenchPointV1,
+) {
+  if (
+    Math.hypot(start.x - end.x, start.y - end.y) <=
+    WORKBENCH_MIN_SKELETON_LENGTH
+  ) {
+    throw new WorkbenchSkeletonZeroLengthErrorV1();
+  }
+}
+
+function pointOnNormalizedSegmentV1(
+  point: NormalizedWorkbenchPointV1,
+  from: NormalizedWorkbenchPointV1,
+  to: NormalizedWorkbenchPointV1,
+) {
+  const cross =
+    (point.x - from.x) * (to.y - from.y) - (point.y - from.y) * (to.x - from.x);
+  if (Math.abs(cross) > WORKBENCH_POINT_EPSILON) return false;
+  return (
+    point.x >= Math.min(from.x, to.x) - WORKBENCH_POINT_EPSILON &&
+    point.x <= Math.max(from.x, to.x) + WORKBENCH_POINT_EPSILON &&
+    point.y >= Math.min(from.y, to.y) - WORKBENCH_POINT_EPSILON &&
+    point.y <= Math.max(from.y, to.y) + WORKBENCH_POINT_EPSILON
+  );
+}
+
+export function workbenchPointInOrOnOutlineV1(
+  point: NormalizedWorkbenchPointV1,
+  outline: readonly NormalizedWorkbenchPointV1[],
+) {
+  if (outline.length < 3) return false;
+  let inside = false;
+  for (
+    let index = 0, previous = outline.length - 1;
+    index < outline.length;
+    previous = index++
+  ) {
+    const currentPoint = outline[index];
+    const previousPoint = outline[previous];
+    if (pointOnNormalizedSegmentV1(point, previousPoint, currentPoint)) {
+      return true;
+    }
+    if (
+      currentPoint.y > point.y !== previousPoint.y > point.y &&
+      point.x <
+        ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) /
+          (previousPoint.y - currentPoint.y) +
+          currentPoint.x
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Keeps a manually selected skeleton endpoint valid for its approved roof mass. */
+export function constrainWorkbenchPointToOutlineV1(
+  point: NormalizedWorkbenchPointV1,
+  outline: readonly NormalizedWorkbenchPointV1[],
+): NormalizedWorkbenchPointV1 {
+  if (workbenchPointInOrOnOutlineV1(point, outline)) {
+    return point;
+  }
+  if (outline.length < 3) throw new WorkbenchSkeletonEndpointErrorV1();
+  let closest = outline[0];
+  let closestDistance = Number.POSITIVE_INFINITY;
+  outline.forEach((from, index) => {
+    const to = outline[(index + 1) % outline.length];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const squaredLength = dx * dx + dy * dy;
+    const projection =
+      squaredLength > 0
+        ? Math.max(
+            0,
+            Math.min(
+              1,
+              ((point.x - from.x) * dx + (point.y - from.y) * dy) /
+                squaredLength,
+            ),
+          )
+        : 0;
+    const candidate = {
+      x: from.x + projection * dx,
+      y: from.y + projection * dy,
+    };
+    const distance = Math.hypot(point.x - candidate.x, point.y - candidate.y);
+    if (distance < closestDistance) {
+      closest = candidate;
+      closestDistance = distance;
+    }
+  });
+  if (closestDistance <= WORKBENCH_ENDPOINT_SNAP_TOLERANCE) return closest;
+  throw new WorkbenchSkeletonEndpointErrorV1();
+}
+
 export function workbenchCalculationBlockersV1(input: {
   trustedOrthophoto: boolean;
   completeHeightSurface: boolean;
@@ -161,7 +285,18 @@ export async function buildWorkbenchDraftFromUiV1(input: {
     vertices.push({ vertexId, ...projected });
     return vertexId;
   };
-  const skeletonEdges = input.lines.map((line, index) => ({
+  const constrainedLines = input.lines.map((line) => ({
+    ...line,
+    start: constrainWorkbenchPointToOutlineV1(
+      line.start,
+      input.approvedOutline,
+    ),
+    end: constrainWorkbenchPointToOutlineV1(line.end, input.approvedOutline),
+  }));
+  constrainedLines.forEach((line) =>
+    assertWorkbenchSkeletonLineLengthV1(line.start, line.end),
+  );
+  const skeletonEdges = constrainedLines.map((line, index) => ({
     edgeId: `manual-${line.kind}-${index + 1}`,
     roofMassId: "roof-mass-1",
     fromVertexId: endpointId(line.start, index, "from"),

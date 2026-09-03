@@ -11,6 +11,7 @@ import {
   parseRoofFusionWorkbenchDraftV1,
   type RoofFusionWorkbenchDraftReferenceV1,
 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
+import { AssistedManualRoofGeometryValidationError } from "@/lib/roof-fusion/assisted-manual-roof-geometry-v1";
 import {
   PayloadRoofFusionWorkbenchDraftRepositoryV1,
   RoofFusionWorkbenchDraftRepositoryError,
@@ -38,6 +39,15 @@ const loadSchema = z
   .strict();
 
 function errorResponse(error: unknown) {
+  if (error instanceof AssistedManualRoofGeometryValidationError) {
+    return NextResponse.json(
+      {
+        error: "Workbench geometry failed validation",
+        code: error.issues[0]?.code ?? "INVALID_GEOMETRY",
+      },
+      { status: 400 },
+    );
+  }
   if (error instanceof RoofFusionPreviewReadErrorV1) {
     const status = error.code === "CASE_NOT_FOUND" ? 404 : error.code === "PREVIEW_REQUIRED" ? 404 : 403;
     return NextResponse.json({ error: error.message, code: error.code }, { status });

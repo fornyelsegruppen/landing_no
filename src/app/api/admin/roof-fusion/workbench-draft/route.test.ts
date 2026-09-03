@@ -124,6 +124,37 @@ describe("POST /api/admin/roof-fusion/workbench-draft", () => {
     expect(mocks.append).not.toHaveBeenCalled();
   });
 
+  it("returns the safe semantic code for a skeleton endpoint outside its mass", async () => {
+    const invalidDraft = structuredClone(validDraft);
+    invalidDraft.geometry.vertices.push({
+      vertexId: "ridge-outside",
+      xM: 500_010.01,
+      yM: 6_640_005,
+    });
+    invalidDraft.geometry.skeletonEdges.push({
+      edgeId: "ridge-test",
+      roofMassId: "mass-test",
+      fromVertexId: "v1",
+      toVertexId: "ridge-outside",
+      type: "ridge",
+      provenance: "manual",
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api", {
+        method: "POST",
+        body: JSON.stringify({ draft: invalidDraft }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "SKELETON_ENDPOINT_OUTSIDE_MASS",
+      error: "Workbench geometry failed validation",
+    });
+    expect(mocks.append).not.toHaveBeenCalled();
+  });
+
   it("fails closed when the case is not authorized", async () => {
     mocks.assertCase.mockRejectedValue(new mocks.previewError("CASE_NOT_FOUND", "Case does not exist"));
     const response = await POST(new Request("http://localhost/api", { method: "POST", body: JSON.stringify({ draft: validDraft }) }));

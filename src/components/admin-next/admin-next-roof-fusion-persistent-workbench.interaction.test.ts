@@ -233,6 +233,77 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe("ridge");
   });
 
+  it("rejects a far-outside skeleton endpoint with an exact corrective message", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await click('[data-roof-fusion-line-mode="ridge"]');
+
+    const canvas = container.querySelector<SVGSVGElement>(
+      "[data-roof-fusion-canvas]",
+    );
+    const canvasShell = container.querySelector<HTMLDivElement>(
+      "[data-roof-fusion-canvas-shell]",
+    );
+    expect(canvas).not.toBeNull();
+    expect(canvasShell).not.toBeNull();
+    canvasShell!.getBoundingClientRect = () =>
+      ({
+        bottom: 500,
+        height: 500,
+        left: 0,
+        right: 1_000,
+        top: 0,
+        width: 1_000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: 10,
+          clientY: 250,
+        }),
+      );
+    });
+
+    expect(container.textContent).toContain("SKELETON_ENDPOINT_OUTSIDE_MASS");
+    expect(container.textContent).toContain(
+      "Patikslinkite kontūrą arba pasirinkite tašką jo viduje",
+    );
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).toBeNull();
+    expect(renderedLines()).toHaveLength(1);
+    expect(stage()).toBe("skeleton");
+
+    for (let index = 0; index < 2; index += 1) {
+      await act(async () => {
+        canvas!.dispatchEvent(
+          new MouseEvent("click", {
+            bubbles: true,
+            clientX: 500,
+            clientY: 250,
+          }),
+        );
+      });
+    }
+    expect(container.textContent).toContain("SKELETON_ZERO_LENGTH");
+    expect(container.textContent).toContain(
+      "Antras kraigo arba slėnio taškas turi skirtis nuo pirmojo",
+    );
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).not.toBeNull();
+    expect(renderedLines()).toHaveLength(2);
+    expect(stage()).toBe("skeleton");
+  });
+
   it("rehydrates on save and explicit reload without resetting skeleton stage or zoom", async () => {
     await act(async () => {
       root.render(renderWorkbench());
