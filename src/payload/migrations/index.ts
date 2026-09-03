@@ -39,6 +39,7 @@ import * as migration_20260826_150000_customer_contract_requests from "./2026082
 import * as migration_20260827_090000_lead_inquiry_type_combined_service from "./20260827_090000_lead_inquiry_type_combined_service";
 import * as migration_20260827_230000_manual_contact_recovery from "./20260827_230000_manual_contact_recovery";
 import * as migration_20260901_120000_roof_fusion_v1 from "./20260901_120000_roof_fusion_v1";
+import * as migration_20260903_120000_roof_fusion_workbench_drafts from "./20260903_120000_roof_fusion_workbench_drafts";
 
 export const migrations = [
   {
@@ -245,5 +246,10 @@ export const migrations = [
     up: migration_20260901_120000_roof_fusion_v1.up,
     down: migration_20260901_120000_roof_fusion_v1.down,
     name: "20260901_120000_roof_fusion_v1",
+  },
+  {
+    up: migration_20260903_120000_roof_fusion_workbench_drafts.up,
+    down: migration_20260903_120000_roof_fusion_workbench_drafts.down,
+    name: "20260903_120000_roof_fusion_workbench_drafts",
   },
 ];

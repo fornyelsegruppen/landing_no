@@ -43,6 +43,7 @@ import {
   RoofFusionCommands,
   RoofFusionSnapshots,
 } from "./payload/collections/RoofFusion";
+import { RoofFusionWorkbenchDrafts } from "./payload/collections/RoofFusionWorkbenchDrafts";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 import { resolveAdminNextPreviewTrustedOrigin } from "./lib/auth/preview-trusted-origin";
@@ -190,6 +191,7 @@ export default buildConfig({
     PrivateMedia,
     RoofFusionSnapshots,
     RoofFusionCommands,
+    RoofFusionWorkbenchDrafts,
   ],
   globals: [SiteSettings],
   editor: lexicalEditor(),

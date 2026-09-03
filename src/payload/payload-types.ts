@@ -98,6 +98,7 @@ export interface Config {
     'private-media': PrivateMedia;
     'roof-fusion-snapshots': RoofFusionSnapshot;
     'roof-fusion-commands': RoofFusionCommand;
+    'roof-fusion-workbench-drafts': RoofFusionWorkbenchDraft;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -136,6 +137,7 @@ export interface Config {
     'private-media': PrivateMediaSelect<false> | PrivateMediaSelect<true>;
     'roof-fusion-snapshots': RoofFusionSnapshotsSelect<false> | RoofFusionSnapshotsSelect<true>;
     'roof-fusion-commands': RoofFusionCommandsSelect<false> | RoofFusionCommandsSelect<true>;
+    'roof-fusion-workbench-drafts': RoofFusionWorkbenchDraftsSelect<false> | RoofFusionWorkbenchDraftsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -1649,6 +1651,31 @@ export interface RoofFusionCommand {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-workbench-drafts".
+ */
+export interface RoofFusionWorkbenchDraft {
+  id: number;
+  draftId: string;
+  caseId: string;
+  caseRevisionKey: string;
+  revision: number;
+  supersedesDraftId?: string | null;
+  draftHash: string;
+  idempotencyKey: string;
+  state: string;
+  sourceContentHash: string;
+  draft:
+    | { [k: string]: unknown }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -2775,6 +2802,24 @@ export interface RoofFusionCommandsSelect<T extends boolean = true> {
   commandType?: T;
   snapshotId?: T;
   result?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-workbench-drafts_select".
+ */
+export interface RoofFusionWorkbenchDraftsSelect<T extends boolean = true> {
+  draftId?: T;
+  caseId?: T;
+  caseRevisionKey?: T;
+  revision?: T;
+  supersedesDraftId?: T;
+  draftHash?: T;
+  idempotencyKey?: T;
+  state?: T;
+  sourceContentHash?: T;
+  draft?: T;
   updatedAt?: T;
   createdAt?: T;
 }
