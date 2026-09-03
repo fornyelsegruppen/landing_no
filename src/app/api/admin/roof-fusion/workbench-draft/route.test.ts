@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   isAdmin: vi.fn(),
   append: vi.fn(),
+  readDraft: vi.fn(),
+  readLatest: vi.fn(),
   assertCase: vi.fn(),
   previewError: class extends Error {
     constructor(readonly code: string, message: string) {
@@ -79,18 +81,24 @@ vi.mock("@/lib/roof-fusion/preview-read-adapters-v1", () => ({
 }));
 vi.mock("@/lib/roof-fusion/workbench-draft-repository-v1", () => ({
   PayloadRoofFusionWorkbenchDraftRepositoryV1: vi.fn(function () {
-    return { appendAtomically: mocks.append };
+    return {
+      appendAtomically: mocks.append,
+      readDraft: mocks.readDraft,
+      readLatestDraft: mocks.readLatest,
+    };
   }),
   RoofFusionWorkbenchDraftRepositoryError: class extends Error {},
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 describe("POST /api/admin/roof-fusion/workbench-draft", () => {
   beforeEach(() => {
     mocks.auth.mockReset();
     mocks.isAdmin.mockReset();
     mocks.append.mockReset();
+    mocks.readDraft.mockReset();
+    mocks.readLatest.mockReset();
     mocks.assertCase.mockReset();
     mocks.auth.mockResolvedValue({ user: { id: 7, role: "admin" } });
     mocks.isAdmin.mockReturnValue(true);
@@ -121,5 +129,48 @@ describe("POST /api/admin/roof-fusion/workbench-draft", () => {
     const response = await POST(new Request("http://localhost/api", { method: "POST", body: JSON.stringify({ draft: validDraft }) }));
     expect(response.status).toBe(404);
     expect(mocks.append).not.toHaveBeenCalled();
+  });
+
+  it("confirms an applied case-scoped CAS append with its idempotency key", async () => {
+    mocks.append.mockResolvedValue("applied");
+
+    const response = await POST(new Request("http://localhost/api", {
+      method: "POST",
+      body: JSON.stringify({ draft: validDraft, expectedLatest: null }),
+    }));
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "applied",
+      confirmation: {
+        kind: "case_scoped_cas_idempotency.v1",
+        caseId: "lead:999",
+        idempotencyKey: "workbench:case-test:1",
+        status: "applied",
+        latest: { draftId: "draft-case-test", revision: 1 },
+      },
+    });
+    expect(mocks.append).toHaveBeenCalledWith({ draft: validDraft, expectedLatest: null });
+  });
+
+  it("loads only the authorized case's latest append-only draft", async () => {
+    mocks.readLatest.mockResolvedValue(validDraft);
+
+    const response = await GET(new Request("http://localhost/api?caseId=lead%3A999"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ draft: validDraft });
+    expect(mocks.assertCase).toHaveBeenCalledWith("lead:999", expect.anything());
+    expect(mocks.readLatest).toHaveBeenCalledWith("lead:999");
+    expect(mocks.readDraft).not.toHaveBeenCalled();
+  });
+
+  it("does not reveal a draft before administrator authorization", async () => {
+    mocks.auth.mockResolvedValue({ user: null });
+
+    const response = await GET(new Request("http://localhost/api?caseId=lead%3A999"));
+
+    expect(response.status).toBe(401);
+    expect(mocks.readLatest).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,12 @@ const requestSchema = z
     expectedLatest: referenceSchema.nullable().default(null),
   })
   .strict();
+const loadSchema = z
+  .object({
+    caseId: z.string().trim().min(1).max(160).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/u),
+    draftId: z.string().trim().min(1).max(160).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/u).optional(),
+  })
+  .strict();
 
 function errorResponse(error: unknown) {
   if (error instanceof RoofFusionPreviewReadErrorV1) {
@@ -64,10 +70,66 @@ export async function POST(request: Request) {
       draft,
       expectedLatest: parsedBody.data.expectedLatest as RoofFusionWorkbenchDraftReferenceV1 | null,
     });
+    const reference = {
+      draftId: draft.draftId,
+      caseId: draft.caseId,
+      revision: draft.revision,
+      draftHash: draft.draftHash,
+      state: draft.state,
+    };
     return NextResponse.json(
-      { status, draft: { draftId: draft.draftId, caseId: draft.caseId, revision: draft.revision, draftHash: draft.draftHash, state: draft.state } },
+      {
+        status,
+        draft: reference,
+        // This is deliberately explicit so a UAT client can distinguish a
+        // successful CAS append from an idempotent transport replay.
+        confirmation: {
+          kind: "case_scoped_cas_idempotency.v1",
+          caseId: draft.caseId,
+          idempotencyKey: draft.idempotencyKey,
+          status,
+          latest: reference,
+        },
+      },
       { status: status === "applied" ? 201 : 200 },
     );
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+/**
+ * Preview-only, administrator-authorized draft load.  The case ID is always
+ * checked before either a latest or historical append-only revision is read.
+ */
+export async function GET(request: Request) {
+  try {
+    assertRoofFusionPreviewEnabledV1(process.env);
+    const parsedQuery = loadSchema.safeParse({
+      caseId: new URL(request.url).searchParams.get("caseId") ?? "",
+      ...(new URL(request.url).searchParams.get("draftId")
+        ? { draftId: new URL(request.url).searchParams.get("draftId") }
+        : {}),
+    });
+    if (!parsedQuery.success) {
+      return NextResponse.json({ error: "Invalid workbench draft lookup", code: "INVALID_LOOKUP" }, { status: 400 });
+    }
+    const payload = await getPayload();
+    const { user } = await payload.auth({ headers: request.headers });
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userIsAdmin(user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    await new PayloadRoofFusionCaseAuthorizationV1(payload).assertAdminCaseAccess(
+      parsedQuery.data.caseId,
+      user,
+    );
+    const repository = new PayloadRoofFusionWorkbenchDraftRepositoryV1(payload);
+    const draft = parsedQuery.data.draftId
+      ? await repository.readDraft(parsedQuery.data.caseId, parsedQuery.data.draftId)
+      : await repository.readLatestDraft(parsedQuery.data.caseId);
+    if (!draft) {
+      return NextResponse.json({ error: "Workbench draft was not found", code: "DRAFT_NOT_FOUND" }, { status: 404 });
+    }
+    return NextResponse.json({ draft });
   } catch (error) {
     return errorResponse(error);
   }
