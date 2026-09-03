@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type WheelEvent,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -94,6 +95,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   blockers?: readonly string[];
   stageBlockers?: Partial<Record<RoofFusionStage, readonly string[]>>;
   guardNotice?: string;
+  /** Changes only when the parent explicitly rehydrates persisted geometry. */
+  geometryHydrationSignal?: string | number;
   initialStage?: RoofFusionStage;
   initialLayers?: Partial<Record<RoofFusionLayer, boolean>>;
   onStageChange?: (stage: RoofFusionStage) => void;
@@ -313,6 +316,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   blockers = [],
   stageBlockers,
   guardNotice = "Nieko neišsaugo, kol nepatvirtinta",
+  geometryHydrationSignal,
   initialStage = "outline",
   initialLayers,
   onStageChange,
@@ -341,6 +345,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [draftLines, setDraftLines] = useState<readonly RoofFusionLine[]>(
     () => lines,
   );
+  const lastGeometryHydrationSignalRef = useRef(geometryHydrationSignal);
   const [viewport, setViewport] = useState<RoofFusionViewport>(
     DEFAULT_ROOF_FUSION_VIEWPORT,
   );
@@ -351,6 +356,20 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const suppressCanvasClickRef = useRef(false);
   const [approvedOutlineFillOpacity, setApprovedOutlineFillOpacity] =
     useState(8);
+
+  useEffect(() => {
+    if (
+      Object.is(lastGeometryHydrationSignalRef.current, geometryHydrationSignal)
+    )
+      return;
+    lastGeometryHydrationSignalRef.current = geometryHydrationSignal;
+    setDraftOutline(
+      (approvedOutline?.length ? approvedOutline : sourceOutline).map(
+        clampRoofFusionPoint,
+      ),
+    );
+    setDraftLines(lines);
+  }, [approvedOutline, geometryHydrationSignal, lines, sourceOutline]);
 
   const getCanvasBounds = useCallback(
     () => canvasShellRef.current?.getBoundingClientRect() ?? null,

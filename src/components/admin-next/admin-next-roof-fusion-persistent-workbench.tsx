@@ -140,6 +140,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   );
   const [heightResult, setHeightResult] = useState<HeightResult | null>(null);
   const [unsupportedLatest, setUnsupportedLatest] = useState(false);
+  const [geometryHydrationSignal, setGeometryHydrationSignal] = useState(0);
   const pendingDraft = useRef<RoofFusionWorkbenchDraftV1 | null>(null);
 
   const evidenceReady = Boolean(
@@ -165,6 +166,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
           setLines(hydrated.lines);
           setConfirmed(draft);
           setDirty(false);
+          setGeometryHydrationSignal((current) => current + 1);
         } else if (
           draft.source.sourceId === capture.sourceId &&
           draft.source.sourceContentHash === capture.rawContentHash
@@ -198,6 +200,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
             setLines(hydrated.lines);
             setConfirmed(draft);
             setDirty(false);
+            setGeometryHydrationSignal((current) => current + 1);
           } else if (
             draft.source.sourceId === capture.sourceId &&
             draft.source.sourceContentHash === capture.rawContentHash
@@ -268,6 +271,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       setConfirmed(saved.draft);
       setDirty(false);
       setSaveState(saved.status);
+      setGeometryHydrationSignal((current) => current + 1);
       pendingDraft.current = null;
     } catch (error) {
       setSaveState("error");
@@ -487,6 +491,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
           ? "Preview · CAS revizija išsaugota ir reload patvirtinta"
           : "Preview · neišsaugoti pakeitimai"
       }
+      geometryHydrationSignal={geometryHydrationSignal}
       horizontalAreaSquareMeters={
         metrics?.horizontalAreaSquareMeters ?? horizontalAreaSquareMeters
       }

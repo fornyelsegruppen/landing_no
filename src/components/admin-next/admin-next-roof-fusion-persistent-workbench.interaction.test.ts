@@ -3,10 +3,10 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RoofFusionWorkbenchDraftV1 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 import { buildWorkbenchDraftFromUiV1 } from "@/lib/roof-fusion/workbench-ui-client-v1";
 import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
-import type { RoofFusionWorkbenchDraftV1 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 
 const geoReference = {
   crs: "EPSG:25833" as const,
@@ -28,6 +28,22 @@ const sourceOutline = [
   { x: 0.1, y: 0.9 },
 ] as const;
 
+const persistedOutline = [
+  { x: 0.2, y: 0.2 },
+  { x: 0.8, y: 0.2 },
+  { x: 0.8, y: 0.8 },
+  { x: 0.2, y: 0.8 },
+] as const;
+
+const persistedLines = [
+  {
+    id: "saved-ridge",
+    kind: "ridge" as const,
+    start: { x: 0.25, y: 0.5 },
+    end: { x: 0.75, y: 0.5 },
+  },
+] as const;
+
 const capture: NorgeIBilderCaptureResult = {
   imageUrl: "/api/admin/media/91",
   mediaId: "91",
@@ -38,29 +54,80 @@ const capture: NorgeIBilderCaptureResult = {
   geoReference,
 };
 
+async function flushAsyncWork() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
   let root: Root;
   let container: HTMLDivElement;
+  let latest: RoofFusionWorkbenchDraftV1 | null;
 
-  beforeEach(() => {
+  const renderWorkbench = (activeCapture = capture) =>
+    createElement(AdminNextRoofFusionPersistentWorkbench, {
+      actorId: "7",
+      capture: activeCapture,
+      caseId: "lead:13",
+      horizontalAreaSquareMeters: 142,
+      orthoImageAlt: "Test roof",
+      sourceOutline,
+    });
+
+  const stage = () =>
+    container
+      .querySelector("[data-roof-fusion-workbench]")
+      ?.getAttribute("data-roof-fusion-stage");
+
+  const renderedLines = () =>
+    container.querySelectorAll("[data-roof-fusion-line-kind]");
+
+  const click = async (selector: string) => {
+    const button = container.querySelector<HTMLButtonElement>(selector);
+    expect(button).not.toBeNull();
+    await act(async () => button!.click());
+  };
+
+  const buttonWithText = (text: string) =>
+    Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (button) => button.textContent?.includes(text),
+    );
+
+  const captureLine = async (startX: number, endX: number) => {
+    const canvas = container.querySelector<SVGSVGElement>(
+      "[data-roof-fusion-canvas]",
+    );
+    expect(canvas).not.toBeNull();
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: startX,
+          clientY: 200,
+        }),
+      );
+    });
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: endX,
+          clientY: 200,
+        }),
+      );
+    });
+  };
+
+  beforeEach(async () => {
     (
       globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-  });
-
-  afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
-    vi.unstubAllGlobals();
-  });
-
-  it("keeps the skeleton stage and captured ridge after a confirmed draft becomes dirty", async () => {
-    const confirmedDraft = await buildWorkbenchDraftFromUiV1({
+    latest = await buildWorkbenchDraftFromUiV1({
       actorId: "7",
-      approvedOutline: sourceOutline,
+      approvedOutline: persistedOutline,
       caseId: "lead:13",
       createdAt: "2026-09-03T08:00:00.000Z",
       draftId: "uat-lead-13-r1",
@@ -72,64 +139,79 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         sourceId: capture.sourceId!,
       },
       idempotencyKey: "workbench:lead:13:r1:test",
-      lines: [],
+      lines: persistedLines,
       revision: 1,
       sourceOutline,
     });
-    let latest: RoofFusionWorkbenchDraftV1 | null = confirmedDraft;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
-        if (!url.startsWith("/api/admin/roof-fusion/workbench-draft?")) {
-          throw new Error(`Unexpected request: ${url}`);
+        if (url === "/api/admin/roof-fusion/workbench-draft") {
+          const request = JSON.parse(String(init?.body)) as {
+            draft: RoofFusionWorkbenchDraftV1;
+          };
+          latest = request.draft;
+          return new Response(
+            JSON.stringify({
+              status: "applied",
+              confirmation: { status: "applied" },
+            }),
+            { headers: { "content-type": "application/json" }, status: 200 },
+          );
         }
-        return latest
-          ? new Response(JSON.stringify({ draft: latest }), {
-              headers: { "content-type": "application/json" },
-              status: 200,
-            })
-          : new Response(JSON.stringify({ code: "DRAFT_NOT_FOUND" }), {
-              headers: { "content-type": "application/json" },
-              status: 404,
-            });
+        if (url.startsWith("/api/admin/roof-fusion/workbench-draft?")) {
+          return latest
+            ? new Response(JSON.stringify({ draft: latest }), {
+                headers: { "content-type": "application/json" },
+                status: 200,
+              })
+            : new Response(JSON.stringify({ code: "DRAFT_NOT_FOUND" }), {
+                headers: { "content-type": "application/json" },
+                status: 404,
+              });
+        }
+        throw new Error(`Unexpected request: ${url}`);
       }),
     );
+  });
 
-    const render = (activeCapture: NorgeIBilderCaptureResult) =>
-      createElement(AdminNextRoofFusionPersistentWorkbench, {
-        actorId: "7",
-        capture: activeCapture,
-        caseId: "lead:13",
-        horizontalAreaSquareMeters: 142,
-        orthoImageAlt: "Test roof",
-        sourceOutline,
-      });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
 
+  it("hydrates approved geometry and a saved line after the latest draft loads asynchronously", async () => {
     await act(async () => {
-      root.render(render(capture));
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      root.render(renderWorkbench());
+      await flushAsyncWork();
     });
 
-    const skeletonTab = container.querySelector<HTMLButtonElement>(
-      '[data-roof-fusion-stage-tab="skeleton"]',
-    );
-    expect(skeletonTab).not.toBeNull();
-    await act(async () => skeletonTab!.click());
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.2,0.2 0.8,0.2 0.8,0.8 0.2,0.8");
 
-    const ridgeMode = container.querySelector<HTMLButtonElement>(
-      '[data-roof-fusion-line-mode="ridge"]',
-    );
-    expect(ridgeMode).not.toBeNull();
-    await act(async () => ridgeMode!.click());
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    expect(renderedLines()).toHaveLength(1);
+    expect(
+      renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
+    ).toBe("ridge");
+  });
 
-    const canvas = container.querySelector<SVGSVGElement>(
-      "[data-roof-fusion-canvas]",
-    );
+  it("rehydrates on save and explicit reload without resetting skeleton stage or zoom", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await click('[data-roof-fusion-line-mode="ridge"]');
+
     const canvasShell = container.querySelector<HTMLDivElement>(
       "[data-roof-fusion-canvas-shell]",
     );
-    expect(canvas).not.toBeNull();
     expect(canvasShell).not.toBeNull();
     canvasShell!.getBoundingClientRect = () =>
       ({
@@ -144,42 +226,49 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         toJSON: () => ({}),
       }) satisfies DOMRect;
 
-    await act(async () => {
-      canvas!.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, clientX: 300, clientY: 200 }),
-      );
-    });
-    await act(async () => {
-      canvas!.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, clientX: 700, clientY: 200 }),
-      );
-    });
+    await click('[aria-label="Didinti vaizdą"]');
+    expect(container.textContent).toContain("150%");
 
-    expect(
-      container
-        .querySelector("[data-roof-fusion-workbench]")
-        ?.getAttribute("data-roof-fusion-stage"),
-    ).toBe("skeleton");
-    expect(
-      container.querySelector('[data-roof-fusion-line-kind="ridge"]'),
-    ).not.toBeNull();
+    await captureLine(300, 700);
+    expect(renderedLines()).toHaveLength(2);
+    expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+
+    await act(async () => {
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
+      await flushAsyncWork();
+    });
+    expect(container.textContent).toContain("CAS revizija išsaugota");
+    expect(renderedLines()).toHaveLength(2);
+    expect(stage()).toBe("skeleton");
+    expect(container.textContent).toContain("150%");
+
+    await captureLine(350, 650);
+    expect(renderedLines()).toHaveLength(3);
+    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+
+    await act(async () => {
+      buttonWithText("Perkrauti")!.click();
+      await flushAsyncWork();
+    });
+    expect(renderedLines()).toHaveLength(2);
+    expect(stage()).toBe("skeleton");
+    expect(container.textContent).toContain("150%");
+    expect(container.textContent).toContain(
+      "Preview · CAS revizija išsaugota ir reload patvirtinta",
+    );
 
     latest = null;
     await act(async () => {
       root.render(
-        render({
+        renderWorkbench({
           ...capture,
           sourceId: "norge-capture-92",
           rawContentHash: "b".repeat(64),
         }),
       );
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushAsyncWork();
     });
-    expect(
-      container
-        .querySelector("[data-roof-fusion-workbench]")
-        ?.getAttribute("data-roof-fusion-stage"),
-    ).toBe("outline");
+    expect(stage()).toBe("outline");
   });
 });
