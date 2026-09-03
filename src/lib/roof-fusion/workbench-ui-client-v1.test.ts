@@ -52,7 +52,7 @@ async function draft(
 }
 
 describe("Roof Fusion workbench UI persistence contract", () => {
-  it("keeps inside endpoints exact and applies one constant screen-space snap tolerance", () => {
+  it("snaps symmetrically near the boundary while preserving far-interior points", () => {
     const approved = [
       { x: 0.4, y: 0.3 },
       { x: 0.6, y: 0.3 },
@@ -67,6 +67,13 @@ describe("Roof Fusion workbench UI persistence contract", () => {
         maxDistancePixels: 14,
       }),
     ).toBe(inside);
+    expect(
+      constrainWorkbenchPointToOutlineV1({ x: 0.404, y: 0.5 }, approved, {
+        xPixelsPerImageUnit: 3_000,
+        yPixelsPerImageUnit: 1_500,
+        maxDistancePixels: 14,
+      }),
+    ).toEqual({ x: 0.4, y: 0.5 });
     expect(
       constrainWorkbenchPointToOutlineV1({ x: 0.388, y: 0.5 }, approved, {
         xPixelsPerImageUnit: 1_000,

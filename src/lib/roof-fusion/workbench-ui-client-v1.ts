@@ -115,10 +115,8 @@ export function constrainWorkbenchPointToOutlineV1(
     maxDistancePixels: WORKBENCH_BUILDER_ENDPOINT_SNAP_TOLERANCE,
   },
 ): NormalizedWorkbenchPointV1 {
-  if (workbenchPointInOrOnOutlineV1(point, outline)) {
-    return point;
-  }
   if (outline.length < 3) throw new WorkbenchSkeletonEndpointErrorV1();
+  const inside = workbenchPointInOrOnOutlineV1(point, outline);
   const xScale =
     Number.isFinite(metric.xPixelsPerImageUnit) &&
     metric.xPixelsPerImageUnit > 0
@@ -166,6 +164,7 @@ export function constrainWorkbenchPointToOutlineV1(
     }
   });
   if (closestDistance <= maxDistance) return closest;
+  if (inside) return point;
   throw new WorkbenchSkeletonEndpointErrorV1();
 }
 

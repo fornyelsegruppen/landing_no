@@ -114,6 +114,7 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   ) => void | boolean | Promise<void | boolean>;
   onOutlineChange?: (points: readonly RoofFusionPoint[]) => void;
   onLineCapture?: (line: RoofFusionLine) => void;
+  onLastLineUndo?: (line: RoofFusionLine) => void;
   onLayerVisibilityChange?: (layer: RoofFusionLayer, visible: boolean) => void;
   persistencePanel?: ReactNode;
 }>;
@@ -346,6 +347,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onPrimaryAction,
   onOutlineChange,
   onLineCapture,
+  onLastLineUndo,
   onLayerVisibilityChange,
   persistencePanel,
 }: RoofFusionUnifiedWorkbenchProps) {
@@ -538,6 +540,16 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     },
     [activateCanvasPoint, getCanvasBounds, viewport],
   );
+
+  const undoLastLine = useCallback(() => {
+    const lastLine = draftLines.at(-1);
+    if (!lastLine) return;
+    setDraftLines((current) => current.slice(0, -1));
+    setPendingLinePoint(null);
+    setLineCaptureProblem(null);
+    setLineCaptureNotice("Paskutinė kraigo arba slėnio linija pašalinta.");
+    onLastLineUndo?.(lastLine);
+  }, [draftLines, onLastLineUndo]);
 
   const handlePointerMove = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
@@ -1198,6 +1210,15 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   {kind === "ridge" ? "＋ Kraigas" : "⌄ Slėnis"}
                 </button>
               ))}
+              <button
+                className="min-h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                data-roof-fusion-undo-last-line
+                disabled={draftLines.length === 0}
+                onClick={undoLastLine}
+                type="button"
+              >
+                Atšaukti paskutinę liniją
+              </button>
               <span className="text-xs text-[#aaa69d]">
                 {lineMode
                   ? pendingLinePoint

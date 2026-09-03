@@ -511,6 +511,12 @@ export function AdminNextRoofFusionPersistentWorkbench({
         setConfirmed(null);
         setHeightResult(null);
       }}
+      onLastLineUndo={() => {
+        setLines((current) => current.slice(0, -1));
+        setDirty(true);
+        setConfirmed(null);
+        setHeightResult(null);
+      }}
       onOutlineChange={(points) => {
         setOutline(points);
         setDirty(true);

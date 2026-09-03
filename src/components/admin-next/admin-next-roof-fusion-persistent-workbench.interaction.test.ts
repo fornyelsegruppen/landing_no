@@ -475,6 +475,74 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
   });
 
+  it("snaps a slightly-inside ridge at 300% and undoes only the last line", async () => {
+    await act(async () => {
+      root.render(renderWorkbench(capture, heightSurface));
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await click('[data-roof-fusion-line-mode="ridge"]');
+
+    const canvasShell = container.querySelector<HTMLDivElement>(
+      "[data-roof-fusion-canvas-shell]",
+    );
+    expect(canvasShell).not.toBeNull();
+    canvasShell!.getBoundingClientRect = () =>
+      ({
+        bottom: 500,
+        height: 500,
+        left: 0,
+        right: 1_000,
+        top: 0,
+        width: 1_000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    expect(container.textContent).toContain("300%");
+
+    // At 3x, x=.404 and x=.596 are each 12 CSS px inside the boundary.
+    await activateCanvasPoint(212);
+    expect(
+      container
+        .querySelector("[data-roof-fusion-pending-line-point]")
+        ?.getAttribute("cx"),
+    ).toBe("0.4");
+    await activateCanvasPoint(788);
+    expect(renderedLines()).toHaveLength(2);
+    expect(container.textContent).toContain(
+      "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
+    );
+
+    await click("[data-roof-fusion-undo-last-line]");
+
+    expect(renderedLines()).toHaveLength(1);
+    expect(
+      renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
+    ).toBe("ridge");
+    expect(stage()).toBe("skeleton");
+    expect(container.textContent).toContain("300%");
+    expect(container.textContent).toContain(
+      "Paskutinė kraigo arba slėnio linija pašalinta",
+    );
+    expect(container.querySelector('img[src="/api/admin/media/91"]')).not.toBeNull();
+    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+
+    await act(async () => {
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
+      await flushAsyncWork();
+    });
+    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+    expect(latest?.source.sourceId).toBe(capture.sourceId);
+    expect(stage()).toBe("skeleton");
+    expect(container.textContent).toContain("300%");
+  });
+
   it("rehydrates on save and explicit reload without resetting skeleton stage or zoom", async () => {
     await act(async () => {
       root.render(renderWorkbench());
