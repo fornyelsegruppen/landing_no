@@ -24,6 +24,7 @@ export type RoofFusionViewport = Readonly<{
 
 export const MIN_ROOF_FUSION_ZOOM = 1;
 export const MAX_ROOF_FUSION_ZOOM = 4;
+export const ROOF_FUSION_PAN_THRESHOLD_PX = 5;
 export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
   scale: MIN_ROOF_FUSION_ZOOM,
   offsetX: 0,
@@ -68,6 +69,7 @@ type RoofFusionPanGesture = Readonly<{
   startClientX: number;
   startClientY: number;
   startViewport: RoofFusionViewport;
+  moved: boolean;
 }>;
 
 export type RoofFusionUnifiedWorkbenchProps = Readonly<{
@@ -199,6 +201,51 @@ export function roofFusionImagePointFromViewportPoint(
   });
 }
 
+export function shouldHandleRoofFusionZoomWheel(event: {
+  ctrlKey: boolean;
+  metaKey: boolean;
+}) {
+  return event.ctrlKey || event.metaKey;
+}
+
+export function hasRoofFusionPanGestureMoved(
+  start: Readonly<{ clientX: number; clientY: number }>,
+  current: Readonly<{ clientX: number; clientY: number }>,
+  threshold = ROOF_FUSION_PAN_THRESHOLD_PX,
+) {
+  return (
+    Math.hypot(
+      current.clientX - start.clientX,
+      current.clientY - start.clientY,
+    ) >= threshold
+  );
+}
+
+export function shouldSuppressRoofFusionCanvasClick(
+  gesture: Readonly<{ moved: boolean }> | null,
+) {
+  return gesture?.moved === true;
+}
+
+export function roofFusionScreenStableMarkerRadii(
+  baseRadius: number,
+  canvasAspectRatio: number,
+  scale: number,
+) {
+  const safeScale = Math.min(
+    MAX_ROOF_FUSION_ZOOM,
+    Math.max(MIN_ROOF_FUSION_ZOOM, scale),
+  );
+  const safeAspectRatio =
+    Number.isFinite(canvasAspectRatio) && canvasAspectRatio > 0
+      ? canvasAspectRatio
+      : 1;
+  return {
+    rx: baseRadius / safeScale,
+    ry: (baseRadius * safeAspectRatio) / safeScale,
+  };
+}
+
 function formatNumber(value: number | undefined, suffix = "") {
   if (value === undefined || !Number.isFinite(value)) return "—";
   return `${new Intl.NumberFormat("lt-LT", { maximumFractionDigits: 1 }).format(value)}${suffix}`;
@@ -297,10 +344,13 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [viewport, setViewport] = useState<RoofFusionViewport>(
     DEFAULT_ROOF_FUSION_VIEWPORT,
   );
-  const [panMode, setPanMode] = useState(false);
   const [panGesture, setPanGesture] = useState<RoofFusionPanGesture | null>(
     null,
   );
+  const panGestureMovedRef = useRef(false);
+  const suppressCanvasClickRef = useRef(false);
+  const [approvedOutlineFillOpacity, setApprovedOutlineFillOpacity] =
+    useState(8);
 
   const getCanvasBounds = useCallback(
     () => canvasShellRef.current?.getBoundingClientRect() ?? null,
@@ -342,7 +392,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const handleCanvasClick = useCallback(
     (event: MouseEvent<SVGSVGElement>) => {
-      if (panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM) return;
+      if (suppressCanvasClickRef.current) {
+        suppressCanvasClickRef.current = false;
+        event.preventDefault();
+        return;
+      }
       const bounds = getCanvasBounds();
       if (!bounds) return;
       const point = pointFromPointer(event, bounds, viewport);
@@ -384,7 +438,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       lineSequence,
       onLineCapture,
       pendingLinePoint,
-      panMode,
       stage,
       updateOutline,
       getCanvasBounds,
@@ -395,9 +448,23 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const handlePointerMove = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
       if (panGesture?.pointerId === event.pointerId) {
+        const moved =
+          panGestureMovedRef.current ||
+          hasRoofFusionPanGestureMoved(
+            {
+              clientX: panGesture.startClientX,
+              clientY: panGesture.startClientY,
+            },
+            event,
+          );
+        if (!moved) return;
+        panGestureMovedRef.current = true;
         const bounds = getCanvasBounds();
         if (!bounds) return;
         event.preventDefault();
+        if (!panGesture.moved) {
+          setPanGesture({ ...panGesture, moved: true });
+        }
         setViewport(
           panRoofFusionViewport(panGesture.startViewport, {
             x: (event.clientX - panGesture.startClientX) / (bounds.width || 1),
@@ -416,18 +483,25 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const handleCanvasPointerDown = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
-      if (!panMode || viewport.scale <= MIN_ROOF_FUSION_ZOOM) return;
+      if (
+        viewport.scale <= MIN_ROOF_FUSION_ZOOM ||
+        !event.isPrimary ||
+        event.button !== 0
+      )
+        return;
       event.preventDefault();
       event.currentTarget.setPointerCapture?.(event.pointerId);
       setDraggingVertex(null);
+      panGestureMovedRef.current = false;
       setPanGesture({
         pointerId: event.pointerId,
         startClientX: event.clientX,
         startClientY: event.clientY,
         startViewport: viewport,
+        moved: false,
       });
     },
-    [panMode, viewport],
+    [viewport],
   );
 
   const finishPointerGesture = useCallback(
@@ -438,6 +512,18 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       ) {
         event.currentTarget.releasePointerCapture?.(event.pointerId);
       }
+      if (
+        event.type === "pointerup" &&
+        shouldSuppressRoofFusionCanvasClick({
+          moved: panGestureMovedRef.current || Boolean(panGesture?.moved),
+        })
+      ) {
+        suppressCanvasClickRef.current = true;
+        window.setTimeout(() => {
+          suppressCanvasClickRef.current = false;
+        }, 250);
+      }
+      panGestureMovedRef.current = false;
       setPanGesture(null);
       setDraggingVertex(null);
     },
@@ -446,6 +532,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const handleWheel = useCallback(
     (event: WheelEvent<HTMLDivElement>) => {
+      if (!shouldHandleRoofFusionZoomWheel(event)) return;
       event.preventDefault();
       const bounds = event.currentTarget.getBoundingClientRect();
       const anchor = clampRoofFusionPoint({
@@ -461,7 +548,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       );
       setViewport(next);
       if (next.scale === MIN_ROOF_FUSION_ZOOM) {
-        setPanMode(false);
         setPanGesture(null);
       }
     },
@@ -473,7 +559,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       const next = zoomRoofFusionViewportAt(viewport, viewport.scale + delta);
       setViewport(next);
       if (next.scale === MIN_ROOF_FUSION_ZOOM) {
-        setPanMode(false);
         setPanGesture(null);
       }
     },
@@ -482,12 +567,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const resetViewport = useCallback(() => {
     setViewport(DEFAULT_ROOF_FUSION_VIEWPORT);
-    setPanMode(false);
     setPanGesture(null);
   }, []);
 
   const handleVertexKeyDown = useCallback(
-    (event: KeyboardEvent<SVGCircleElement>, index: number) => {
+    (event: KeyboardEvent<SVGGElement>, index: number) => {
       const current = draftOutline[index];
       if (!current) return;
       const step = event.shiftKey ? 0.05 : 0.01;
@@ -565,6 +649,30 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         ]
       : []),
   ];
+  const canvasAspectRatio =
+    orthoImageWidth && orthoImageHeight
+      ? orthoImageWidth / orthoImageHeight
+      : 4 / 3;
+  const heightPointRadii = roofFusionScreenStableMarkerRadii(
+    0.0035,
+    canvasAspectRatio,
+    viewport.scale,
+  );
+  const vertexHitRadii = roofFusionScreenStableMarkerRadii(
+    0.022,
+    canvasAspectRatio,
+    viewport.scale,
+  );
+  const vertexRadii = roofFusionScreenStableMarkerRadii(
+    0.006,
+    canvasAspectRatio,
+    viewport.scale,
+  );
+  const selectedVertexRadii = roofFusionScreenStableMarkerRadii(
+    0.008,
+    canvasAspectRatio,
+    viewport.scale,
+  );
 
   return (
     <section
@@ -656,18 +764,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             >
               Talpinti
             </button>
-            <button
-              aria-pressed={panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM}
-              className={`min-h-11 rounded-xl border px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
-              disabled={viewport.scale <= MIN_ROOF_FUSION_ZOOM}
-              onClick={() => setPanMode((current) => !current)}
-              type="button"
-            >
-              Perstumti vaizdą
-            </button>
             <span className="text-xs text-[#aaa69d]">
-              Ratukas / jutiklinis kilimėlis keičia mastelį. Perstumti galima
-              tik priartinus.
+              Ctrl/Cmd + ratukas keičia mastelį. Priartinus tempkite tuščią
+              drobės vietą vaizdui perstumti.
             </span>
           </div>
 
@@ -703,7 +802,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             />
             <svg
               aria-label="Stogo žymėjimo sluoksniai"
-              className={`absolute inset-0 h-full w-full touch-none ${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? (panGesture ? "cursor-grabbing" : "cursor-grab") : ""}`}
+              className={`absolute inset-0 h-full w-full ${viewport.scale > MIN_ROOF_FUSION_ZOOM ? `touch-none ${panGesture?.moved ? "cursor-grabbing" : "cursor-grab"}` : "touch-pan-y"}`}
+              data-roof-fusion-direct-pan={
+                viewport.scale > MIN_ROOF_FUSION_ZOOM ? "enabled" : "disabled"
+              }
               data-roof-fusion-canvas
               data-roof-fusion-viewport
               data-roof-fusion-viewport-scale={viewport.scale}
@@ -727,13 +829,15 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               {layerVisibility.hoydedata && (
                 <g data-roof-fusion-layer="hoydedata">
                   {heightPoints.map((item, index) => (
-                    <circle
+                    <ellipse
                       cx={item.point.x}
                       cy={item.point.y}
-                      fill="#55b7dc"
+                      data-roof-fusion-height-point={index}
+                      fill="#62d7a7"
                       key={index}
                       opacity=".72"
-                      r=".012"
+                      rx={heightPointRadii.rx}
+                      ry={heightPointRadii.ry}
                     />
                   ))}
                 </g>
@@ -772,7 +876,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 <polygon
                   data-roof-fusion-layer="approvedOutline"
                   fill="#46d69a"
-                  fillOpacity=".08"
+                  fillOpacity={approvedOutlineFillOpacity / 100}
                   points={pointsAttribute(draftOutline)}
                   stroke="#46d69a"
                   strokeWidth=".007"
@@ -816,38 +920,53 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               )}
               {stage === "outline" &&
                 draftOutline.map((point, index) => (
-                  <circle
+                  <g
                     aria-label={`Kontūro taškas ${index + 1}. Rodyklėmis perkelti.`}
-                    className={`${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? "cursor-grab" : "cursor-move"} outline-none`}
-                    cx={point.x}
-                    cy={point.y}
+                    className="cursor-move touch-none outline-none"
                     data-roof-fusion-vertex={index}
-                    fill={selectedVertex === index ? "#fff" : "#46d69a"}
                     key={`vertex-${index}`}
                     onClick={(event) => {
-                      if (panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM)
-                        return;
                       event.stopPropagation();
                       setSelectedVertex(index);
                     }}
                     onKeyDown={(event) => handleVertexKeyDown(event, index)}
                     onPointerDown={(event) => {
-                      if (panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM)
-                        return;
                       event.stopPropagation();
                       setSelectedVertex(index);
                       setDraggingVertex(index);
                     }}
-                    r={
-                      (selectedVertex === index ? 0.025 : 0.018) /
-                      viewport.scale
-                    }
                     role="button"
                     tabIndex={0}
-                    stroke="#0b111a"
-                    strokeWidth=".006"
-                    vectorEffect="non-scaling-stroke"
-                  />
+                  >
+                    <ellipse
+                      cx={point.x}
+                      cy={point.y}
+                      data-roof-fusion-vertex-hit-target={index}
+                      fill="transparent"
+                      rx={vertexHitRadii.rx}
+                      ry={vertexHitRadii.ry}
+                    />
+                    <ellipse
+                      cx={point.x}
+                      cy={point.y}
+                      data-roof-fusion-vertex-marker={index}
+                      fill={selectedVertex === index ? "#fff" : "#46d69a"}
+                      pointerEvents="none"
+                      rx={
+                        selectedVertex === index
+                          ? selectedVertexRadii.rx
+                          : vertexRadii.rx
+                      }
+                      ry={
+                        selectedVertex === index
+                          ? selectedVertexRadii.ry
+                          : vertexRadii.ry
+                      }
+                      stroke="#0b111a"
+                      strokeWidth=".003"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </g>
                 ))}
               {pendingLinePoint && (
                 <circle
@@ -976,6 +1095,29 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   ),
                 )}
               </div>
+              <label
+                className="mt-3 block rounded-xl border border-white/10 bg-[#0f151f] p-3 text-xs font-medium text-[#ddd8cd]"
+                data-roof-fusion-approved-outline-opacity-control
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span>Patvirtinto ploto spalvos ryškumas</span>
+                  <output aria-live="polite">
+                    {approvedOutlineFillOpacity}%
+                  </output>
+                </span>
+                <input
+                  aria-label="Patvirtinto ploto spalvos ryškumas"
+                  className="mt-2 w-full accent-[#46d69a] disabled:opacity-40"
+                  disabled={!layerVisibility.approvedOutline}
+                  max="100"
+                  min="0"
+                  onChange={(event) =>
+                    setApprovedOutlineFillOpacity(Number(event.target.value))
+                  }
+                  type="range"
+                  value={approvedOutlineFillOpacity}
+                />
+              </label>
             </div>
 
             <div

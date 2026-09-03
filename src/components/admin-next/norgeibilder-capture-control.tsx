@@ -24,7 +24,9 @@ import {
   DEFAULT_ROOF_FUSION_VIEWPORT,
   MAX_ROOF_FUSION_ZOOM,
   MIN_ROOF_FUSION_ZOOM,
+  hasRoofFusionPanGestureMoved,
   panRoofFusionViewport,
+  shouldHandleRoofFusionZoomWheel,
   zoomRoofFusionViewportAt,
   type RoofFusionPoint,
   type RoofFusionViewport,
@@ -128,6 +130,7 @@ type CapturePanGesture = Readonly<{
   startClientX: number;
   startClientY: number;
   startViewport: RoofFusionViewport;
+  moved: boolean;
 }>;
 
 export function NorgeIBilderCaptureViewport({
@@ -147,7 +150,6 @@ export function NorgeIBilderCaptureViewport({
   const [viewport, setViewport] = useState<RoofFusionViewport>(
     DEFAULT_ROOF_FUSION_VIEWPORT,
   );
-  const [panMode, setPanMode] = useState(false);
   const [panGesture, setPanGesture] = useState<CapturePanGesture | null>(null);
   const transform = `translate(${viewport.offsetX * 100}%, ${viewport.offsetY * 100}%) scale(${viewport.scale})`;
   const imageWidth = geoReference?.imageWidth ?? 16;
@@ -156,7 +158,6 @@ export function NorgeIBilderCaptureViewport({
   const applyViewport = useCallback((next: RoofFusionViewport) => {
     setViewport(next);
     if (next.scale === MIN_ROOF_FUSION_ZOOM) {
-      setPanMode(false);
       setPanGesture(null);
     }
   }, []);
@@ -174,6 +175,7 @@ export function NorgeIBilderCaptureViewport({
 
   const handleWheel = useCallback(
     (event: WheelEvent<HTMLDivElement>) => {
+      if (!shouldHandleRoofFusionZoomWheel(event)) return;
       event.preventDefault();
       const bounds = event.currentTarget.getBoundingClientRect();
       const anchor = {
@@ -200,7 +202,12 @@ export function NorgeIBilderCaptureViewport({
 
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
-      if (!panMode || viewport.scale <= MIN_ROOF_FUSION_ZOOM) return;
+      if (
+        viewport.scale <= MIN_ROOF_FUSION_ZOOM ||
+        !event.isPrimary ||
+        event.button !== 0
+      )
+        return;
       event.preventDefault();
       event.currentTarget.setPointerCapture?.(event.pointerId);
       setPanGesture({
@@ -208,17 +215,31 @@ export function NorgeIBilderCaptureViewport({
         startClientX: event.clientX,
         startClientY: event.clientY,
         startViewport: viewport,
+        moved: false,
       });
     },
-    [panMode, viewport],
+    [viewport],
   );
 
   const handlePointerMove = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       if (panGesture?.pointerId !== event.pointerId) return;
+      const moved =
+        panGesture.moved ||
+        hasRoofFusionPanGestureMoved(
+          {
+            clientX: panGesture.startClientX,
+            clientY: panGesture.startClientY,
+          },
+          event,
+        );
+      if (!moved) return;
       const bounds = shellRef.current?.getBoundingClientRect();
       if (!bounds) return;
       event.preventDefault();
+      if (!panGesture.moved) {
+        setPanGesture({ ...panGesture, moved: true });
+      }
       setViewport(
         panRoofFusionViewport(panGesture.startViewport, {
           x: (event.clientX - panGesture.startClientX) / (bounds.width || 1),
@@ -284,22 +305,16 @@ export function NorgeIBilderCaptureViewport({
         >
           Talpinti
         </button>
-        <button
-          aria-pressed={panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM}
-          className={`min-h-11 rounded-lg border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-40 ${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? "border-emerald-300/50 bg-emerald-300/15 text-emerald-100" : "border-white/15 bg-white/5 text-white"}`}
-          disabled={viewport.scale <= MIN_ROOF_FUSION_ZOOM}
-          onClick={() => setPanMode((current) => !current)}
-          type="button"
-        >
-          Perstumti
-        </button>
         <span className="text-[11px] text-[var(--an-muted)]">
-          Ratukas / jutiklinis kilimėlis keičia mastelį.
+          Ctrl/Cmd + ratukas keičia mastelį. Priartinus tempkite vaizdą.
         </span>
       </div>
       <div className="bg-[#080d12]">
         <div
-          className={`relative mx-auto w-full overflow-hidden ${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? (panGesture ? "cursor-grabbing touch-none" : "cursor-grab touch-none") : "touch-pan-y"}`}
+          className={`relative mx-auto w-full overflow-hidden ${viewport.scale > MIN_ROOF_FUSION_ZOOM ? (panGesture?.moved ? "cursor-grabbing touch-none" : "cursor-grab touch-none") : "touch-pan-y"}`}
+          data-norgeibilder-capture-direct-pan={
+            viewport.scale > MIN_ROOF_FUSION_ZOOM ? "enabled" : "disabled"
+          }
           data-norgeibilder-capture-viewport-shell
           onPointerCancel={finishPointerGesture}
           onPointerDown={handlePointerDown}

@@ -10,8 +10,12 @@ import {
   ROOF_FUSION_STAGES,
   clampRoofFusionPoint,
   clampRoofFusionViewport,
+  hasRoofFusionPanGestureMoved,
   panRoofFusionViewport,
   roofFusionImagePointFromViewportPoint,
+  roofFusionScreenStableMarkerRadii,
+  shouldHandleRoofFusionZoomWheel,
+  shouldSuppressRoofFusionCanvasClick,
   zoomRoofFusionViewportAt,
 } from "./admin-next-roof-fusion-unified-workbench";
 import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
@@ -78,6 +82,30 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     ).toEqual({ x: 0.5, y: 0.375 });
   });
 
+  it("leaves plain wheel scrolling alone and reserves Ctrl/Cmd-wheel for zoom", () => {
+    expect(
+      shouldHandleRoofFusionZoomWheel({ ctrlKey: false, metaKey: false }),
+    ).toBe(false);
+    expect(
+      shouldHandleRoofFusionZoomWheel({ ctrlKey: true, metaKey: false }),
+    ).toBe(true);
+    expect(
+      shouldHandleRoofFusionZoomWheel({ ctrlKey: false, metaKey: true }),
+    ).toBe(true);
+  });
+
+  it("arbitrates a direct pan only after movement and suppresses its click", () => {
+    const start = { clientX: 100, clientY: 100 };
+    expect(
+      hasRoofFusionPanGestureMoved(start, { clientX: 103, clientY: 103 }),
+    ).toBe(false);
+    expect(
+      hasRoofFusionPanGestureMoved(start, { clientX: 106, clientY: 100 }),
+    ).toBe(true);
+    expect(shouldSuppressRoofFusionCanvasClick({ moved: false })).toBe(false);
+    expect(shouldSuppressRoofFusionCanvasClick({ moved: true })).toBe(true);
+  });
+
   it("keeps source geometry visibly immutable while providing one clear image surface", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
@@ -97,13 +125,19 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('data-roof-fusion-viewport-scale="1"');
     expect(html).toContain("Dabartinis vaizdo mastelis");
     expect(html).toContain("100%");
-    expect(html).toContain("Perstumti vaizdą");
+    expect(html).not.toContain(">Perstumti vaizdą<");
+    expect(html).toContain("Ctrl/Cmd + ratukas");
     expect(html).toContain("Talpinti");
     expect(html).toContain('src="/preview/house-ortho.jpg"');
     expect(html).toContain("aspect-ratio:1920 / 1080");
     expect(html).toContain('preserveAspectRatio="none"');
     expect(html).toContain("©norgeibilder.no");
     expect(html).toContain('data-roof-fusion-layer="sourceOutline"');
+    expect(html).toContain("data-roof-fusion-approved-outline-opacity-control");
+    expect(html).toContain("Patvirtinto ploto spalvos ryškumas");
+    expect(html).toContain("touch-pan-y");
+    expect(html).toContain('data-roof-fusion-vertex-marker="0"');
+    expect(html).toContain('rx="0.006"');
     expect(html).toContain("Šaltinio kontūras nekintamas");
     expect(html).toContain("142 m²");
     expect(html).toContain("159,4 m²");
@@ -111,6 +145,28 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).not.toContain('data-roof-fusion-layer="hoydedata"');
     expect(html).not.toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).not.toContain('data-roof-fusion-layer="skeleton"');
+  });
+
+  it("renders Høydedata samples as small aspect-corrected points", () => {
+    const atOneX = roofFusionScreenStableMarkerRadii(0.006, 4 / 3, 1);
+    const atFourX = roofFusionScreenStableMarkerRadii(0.006, 4 / 3, 4);
+    expect(atFourX.rx * 4).toBeCloseTo(atOneX.rx);
+    expect(atFourX.ry * 4).toBeCloseTo(atOneX.ry);
+
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        heightPoints: [{ point: { x: 0.5, y: 0.5 }, elevationMeters: 123 }],
+        initialLayers: { hoydedata: true },
+        orthoImageHeight: 750,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        orthoImageWidth: 1000,
+        sourceOutline,
+      }),
+    );
+
+    expect(html).toContain('data-roof-fusion-height-point="0"');
+    expect(html).toContain('rx="0.0035"');
+    expect(html).toContain('ry="0.004666666666666666"');
   });
 
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {

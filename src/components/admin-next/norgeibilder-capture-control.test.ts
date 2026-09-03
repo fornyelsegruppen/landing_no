@@ -93,7 +93,9 @@ describe("Norge i bilder capture control", () => {
     expect(html).toContain("Mastelis +");
     expect(html).toContain("100%");
     expect(html).toContain("Talpinti");
-    expect(html).toContain("Perstumti");
+    expect(html).not.toContain(">Perstumti<");
+    expect(html).toContain("Ctrl/Cmd + ratukas");
+    expect(html).toContain('data-norgeibilder-capture-direct-pan="disabled"');
 
     const transformedLayerStart = html.indexOf(
       "data-norgeibilder-capture-viewport-content",
