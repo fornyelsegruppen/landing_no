@@ -1,4 +1,4 @@
-export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-03-v3";
+export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-03-v4";
 
 export const approvedBlogKnowledge = {
   company: "Takfornyelse, en del av Fornyelse Gruppen AS",
@@ -61,7 +61,9 @@ export const approvedBlogKnowledge = {
   ],
   safety:
     "Ikke oppfordre boligeiere til å gå opp på taket. Ved lekkasje, snølast, konstruksjonsrisiko eller usikkerhet skal fagperson vurdere saken.",
-  cta: "Be om en gratis og uforpliktende vurdering. Be om postnummer, valgfri adresse og gjerne bilder, uten å love endelig teknisk konklusjon eller pris.",
+  cta: "Be om en gratis og uforpliktende vurdering.",
+  leadInformation:
+    "For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gjerne sende bilder. Dette er bakgrunnsinformasjon, ikke en teknisk konklusjon eller et bindende pristilbud.",
   forbiddenClaims: [
     "Norges beste",
     "billigst i markedet",

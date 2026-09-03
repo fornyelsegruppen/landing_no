@@ -158,4 +158,24 @@ Når taket er teknisk egnet, kan riktig behandling bidra til å forlenge takets 
       ]),
     );
   });
+
+  it("blocks the grammar, category and instruction leaks found in post 5", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}
+
+Standard inkluderer impregnering som redusere fuktopptak på egnet takstein. Et bratt tak kan ha høyt monterte flater, og det er streng regulering knyttet til sikring. Taket samler organisk materiale som mose og sot. Be om postnummer, valgfri adresse og gjerne bilder, uten å love endelig teknisk konklusjon eller pris.`,
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "unnatural_norwegian",
+        "material_category_error",
+        "internal_instruction_leak",
+      ]),
+    );
+  });
 });

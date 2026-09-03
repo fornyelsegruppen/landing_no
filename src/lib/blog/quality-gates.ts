@@ -141,7 +141,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet/i.test(
+    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til/i.test(
       allText,
     )
   ) {
@@ -151,6 +151,15 @@ export function evaluateArticleQuality(
       "unnatural_norwegian",
       "blocker",
       "Teksten inneholder unaturlig eller grammatisk feil norsk som må omskrives.",
+    );
+  }
+  if (/organisk\s+materiale[^.]{0,100}\bsot\b/i.test(allText)) {
+    add(
+      issues,
+      "facts",
+      "material_category_error",
+      "blocker",
+      "Sot skal ikke beskrives som organisk materiale.",
     );
   }
   if (
@@ -190,6 +199,19 @@ export function evaluateArticleQuality(
       "inspection_cta_mismatch",
       "blocker",
       "CTA-en skal be om en gratis og uforpliktende vurdering, ikke bestilling av takfornying.",
+    );
+  }
+  if (
+    /be\s+om\s+postnummer[^.]{0,240}(uten\s+å\s+love|teknisk\s+konklusjon)/i.test(
+      allText,
+    )
+  ) {
+    add(
+      issues,
+      "conversion",
+      "internal_instruction_leak",
+      "blocker",
+      "Intern CTA-instruksjon må omskrives til naturlig lesertekst.",
     );
   }
 

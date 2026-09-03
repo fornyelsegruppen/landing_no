@@ -15,7 +15,10 @@ describe("blog generator prompt guardrails", () => {
     );
     expect(combined).toContain("Ikke skriv at impregnering styrker taksteinen");
     expect(combined).toContain("kan bidra");
+    expect(combined).toContain("impregnering som reduserer fuktopptak");
+    expect(combined).toContain("Ikke kall sot organisk materiale");
     expect(combined).toContain("gratis og uforpliktende vurdering");
+    expect(combined).toContain("Ikke kopier interne instruksjoner");
     expect(combined).toContain("generell forskriftsindeks");
     expect(combined).toContain("TEK17 § 13-12. Nedbør");
   });
