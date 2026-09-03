@@ -14,6 +14,7 @@ import {
   projectWgs84ToOrthoPixels,
   type GeoReference,
 } from "./norgeibilder-projection";
+import type { RoofFusionPoint } from "./admin-next-roof-fusion-unified-workbench";
 import { NorgeMeasurementActions } from "./norge-measurement-actions";
 
 export type NorgeIBilderCaptureRequest = {
@@ -40,6 +41,38 @@ export type NorgeIBilderCaptureResult = {
 export type NorgeIBilderCaptureApi = (
   request: NorgeIBilderCaptureRequest,
 ) => Promise<NorgeIBilderCaptureResult>;
+
+/** Convert the georeferenced pixel overlay into the workbench's 0..1 space. */
+export function normalizeOrthoOverlayPoints(
+  overlay: string | null,
+  reference: GeoReference,
+): RoofFusionPoint[] | null {
+  if (!overlay || reference.imageWidth <= 0 || reference.imageHeight <= 0) {
+    return null;
+  }
+  const points = overlay.trim().split(/\s+/u).map((value) => {
+    const [x, y] = value.split(",").map(Number);
+    return { x, y };
+  });
+  if (
+    points.length < 3 ||
+    points.some(
+      (point) =>
+        !Number.isFinite(point.x) ||
+        !Number.isFinite(point.y) ||
+        point.x < 0 ||
+        point.x > reference.imageWidth ||
+        point.y < 0 ||
+        point.y > reference.imageHeight,
+    )
+  ) {
+    return null;
+  }
+  return points.map((point) => ({
+    x: point.x / reference.imageWidth,
+    y: point.y / reference.imageHeight,
+  }));
+}
 
 type CaptureState =
   | { kind: "idle" }
@@ -74,11 +107,13 @@ export function NorgeIBilderCaptureControl({
   address,
   caseReference,
   leadId,
+  onCaptureResultChange,
   selectedFootprint,
 }: {
   api?: NorgeIBilderCaptureApi;
   caseReference: string;
   leadId?: number;
+  onCaptureResultChange?: (result: NorgeIBilderCaptureResult | null) => void;
   selectedFootprint?: GeoPoint[];
   address?: AddressCandidate;
 }) {
@@ -88,6 +123,7 @@ export function NorgeIBilderCaptureControl({
   async function capture() {
     if (!leadId) return;
     const clickId = crypto.randomUUID();
+    onCaptureResultChange?.(null);
     setState({ kind: "loading", attempt: 1 });
     try {
       const captureApi =
@@ -121,12 +157,14 @@ export function NorgeIBilderCaptureControl({
       const result = await captureApi({ clickId, leadId });
       if (!result.imageUrl) throw new Error("Tuščias vaizdo rezultatas");
       setState({ kind: "success", result });
+      onCaptureResultChange?.(result);
     } catch (error) {
       setState({
         kind: "error",
         message:
           error instanceof Error ? error.message : "Nepavyko gauti vaizdo.",
       });
+      onCaptureResultChange?.(null);
     }
   }
 
@@ -216,8 +254,10 @@ export function NorgeIBilderCaptureControl({
             <strong>Bylos adresas:</strong>{" "}
             {state.result.addressLabel ?? "patvirtintas serverio pagal bylą"}
           </div>
-          <div className="relative bg-[#080d12]">
-            <img
+            <div className="relative bg-[#080d12]">
+              {/* Protected media URLs are not compatible with the public Next image optimizer. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
               src={state.result.imageUrl}
               alt="Norge i bilder stogo vaizdo peržiūra"
               className="block max-h-[480px] w-full object-contain"

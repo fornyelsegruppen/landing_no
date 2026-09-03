@@ -152,10 +152,13 @@ export async function POST(request: Request) {
         source: result.source,
         attribution: result.attribution,
         capturedAt: result.capturedAt,
-        geoReferenceCrs: result.geoReference.crs,
-        geoReferenceBounds: JSON.stringify(result.geoReference.bounds),
-        imageWidth: result.geoReference.imageWidth,
-        imageHeight: result.geoReference.imageHeight,
+        geoReferenceCrs: result.geoReference?.crs ?? null,
+        geoReferenceTrust: result.geoReference?.extentTrust ?? null,
+        geoReferenceBounds: result.geoReference
+          ? JSON.stringify(result.geoReference.bounds)
+          : null,
+        imageWidth: result.geoReference?.imageWidth ?? null,
+        imageHeight: result.geoReference?.imageHeight ?? null,
         trainingProhibited: true,
       },
     });

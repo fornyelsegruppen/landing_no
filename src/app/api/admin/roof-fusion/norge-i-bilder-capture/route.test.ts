@@ -63,6 +63,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       attempts: 1,
       geoReference: {
         crs: "EPSG:25833",
+        extentTrust: "actual-visible-extent",
         bounds: {
           minEastingM: 264951.272,
           minNorthingM: 6647307.668,
@@ -137,6 +138,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       attempts: 1,
       geoReference: {
         crs: "EPSG:25833",
+        extentTrust: "actual-visible-extent",
         bounds: {
           minEastingM: 264951.272,
           minNorthingM: 6647307.668,
@@ -167,6 +169,9 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       expect.objectContaining({
         entityId: "lead-18",
         action: "norge-i-bilder.captured",
+        metadata: expect.objectContaining({
+          geoReferenceTrust: "actual-visible-extent",
+        }),
       }),
     );
   });

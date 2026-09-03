@@ -28,9 +28,16 @@ import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/o
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { RoofFusionTransientR4Drawer } from "@/components/admin-next/admin-next-r4-measurement-review";
 import {
+  AdminNextRoofFusionUnifiedWorkbench,
+} from "@/components/admin-next/admin-next-roof-fusion-unified-workbench";
+import {
+  captureMatchesSelectedAddress,
   NorgeIBilderCaptureControl,
   type NorgeIBilderCaptureApi,
+  type NorgeIBilderCaptureResult,
+  normalizeOrthoOverlayPoints,
 } from "@/components/admin-next/norgeibilder-capture-control";
+import { projectWgs84ToOrthoPixels } from "@/components/admin-next/norgeibilder-projection";
 
 export type RoofFusionUatActionState =
   | { kind: "idle" }
@@ -710,6 +717,8 @@ export function RealAddressResult({
   const [ridgePoints, setRidgePoints] = useState<
     Array<{ x: number; y: number }>
   >([]);
+  const [captureResult, setCaptureResult] =
+    useState<NorgeIBilderCaptureResult | null>(null);
   const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<Extract<
     RoofFusionHeightAnalysisState,
     { kind: "success" }
@@ -748,6 +757,10 @@ export function RealAddressResult({
   );
   const activePlanes = activeHeight?.visualization.planes ?? [];
   const hasSegmentedPlanes = activePlanes.length > 0;
+  const captureMatchesSelection = captureMatchesSelectedAddress(
+    captureResult?.address,
+    result.address,
+  );
 
   function selectRidgePoint(event: MouseEvent<HTMLButtonElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -775,8 +788,62 @@ export function RealAddressResult({
           0,
         ) / r4SurfaceAreaSquareMeters
       : undefined;
+  const normalizedSourceOutline =
+    captureResult?.geoReference && captureMatchesSelection
+      ? normalizeOrthoOverlayPoints(
+          projectWgs84ToOrthoPixels(
+            selected.polygon,
+            captureResult.geoReference,
+          ),
+          captureResult.geoReference,
+        ) ?? []
+      : [];
+  const unifiedCalculationBlockers = [
+    ...(!activeHeight
+      ? ["Dar reikia nuskaityti Høydedata aukščio paviršių."]
+      : []),
+    ...(activeHeight?.summary.blockers.map((blocker) => t.heightBlockers[blocker]) ??
+      []),
+    ...(heightState.kind === "error" ? [t.heightErrors[heightState.code]] : []),
+  ];
+  const canRenderUnifiedWorkbench =
+    Boolean(captureResult?.imageUrl) &&
+    normalizedSourceOutline.length >= 3 &&
+    captureMatchesSelection;
+  const workbenchImageSrc = captureResult?.imageUrl;
   return (
     <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+      {canRenderUnifiedWorkbench ? (
+        <div className="xl:col-span-2">
+          <AdminNextRoofFusionUnifiedWorkbench
+            approvedOutline={normalizedSourceOutline}
+            averageSlopeDegrees={r4PitchDegrees}
+            confidence="low"
+            confidenceReason="Vaizdas paruoštas kontūro ir kraigo korekcijai. Høydedata sluoksnis bus rodomas tik patvirtinus atskirą geografinę registraciją."
+            guardNotice="Preview · pakeitimai šiame pjūvyje dar neišsaugomi"
+            horizontalAreaSquareMeters={selected.horizontalAreaSquareMeters}
+            initialLayers={{
+              approvedOutline: true,
+              sourceOutline: true,
+            }}
+            key={`${selected.id}:${captureResult?.capturedAt ?? "capture"}`}
+            orthoAttribution={captureResult?.attribution ?? "©norgeibilder.no"}
+            orthoImageAlt={`Stogo vaizdas ${result.address.label}`}
+            orthoImageHeight={captureResult?.geoReference?.imageHeight}
+            orthoImageSrc={workbenchImageSrc ?? ""}
+            orthoImageWidth={captureResult?.geoReference?.imageWidth}
+            sourceOutline={normalizedSourceOutline}
+            stageBlockers={{
+              slopes: unifiedCalculationBlockers,
+              review: [
+                ...unifiedCalculationBlockers,
+                "Patvirtinto kontūro ir skeleto išsaugojimas dar neprijungtas.",
+              ],
+            }}
+            totalSurfaceAreaSquareMeters={r4SurfaceAreaSquareMeters}
+          />
+        </div>
+      ) : null}
       <div className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-canvas)]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--an-border)] px-4 py-3">
           <div>
@@ -1262,6 +1329,7 @@ export function RealAddressResult({
         api={captureApi}
         caseReference={caseReference}
         leadId={leadId}
+        onCaptureResultChange={setCaptureResult}
         address={result.address}
         selectedFootprint={selected.polygon}
       />

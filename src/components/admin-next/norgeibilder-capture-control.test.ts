@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   captureMatchesSelectedAddress,
   NorgeIBilderCaptureControl,
+  normalizeOrthoOverlayPoints,
   type NorgeIBilderCaptureResult,
 } from "./norgeibilder-capture-control";
+import type { GeoReference } from "./norgeibilder-projection";
 
 const capturedAddress = {
   id: "0301-1-2-0-0-Lyngveien 28A",
@@ -18,6 +20,35 @@ const capturedAddress = {
 };
 
 describe("Norge i bilder capture control", () => {
+  const geoReference: GeoReference = {
+    crs: "EPSG:25833",
+    extentTrust: "actual-visible-extent",
+    bounds: {
+      minEastingM: 0,
+      minNorthingM: 0,
+      maxEastingM: 10,
+      maxNorthingM: 10,
+    },
+    imageWidth: 1000,
+    imageHeight: 500,
+  };
+
+  it("normalizes a georeferenced outline for the unified workbench", () => {
+    expect(
+      normalizeOrthoOverlayPoints("100,50 900,50 900,450", geoReference),
+    ).toEqual([
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.9, y: 0.9 },
+    ]);
+  });
+
+  it("does not activate an outline when projected points are outside the image", () => {
+    expect(
+      normalizeOrthoOverlayPoints("-1,50 900,50 900,450", geoReference),
+    ).toBeNull();
+  });
+
   it("accepts the server-resolved address identity in the capture response", () => {
     const result: NorgeIBilderCaptureResult = {
       addressLabel: "Storgata 1, Oslo",

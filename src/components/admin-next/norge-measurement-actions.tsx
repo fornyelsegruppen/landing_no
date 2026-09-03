@@ -24,6 +24,10 @@ type CreatedMeasurementResponse = {
   };
 };
 
+type ProposalCreateEligibility =
+  | { allowed: true }
+  | { allowed: false; message: string };
+
 type ActionState =
   | { kind: "idle" }
   | { kind: "analyzing" }
@@ -62,6 +66,29 @@ export function buildCreateRequest(
     credits: SCREENSHOT_CREDITS,
     mapImageId,
   };
+}
+
+export function getProposalCreateEligibility(
+  proposal: RoofProposal | undefined,
+): ProposalCreateEligibility {
+  if (!proposal) {
+    return { allowed: false, message: "Pirmiausia paleisk stogo analizę." };
+  }
+  if (proposal.confidence === "low") {
+    return {
+      allowed: false,
+      message:
+        "AI pasiūlymas per silpnas. Paleisk analizę dar kartą arba pataisyk kontūrą prieš kuriant peržiūrą.",
+    };
+  }
+  if (proposal.roofPlanes.length === 0) {
+    return {
+      allowed: false,
+      message:
+        "AI nepateikė nė vienos stogo plokštumos. Peržiūros kurti negalima.",
+    };
+  }
+  return { allowed: true };
 }
 
 async function responseJson<T>(response: Response): Promise<T> {
@@ -117,7 +144,22 @@ export function NorgeMeasurementActions({
   }
 
   async function create() {
-    if (!proposal) return;
+    if (!proposal) {
+      setState({
+        kind: "error",
+        message: "Pirmiausia paleisk stogo analizę.",
+      });
+      return;
+    }
+    const eligibility = getProposalCreateEligibility(proposal.proposal);
+    if (!eligibility.allowed) {
+      setState({
+        kind: "error",
+        message: eligibility.message,
+        proposal,
+      });
+      return;
+    }
     setState({ kind: "creating", proposal });
     try {
       const response = await fetch("/api/admin/measurements", {
@@ -140,6 +182,7 @@ export function NorgeMeasurementActions({
   }
 
   const busy = state.kind === "analyzing" || state.kind === "creating";
+  const createEligibility = getProposalCreateEligibility(proposal?.proposal);
 
   return (
     <div
@@ -163,7 +206,9 @@ export function NorgeMeasurementActions({
         <button
           type="button"
           onClick={create}
-          disabled={busy || !proposal || state.kind === "created"}
+          disabled={
+            busy || !createEligibility.allowed || state.kind === "created"
+          }
           className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--an-amber)] px-3 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state.kind === "creating" ? (
@@ -186,6 +231,11 @@ export function NorgeMeasurementActions({
           <p className="mt-1 font-bold text-amber-200">
             PREVIEW · būtina administratoriaus peržiūra
           </p>
+          {!createEligibility.allowed ? (
+            <p className="mt-2 font-bold text-red-200">
+              Blokatorius: {createEligibility.message}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

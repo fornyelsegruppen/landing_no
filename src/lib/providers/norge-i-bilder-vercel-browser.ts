@@ -5,7 +5,9 @@ import type { Page } from "puppeteer-core";
 import type {
   BrowserCaptureRuntime,
   BrowserCaptureSession,
+  NorgeIBilderActualVisibleExtent,
   NorgeIBilderCaptureRequest,
+  NorgeIBilderEpsg25833Bounds,
 } from "./norge-i-bilder-capture-provider";
 
 const NAVIGATION_TIMEOUT_MS = 12_000;
@@ -14,6 +16,16 @@ const MAP_PAINT_SETTLE_MS = 700;
 const MAP_FRAME_COMPARE_MS = 450;
 
 type MapClip = { x: number; y: number; width: number; height: number };
+
+type ArcGisExtentCandidate = {
+  xmin?: unknown;
+  ymin?: unknown;
+  xmax?: unknown;
+  ymax?: unknown;
+  spatialReference?: { wkid?: unknown; latestWkid?: unknown };
+  viewWidth?: unknown;
+  viewHeight?: unknown;
+};
 
 function wait(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -75,6 +87,52 @@ function meanAbsoluteFrameDelta(left: Uint8Array, right: Uint8Array) {
     total += Math.abs(left[index] - right[index]);
   }
   return total / left.length;
+}
+
+/**
+ * Converts only an explicitly EPSG:25833 ArcGIS view extent into a geometry
+ * registration contract. The screenshot may still be stored when this is
+ * unavailable, but callers must then treat it as contextual imagery only.
+ */
+export function normalizeActualArcgisVisibleExtent(
+  candidate: ArcGisExtentCandidate | null | undefined,
+  capturedClip?: Pick<MapClip, "width" | "height">,
+): NorgeIBilderActualVisibleExtent | undefined {
+  const wkid =
+    candidate?.spatialReference?.latestWkid ??
+    candidate?.spatialReference?.wkid;
+  const values = [
+    candidate?.xmin,
+    candidate?.ymin,
+    candidate?.xmax,
+    candidate?.ymax,
+  ];
+  if (
+    wkid !== 25833 ||
+    values.some((value) => typeof value !== "number" || !Number.isFinite(value))
+  ) {
+    return undefined;
+  }
+  if (
+    capturedClip &&
+    (typeof candidate?.viewWidth !== "number" ||
+      typeof candidate.viewHeight !== "number" ||
+      Math.abs(candidate.viewWidth - capturedClip.width) > 2 ||
+      Math.abs(candidate.viewHeight - capturedClip.height) > 2)
+  ) {
+    return undefined;
+  }
+  const [minEastingM, minNorthingM, maxEastingM, maxNorthingM] =
+    values as number[];
+  if (maxEastingM <= minEastingM || maxNorthingM <= minNorthingM)
+    return undefined;
+  const bounds: NorgeIBilderEpsg25833Bounds = {
+    minEastingM,
+    minNorthingM,
+    maxEastingM,
+    maxNorthingM,
+  };
+  return { crs: "EPSG:25833", bounds };
 }
 
 /**
@@ -170,7 +228,15 @@ export class NorgeIBilderVercelBrowserRuntime implements BrowserCaptureRuntime {
           ) {
             return { kind: "tiles_not_ready" };
           }
-          return { kind: "captured", image, contentType: "image/png" };
+          return {
+            kind: "captured",
+            image,
+            contentType: "image/png",
+            actualVisibleExtent: await readActualArcgisVisibleExtent(
+              page,
+              clip,
+            ),
+          };
         } catch (error) {
           if (page.isClosed()) loadedUrl = undefined;
           if (isRetryableRenderError(error)) {
@@ -191,6 +257,67 @@ export class NorgeIBilderVercelBrowserRuntime implements BrowserCaptureRuntime {
         await browser.close();
       },
     };
+  }
+}
+
+/**
+ * ArcGIS exposes the active View extent on its map web component. This probes
+ * only that public in-page state; it does not request map tiles or services.
+ */
+async function readActualArcgisVisibleExtent(
+  page: Page,
+  clip: MapClip,
+): Promise<NorgeIBilderActualVisibleExtent | undefined> {
+  try {
+    const candidate = await page.evaluate(() => {
+      type ArcGisMapElement = Element & {
+        extent?: ArcGisExtentCandidate;
+        view?: {
+          extent?: ArcGisExtentCandidate;
+          width?: unknown;
+          height?: unknown;
+        };
+      };
+      const containers = Array.from(
+        document.querySelectorAll(
+          "arcgis-map, #arcgis-map, [aria-label='arcgis-map']",
+        ),
+      );
+      const roots = containers.flatMap((container) => {
+        const nested = [
+          ...Array.from(container.querySelectorAll("arcgis-map")),
+          ...Array.from(
+            container.shadowRoot?.querySelectorAll("arcgis-map") || [],
+          ),
+        ];
+        return [container, ...nested];
+      }) as ArcGisMapElement[];
+      for (const root of roots) {
+        const extent = root.view?.extent ?? root.extent;
+        const viewWidth = root.view?.width;
+        const viewHeight = root.view?.height;
+        if (extent) {
+          return {
+            xmin: extent.xmin,
+            ymin: extent.ymin,
+            xmax: extent.xmax,
+            ymax: extent.ymax,
+            spatialReference: extent.spatialReference
+              ? {
+                  wkid: extent.spatialReference.wkid,
+                  latestWkid: extent.spatialReference.latestWkid,
+                }
+              : undefined,
+            viewWidth,
+            viewHeight,
+          };
+        }
+      }
+      return null;
+    });
+    return normalizeActualArcgisVisibleExtent(candidate, clip);
+  } catch {
+    return undefined;
   }
 }
 

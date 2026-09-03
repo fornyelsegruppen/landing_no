@@ -4,6 +4,7 @@ import type { AddressCandidate } from "@/lib/providers/contracts";
 import {
   buildCreateRequest,
   buildProposalRequest,
+  getProposalCreateEligibility,
 } from "./norge-measurement-actions";
 
 const address: AddressCandidate = {
@@ -57,6 +58,19 @@ describe("Norge i bilder measurement request builders", () => {
       imagerySourceUrl: "https://norgeibilder.no/",
       credits: "©norgeibilder.no",
       mapImageId: 91,
+    });
+  });
+
+  it("allows create only for non-low proposals with at least one roof plane", () => {
+    expect(getProposalCreateEligibility(proposal)).toEqual({ allowed: true });
+    expect(
+      getProposalCreateEligibility({ ...proposal, confidence: "low" }),
+    ).toMatchObject({ allowed: false });
+    expect(
+      getProposalCreateEligibility({ ...proposal, roofPlanes: [] }),
+    ).toMatchObject({ allowed: false });
+    expect(getProposalCreateEligibility(undefined)).toMatchObject({
+      allowed: false,
     });
   });
 });
