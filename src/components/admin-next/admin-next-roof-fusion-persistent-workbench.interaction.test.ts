@@ -356,6 +356,88 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe("ridge");
   });
 
+  it("carries persisted annotations across a same-footprint capture refresh", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+    const refreshedCapture = {
+      ...capture,
+      sourceId: "norge-capture-92",
+      rawContentHash: "d".repeat(64),
+      capturedAt: "2026-09-04T00:05:00.000Z",
+    };
+
+    await act(async () => {
+      root.render(renderWorkbench(refreshedCapture, heightSurface));
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+
+    expect(renderedLines()).toHaveLength(1);
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        "[data-roof-fusion-undo-last-line]",
+      )?.disabled,
+    ).toBe(false);
+    expect(container.textContent).toContain(
+      "Ankstesnės rankinės anotacijos perkeltos",
+    );
+    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+
+    await act(async () => {
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
+      await vi.waitFor(() => expect(latest?.revision).toBe(2));
+      await flushAsyncWork();
+    });
+
+    expect(latest?.revision).toBe(2);
+    expect(latest?.source.sourceId).toBe(refreshedCapture.sourceId);
+    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+    expect(stage()).toBe("skeleton");
+  });
+
+  it("blocks a mismatched capture from clearing annotations until explicit confirmation", async () => {
+    const mismatchedCapture = {
+      ...capture,
+      sourceId: "norge-capture-other",
+      rawContentHash: "e".repeat(64),
+      geoReference: {
+        ...geoReference,
+        bounds: {
+          ...geoReference.bounds,
+          minEastingM: geoReference.bounds.minEastingM + 100,
+          maxEastingM: geoReference.bounds.maxEastingM + 100,
+        },
+      },
+    };
+    await act(async () => {
+      root.render(renderWorkbench(mismatchedCapture, heightSurface));
+      await flushAsyncWork();
+    });
+
+    expect(container.textContent).toContain(
+      "Rankinės anotacijos neišvalytos",
+    );
+    expect(
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled,
+    ).toBe(true);
+    expect(
+      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
+    ).not.toBeNull();
+    expect(latest?.revision).toBe(1);
+
+    await click("[data-roof-fusion-confirm-source-reset]");
+
+    expect(container.textContent).toContain(
+      "ankstesnės rankinės anotacijos pašalintos tik iš naujos neišsaugotos geometrijos",
+    );
+    expect(
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled,
+    ).toBe(false);
+    expect(latest?.revision).toBe(1);
+  });
+
   it("keeps the slopes stage on calculation failure and advances only after success", async () => {
     await act(async () => {
       root.render(renderWorkbench(capture, heightSurface));

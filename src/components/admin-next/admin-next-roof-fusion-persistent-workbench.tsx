@@ -60,12 +60,7 @@ function hydrateDraft(
   draft: RoofFusionWorkbenchDraftV1,
   capture: NorgeIBilderCaptureResult,
 ) {
-  if (
-    !capture.geoReference ||
-    capture.sourceId !== draft.source.sourceId ||
-    capture.rawContentHash !== draft.source.sourceContentHash
-  )
-    return null;
+  if (!capture.geoReference) return null;
   if (
     draft.geometry.roofMasses.length !== 1 ||
     draft.geometry.openings.length > 0 ||
@@ -101,6 +96,47 @@ function hydrateDraft(
       ),
     })),
   };
+}
+
+const FOOTPRINT_IDENTITY_TOLERANCE_METERS = 0.05;
+
+function sourceFootprintMatchesCapture(
+  draft: RoofFusionWorkbenchDraftV1,
+  capture: NorgeIBilderCaptureResult,
+  sourceOutline: readonly RoofFusionPoint[],
+  sourceFootprintId?: string,
+) {
+  const reference = capture.geoReference;
+  if (!reference || sourceOutline.length < 3) return false;
+  const footprint = draft.geometry.sourceFootprint;
+  const legacyAliasedIdentity = footprint.sourceId === draft.source.sourceId;
+  if (
+    sourceFootprintId &&
+    !legacyAliasedIdentity &&
+    footprint.sourceId !== sourceFootprintId
+  ) {
+    return false;
+  }
+  const spanX = reference.bounds.maxEastingM - reference.bounds.minEastingM;
+  const spanY = reference.bounds.maxNorthingM - reference.bounds.minNorthingM;
+  const projected = sourceOutline.map((point) => ({
+    xM: reference.bounds.minEastingM + point.x * spanX,
+    yM: reference.bounds.maxNorthingM - point.y * spanY,
+  }));
+  if (projected.length !== footprint.points.length) return false;
+  const unmatched = new Set(projected.map((_, index) => index));
+  return footprint.points.every((stored) => {
+    const match = [...unmatched].find((index) => {
+      const current = projected[index];
+      return (
+        Math.hypot(current.xM - stored.xM, current.yM - stored.yM) <=
+        FOOTPRINT_IDENTITY_TOLERANCE_METERS
+      );
+    });
+    if (match === undefined) return false;
+    unmatched.delete(match);
+    return true;
+  });
 }
 
 export function AdminNextRoofFusionPersistentWorkbench({
@@ -142,8 +178,22 @@ export function AdminNextRoofFusionPersistentWorkbench({
   );
   const [heightResult, setHeightResult] = useState<HeightResult | null>(null);
   const [unsupportedLatest, setUnsupportedLatest] = useState(false);
+  const [sourceResetRequired, setSourceResetRequired] = useState(false);
   const [geometryHydrationSignal, setGeometryHydrationSignal] = useState(0);
   const pendingDraft = useRef<RoofFusionWorkbenchDraftV1 | null>(null);
+  const sourceOutlineIdentity = sourceOutline
+    .map((point) => `${point.x}:${point.y}`)
+    .join("|");
+  const registeredSourceOutline = useMemo(
+    () =>
+      sourceOutlineIdentity
+        ? sourceOutlineIdentity.split("|").map((pair) => {
+            const [x, y] = pair.split(":").map(Number);
+            return { x, y };
+          })
+        : [],
+    [sourceOutlineIdentity],
+  );
 
   const evidenceReady = Boolean(
     capture.sourceId &&
@@ -153,6 +203,53 @@ export function AdminNextRoofFusionPersistentWorkbench({
     capture.geoReference.extentTrust === "actual-visible-extent",
   );
 
+  const applyLoadedDraft = useCallback(
+    (draft: RoofFusionWorkbenchDraftV1) => {
+      const hydrated = hydrateDraft(draft, capture);
+      const exactCapture =
+        draft.source.sourceId === capture.sourceId &&
+        draft.source.sourceContentHash === capture.rawContentHash;
+      const transferable = sourceFootprintMatchesCapture(
+        draft,
+        capture,
+        registeredSourceOutline,
+        sourceFootprintId,
+      );
+      if (hydrated && (exactCapture || transferable)) {
+        setUnsupportedLatest(false);
+        setSourceResetRequired(false);
+        setSaveState("idle");
+        pendingDraft.current = null;
+        setOutline(hydrated.outline);
+        setLines(hydrated.lines);
+        setConfirmed(exactCapture ? draft : null);
+        setDirty(!exactCapture);
+        if (!exactCapture) {
+          setProblem(
+            "Ankstesnės rankinės anotacijos perkeltos į tą patį registruotą stogo kontūrą. Išsaugokite naują reviziją, kad susietumėte jas su atnaujintu vaizdu.",
+          );
+        } else {
+          setProblem(null);
+        }
+        setGeometryHydrationSignal((current) => current + 1);
+        return;
+      }
+      setUnsupportedLatest(true);
+      setSaveState("idle");
+      pendingDraft.current = null;
+      if (exactCapture) {
+        setSourceResetRequired(false);
+        setProblem(
+          "Naujausioje revizijoje yra keli stogo masyvai, angos, kliūtys arba nepalaikomi kraštai. Ši UAT drobė jų saugiai nepriskiria paviršiams — reikalinga peržiūra.",
+        );
+        return;
+      }
+      setSourceResetRequired(true);
+      setProblem(
+        "Atnaujinto vaizdo stogo kontūro tapatybė nesutampa su išsaugota revizija. Rankinės anotacijos neišvalytos; patvirtinkite naujos geometrijos pradžią tik jei tikrai norite jų atsisakyti.",
+      );
+    }, [capture, registeredSourceOutline, sourceFootprintId]);
+
   const loadLatest = useCallback(async () => {
     setLoadState("loading");
     setProblem(null);
@@ -160,32 +257,14 @@ export function AdminNextRoofFusionPersistentWorkbench({
       const draft = await loadWorkbenchDraftV1(caseId);
       setLatest(draft);
       setLoadState(draft ? "loaded" : "none");
-      if (draft) {
-        const hydrated = hydrateDraft(draft, capture);
-        if (hydrated) {
-          setUnsupportedLatest(false);
-          setOutline(hydrated.outline);
-          setLines(hydrated.lines);
-          setConfirmed(draft);
-          setDirty(false);
-          setGeometryHydrationSignal((current) => current + 1);
-        } else if (
-          draft.source.sourceId === capture.sourceId &&
-          draft.source.sourceContentHash === capture.rawContentHash
-        ) {
-          setUnsupportedLatest(true);
-          setProblem(
-            "Naujausioje revizijoje yra keli stogo masyvai, angos, kliūtys arba nepalaikomi kraštai. Ši UAT drobė jų saugiai nepriskiria paviršiams — reikalinga peržiūra.",
-          );
-        }
-      }
+      if (draft) applyLoadedDraft(draft);
     } catch (error) {
       setLoadState("error");
       setProblem(
         error instanceof Error ? error.message : "Juodraščio įkelti nepavyko",
       );
     }
-  }, [capture, caseId]);
+  }, [applyLoadedDraft, caseId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,25 +273,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         if (cancelled) return;
         setLatest(draft);
         setLoadState(draft ? "loaded" : "none");
-        if (draft) {
-          const hydrated = hydrateDraft(draft, capture);
-          if (hydrated) {
-            setUnsupportedLatest(false);
-            setOutline(hydrated.outline);
-            setLines(hydrated.lines);
-            setConfirmed(draft);
-            setDirty(false);
-            setGeometryHydrationSignal((current) => current + 1);
-          } else if (
-            draft.source.sourceId === capture.sourceId &&
-            draft.source.sourceContentHash === capture.rawContentHash
-          ) {
-            setUnsupportedLatest(true);
-            setProblem(
-              "Naujausioje revizijoje yra keli stogo masyvai, angos, kliūtys arba nepalaikomi kraštai. Ši UAT drobė jų saugiai nepriskiria paviršiams — reikalinga peržiūra.",
-            );
-          }
-        }
+        if (draft) applyLoadedDraft(draft);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -224,7 +285,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     return () => {
       cancelled = true;
     };
-  }, [capture, caseId]);
+  }, [applyLoadedDraft, caseId]);
 
   const save = useCallback(async () => {
     if (
@@ -368,11 +429,13 @@ export function AdminNextRoofFusionPersistentWorkbench({
         : []),
       ...(unsupportedLatest
         ? [
-            "Sudėtingos revizijos paviršių, angų ar kliūčių priklausomybės šioje drobėje negali būti saugiai atkurtos — reikalinga peržiūra.",
+            sourceResetRequired
+              ? "Atnaujinto vaizdo footprint tapatybė nepatvirtinta; anotacijų išvalymas laukia aiškaus patvirtinimo."
+              : "Sudėtingos revizijos paviršių, angų ar kliūčių priklausomybės šioje drobėje negali būti saugiai atkurtos — reikalinga peržiūra.",
           ]
         : []),
     ],
-    [evidenceReady, unsupportedLatest],
+    [evidenceReady, sourceResetRequired, unsupportedLatest],
   );
   const calculationBlockerCodes = workbenchCalculationBlockersV1({
     trustedOrthophoto: evidenceReady,
@@ -391,6 +454,21 @@ export function AdminNextRoofFusionPersistentWorkbench({
     (code) => calculationBlockerCopy[code],
   );
   const metrics = heightResult?.metrics;
+  const confirmSourceReset = useCallback(() => {
+    if (!sourceResetRequired) return;
+    setOutline(sourceOutline);
+    setLines([]);
+    setConfirmed(null);
+    setDirty(true);
+    setUnsupportedLatest(false);
+    setSourceResetRequired(false);
+    setHeightResult(null);
+    pendingDraft.current = null;
+    setGeometryHydrationSignal((current) => current + 1);
+    setProblem(
+      "Patvirtinta: ankstesnės rankinės anotacijos pašalintos tik iš naujos neišsaugotos geometrijos.",
+    );
+  }, [sourceOutline, sourceResetRequired]);
   const persistencePanel = (
     <div
       className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
@@ -430,6 +508,16 @@ export function AdminNextRoofFusionPersistentWorkbench({
           <TriangleAlert aria-hidden className="mr-1 inline size-4" />
           {problem}
         </p>
+      ) : null}
+      {sourceResetRequired ? (
+        <button
+          className="mt-3 min-h-10 w-full rounded-xl border border-red-400/35 bg-red-400/10 px-3 text-sm font-bold text-red-200"
+          data-roof-fusion-confirm-source-reset
+          onClick={confirmSourceReset}
+          type="button"
+        >
+          Patvirtinti: pradėti be ankstesnių anotacijų
+        </button>
       ) : null}
       <button
         className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#e8a317]/40 bg-[#e8a317]/10 px-3 text-sm font-bold text-[#f3c66b] disabled:opacity-40"
