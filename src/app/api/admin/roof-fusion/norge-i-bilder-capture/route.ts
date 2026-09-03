@@ -150,6 +150,8 @@ export async function POST(request: Request) {
       metadata: {
         attempts: result.attempts,
         source: result.source,
+        sourceId: `norge-i-bilder:${result.mediaId}`,
+        rawContentHash: result.rawContentHash,
         attribution: result.attribution,
         capturedAt: result.capturedAt,
         geoReferenceCrs: result.geoReference?.crs ?? null,
@@ -168,6 +170,8 @@ export async function POST(request: Request) {
         evidenceId: result.mediaId,
         imageUrl: `/api/admin/media/${encodeURIComponent(result.mediaId)}`,
         source: result.source,
+        sourceId: `norge-i-bilder:${result.mediaId}`,
+        rawContentHash: result.rawContentHash,
         capturedAt: result.capturedAt,
         address,
         addressLabel: address.label,

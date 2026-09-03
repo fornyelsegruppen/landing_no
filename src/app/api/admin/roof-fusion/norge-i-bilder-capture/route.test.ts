@@ -60,6 +60,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       capturedAt: "2026-09-02T12:00:00.000Z",
       attribution: "©norgeibilder.no",
       source: "norge-i-bilder-screenshot",
+      rawContentHash: "a".repeat(64),
       attempts: 1,
       geoReference: {
         crs: "EPSG:25833",
@@ -124,6 +125,8 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       evidenceId: "91",
       imageUrl: "/api/admin/media/91",
       source: "norge-i-bilder-screenshot",
+      sourceId: "norge-i-bilder:91",
+      rawContentHash: "a".repeat(64),
       capturedAt: "2026-09-02T12:00:00.000Z",
       address: {
         id: "0301-149-181",

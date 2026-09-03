@@ -7,6 +7,7 @@ import {
   ROOF_FUSION_STAGES,
   clampRoofFusionPoint,
 } from "./admin-next-roof-fusion-unified-workbench";
+import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
 
 const sourceOutline = [
   { x: 0.16, y: 0.18 },
@@ -17,7 +18,12 @@ const sourceOutline = [
 
 describe("Admin Next unified Roof Fusion workbench", () => {
   it("exports a four-stage guided workflow and safe normalized-point helper", () => {
-    expect(ROOF_FUSION_STAGES).toEqual(["outline", "skeleton", "slopes", "review"]);
+    expect(ROOF_FUSION_STAGES).toEqual([
+      "outline",
+      "skeleton",
+      "slopes",
+      "review",
+    ]);
     expect(clampRoofFusionPoint({ x: -0.2, y: 1.4 })).toEqual({ x: 0, y: 1 });
     expect(DEFAULT_ROOF_FUSION_LAYERS.hoydedata).toBe(false);
     expect(DEFAULT_ROOF_FUSION_LAYERS.roofPlanes).toBe(false);
@@ -38,7 +44,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-workbench="unified"');
-    expect(html).toContain('data-roof-fusion-canvas');
+    expect(html).toContain("data-roof-fusion-canvas");
     expect(html).toContain('src="/preview/house-ortho.jpg"');
     expect(html).toContain("aspect-ratio:1920 / 1080");
     expect(html).toContain('preserveAspectRatio="none"');
@@ -69,8 +75,17 @@ describe("Admin Next unified Roof Fusion workbench", () => {
             slopeDegrees: 26,
           },
         ],
-        lines: [{ id: "ridge-a", kind: "ridge", start: { x: 0.5, y: 0.3 }, end: { x: 0.5, y: 0.7 } }],
-        obstacles: [{ id: "chimney", point: { x: 0.65, y: 0.52 }, label: "Kaminas" }],
+        lines: [
+          {
+            id: "ridge-a",
+            kind: "ridge",
+            start: { x: 0.5, y: 0.3 },
+            end: { x: 0.5, y: 0.7 },
+          },
+        ],
+        obstacles: [
+          { id: "chimney", point: { x: 0.65, y: 0.52 }, label: "Kaminas" },
+        ],
         initialLayers: { roofPlanes: true, skeleton: true },
         blockers: ["Trūksta patvirtinto nuolydžio"],
         confidence: "low",
@@ -106,5 +121,43 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(outlineHtml).not.toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain('disabled=""');
+  });
+
+  it("keeps save, reload proof and height gating inside the approved one-window UI", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionPersistentWorkbench, {
+        actorId: "7",
+        caseId: "lead:13",
+        horizontalAreaSquareMeters: 142,
+        orthoImageAlt: "Test roof",
+        sourceOutline,
+        capture: {
+          imageUrl: "/api/admin/media/91",
+          mediaId: "91",
+          sourceId: "norge-i-bilder:91",
+          rawContentHash: "a".repeat(64),
+          capturedAt: "2026-09-03T08:00:00.000Z",
+          attribution: "©norgeibilder.no",
+          geoReference: {
+            crs: "EPSG:25833",
+            extentTrust: "actual-visible-extent",
+            bounds: {
+              minEastingM: 500000,
+              minNorthingM: 6640000,
+              maxEastingM: 500020,
+              maxNorthingM: 6640010,
+            },
+            imageWidth: 1920,
+            imageHeight: 1080,
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain('data-roof-fusion-workbench="unified"');
+    expect(html).toContain('data-roof-fusion-persistence="true"');
+    expect(html).toContain("Išsaugoti ir patvirtinti reviziją");
+    expect(html).toContain("Perkrauti");
+    expect(html).not.toContain("pakeitimai šiame pjūvyje dar neišsaugomi");
   });
 });

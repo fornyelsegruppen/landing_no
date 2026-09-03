@@ -4,6 +4,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
+  type ReactNode,
   useCallback,
   useMemo,
   useState,
@@ -16,11 +17,7 @@ export type RoofFusionStage = "outline" | "skeleton" | "slopes" | "review";
 export type RoofFusionLineKind = "ridge" | "valley";
 export type RoofFusionConfidence = "high" | "medium" | "low";
 export type RoofFusionLayer =
-  | "sourceOutline"
-  | "approvedOutline"
-  | "hoydedata"
-  | "roofPlanes"
-  | "skeleton";
+  "sourceOutline" | "approvedOutline" | "hoydedata" | "roofPlanes" | "skeleton";
 
 export type RoofFusionLine = Readonly<{
   id: string;
@@ -65,6 +62,7 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   totalSurfaceAreaSquareMeters?: number;
   horizontalAreaSquareMeters?: number;
   averageSlopeDegrees?: number;
+  footprintPerimeterMeters?: number;
   confidence?: RoofFusionConfidence;
   confidenceReason?: string;
   blockers?: readonly string[];
@@ -77,6 +75,7 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   onOutlineChange?: (points: readonly RoofFusionPoint[]) => void;
   onLineCapture?: (line: RoofFusionLine) => void;
   onLayerVisibilityChange?: (layer: RoofFusionLayer, visible: boolean) => void;
+  persistencePanel?: ReactNode;
 }>;
 
 export const ROOF_FUSION_STAGES: readonly RoofFusionStage[] = [
@@ -161,6 +160,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   totalSurfaceAreaSquareMeters,
   horizontalAreaSquareMeters,
   averageSlopeDegrees,
+  footprintPerimeterMeters,
   confidence = "medium",
   confidenceReason,
   blockers = [],
@@ -173,6 +173,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onOutlineChange,
   onLineCapture,
   onLayerVisibilityChange,
+  persistencePanel,
 }: RoofFusionUnifiedWorkbenchProps) {
   const [stage, setStage] = useState<RoofFusionStage>(initialStage);
   const [layerVisibility, setLayerVisibility] = useState(() => ({
@@ -186,9 +187,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [draggingVertex, setDraggingVertex] = useState<number | null>(null);
   const [addingVertex, setAddingVertex] = useState(false);
   const [lineMode, setLineMode] = useState<RoofFusionLineKind | null>(null);
-  const [pendingLinePoint, setPendingLinePoint] = useState<RoofFusionPoint | null>(
-    null,
-  );
+  const [pendingLinePoint, setPendingLinePoint] =
+    useState<RoofFusionPoint | null>(null);
   const [lineSequence, setLineSequence] = useState(1);
   const [draftLines, setDraftLines] = useState<readonly RoofFusionLine[]>(
     () => lines,
@@ -217,8 +217,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const removeVertex = useCallback(
     (index: number) => {
-      if (draftOutline.length <= 3 || index < 0 || index >= draftOutline.length) return;
-      updateOutline(draftOutline.filter((_, currentIndex) => currentIndex !== index));
+      if (draftOutline.length <= 3 || index < 0 || index >= draftOutline.length)
+        return;
+      updateOutline(
+        draftOutline.filter((_, currentIndex) => currentIndex !== index),
+      );
       setSelectedVertex(null);
     },
     [draftOutline, updateOutline],
@@ -344,9 +347,19 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     if (nextStage) goToStage(nextStage);
   }, [activeBlockers.length, goToStage, onPrimaryAction, stage]);
 
-  const displayLines = [...draftLines, ...(pendingLinePoint && lineMode
-    ? [{ id: "pending-line", kind: lineMode, start: pendingLinePoint, end: pendingLinePoint }]
-    : [])];
+  const displayLines = [
+    ...draftLines,
+    ...(pendingLinePoint && lineMode
+      ? [
+          {
+            id: "pending-line",
+            kind: lineMode,
+            start: pendingLinePoint,
+            end: pendingLinePoint,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <section
@@ -366,7 +379,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 Sudėtingo stogo matavimas
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-[#c4c0b8]">
-                Viename ortofoto lange pažymėkite tik tai, ko sistema negali patikimai nustatyti pati.
+                Viename ortofoto lange pažymėkite tik tai, ko sistema negali
+                patikimai nustatyti pati.
               </p>
             </div>
             <span className="rounded-full border border-[#e8a317]/30 bg-[#e8a317]/10 px-3 py-1.5 text-xs font-medium text-[#f3c66b]">
@@ -374,7 +388,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             </span>
           </div>
 
-          <nav aria-label="Matavimo etapai" className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-[#171e2a] p-1">
+          <nav
+            aria-label="Matavimo etapai"
+            className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-[#171e2a] p-1"
+          >
             {ROOF_FUSION_STAGES.map((item, index) => (
               <button
                 aria-current={item === stage ? "step" : undefined}
@@ -402,7 +419,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
           >
             {/* Dynamic authenticated/data URLs cannot use the Next image optimizer. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt={orthoImageAlt} className="absolute inset-0 h-full w-full object-contain" src={orthoImageSrc} />
+            <img
+              alt={orthoImageAlt}
+              className="absolute inset-0 h-full w-full object-contain"
+              src={orthoImageSrc}
+            />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#08101a]/55 via-transparent to-[#08101a]/10" />
             <svg
               aria-label="Stogo žymėjimo sluoksniai"
@@ -420,7 +441,14 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               {layerVisibility.hoydedata && (
                 <g data-roof-fusion-layer="hoydedata">
                   {heightPoints.map((item, index) => (
-                    <circle cx={item.point.x} cy={item.point.y} fill="#55b7dc" key={index} opacity=".72" r=".012" />
+                    <circle
+                      cx={item.point.x}
+                      cy={item.point.y}
+                      fill="#55b7dc"
+                      key={index}
+                      opacity=".72"
+                      r=".012"
+                    />
                   ))}
                 </g>
               )}
@@ -436,7 +464,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       strokeWidth=".004"
                       vectorEffect="non-scaling-stroke"
                     >
-                      <title>{plane.label ?? `Stogo plokštuma ${index + 1}`}</title>
+                      <title>
+                        {plane.label ?? `Stogo plokštuma ${index + 1}`}
+                      </title>
                     </polygon>
                   ))}
                 </g>
@@ -470,7 +500,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       data-roof-fusion-line-kind={line.kind}
                       key={line.id}
                       stroke={line.kind === "ridge" ? "#f8d164" : "#8cb8ff"}
-                      strokeDasharray={line.id === "pending-line" ? ".012 .009" : undefined}
+                      strokeDasharray={
+                        line.id === "pending-line" ? ".012 .009" : undefined
+                      }
                       strokeWidth=".008"
                       vectorEffect="non-scaling-stroke"
                       x1={line.start.x}
@@ -496,68 +528,123 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   ))}
                 </g>
               )}
-              {stage === "outline" && draftOutline.map((point, index) => (
+              {stage === "outline" &&
+                draftOutline.map((point, index) => (
+                  <circle
+                    aria-label={`Kontūro taškas ${index + 1}. Rodyklėmis perkelti.`}
+                    className="cursor-move outline-none"
+                    cx={point.x}
+                    cy={point.y}
+                    data-roof-fusion-vertex={index}
+                    fill={selectedVertex === index ? "#fff" : "#46d69a"}
+                    key={`vertex-${index}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSelectedVertex(index);
+                    }}
+                    onKeyDown={(event) => handleVertexKeyDown(event, index)}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      setSelectedVertex(index);
+                      setDraggingVertex(index);
+                    }}
+                    r={selectedVertex === index ? ".025" : ".018"}
+                    role="button"
+                    tabIndex={0}
+                    stroke="#0b111a"
+                    strokeWidth=".006"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+              {pendingLinePoint && (
                 <circle
-                  aria-label={`Kontūro taškas ${index + 1}. Rodyklėmis perkelti.`}
-                  className="cursor-move outline-none"
-                  cx={point.x}
-                  cy={point.y}
-                  data-roof-fusion-vertex={index}
-                  fill={selectedVertex === index ? "#fff" : "#46d69a"}
-                  key={`vertex-${index}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setSelectedVertex(index);
-                  }}
-                  onKeyDown={(event) => handleVertexKeyDown(event, index)}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    setSelectedVertex(index);
-                    setDraggingVertex(index);
-                  }}
-                  r={selectedVertex === index ? ".025" : ".018"}
-                  role="button"
-                  tabIndex={0}
-                  stroke="#0b111a"
+                  cx={pendingLinePoint.x}
+                  cy={pendingLinePoint.y}
+                  fill="#fff"
+                  r=".014"
+                  stroke="#e8a317"
                   strokeWidth=".006"
                   vectorEffect="non-scaling-stroke"
                 />
-              ))}
-              {pendingLinePoint && (
-                <circle cx={pendingLinePoint.x} cy={pendingLinePoint.y} fill="#fff" r=".014" stroke="#e8a317" strokeWidth=".006" vectorEffect="non-scaling-stroke" />
               )}
             </svg>
             <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2 text-[11px] font-medium">
-              <span className="rounded-full border border-[#f3c66b]/50 bg-[#111722]/85 px-2.5 py-1 text-[#f3c66b]">— Šaltinis (nekintamas)</span>
-              <span className="rounded-full border border-[#46d69a]/50 bg-[#111722]/85 px-2.5 py-1 text-[#71e6b4]">— Patvirtinta</span>
+              <span className="rounded-full border border-[#f3c66b]/50 bg-[#111722]/85 px-2.5 py-1 text-[#f3c66b]">
+                — Šaltinis (nekintamas)
+              </span>
+              <span className="rounded-full border border-[#46d69a]/50 bg-[#111722]/85 px-2.5 py-1 text-[#71e6b4]">
+                — Patvirtinta
+              </span>
             </div>
             <span className="pointer-events-none absolute right-3 bottom-3 rounded-md bg-black/75 px-2 py-1 text-[10px] font-semibold text-white">
               {orthoAttribution}
             </span>
-            {addingVertex && <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-[#e8a317] px-3 py-1.5 text-xs font-semibold text-[#101318]">Spustelėkite vietą naujam taškui</div>}
+            {addingVertex && (
+              <div className="pointer-events-none absolute top-3 right-3 rounded-full bg-[#e8a317] px-3 py-1.5 text-xs font-semibold text-[#101318]">
+                Spustelėkite vietą naujam taškui
+              </div>
+            )}
           </div>
 
           {stage === "outline" && (
-            <div className="mt-3 flex flex-wrap items-center gap-2" data-roof-fusion-outline-tools>
-              <button aria-pressed={addingVertex} className={`min-h-10 rounded-xl border px-3 text-sm font-medium ${addingVertex ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`} onClick={() => setAddingVertex((current) => !current)} type="button">
+            <div
+              className="mt-3 flex flex-wrap items-center gap-2"
+              data-roof-fusion-outline-tools
+            >
+              <button
+                aria-pressed={addingVertex}
+                className={`min-h-10 rounded-xl border px-3 text-sm font-medium ${addingVertex ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
+                onClick={() => setAddingVertex((current) => !current)}
+                type="button"
+              >
                 + Pridėti kontūro tašką
               </button>
-              <button className="min-h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" disabled={selectedVertex === null || draftOutline.length <= 3} onClick={() => selectedVertex !== null && removeVertex(selectedVertex)} type="button">
+              <button
+                className="min-h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={selectedVertex === null || draftOutline.length <= 3}
+                onClick={() =>
+                  selectedVertex !== null && removeVertex(selectedVertex)
+                }
+                type="button"
+              >
                 − Pašalinti pasirinktą
               </button>
-              <span className="text-xs text-[#aaa69d]">Tašką galima tempti pele, paliesti arba perkelti rodyklėmis.</span>
+              <span className="text-xs text-[#aaa69d]">
+                Tašką galima tempti pele, paliesti arba perkelti rodyklėmis.
+              </span>
             </div>
           )}
 
           {stage === "skeleton" && (
-            <div className="mt-3 flex flex-wrap items-center gap-2" data-roof-fusion-skeleton-tools>
-              <span className="mr-1 text-xs text-[#aaa69d]">Nubrėžti dviem paspaudimais:</span>
+            <div
+              className="mt-3 flex flex-wrap items-center gap-2"
+              data-roof-fusion-skeleton-tools
+            >
+              <span className="mr-1 text-xs text-[#aaa69d]">
+                Nubrėžti dviem paspaudimais:
+              </span>
               {(["ridge", "valley"] as const).map((kind) => (
-                <button aria-pressed={lineMode === kind} className={`min-h-10 rounded-xl border px-3 text-sm font-medium ${lineMode === kind ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`} data-roof-fusion-line-mode={kind} key={kind} onClick={() => { setLineMode((current) => current === kind ? null : kind); setPendingLinePoint(null); }} type="button">
+                <button
+                  aria-pressed={lineMode === kind}
+                  className={`min-h-10 rounded-xl border px-3 text-sm font-medium ${lineMode === kind ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
+                  data-roof-fusion-line-mode={kind}
+                  key={kind}
+                  onClick={() => {
+                    setLineMode((current) => (current === kind ? null : kind));
+                    setPendingLinePoint(null);
+                  }}
+                  type="button"
+                >
                   {kind === "ridge" ? "＋ Kraigas" : "⌄ Slėnis"}
                 </button>
               ))}
-              <span className="text-xs text-[#aaa69d]">{lineMode ? pendingLinePoint ? "Pasirinkite antrą tašką" : "Pasirinkite pirmą tašką" : ""}</span>
+              <span className="text-xs text-[#aaa69d]">
+                {lineMode
+                  ? pendingLinePoint
+                    ? "Pasirinkite antrą tašką"
+                    : "Pasirinkite pirmą tašką"
+                  : ""}
+              </span>
             </div>
           )}
         </div>
@@ -565,44 +652,129 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         <aside className="w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 sm:p-5 xl:w-[360px] xl:border-t-0 xl:border-l">
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-[#f5f0e8]">Sluoksniai</h3>
-              <p className="mt-1 text-xs text-[#aaa69d]">Techniniai sluoksniai įjungti tik tada, kai jų reikia.</p>
+              <h3 className="text-sm font-semibold text-[#f5f0e8]">
+                Sluoksniai
+              </h3>
+              <p className="mt-1 text-xs text-[#aaa69d]">
+                Techniniai sluoksniai įjungti tik tada, kai jų reikia.
+              </p>
               <div className="mt-3 grid grid-cols-1 gap-2">
-                {(Object.keys(layerLabels) as RoofFusionLayer[]).map((layer) => (
-                  <button aria-pressed={layerVisibility[layer]} className="flex min-h-11 items-center justify-between rounded-xl border border-white/10 bg-[#0f151f] px-3 text-left text-sm hover:border-white/20" data-roof-fusion-layer-toggle={layer} key={layer} onClick={() => setLayer(layer)} type="button">
-                    <span className="flex items-center gap-2"><span aria-hidden className={`h-2.5 w-2.5 rounded-full ${layerVisibility[layer] ? "bg-[#46d69a]" : "bg-[#626b79]"}`} />{layerLabels[layer]}</span>
-                    <span className="text-xs text-[#aaa69d]">{layerVisibility[layer] ? "Rodyti" : "Paslėpta"}</span>
-                  </button>
-                ))}
+                {(Object.keys(layerLabels) as RoofFusionLayer[]).map(
+                  (layer) => (
+                    <button
+                      aria-pressed={layerVisibility[layer]}
+                      className="flex min-h-11 items-center justify-between rounded-xl border border-white/10 bg-[#0f151f] px-3 text-left text-sm hover:border-white/20"
+                      data-roof-fusion-layer-toggle={layer}
+                      key={layer}
+                      onClick={() => setLayer(layer)}
+                      type="button"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          aria-hidden
+                          className={`h-2.5 w-2.5 rounded-full ${layerVisibility[layer] ? "bg-[#46d69a]" : "bg-[#626b79]"}`}
+                        />
+                        {layerLabels[layer]}
+                      </span>
+                      <span className="text-xs text-[#aaa69d]">
+                        {layerVisibility[layer] ? "Rodyti" : "Paslėpta"}
+                      </span>
+                    </button>
+                  ),
+                )}
               </div>
             </div>
 
-            <div aria-live="polite" className="rounded-2xl border border-white/10 bg-[#0f151f] p-3" data-roof-fusion-status>
+            <div
+              aria-live="polite"
+              className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
+              data-roof-fusion-status
+            >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">Patikimumas</span>
-                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${confidence === "high" ? "bg-[#46d69a]/15 text-[#71e6b4]" : confidence === "medium" ? "bg-[#e8a317]/15 text-[#f3c66b]" : "bg-[#ef7676]/15 text-[#ff9d9d]"}`}>{confidenceLabels[confidence]}</span>
+                <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
+                  Patikimumas
+                </span>
+                <span
+                  className={`rounded-full px-2 py-1 text-xs font-semibold ${confidence === "high" ? "bg-[#46d69a]/15 text-[#71e6b4]" : confidence === "medium" ? "bg-[#e8a317]/15 text-[#f3c66b]" : "bg-[#ef7676]/15 text-[#ff9d9d]"}`}
+                >
+                  {confidenceLabels[confidence]}
+                </span>
               </div>
-              <p className="mt-2 text-sm text-[#ddd8cd]">{confidenceReason ?? "Patikimumas bus patikslintas po nuolydžio skaičiavimo."}</p>
+              <p className="mt-2 text-sm text-[#ddd8cd]">
+                {confidenceReason ??
+                  "Patikimumas bus patikslintas po nuolydžio skaičiavimo."}
+              </p>
               <div className="mt-3 border-t border-white/10 pt-3">
-                <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">Blokatoriai</span>
-                {activeBlockers.length ? <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#ffadad]">{activeBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : <p className="mt-1 text-xs text-[#71e6b4]">Nėra — galima tęsti.</p>}
+                <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
+                  Blokatoriai
+                </span>
+                {activeBlockers.length ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#ffadad]">
+                    {activeBlockers.map((blocker) => (
+                      <li key={blocker}>{blocker}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-xs text-[#71e6b4]">
+                    Nėra — galima tęsti.
+                  </p>
+                )}
               </div>
             </div>
 
             <dl className="grid grid-cols-2 gap-2" data-roof-fusion-metrics>
-              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3"><dt className="text-[11px] text-[#aaa69d]">Horizontalus</dt><dd className="mt-1 text-lg font-semibold">{formatNumber(horizontalAreaSquareMeters, " m²")}</dd></div>
-              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3"><dt className="text-[11px] text-[#aaa69d]">Tikras paviršius</dt><dd className="mt-1 text-lg font-semibold text-[#f3c66b]">{formatNumber(totalSurfaceAreaSquareMeters, " m²")}</dd></div>
-              <div className="col-span-2 rounded-xl border border-white/10 bg-[#0f151f] p-3"><dt className="text-[11px] text-[#aaa69d]">Vidutinis nuolydis</dt><dd className="mt-1 text-lg font-semibold">{formatNumber(averageSlopeDegrees, "°")}</dd></div>
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
+                <dt className="text-[11px] text-[#aaa69d]">Horizontalus</dt>
+                <dd className="mt-1 text-lg font-semibold">
+                  {formatNumber(horizontalAreaSquareMeters, " m²")}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
+                <dt className="text-[11px] text-[#aaa69d]">Tikras paviršius</dt>
+                <dd className="mt-1 text-lg font-semibold text-[#f3c66b]">
+                  {formatNumber(totalSurfaceAreaSquareMeters, " m²")}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
+                <dt className="text-[11px] text-[#aaa69d]">
+                  Vidutinis nuolydis
+                </dt>
+                <dd className="mt-1 text-lg font-semibold">
+                  {formatNumber(averageSlopeDegrees, "°")}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
+                <dt className="text-[11px] text-[#aaa69d]">Perimetras</dt>
+                <dd className="mt-1 text-lg font-semibold">
+                  {formatNumber(footprintPerimeterMeters, " m")}
+                </dd>
+              </div>
             </dl>
 
             <div className="rounded-2xl border border-[#e8a317]/25 bg-[#e8a317]/10 p-3 text-xs leading-relaxed text-[#ddd8cd]">
-              <strong className="text-[#f3c66b]">Šaltinio kontūras nekintamas.</strong> Jis lieka matomas brūkšniuota linija, o pataisymai kuriami kaip atskiras patvirtintas kontūras.
+              <strong className="text-[#f3c66b]">
+                Šaltinio kontūras nekintamas.
+              </strong>{" "}
+              Jis lieka matomas brūkšniuota linija, o pataisymai kuriami kaip
+              atskiras patvirtintas kontūras.
             </div>
 
-            <button className="min-h-12 w-full rounded-xl bg-[#e8a317] px-4 py-3 text-sm font-bold text-[#101318] shadow-lg shadow-[#e8a317]/10 transition hover:bg-[#f0b12e] disabled:cursor-not-allowed disabled:opacity-45" data-roof-fusion-primary-action={stage} disabled={activeBlockers.length > 0} onClick={handlePrimaryAction} type="button">
+            {persistencePanel}
+
+            <button
+              className="min-h-12 w-full rounded-xl bg-[#e8a317] px-4 py-3 text-sm font-bold text-[#101318] shadow-lg shadow-[#e8a317]/10 transition hover:bg-[#f0b12e] disabled:cursor-not-allowed disabled:opacity-45"
+              data-roof-fusion-primary-action={stage}
+              disabled={activeBlockers.length > 0}
+              onClick={handlePrimaryAction}
+              type="button"
+            >
               {primaryActionLabel}
             </button>
-            {activeBlockers.length > 0 && <p className="text-center text-xs text-[#ffadad]">Pirmiausia išspręskite blokatorius.</p>}
+            {activeBlockers.length > 0 && (
+              <p className="text-center text-xs text-[#ffadad]">
+                Pirmiausia išspręskite blokatorius.
+              </p>
+            )}
           </div>
         </aside>
       </div>

@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { createHash } from "node:crypto";
 import type { Payload } from "payload";
 import { createPrivateMedia } from "@/lib/private-media-storage";
 import { rateLimit } from "@/lib/rate-limit";
@@ -59,7 +60,10 @@ export class UpstashNorgeIBilderCaptureLedger implements NorgeIBilderCaptureLedg
       windowSec: MONTH_SECONDS,
     });
     if (!click.success) {
-      return { allowed: false as const, reason: "This employee click has already been used" };
+      return {
+        allowed: false as const,
+        reason: "This employee click has already been used",
+      };
     }
     const caseBurst = await rateLimit(
       "norge-i-bilder-case-burst",
@@ -67,21 +71,30 @@ export class UpstashNorgeIBilderCaptureLedger implements NorgeIBilderCaptureLedg
       { limit: 1, windowSec: 15 },
     );
     if (!caseBurst.success) {
-      return { allowed: false as const, reason: "A capture is already in progress for this case" };
+      return {
+        allowed: false as const,
+        reason: "A capture is already in progress for this case",
+      };
     }
     const day = await rateLimit("norge-i-bilder-day", daily, {
       limit: input.dailyLimit,
       windowSec: DAY_SECONDS,
     });
     if (!day.success) {
-      return { allowed: false as const, reason: "Daily Norge i bilder capture limit reached" };
+      return {
+        allowed: false as const,
+        reason: "Daily Norge i bilder capture limit reached",
+      };
     }
     const month = await rateLimit("norge-i-bilder-month", monthly, {
       limit: input.monthlyLimit,
       windowSec: MONTH_SECONDS,
     });
     if (!month.success) {
-      return { allowed: false as const, reason: "Monthly Norge i bilder capture limit reached" };
+      return {
+        allowed: false as const,
+        reason: "Monthly Norge i bilder capture limit reached",
+      };
     }
     return { allowed: true as const, reservation: { id: input.clickId } };
   }
@@ -126,7 +139,9 @@ export async function burnNorgeIBilderAttribution(image: Uint8Array) {
     throw new Error("Norge i bilder screenshot metadata is incomplete");
   }
   return source
-    .composite([{ input: watermarkSvg(metadata.width, metadata.height), top: 0, left: 0 }])
+    .composite([
+      { input: watermarkSvg(metadata.width, metadata.height), top: 0, left: 0 },
+    ])
     .png({ compressionLevel: 9 })
     .toBuffer();
 }
@@ -154,7 +169,9 @@ export function norgeIBilderCapturePrivateMediaDescriptor(
 export class PayloadNorgeIBilderFinalImageStore implements NorgeIBilderFinalImageStore {
   constructor(private readonly payload: Payload) {}
 
-  async saveFinal(input: Parameters<NorgeIBilderFinalImageStore["saveFinal"]>[0]) {
+  async saveFinal(
+    input: Parameters<NorgeIBilderFinalImageStore["saveFinal"]>[0],
+  ) {
     const image = await burnNorgeIBilderAttribution(input.image);
     const descriptor = norgeIBilderCapturePrivateMediaDescriptor(
       input.caseId,
@@ -174,6 +191,11 @@ export class PayloadNorgeIBilderFinalImageStore implements NorgeIBilderFinalImag
         mimeType: "image/png",
       },
     );
-    return { mediaId: String(media.id) };
+    return {
+      mediaId: String(media.id),
+      // Hash after the mandatory attribution burn: this identifies the exact
+      // bytes represented by the private-media record, not the browser input.
+      rawContentHash: createHash("sha256").update(image).digest("hex"),
+    };
   }
 }

@@ -29,6 +29,10 @@ export type NorgeIBilderCaptureResult = {
   attempts?: number;
   evidenceId?: number | string;
   source?: string;
+  /** Stable evidence identity returned by the authenticated capture route. */
+  sourceId?: string;
+  /** SHA-256 of the exact attributed bytes stored in private media. */
+  rawContentHash?: string;
   attribution?: string;
   capturedAt?: string;
   addressLabel?: string;

@@ -24,12 +24,11 @@ import type { AddressCandidate } from "@/lib/providers/contracts";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
 import type { RoofFusionHeightSurfacePreviewSummaryV1 } from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
 import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
+import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
 import type { RoofFusionOsmFootprintPreviewSummaryV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { RoofFusionTransientR4Drawer } from "@/components/admin-next/admin-next-r4-measurement-review";
-import {
-  AdminNextRoofFusionUnifiedWorkbench,
-} from "@/components/admin-next/admin-next-roof-fusion-unified-workbench";
+import { AdminNextRoofFusionPersistentWorkbench } from "@/components/admin-next/admin-next-roof-fusion-persistent-workbench";
 import {
   captureMatchesSelectedAddress,
   NorgeIBilderCaptureControl,
@@ -86,6 +85,8 @@ export type RoofFusionHeightAnalysisState =
       candidateId: string;
       summary: RoofFusionHeightSurfacePreviewSummaryV1;
       visualization: HeightSurfaceVisualizationV1;
+      /** Exact complete DOM/DTM grid used for the visible analysis. */
+      surface?: KartverketHeightSurfaceV1;
     };
 
 const initialState: RoofFusionUatActionState = { kind: "idle" };
@@ -693,6 +694,7 @@ export function HeightAnalysisPanel({
 }
 
 export function RealAddressResult({
+  actorId,
   captureApi,
   caseReference,
   leadId,
@@ -700,6 +702,7 @@ export function RealAddressResult({
   locale,
   result,
 }: {
+  actorId: string;
   captureApi?: NorgeIBilderCaptureApi;
   caseReference: string;
   leadId?: number;
@@ -790,57 +793,32 @@ export function RealAddressResult({
       : undefined;
   const normalizedSourceOutline =
     captureResult?.geoReference && captureMatchesSelection
-      ? normalizeOrthoOverlayPoints(
+      ? (normalizeOrthoOverlayPoints(
           projectWgs84ToOrthoPixels(
             selected.polygon,
             captureResult.geoReference,
           ),
           captureResult.geoReference,
-        ) ?? []
+        ) ?? [])
       : [];
-  const unifiedCalculationBlockers = [
-    ...(!activeHeight
-      ? ["Dar reikia nuskaityti Høydedata aukščio paviršių."]
-      : []),
-    ...(activeHeight?.summary.blockers.map((blocker) => t.heightBlockers[blocker]) ??
-      []),
-    ...(heightState.kind === "error" ? [t.heightErrors[heightState.code]] : []),
-  ];
   const canRenderUnifiedWorkbench =
+    Boolean(leadId) &&
     Boolean(captureResult?.imageUrl) &&
     normalizedSourceOutline.length >= 3 &&
     captureMatchesSelection;
-  const workbenchImageSrc = captureResult?.imageUrl;
   return (
     <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
       {canRenderUnifiedWorkbench ? (
         <div className="xl:col-span-2">
-          <AdminNextRoofFusionUnifiedWorkbench
-            approvedOutline={normalizedSourceOutline}
-            averageSlopeDegrees={r4PitchDegrees}
-            confidence="low"
-            confidenceReason="Vaizdas paruoštas kontūro ir kraigo korekcijai. Høydedata sluoksnis bus rodomas tik patvirtinus atskirą geografinę registraciją."
-            guardNotice="Preview · pakeitimai šiame pjūvyje dar neišsaugomi"
+          <AdminNextRoofFusionPersistentWorkbench
+            actorId={actorId}
+            capture={captureResult!}
+            caseId={`lead:${leadId}`}
+            heightSurface={activeHeight?.surface}
             horizontalAreaSquareMeters={selected.horizontalAreaSquareMeters}
-            initialLayers={{
-              approvedOutline: true,
-              sourceOutline: true,
-            }}
             key={`${selected.id}:${captureResult?.capturedAt ?? "capture"}`}
-            orthoAttribution={captureResult?.attribution ?? "©norgeibilder.no"}
             orthoImageAlt={`Stogo vaizdas ${result.address.label}`}
-            orthoImageHeight={captureResult?.geoReference?.imageHeight}
-            orthoImageSrc={workbenchImageSrc ?? ""}
-            orthoImageWidth={captureResult?.geoReference?.imageWidth}
             sourceOutline={normalizedSourceOutline}
-            stageBlockers={{
-              slopes: unifiedCalculationBlockers,
-              review: [
-                ...unifiedCalculationBlockers,
-                "Patvirtinto kontūro ir skeleto išsaugojimas dar neprijungtas.",
-              ],
-            }}
-            totalSurfaceAreaSquareMeters={r4SurfaceAreaSquareMeters}
           />
         </div>
       ) : null}
@@ -1339,12 +1317,14 @@ export function RealAddressResult({
 
 export function AdminNextRoofFusionUatControl({
   action,
+  actorId,
   addressLookupAction,
   captureApi,
   defaultCaseReference = "TF-13",
   heightAnalysisAction,
   locale,
 }: {
+  actorId: string;
   action: (
     previousState: RoofFusionUatActionState,
     formData: FormData,
@@ -1537,6 +1517,7 @@ export function AdminNextRoofFusionUatControl({
         </p>
         {addressState.kind === "success" ? (
           <RealAddressResult
+            actorId={actorId}
             captureApi={captureApi}
             caseReference={caseReference}
             leadId={leadId}

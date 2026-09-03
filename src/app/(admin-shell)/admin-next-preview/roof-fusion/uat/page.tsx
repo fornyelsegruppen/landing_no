@@ -226,6 +226,7 @@ export default async function AdminNextRoofFusionUatPage() {
         candidateId,
         summary: preview.summary,
         visualization,
+        surface,
       };
     } catch (error) {
       if (
@@ -244,6 +245,7 @@ export default async function AdminNextRoofFusionUatPage() {
   return (
     <AdminNextRoofFusionUatControl
       action={prepareR4Uat}
+      actorId={String(user.id)}
       addressLookupAction={lookupRealAddress}
       defaultCaseReference="TF-13"
       heightAnalysisAction={analyzeHeightSurface}

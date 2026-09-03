@@ -38,6 +38,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUatControl, {
         action: async () => ({ kind: "idle" as const }),
+        actorId: "7",
         addressLookupAction: async () => ({ kind: "idle" as const }),
         heightAnalysisAction: async () => ({ kind: "idle" as const }),
         defaultCaseReference: "TF-13",
@@ -59,6 +60,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
   it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {
     const html = renderToStaticMarkup(
       createElement(RealAddressResult, {
+        actorId: "7",
         caseReference: "TF-13",
         heightAnalysisAction: async () => ({ kind: "idle" as const }),
         locale: "lt",
