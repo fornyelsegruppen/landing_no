@@ -60,7 +60,7 @@ function normalizePackageLines(content: string) {
     .split("\n")
     .map((line) => {
       const match = line.match(
-        /^\s*[-*]\s+\*{0,2}(Basic|Standard|Premium)\*{0,2}\s*:.*$/i,
+        /^\s*[-*]\s+\*{0,2}(Basic|Standard|Premium)\b.*$/i,
       );
       if (!match) return line;
       const name =

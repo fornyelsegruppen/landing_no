@@ -6,9 +6,9 @@ describe("generated article normalizer", () => {
   it("replaces only approved language and package copy before quality gates", () => {
     const input = validGeneratedArticle({
       content: `## Pakker
-* Basic: Standard overflatebehandling.
-* Standard: Impregnering som styrker taksteinen.
-* Premium: Dypere beskyttelse og maling.
+* **Basic fra 99 kr/m² + mva:** Standard overflatebehandling.
+* Standard – Impregnering som styrker taksteinen.
+* **Premium:** Dypere beskyttelse og maling.
 
 Tak med høyt monterte flater krever ekstra omtanke under utførelsen. Impregnering som redusere fuktopptak omtales forsiktig. Taket har organisk materiale som mose og sot. Be om postnummer, valgfri adresse og gjerne bilder, uten å love endelig teknisk konklusjon eller pris.
 
