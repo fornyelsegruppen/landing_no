@@ -123,3 +123,33 @@ For every archetype:
 - focused tests, full typecheck, lint and regression suite pass.
 
 Production activation is a separate explicit gate after protected Preview UAT.
+
+## Live UAT decision — 2026-09-03
+
+Multiple skeleton edges are a required Production capability, not an optional
+polish item. The client and persisted draft already accept repeated ridge and
+valley lines, and the deterministic subdivision core accepts multi-edge roof
+graphs. The protected Preview calculation path must still be wired to that
+subdivision result before a complex roof can be considered complete.
+
+Required closure work:
+
+1. Keep repeated ridge and valley capture in the same orthophoto canvas; add
+   undo and explicit line deletion without resetting the active stage or zoom.
+2. Add shared-node snapping and clear topology feedback for dangling,
+   overlapping or crossing edges. Where Høydedata cannot infer a hip or
+   junction safely, request only that missing edge from the administrator.
+3. Invoke `subdivideAssistedManualRoofSurfacesV1` from the protected workbench
+   calculation path, then return per-plane horizontal area, surface area,
+   pitch, confidence and provenance to the unified review card.
+4. Preserve the fallback ladder: automatic height-based result, assisted
+   skeleton, verified manual pitch and finally the legacy manual calculation.
+   A fallback must always state the method and reason; it may never be silent.
+5. Pass live Preview UAT for one ridge, multiple ridges, an L-shaped
+   ridge/valley roof and a compound roof before any Production GO decision.
+
+The high-zoom ridge interaction fix is committed as `b937723`: stationary
+pointer activation records endpoints, captured lines use a visible fixed pixel
+stroke, and pending/final endpoint markers remain screen-stable. This closes
+the interaction defect only; it does not by itself close multi-plane
+calculation wiring.
