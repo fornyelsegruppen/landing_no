@@ -3,9 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   AdminNextRoofFusionUnifiedWorkbench,
+  DEFAULT_ROOF_FUSION_VIEWPORT,
   DEFAULT_ROOF_FUSION_LAYERS,
+  MAX_ROOF_FUSION_ZOOM,
+  MIN_ROOF_FUSION_ZOOM,
   ROOF_FUSION_STAGES,
   clampRoofFusionPoint,
+  clampRoofFusionViewport,
+  panRoofFusionViewport,
+  roofFusionImagePointFromViewportPoint,
+  zoomRoofFusionViewportAt,
 } from "./admin-next-roof-fusion-unified-workbench";
 import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
 
@@ -30,6 +37,47 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(DEFAULT_ROOF_FUSION_LAYERS.skeleton).toBe(false);
   });
 
+  it("bounds zoom and pan, and resets the complete viewport at 1x", () => {
+    expect(
+      clampRoofFusionViewport({ scale: 12, offsetX: -20, offsetY: 5 }),
+    ).toEqual({
+      scale: MAX_ROOF_FUSION_ZOOM,
+      offsetX: 1 - MAX_ROOF_FUSION_ZOOM,
+      offsetY: 0,
+    });
+    expect(
+      zoomRoofFusionViewportAt({ scale: 3, offsetX: -1, offsetY: -0.5 }, 0.5),
+    ).toEqual(DEFAULT_ROOF_FUSION_VIEWPORT);
+    expect(
+      panRoofFusionViewport(DEFAULT_ROOF_FUSION_VIEWPORT, {
+        x: -0.5,
+        y: -0.5,
+      }),
+    ).toEqual(DEFAULT_ROOF_FUSION_VIEWPORT);
+    expect(MIN_ROOF_FUSION_ZOOM).toBe(1);
+    expect(MAX_ROOF_FUSION_ZOOM).toBe(4);
+  });
+
+  it("keeps the image point under the zoom anchor and maps panned pointers back exactly", () => {
+    const anchor = { x: 0.25, y: 0.75 };
+    const zoomed = zoomRoofFusionViewportAt(
+      DEFAULT_ROOF_FUSION_VIEWPORT,
+      2,
+      anchor,
+    );
+
+    expect(zoomed).toEqual({ scale: 2, offsetX: -0.25, offsetY: -0.75 });
+    expect(roofFusionImagePointFromViewportPoint(anchor, zoomed)).toEqual(
+      anchor,
+    );
+    expect(
+      roofFusionImagePointFromViewportPoint(
+        { x: 0.5, y: 0.5 },
+        { scale: 2, offsetX: -0.5, offsetY: -0.25 },
+      ),
+    ).toEqual({ x: 0.5, y: 0.375 });
+  });
+
   it("keeps source geometry visibly immutable while providing one clear image surface", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
@@ -45,6 +93,12 @@ describe("Admin Next unified Roof Fusion workbench", () => {
 
     expect(html).toContain('data-roof-fusion-workbench="unified"');
     expect(html).toContain("data-roof-fusion-canvas");
+    expect(html).toContain("data-roof-fusion-viewport-controls");
+    expect(html).toContain('data-roof-fusion-viewport-scale="1"');
+    expect(html).toContain("Dabartinis vaizdo mastelis");
+    expect(html).toContain("100%");
+    expect(html).toContain("Perstumti vaizdą");
+    expect(html).toContain("Talpinti");
     expect(html).toContain('src="/preview/house-ortho.jpg"');
     expect(html).toContain("aspect-ratio:1920 / 1080");
     expect(html).toContain('preserveAspectRatio="none"');

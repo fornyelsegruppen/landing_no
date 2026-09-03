@@ -5,13 +5,30 @@ import {
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
+  type WheelEvent,
   useCallback,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
 /** Coordinates are normalized to the image surface (0..1). */
 export type RoofFusionPoint = Readonly<{ x: number; y: number }>;
+
+export type RoofFusionViewport = Readonly<{
+  scale: number;
+  /** Translation in visible-canvas fractions after scaling. */
+  offsetX: number;
+  offsetY: number;
+}>;
+
+export const MIN_ROOF_FUSION_ZOOM = 1;
+export const MAX_ROOF_FUSION_ZOOM = 4;
+export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
+  scale: MIN_ROOF_FUSION_ZOOM,
+  offsetX: 0,
+  offsetY: 0,
+};
 
 export type RoofFusionStage = "outline" | "skeleton" | "slopes" | "review";
 export type RoofFusionLineKind = "ridge" | "valley";
@@ -44,6 +61,13 @@ export type RoofFusionObstacle = Readonly<{
   id: string;
   point: RoofFusionPoint;
   label?: string;
+}>;
+
+type RoofFusionPanGesture = Readonly<{
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startViewport: RoofFusionViewport;
 }>;
 
 export type RoofFusionUnifiedWorkbenchProps = Readonly<{
@@ -102,6 +126,79 @@ export function clampRoofFusionPoint(point: RoofFusionPoint): RoofFusionPoint {
   };
 }
 
+export function clampRoofFusionViewport(
+  viewport: RoofFusionViewport,
+): RoofFusionViewport {
+  const requestedScale = Number.isFinite(viewport.scale)
+    ? viewport.scale
+    : MIN_ROOF_FUSION_ZOOM;
+  const scale = Math.min(
+    MAX_ROOF_FUSION_ZOOM,
+    Math.max(MIN_ROOF_FUSION_ZOOM, requestedScale),
+  );
+  if (scale === MIN_ROOF_FUSION_ZOOM) {
+    return DEFAULT_ROOF_FUSION_VIEWPORT;
+  }
+  const minimumOffset = 1 - scale;
+  const clampOffset = (value: number) =>
+    Math.min(0, Math.max(minimumOffset, Number.isFinite(value) ? value : 0));
+  return {
+    scale,
+    offsetX: clampOffset(viewport.offsetX),
+    offsetY: clampOffset(viewport.offsetY),
+  };
+}
+
+export function zoomRoofFusionViewportAt(
+  viewport: RoofFusionViewport,
+  requestedScale: number,
+  anchor: RoofFusionPoint = { x: 0.5, y: 0.5 },
+): RoofFusionViewport {
+  const current = clampRoofFusionViewport(viewport);
+  const nextScale = Math.min(
+    MAX_ROOF_FUSION_ZOOM,
+    Math.max(MIN_ROOF_FUSION_ZOOM, requestedScale),
+  );
+  if (nextScale === MIN_ROOF_FUSION_ZOOM) {
+    return DEFAULT_ROOF_FUSION_VIEWPORT;
+  }
+  const safeAnchor = clampRoofFusionPoint(anchor);
+  const imageX = (safeAnchor.x - current.offsetX) / current.scale;
+  const imageY = (safeAnchor.y - current.offsetY) / current.scale;
+  return clampRoofFusionViewport({
+    scale: nextScale,
+    offsetX: safeAnchor.x - imageX * nextScale,
+    offsetY: safeAnchor.y - imageY * nextScale,
+  });
+}
+
+export function panRoofFusionViewport(
+  viewport: RoofFusionViewport,
+  delta: RoofFusionPoint,
+): RoofFusionViewport {
+  const current = clampRoofFusionViewport(viewport);
+  if (current.scale === MIN_ROOF_FUSION_ZOOM) {
+    return DEFAULT_ROOF_FUSION_VIEWPORT;
+  }
+  return clampRoofFusionViewport({
+    ...current,
+    offsetX: current.offsetX + delta.x,
+    offsetY: current.offsetY + delta.y,
+  });
+}
+
+/** Maps a point on the visible canvas back to the original image coordinate. */
+export function roofFusionImagePointFromViewportPoint(
+  point: RoofFusionPoint,
+  viewport: RoofFusionViewport,
+): RoofFusionPoint {
+  const current = clampRoofFusionViewport(viewport);
+  return clampRoofFusionPoint({
+    x: (point.x - current.offsetX) / current.scale,
+    y: (point.y - current.offsetY) / current.scale,
+  });
+}
+
 function formatNumber(value: number | undefined, suffix = "") {
   if (value === undefined || !Number.isFinite(value)) return "—";
   return `${new Intl.NumberFormat("lt-LT", { maximumFractionDigits: 1 }).format(value)}${suffix}`;
@@ -134,15 +231,18 @@ function pointsAttribute(points: readonly RoofFusionPoint[]) {
 
 function pointFromPointer(
   event: { clientX: number; clientY: number },
-  element: SVGSVGElement,
+  bounds: Pick<DOMRect, "left" | "top" | "width" | "height">,
+  viewport: RoofFusionViewport,
 ): RoofFusionPoint {
-  const bounds = element.getBoundingClientRect();
-  const width = bounds.width || element.clientWidth || 1;
-  const height = bounds.height || element.clientHeight || 1;
-  return clampRoofFusionPoint({
-    x: (event.clientX - bounds.left) / width,
-    y: (event.clientY - bounds.top) / height,
-  });
+  const width = bounds.width || 1;
+  const height = bounds.height || 1;
+  return roofFusionImagePointFromViewportPoint(
+    {
+      x: (event.clientX - bounds.left) / width,
+      y: (event.clientY - bounds.top) / height,
+    },
+    viewport,
+  );
 }
 
 export function AdminNextRoofFusionUnifiedWorkbench({
@@ -175,6 +275,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onLayerVisibilityChange,
   persistencePanel,
 }: RoofFusionUnifiedWorkbenchProps) {
+  const canvasShellRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<RoofFusionStage>(initialStage);
   const [layerVisibility, setLayerVisibility] = useState(() => ({
     ...DEFAULT_ROOF_FUSION_LAYERS,
@@ -192,6 +293,18 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [lineSequence, setLineSequence] = useState(1);
   const [draftLines, setDraftLines] = useState<readonly RoofFusionLine[]>(
     () => lines,
+  );
+  const [viewport, setViewport] = useState<RoofFusionViewport>(
+    DEFAULT_ROOF_FUSION_VIEWPORT,
+  );
+  const [panMode, setPanMode] = useState(false);
+  const [panGesture, setPanGesture] = useState<RoofFusionPanGesture | null>(
+    null,
+  );
+
+  const getCanvasBounds = useCallback(
+    () => canvasShellRef.current?.getBoundingClientRect() ?? null,
+    [],
   );
 
   const updateOutline = useCallback(
@@ -229,7 +342,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const handleCanvasClick = useCallback(
     (event: MouseEvent<SVGSVGElement>) => {
-      const point = pointFromPointer(event, event.currentTarget);
+      if (panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM) return;
+      const bounds = getCanvasBounds();
+      if (!bounds) return;
+      const point = pointFromPointer(event, bounds, viewport);
       if (stage === "outline" && addingVertex) {
         const next = [...draftOutline];
         const nearestIndex = next.reduce(
@@ -268,18 +384,107 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       lineSequence,
       onLineCapture,
       pendingLinePoint,
+      panMode,
       stage,
       updateOutline,
+      getCanvasBounds,
+      viewport,
     ],
   );
 
   const handlePointerMove = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
+      if (panGesture?.pointerId === event.pointerId) {
+        const bounds = getCanvasBounds();
+        if (!bounds) return;
+        event.preventDefault();
+        setViewport(
+          panRoofFusionViewport(panGesture.startViewport, {
+            x: (event.clientX - panGesture.startClientX) / (bounds.width || 1),
+            y: (event.clientY - panGesture.startClientY) / (bounds.height || 1),
+          }),
+        );
+        return;
+      }
       if (draggingVertex === null || stage !== "outline") return;
-      moveVertex(draggingVertex, pointFromPointer(event, event.currentTarget));
+      const bounds = getCanvasBounds();
+      if (!bounds) return;
+      moveVertex(draggingVertex, pointFromPointer(event, bounds, viewport));
     },
-    [draggingVertex, moveVertex, stage],
+    [draggingVertex, getCanvasBounds, moveVertex, panGesture, stage, viewport],
   );
+
+  const handleCanvasPointerDown = useCallback(
+    (event: PointerEvent<SVGSVGElement>) => {
+      if (!panMode || viewport.scale <= MIN_ROOF_FUSION_ZOOM) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setDraggingVertex(null);
+      setPanGesture({
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startViewport: viewport,
+      });
+    },
+    [panMode, viewport],
+  );
+
+  const finishPointerGesture = useCallback(
+    (event: PointerEvent<SVGSVGElement>) => {
+      if (
+        panGesture?.pointerId === event.pointerId &&
+        event.currentTarget.hasPointerCapture?.(event.pointerId)
+      ) {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      }
+      setPanGesture(null);
+      setDraggingVertex(null);
+    },
+    [panGesture],
+  );
+
+  const handleWheel = useCallback(
+    (event: WheelEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const anchor = clampRoofFusionPoint({
+        x: (event.clientX - bounds.left) / (bounds.width || 1),
+        y: (event.clientY - bounds.top) / (bounds.height || 1),
+      });
+      const boundedDelta = Math.max(-100, Math.min(100, event.deltaY));
+      const factor = Math.exp(-boundedDelta * 0.0025);
+      const next = zoomRoofFusionViewportAt(
+        viewport,
+        viewport.scale * factor,
+        anchor,
+      );
+      setViewport(next);
+      if (next.scale === MIN_ROOF_FUSION_ZOOM) {
+        setPanMode(false);
+        setPanGesture(null);
+      }
+    },
+    [viewport],
+  );
+
+  const changeZoom = useCallback(
+    (delta: number) => {
+      const next = zoomRoofFusionViewportAt(viewport, viewport.scale + delta);
+      setViewport(next);
+      if (next.scale === MIN_ROOF_FUSION_ZOOM) {
+        setPanMode(false);
+        setPanGesture(null);
+      }
+    },
+    [viewport],
+  );
+
+  const resetViewport = useCallback(() => {
+    setViewport(DEFAULT_ROOF_FUSION_VIEWPORT);
+    setPanMode(false);
+    setPanGesture(null);
+  }, []);
 
   const handleVertexKeyDown = useCallback(
     (event: KeyboardEvent<SVGCircleElement>, index: number) => {
@@ -408,8 +613,69 @@ export function AdminNextRoofFusionUnifiedWorkbench({
           </nav>
 
           <div
+            aria-label="Vaizdo mastelio ir pozicijos valdikliai"
+            className="mb-2 flex flex-wrap items-center gap-2"
+            data-roof-fusion-viewport-controls
+            role="group"
+          >
+            <button
+              aria-label="Mažinti vaizdą"
+              className="min-h-11 min-w-11 rounded-xl border border-white/15 bg-white/5 px-3 text-lg font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={viewport.scale <= MIN_ROOF_FUSION_ZOOM}
+              onClick={() => changeZoom(-0.5)}
+              type="button"
+            >
+              −
+            </button>
+            <output
+              aria-label="Dabartinis vaizdo mastelis"
+              aria-live="polite"
+              className="min-w-16 rounded-xl border border-white/10 bg-[#171e2a] px-3 py-2 text-center text-sm font-semibold text-[#f3c66b]"
+              data-roof-fusion-zoom-percent
+            >
+              {Math.round(viewport.scale * 100)}%
+            </output>
+            <button
+              aria-label="Didinti vaizdą"
+              className="min-h-11 min-w-11 rounded-xl border border-white/15 bg-white/5 px-3 text-lg font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={viewport.scale >= MAX_ROOF_FUSION_ZOOM}
+              onClick={() => changeZoom(0.5)}
+              type="button"
+            >
+              +
+            </button>
+            <button
+              className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-3 text-sm font-medium text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={
+                viewport.scale === MIN_ROOF_FUSION_ZOOM &&
+                viewport.offsetX === 0 &&
+                viewport.offsetY === 0
+              }
+              onClick={resetViewport}
+              type="button"
+            >
+              Talpinti
+            </button>
+            <button
+              aria-pressed={panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM}
+              className={`min-h-11 rounded-xl border px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
+              disabled={viewport.scale <= MIN_ROOF_FUSION_ZOOM}
+              onClick={() => setPanMode((current) => !current)}
+              type="button"
+            >
+              Perstumti vaizdą
+            </button>
+            <span className="text-xs text-[#aaa69d]">
+              Ratukas / jutiklinis kilimėlis keičia mastelį. Perstumti galima
+              tik priartinus.
+            </span>
+          </div>
+
+          <div
             className="relative overflow-hidden rounded-2xl border border-white/15 bg-[#202938]"
             data-roof-fusion-canvas-shell
+            onWheel={handleWheel}
+            ref={canvasShellRef}
             style={{
               aspectRatio:
                 orthoImageWidth && orthoImageHeight
@@ -423,18 +689,38 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               alt={orthoImageAlt}
               className="absolute inset-0 h-full w-full object-contain"
               src={orthoImageSrc}
+              style={{
+                transform: `translate(${viewport.offsetX * 100}%, ${viewport.offsetY * 100}%) scale(${viewport.scale})`,
+                transformOrigin: "top left",
+              }}
             />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#08101a]/55 via-transparent to-[#08101a]/10" />
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#08101a]/55 via-transparent to-[#08101a]/10"
+              style={{
+                transform: `translate(${viewport.offsetX * 100}%, ${viewport.offsetY * 100}%) scale(${viewport.scale})`,
+                transformOrigin: "top left",
+              }}
+            />
             <svg
               aria-label="Stogo žymėjimo sluoksniai"
-              className="absolute inset-0 h-full w-full touch-none"
+              className={`absolute inset-0 h-full w-full touch-none ${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? (panGesture ? "cursor-grabbing" : "cursor-grab") : ""}`}
               data-roof-fusion-canvas
+              data-roof-fusion-viewport
+              data-roof-fusion-viewport-scale={viewport.scale}
               onClick={handleCanvasClick}
+              onPointerCancel={finishPointerGesture}
+              onPointerDown={handleCanvasPointerDown}
               onPointerMove={handlePointerMove}
-              onPointerUp={() => setDraggingVertex(null)}
-              onPointerLeave={() => setDraggingVertex(null)}
+              onPointerUp={finishPointerGesture}
+              onPointerLeave={() => {
+                if (!panGesture) setDraggingVertex(null);
+              }}
               role="img"
               preserveAspectRatio="none"
+              style={{
+                transform: `translate(${viewport.offsetX * 100}%, ${viewport.offsetY * 100}%) scale(${viewport.scale})`,
+                transformOrigin: "top left",
+              }}
               viewBox="0 0 1 1"
               xmlns="http://www.w3.org/2000/svg"
             >
@@ -532,23 +818,30 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 draftOutline.map((point, index) => (
                   <circle
                     aria-label={`Kontūro taškas ${index + 1}. Rodyklėmis perkelti.`}
-                    className="cursor-move outline-none"
+                    className={`${panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM ? "cursor-grab" : "cursor-move"} outline-none`}
                     cx={point.x}
                     cy={point.y}
                     data-roof-fusion-vertex={index}
                     fill={selectedVertex === index ? "#fff" : "#46d69a"}
                     key={`vertex-${index}`}
                     onClick={(event) => {
+                      if (panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM)
+                        return;
                       event.stopPropagation();
                       setSelectedVertex(index);
                     }}
                     onKeyDown={(event) => handleVertexKeyDown(event, index)}
                     onPointerDown={(event) => {
+                      if (panMode && viewport.scale > MIN_ROOF_FUSION_ZOOM)
+                        return;
                       event.stopPropagation();
                       setSelectedVertex(index);
                       setDraggingVertex(index);
                     }}
-                    r={selectedVertex === index ? ".025" : ".018"}
+                    r={
+                      (selectedVertex === index ? 0.025 : 0.018) /
+                      viewport.scale
+                    }
                     role="button"
                     tabIndex={0}
                     stroke="#0b111a"
