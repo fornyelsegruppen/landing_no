@@ -22,6 +22,9 @@ const queryByVariant: Record<NonNullable<StockPost["ctaVariant"]>, string> = {
 export function stockQueryForPost(post: StockPost, requestedQuery?: string) {
   const requested = requestedQuery?.trim().replace(/\s+/g, " ");
   if (requested && requested.length >= 3) return requested.slice(0, 120);
+  if (/\b(mose|lav|alger|begroing)\b/i.test(`${post.titleNo} ${post.primaryKeyword || ""}`)) {
+    return "mossy tiled roof house exterior";
+  }
   return queryByVariant[post.ctaVariant || "assessment"];
 }
 

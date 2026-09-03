@@ -21,5 +21,7 @@ describe("blog generator prompt guardrails", () => {
     expect(combined).toContain("Ikke kopier interne instruksjoner");
     expect(combined).toContain("generell forskriftsindeks");
     expect(combined).toContain("TEK17 § 13-12. Nedbør");
+    expect(combined).toContain("mose, lav eller alger");
+    expect(combined).toContain("faktiske motivet");
   });
 });

@@ -31,6 +31,17 @@ describe("blog stock images", () => {
     );
   });
 
+  it("uses a moss-relevant query for moss topics", () => {
+    expect(
+      stockQueryForPost({
+        id: 9,
+        titleNo: "Mose på taket",
+        primaryKeyword: "mose på taket",
+        ctaVariant: "assessment",
+      }),
+    ).toBe("mossy tiled roof house exterior");
+  });
+
   it("imports attribution metadata and replaces the draft hero image", async () => {
     const search = vi.fn(async () => [
       {

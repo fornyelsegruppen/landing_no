@@ -239,4 +239,26 @@ Kort svar uten Markdown-overskrift. Avhengig av hva en befant viser, vurderes ty
       ]),
     );
   });
+
+  it("blocks the post 9 grammar and unsupported moss-treatment promises", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}
+
+## Mose på taket
+
+Mosen kan etne seg fast, og når det har slutten å regne blir sterk begrodd mose farlig. Tidlig behandling sikrer at taket holder seg trygt og funksjonelt i mange år fremover. Mose kan holde på fukt som gir frostskader og sprekker i taksteinen.`,
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "unnatural_norwegian",
+        "overstated_treatment_outcome",
+        "unsupported_growth_damage_claim",
+      ]),
+    );
+  });
 });

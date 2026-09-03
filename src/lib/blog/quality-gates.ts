@@ -141,7 +141,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne|hva\s+en\s+befant\s+viser|takets\s+faktiske\s+tåleevne|boligens\s+ytre\s+vern\s+mot\s+nedbør|type\s+begroing:\s*sterkt\s+begrodd/i.test(
+    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne|hva\s+en\s+befant\s+viser|takets\s+faktiske\s+tåleevne|boligens\s+ytre\s+vern\s+mot\s+nedbør|type\s+begroing:\s*sterkt\s+begrodd|\betne\s+seg\s+fast\b|\bhar\s+slutten\s+å\s+regne\b|\bsterk\s+begrodd\s+mose\b/i.test(
       allText,
     )
   ) {
@@ -191,6 +191,32 @@ export function evaluateArticleQuality(
       "overstated_replacement_claim",
       "blocker",
       "Behov for takskifte krever faglig vurdering og skal ikke fremstilles som uunngåelig.",
+    );
+  }
+  if (
+    /(?:tidlig|rask)\s+(?:vask|behandling)[^.]{0,160}\b(?:sikrer|sikre)\b[^.]{0,140}\b(?:trygt|funksjonelt|mange\s+år)\b/i.test(
+      allText,
+    )
+  ) {
+    add(
+      issues,
+      "facts",
+      "overstated_treatment_outcome",
+      "blocker",
+      "Takbehandling skal ikke beskrives som en sikker garanti for fremtidig funksjon eller levetid.",
+    );
+  }
+  if (
+    /\b(?:mose|lav|alger)\b[^.]{0,140}\b(?:fukt|frost)\b[^.]{0,140}\b(?:skade|sprekker|forverr)\w*/i.test(
+      allText,
+    )
+  ) {
+    add(
+      issues,
+      "facts",
+      "unsupported_growth_damage_claim",
+      "blocker",
+      "Påstander om begroing, fukt, frost og skade krever en presis kilde som faktisk dekker sammenhengen.",
     );
   }
   if (
