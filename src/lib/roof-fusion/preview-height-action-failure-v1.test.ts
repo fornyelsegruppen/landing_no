@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { KartverketHeightDataError } from "@/lib/providers/kartverket-hoydedata-provider";
 import { RoofFusionHeightSurfacePreviewError } from "./hoydedata-surface-preview-v1";
 import { mapRoofFusionHeightActionFailureV1 } from "./preview-height-action-failure-v1";
+import { SimpleRoofPlaneSegmentationError } from "./simple-roof-plane-segmentation-v1";
 
 describe("Preview height action failure mapping", () => {
   it("keeps source revalidation failures distinct from Høydedata", () => {
@@ -39,6 +40,19 @@ describe("Preview height action failure mapping", () => {
         "correlation-789",
       ).state.code,
     ).toBe("ROOF_NOT_DETECTED");
+    expect(
+      mapRoofFusionHeightActionFailureV1(
+        "height_processing",
+        new SimpleRoofPlaneSegmentationError(
+          "MODEL_NOT_RELIABLE",
+          "sensitive fit detail",
+        ),
+        "correlation-ridge",
+      ),
+    ).toMatchObject({
+      state: { code: "RIDGE_CORRECTION_REVIEW_REQUIRED" },
+      diagnostic: { reasonCode: "MODEL_NOT_RELIABLE" },
+    });
     expect(
       mapRoofFusionHeightActionFailureV1(
         "height_processing",

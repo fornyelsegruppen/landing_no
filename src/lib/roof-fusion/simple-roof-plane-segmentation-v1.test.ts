@@ -5,6 +5,7 @@ import {
 } from "@/lib/providers/kartverket-hoydedata-provider";
 import type { BuildingFootprintCandidate } from "@/lib/providers/osm-building-provider";
 import {
+  manualRidgeCorrectionStatusV1,
   segmentSimpleRoofPlanesV1,
   segmentSimpleRoofPlanesWithRidgeV1,
   SimpleRoofPlaneSegmentationError,
@@ -106,6 +107,28 @@ function surfaceFixture(
 }
 
 describe("simple Roof Fusion plane segmentation", () => {
+  it("marks the live Lyngveien 28A concave outline as unsupported for ridge correction", () => {
+    const lyngveienCandidate: BuildingFootprintCandidate = {
+      ...candidate,
+      id: "way/132540663",
+      horizontalAreaSquareMeters: 86.7,
+      polygon: [
+        { latitude: 59.8964726, longitude: 10.7980925 },
+        { latitude: 59.8964854, longitude: 10.7980545 },
+        { latitude: 59.896405, longitude: 10.7979469 },
+        { latitude: 59.8963831, longitude: 10.798012 },
+        { latitude: 59.8964068, longitude: 10.7980438 },
+        { latitude: 59.8963871, longitude: 10.7981025 },
+        { latitude: 59.8964561, longitude: 10.7981948 },
+        { latitude: 59.896485, longitude: 10.798109 },
+      ],
+    };
+
+    expect(manualRidgeCorrectionStatusV1(lyngveienCandidate)).toBe(
+      "unsupported_footprint",
+    );
+  });
+
   it("fits two planes around an administrator-selected normalized ridge", () => {
     const surface = surfaceFixture(
       (point, center) => 12 - Math.abs(point.x - center.x) * 0.5,

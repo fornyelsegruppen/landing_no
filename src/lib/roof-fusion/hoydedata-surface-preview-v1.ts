@@ -20,6 +20,7 @@ import {
   segmentSimpleRoofPlanesV1,
   segmentSimpleRoofPlanesWithRidgeV1,
   SimpleRoofPlaneSegmentationError,
+  manualRidgeCorrectionStatusV1,
   type NormalizedRoofRidgePointV1,
   type SimpleRoofPlaneSegmentationV1,
 } from "./simple-roof-plane-segmentation-v1";
@@ -44,6 +45,7 @@ export type RoofFusionHeightSurfacePreviewSummaryV1 = {
   qualityStatus: "review_required";
   measurementClass: "preliminary";
   pricingReady: false;
+  manualRidgeCorrectionStatus: "available" | "unsupported_footprint";
   blockers: RoofFusionHeightSurfacePreviewBlocker[];
   engineHorizontalAreaSquareMeters: number;
   footprintPerimeterMeters: number;
@@ -605,6 +607,7 @@ export function buildRoofFusionHeightSurfacePreviewV1(input: {
     qualityStatus: "review_required",
     measurementClass: "preliminary",
     pricingReady: false,
+    manualRidgeCorrectionStatus: manualRidgeCorrectionStatusV1(candidate),
     blockers: segmentation
       ? ["ROOF_SURFACE_RENDER_REQUIRED"]
       : [...ROOF_FUSION_HEIGHT_SURFACE_PREVIEW_BLOCKERS],

@@ -82,6 +82,7 @@ export type RoofFusionHeightAnalysisState =
         | "SOURCE_VALIDATION_UNAVAILABLE"
         | "HEIGHT_DATA_UNAVAILABLE"
         | "ROOF_NOT_DETECTED"
+        | "RIDGE_CORRECTION_REVIEW_REQUIRED"
         | "HEIGHT_PROCESSING_FAILED";
       correlationId?: string;
     }
@@ -154,6 +155,8 @@ const copy = {
     ridgeSubmit: "Korriger med valgt møne",
     ridgeWorking: "Kontrollerer møne og tilpasser flater …",
     ridgeClear: "Tøm mønepunkter",
+    ridgeUnsupported:
+      "Denne komplekse takkanten kan ikke deles sikkert med tomøne-modellen. Behold den foreløpige flaten og bruk manuell gjennomgang.",
     heightTitle: "Virkelig 1 m høydeoverflate",
     heightIntro:
       "Skyggerelieff er laget av Kartverkets åpne DOM minus DTM. Den gule konturen er valgt OSM-bygning; dette er høydedata, ikke et foto.",
@@ -179,6 +182,8 @@ const copy = {
         "Kartverkets høydedata er midlertidig utilgjengelige for denne konturen.",
       HEIGHT_PROCESSING_FAILED:
         "Høydesvaret kunne ikke behandles sikkert. Prøv igjen eller bruk manuell kontroll.",
+      RIDGE_CORRECTION_REVIEW_REQUIRED:
+        "Den valgte mønekorrigeringen kan ikke brukes sikkert. Behold forhåndsvisningen og gjennomgå taket manuelt.",
       ROOF_NOT_DETECTED:
         "Høydemodellen viser ikke en sammenhengende takflate. Bruk manuell kontroll.",
     },
@@ -259,6 +264,8 @@ const copy = {
     ridgeSubmit: "Koreguoti pagal pažymėtą kraigą",
     ridgeWorking: "Tikrinamas kraigas ir pritaikomi šlaitai…",
     ridgeClear: "Išvalyti kraigo taškus",
+    ridgeUnsupported:
+      "Šio sudėtingo stogo kontūro negalima saugiai padalyti dviejų plokštumų modeliu. Palikite preliminarų paviršių ir atlikite rankinę peržiūrą.",
     heightTitle: "Tikras 1 m aukščio paviršius",
     heightIntro:
       "Reljefo vaizdas sukurtas iš atvirų Kartverket DOM minus DTM duomenų. Geltonas kontūras yra pasirinktas OSM pastatas; tai aukščio modelis, ne fotografija.",
@@ -284,6 +291,8 @@ const copy = {
         "Šiam kontūrui Kartverket aukščio duomenys laikinai nepasiekiami.",
       HEIGHT_PROCESSING_FAILED:
         "Aukščio atsako nepavyko saugiai apdoroti. Bandykite dar kartą arba naudokite rankinę peržiūrą.",
+      RIDGE_CORRECTION_REVIEW_REQUIRED:
+        "Pažymėtos kraigo korekcijos negalima saugiai pritaikyti. Palikite peržiūrą ir stogą patikrinkite rankiniu būdu.",
       ROOF_NOT_DETECTED:
         "Aukščio modelyje nėra vientiso stogo paviršiaus. Reikia rankinės peržiūros.",
     },
@@ -363,6 +372,8 @@ const copy = {
     ridgeSubmit: "Correct with selected ridge",
     ridgeWorking: "Validating ridge and fitting planes …",
     ridgeClear: "Clear ridge points",
+    ridgeUnsupported:
+      "This complex roof outline cannot be split safely with the two-plane model. Keep the preliminary surface and use manual review.",
     heightTitle: "Real 1 m height surface",
     heightIntro:
       "The shaded surface is derived from open Kartverket DOM minus DTM data. The amber outline is the selected OSM building; this is elevation data, not a photograph.",
@@ -388,6 +399,8 @@ const copy = {
         "Kartverket height data is temporarily unavailable for this footprint.",
       HEIGHT_PROCESSING_FAILED:
         "The height response could not be processed safely. Try again or use manual review.",
+      RIDGE_CORRECTION_REVIEW_REQUIRED:
+        "The selected ridge correction cannot be applied safely. Keep the preview and review the roof manually.",
       ROOF_NOT_DETECTED:
         "The height model does not show a continuous roof surface. Use manual review.",
     },
@@ -784,6 +797,8 @@ export function RealAddressResult({
   );
   const activePlanes = activeHeight?.visualization.planes ?? [];
   const hasSegmentedPlanes = activePlanes.length > 0;
+  const manualRidgeAvailable =
+    activeHeight?.summary.manualRidgeCorrectionStatus === "available";
   const captureMatchesSelection = captureMatchesSelectedAddress(
     captureResult?.address,
     result.address,
@@ -879,7 +894,8 @@ export function RealAddressResult({
           >
             <button
               aria-label={t.ridgeInstruction}
-              className="absolute inset-0 z-10 cursor-crosshair"
+              className={`absolute inset-0 z-10 ${manualRidgeAvailable ? "cursor-crosshair" : "cursor-default"}`}
+              disabled={!manualRidgeAvailable}
               onClick={selectRidgePoint}
               type="button"
             />
@@ -1136,7 +1152,7 @@ export function RealAddressResult({
             {heightPending ? t.heightWorking : t.heightAction}
           </button>
         </form>
-        {activeHeight ? (
+        {activeHeight && manualRidgeAvailable ? (
           <form
             action={heightFormAction}
             className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-3"
@@ -1184,6 +1200,13 @@ export function RealAddressResult({
               </button>
             </div>
           </form>
+        ) : activeHeight ? (
+          <p
+            className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-3 text-[10px] leading-4 text-amber-100"
+            data-roof-fusion-manual-ridge="unsupported-footprint"
+          >
+            {t.ridgeUnsupported}
+          </p>
         ) : null}
       </div>
       <p className="rounded-xl border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] p-3 text-xs font-semibold text-[var(--an-amber)] xl:col-span-2">

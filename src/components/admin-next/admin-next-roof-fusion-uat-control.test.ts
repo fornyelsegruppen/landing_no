@@ -30,18 +30,21 @@ describe("Admin Next Roof Fusion UAT control", () => {
 
     expect(
       selectActiveHeightState(
-        { kind: "error", code: "ROOF_NOT_DETECTED" },
+        { kind: "error", code: "RIDGE_CORRECTION_REVIEW_REQUIRED" },
         previous,
         "way/123",
       ),
     ).toBe(previous);
     expect(
       selectActiveHeightState(
-        { kind: "error", code: "ROOF_NOT_DETECTED" },
+        { kind: "error", code: "RIDGE_CORRECTION_REVIEW_REQUIRED" },
         previous,
         "way/other",
       ),
     ).toBeNull();
+    expect(
+      roofFusionHeightErrorMessage("lt", "RIDGE_CORRECTION_REVIEW_REQUIRED"),
+    ).toContain("kraigo korekcijos");
   });
 
   it("renders an explicit, Preview-only synthetic preparation action", () => {
@@ -169,6 +172,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
             qualityStatus: "review_required" as const,
             measurementClass: "preliminary" as const,
             pricingReady: false as const,
+            manualRidgeCorrectionStatus: "available" as const,
             blockers: [
               "ROOF_PLANES_REQUIRED" as const,
               "ROOF_PITCH_REQUIRED" as const,

@@ -12,6 +12,7 @@ export type RoofFusionHeightActionErrorCodeV1 =
   | "SOURCE_VALIDATION_UNAVAILABLE"
   | "HEIGHT_DATA_UNAVAILABLE"
   | "ROOF_NOT_DETECTED"
+  | "RIDGE_CORRECTION_REVIEW_REQUIRED"
   | "HEIGHT_PROCESSING_FAILED";
 
 function safeErrorType(error: unknown) {
@@ -33,10 +34,12 @@ export function mapRoofFusionHeightActionFailureV1(
     code = "SOURCE_VALIDATION_UNAVAILABLE";
   } else if (error instanceof KartverketHeightDataError) {
     code = "HEIGHT_DATA_UNAVAILABLE";
-  } else if (
-    error instanceof RoofFusionHeightSurfacePreviewError ||
-    error instanceof SimpleRoofPlaneSegmentationError
-  ) {
+  } else if (error instanceof SimpleRoofPlaneSegmentationError) {
+    // Automatic segmentation failures remain a preliminary preview and are
+    // caught by the builder. Reaching the action means a manual correction was
+    // rejected, not that the underlying roof surface disappeared.
+    code = "RIDGE_CORRECTION_REVIEW_REQUIRED";
+  } else if (error instanceof RoofFusionHeightSurfacePreviewError) {
     code = "ROOF_NOT_DETECTED";
   } else {
     code = "HEIGHT_PROCESSING_FAILED";
@@ -49,6 +52,9 @@ export function mapRoofFusionHeightActionFailureV1(
       phase,
       code,
       errorType: safeErrorType(error),
+      ...(error instanceof SimpleRoofPlaneSegmentationError
+        ? { reasonCode: error.code }
+        : {}),
     },
   };
 }
