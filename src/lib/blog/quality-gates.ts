@@ -141,7 +141,7 @@ export function evaluateArticleQuality(
     );
   }
   if (
-    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne|hva\s+en\s+befant\s+viser|takets\s+faktiske\s+tåleevne|boligens\s+ytre\s+vern\s+mot\s+nedbør|type\s+begroing:\s*sterkt\s+begrodd|\betne\s+seg\s+fast\b|\bhar\s+slutten\s+å\s+regne\b|\bsterk\s+begrodd\s+mose\b/i.test(
+    /sterkt\s+angrepet\s+av\s+tilstoppinger|ekstra\s+omtanke\s+under\s+utførelsen|geografiske\s+beliggenhet|som\s+redusere\s+fuktopptak|høyt\s+monterte\s+flater|streng\s+regulering\s+knyttet\s+til|boligens\s+øverste\s+flater|taket\s+har\s+det\s+vanskelig|lang\s+soltid|påfølgende\s+behandlinger\s+skal\s+få\s+gode\s+vilkår|nedfall\s+i\s+form\s+av\s+blader|\bindikasjonar\b|samt\s+sende\s+gjerne|hva\s+en\s+befant\s+viser|takets\s+faktiske\s+tåleevne|boligens\s+ytre\s+vern\s+mot\s+nedbør|type\s+begroing:\s*sterkt\s+begrodd|\betne\s+seg\s+fast\b|\bhar\s+slutten\s+å\s+regne\b|\bsterk\s+begrodd\s+mose\b|\bslkumring\b|\bknkt\s+takstein\b|\bmyesande\s+masse\b/i.test(
       allText,
     )
   ) {
@@ -191,6 +191,32 @@ export function evaluateArticleQuality(
       "overstated_replacement_claim",
       "blocker",
       "Behov for takskifte krever faglig vurdering og skal ikke fremstilles som uunngåelig.",
+    );
+  }
+  if (
+    /(?:TEK17\s*§?\s*13-12|§\s*13-12)[^.]{0,180}\b(?:ikke\s+lenger\s+)?ivaretas\b/i.test(
+      allText,
+    )
+  ) {
+    add(
+      issues,
+      "facts",
+      "unsupported_tek17_conclusion",
+      "blocker",
+      "TEK17 § 13-12 skal ikke brukes til å fastslå at et konkret tak ikke oppfyller kravene.",
+    );
+  }
+  if (
+    /takets\s+alder[^.]{0,100}\b(?:i\s+alle\s+tilfeller|alltid)\b[^.]{0,100}\b(?:avgjør|bestemmer)\b/i.test(
+      allText,
+    )
+  ) {
+    add(
+      issues,
+      "facts",
+      "age_as_decisive_roof_assessment",
+      "blocker",
+      "Takets alder alene skal ikke fremstilles som avgjørende for tilstand, tiltak eller behov for utskifting.",
     );
   }
   if (

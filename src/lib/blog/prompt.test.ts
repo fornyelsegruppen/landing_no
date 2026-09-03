@@ -23,5 +23,7 @@ describe("blog generator prompt guardrails", () => {
     expect(combined).toContain("TEK17 § 13-12. Nedbør");
     expect(combined).toContain("mose, lav eller alger");
     expect(combined).toContain("faktiske motivet");
+    expect(combined).toContain("Takets alder er bare ett vurderingspunkt");
+    expect(combined).toContain("må aldri brukes til å konkludere");
   });
 });

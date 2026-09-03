@@ -261,4 +261,26 @@ Mosen kan etne seg fast, og når det har slutten å regne blir sterk begrodd mos
       ]),
     );
   });
+
+  it("blocks the post 10 language defects and overconfident assessments", () => {
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}
+
+## Vurdering av taket
+
+Slkumring ved knkt takstein kan bli myesande masse. TEK17 § 13-12 betyr at kravet til fuktsikring ikke lenger ivaretas. Takets alder i alle tilfeller avgjør om det må skiftes.`,
+      }),
+      validTopic,
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "unnatural_norwegian",
+        "unsupported_tek17_conclusion",
+        "age_as_decisive_roof_assessment",
+      ]),
+    );
+  });
 });
