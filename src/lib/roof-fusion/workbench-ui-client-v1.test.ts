@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { parseRoofFusionWorkbenchDraftV1 } from "./workbench-draft-contract-v1";
 import {
   buildWorkbenchDraftFromUiV1,
+  constrainWorkbenchPointToOutlineV1,
   loadWorkbenchDraftV1,
   persistAndReloadWorkbenchDraftV1,
   workbenchCalculationBlockersV1,
@@ -51,6 +52,62 @@ async function draft(
 }
 
 describe("Roof Fusion workbench UI persistence contract", () => {
+  it("keeps inside endpoints exact and applies one constant screen-space snap tolerance", () => {
+    const approved = [
+      { x: 0.4, y: 0.3 },
+      { x: 0.6, y: 0.3 },
+      { x: 0.6, y: 0.7 },
+      { x: 0.4, y: 0.7 },
+    ];
+    const inside = { x: 0.5, y: 0.5 };
+    expect(
+      constrainWorkbenchPointToOutlineV1(inside, approved, {
+        xPixelsPerImageUnit: 1_000,
+        yPixelsPerImageUnit: 500,
+        maxDistancePixels: 14,
+      }),
+    ).toBe(inside);
+    expect(
+      constrainWorkbenchPointToOutlineV1({ x: 0.388, y: 0.5 }, approved, {
+        xPixelsPerImageUnit: 1_000,
+        yPixelsPerImageUnit: 500,
+        maxDistancePixels: 14,
+      }),
+    ).toEqual({ x: 0.4, y: 0.5 });
+    expect(
+      constrainWorkbenchPointToOutlineV1({ x: 0.396, y: 0.5 }, approved, {
+        xPixelsPerImageUnit: 3_000,
+        yPixelsPerImageUnit: 1_500,
+        maxDistancePixels: 14,
+      }),
+    ).toEqual({ x: 0.4, y: 0.5 });
+    expect(() =>
+      constrainWorkbenchPointToOutlineV1({ x: 0.394, y: 0.5 }, approved, {
+        xPixelsPerImageUnit: 3_000,
+        yPixelsPerImageUnit: 1_500,
+        maxDistancePixels: 14,
+      }),
+    ).toThrow("SKELETON_ENDPOINT_OUTSIDE_MASS");
+  });
+
+  it("snaps to the closing edge of a concave approved outline", () => {
+    const concave = [
+      { x: 0.2, y: 0.2 },
+      { x: 0.8, y: 0.2 },
+      { x: 0.8, y: 0.8 },
+      { x: 0.5, y: 0.5 },
+      { x: 0.2, y: 0.8 },
+    ];
+
+    expect(
+      constrainWorkbenchPointToOutlineV1({ x: 0.19, y: 0.5 }, concave, {
+        xPixelsPerImageUnit: 1_000,
+        yPixelsPerImageUnit: 500,
+        maxDistancePixels: 14,
+      }),
+    ).toEqual({ x: 0.2, y: 0.5 });
+  });
+
   it("constructs a server-valid EPSG:25833 draft from approved pixels and exact capture evidence", async () => {
     const value = await draft();
     expect(() => parseRoofFusionWorkbenchDraftV1(value)).not.toThrow();

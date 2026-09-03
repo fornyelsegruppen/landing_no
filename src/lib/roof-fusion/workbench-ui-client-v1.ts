@@ -14,8 +14,15 @@ export type NormalizedWorkbenchLineV1 = {
 };
 
 const WORKBENCH_POINT_EPSILON = 1e-10;
-export const WORKBENCH_ENDPOINT_SNAP_TOLERANCE = 0.005;
+export const WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX = 14;
+export const WORKBENCH_BUILDER_ENDPOINT_SNAP_TOLERANCE = 0.005;
 export const WORKBENCH_MIN_SKELETON_LENGTH = 0.002;
+
+export type WorkbenchEndpointConstraintMetricV1 = Readonly<{
+  xPixelsPerImageUnit: number;
+  yPixelsPerImageUnit: number;
+  maxDistancePixels: number;
+}>;
 
 export class WorkbenchSkeletonEndpointErrorV1 extends Error {
   readonly code = "SKELETON_ENDPOINT_OUTSIDE_MASS";
@@ -100,25 +107,47 @@ export function workbenchPointInOrOnOutlineV1(
 export function constrainWorkbenchPointToOutlineV1(
   point: NormalizedWorkbenchPointV1,
   outline: readonly NormalizedWorkbenchPointV1[],
+  // Interactive callers pass a CSS-pixel metric. Omission is reserved for
+  // the serializer's tight normalized-coordinate defense before server parse.
+  metric: WorkbenchEndpointConstraintMetricV1 = {
+    xPixelsPerImageUnit: 1,
+    yPixelsPerImageUnit: 1,
+    maxDistancePixels: WORKBENCH_BUILDER_ENDPOINT_SNAP_TOLERANCE,
+  },
 ): NormalizedWorkbenchPointV1 {
   if (workbenchPointInOrOnOutlineV1(point, outline)) {
     return point;
   }
   if (outline.length < 3) throw new WorkbenchSkeletonEndpointErrorV1();
+  const xScale =
+    Number.isFinite(metric.xPixelsPerImageUnit) &&
+    metric.xPixelsPerImageUnit > 0
+      ? metric.xPixelsPerImageUnit
+      : 1;
+  const yScale =
+    Number.isFinite(metric.yPixelsPerImageUnit) &&
+    metric.yPixelsPerImageUnit > 0
+      ? metric.yPixelsPerImageUnit
+      : 1;
+  const maxDistance =
+    Number.isFinite(metric.maxDistancePixels) && metric.maxDistancePixels >= 0
+      ? metric.maxDistancePixels
+      : 0;
   let closest = outline[0];
   let closestDistance = Number.POSITIVE_INFINITY;
   outline.forEach((from, index) => {
     const to = outline[(index + 1) % outline.length];
     const dx = to.x - from.x;
     const dy = to.y - from.y;
-    const squaredLength = dx * dx + dy * dy;
+    const squaredLength = dx * dx * xScale ** 2 + dy * dy * yScale ** 2;
     const projection =
       squaredLength > 0
         ? Math.max(
             0,
             Math.min(
               1,
-              ((point.x - from.x) * dx + (point.y - from.y) * dy) /
+              ((point.x - from.x) * dx * xScale ** 2 +
+                (point.y - from.y) * dy * yScale ** 2) /
                 squaredLength,
             ),
           )
@@ -127,13 +156,16 @@ export function constrainWorkbenchPointToOutlineV1(
       x: from.x + projection * dx,
       y: from.y + projection * dy,
     };
-    const distance = Math.hypot(point.x - candidate.x, point.y - candidate.y);
+    const distance = Math.hypot(
+      (point.x - candidate.x) * xScale,
+      (point.y - candidate.y) * yScale,
+    );
     if (distance < closestDistance) {
       closest = candidate;
       closestDistance = distance;
     }
   });
-  if (closestDistance <= WORKBENCH_ENDPOINT_SNAP_TOLERANCE) return closest;
+  if (closestDistance <= maxDistance) return closest;
   throw new WorkbenchSkeletonEndpointErrorV1();
 }
 

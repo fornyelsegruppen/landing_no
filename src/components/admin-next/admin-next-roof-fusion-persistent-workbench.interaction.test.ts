@@ -29,18 +29,18 @@ const sourceOutline = [
 ] as const;
 
 const persistedOutline = [
-  { x: 0.2, y: 0.2 },
-  { x: 0.8, y: 0.2 },
-  { x: 0.8, y: 0.8 },
-  { x: 0.2, y: 0.8 },
+  { x: 0.4, y: 0.3 },
+  { x: 0.6, y: 0.3 },
+  { x: 0.6, y: 0.7 },
+  { x: 0.4, y: 0.7 },
 ] as const;
 
 const persistedLines = [
   {
     id: "saved-ridge",
     kind: "ridge" as const,
-    start: { x: 0.25, y: 0.5 },
-    end: { x: 0.75, y: 0.5 },
+    start: { x: 0.45, y: 0.5 },
+    end: { x: 0.55, y: 0.5 },
   },
 ] as const;
 
@@ -145,6 +145,49 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     await dispatchCanvasClick(clientX);
   };
 
+  const panCanvas = async (fromX: number, toX: number) => {
+    const canvas = container.querySelector<SVGSVGElement>(
+      "[data-roof-fusion-canvas]",
+    );
+    expect(canvas).not.toBeNull();
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: fromX,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 2,
+        }),
+      );
+    });
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          button: 0,
+          clientX: toX,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 2,
+        }),
+      );
+    });
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new PointerEvent("pointerup", {
+          bubbles: true,
+          button: 0,
+          clientX: toX,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 2,
+        }),
+      );
+    });
+  };
+
   const captureLine = async (startX: number, endX: number) => {
     await activateCanvasPoint(startX);
     await activateCanvasPoint(endX);
@@ -224,7 +267,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       container
         .querySelector('[data-roof-fusion-layer="approvedOutline"]')
         ?.getAttribute("points"),
-    ).toBe("0.2,0.2 0.8,0.2 0.8,0.8 0.2,0.8");
+    ).toBe("0.4,0.3 0.6,0.3 0.6,0.7 0.4,0.7");
 
     await click('[data-roof-fusion-stage-tab="skeleton"]');
     expect(renderedLines()).toHaveLength(1);
@@ -233,13 +276,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe("ridge");
   });
 
-  it("rejects a far-outside skeleton endpoint with an exact corrective message", async () => {
+  it("snaps a near valley endpoint at 100% and preserves pending on far/zero rejection", async () => {
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
     await click('[data-roof-fusion-stage-tab="skeleton"]');
-    await click('[data-roof-fusion-line-mode="ridge"]');
+    await click('[data-roof-fusion-line-mode="valley"]');
 
     const canvas = container.querySelector<SVGSVGElement>(
       "[data-roof-fusion-canvas]",
@@ -262,37 +305,51 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         toJSON: () => ({}),
       }) satisfies DOMRect;
 
-    await act(async () => {
-      canvas!.dispatchEvent(
-        new MouseEvent("click", {
-          bubbles: true,
-          clientX: 10,
-          clientY: 250,
-        }),
-      );
-    });
+    const clickCanvasAt = activateCanvasPoint;
 
+    await clickCanvasAt(388);
+    expect(
+      container
+        .querySelector("[data-roof-fusion-pending-line-point]")
+        ?.getAttribute("cx"),
+    ).toBe("0.4");
+    expect(container.textContent).toContain(
+      "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
+    );
+    await clickCanvasAt(600);
+    expect(
+      container.querySelector('[data-roof-fusion-line-kind="valley"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-roof-fusion-line-kind="ridge"]'),
+    ).not.toBeNull();
+    expect(renderedLines()).toHaveLength(2);
+
+    await click('[data-roof-fusion-line-mode="ridge"]');
+    await clickCanvasAt(10);
+    expect(container.textContent).toContain("SKELETON_ENDPOINT_OUTSIDE_MASS");
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).toBeNull();
+    expect(renderedLines()).toHaveLength(2);
+
+    await clickCanvasAt(500);
+    const pendingBeforeRejection = container
+      .querySelector("[data-roof-fusion-pending-line-point]")
+      ?.getAttribute("cx");
+    await clickCanvasAt(10);
     expect(container.textContent).toContain("SKELETON_ENDPOINT_OUTSIDE_MASS");
     expect(container.textContent).toContain(
       "Patikslinkite kontūrą arba pasirinkite tašką jo viduje",
     );
     expect(
-      container.querySelector("[data-roof-fusion-pending-line-point]"),
-    ).toBeNull();
-    expect(renderedLines()).toHaveLength(1);
-    expect(stage()).toBe("skeleton");
+      container
+        .querySelector("[data-roof-fusion-pending-line-point]")
+        ?.getAttribute("cx"),
+    ).toBe(pendingBeforeRejection);
+    expect(renderedLines()).toHaveLength(3);
 
-    for (let index = 0; index < 2; index += 1) {
-      await act(async () => {
-        canvas!.dispatchEvent(
-          new MouseEvent("click", {
-            bubbles: true,
-            clientX: 500,
-            clientY: 250,
-          }),
-        );
-      });
-    }
+    await clickCanvasAt(500);
     expect(container.textContent).toContain("SKELETON_ZERO_LENGTH");
     expect(container.textContent).toContain(
       "Antras kraigo arba slėnio taškas turi skirtis nuo pirmojo",
@@ -300,7 +357,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       container.querySelector("[data-roof-fusion-pending-line-point]"),
     ).not.toBeNull();
-    expect(renderedLines()).toHaveLength(2);
+    expect(renderedLines()).toHaveLength(3);
     expect(stage()).toBe("skeleton");
   });
 
@@ -334,15 +391,20 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     await click('[aria-label="Didinti vaizdą"]');
     await click('[aria-label="Didinti vaizdą"]');
     expect(container.textContent).toContain("300%");
+    await panCanvas(500, 600);
 
-    await dispatchCanvasPointerActivation(300);
+    await dispatchCanvasPointerActivation(288);
     const pendingMarker = container.querySelector<SVGEllipseElement>(
       "[data-roof-fusion-pending-line-point]",
     );
     expect(pendingMarker).not.toBeNull();
+    expect(pendingMarker!.getAttribute("cx")).toBe("0.4");
     expect(Number(pendingMarker!.getAttribute("rx"))).toBeLessThan(0.002);
     expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
-    await dispatchCanvasClick(300);
+    expect(container.textContent).toContain(
+      "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
+    );
+    await dispatchCanvasClick(288);
     expect(renderedLines()).toHaveLength(2);
 
     await dispatchCanvasPointerActivation(700);
@@ -356,6 +418,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toHaveLength(4);
     await dispatchCanvasClick(700);
     expect(renderedLines()).toHaveLength(2);
+    expect(
+      Array.from(renderedLines()).some(
+        (line) =>
+          line.getAttribute("x1") === "0.4" ||
+          line.getAttribute("x2") === "0.4",
+      ),
+    ).toBe(true);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
@@ -379,6 +448,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     });
     expect(container.textContent).toContain("CAS revizija išsaugota");
     expect(renderedLines()).toHaveLength(2);
+    expect(
+      Array.from(renderedLines()).some(
+        (line) =>
+          line.getAttribute("x1") === "0.4" ||
+          line.getAttribute("x2") === "0.4",
+      ),
+    ).toBe(true);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
 
@@ -391,6 +467,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     expect(renderedLines()).toHaveLength(2);
+    expect(
+      Array.from(renderedLines()).some(
+        (line) =>
+          line.getAttribute("x1") === "0.4" ||
+          line.getAttribute("x2") === "0.4",
+      ),
+    ).toBe(true);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
     expect(container.textContent).toContain(

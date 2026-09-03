@@ -12,6 +12,7 @@ import {
   clampRoofFusionViewport,
   hasRoofFusionPanGestureMoved,
   panRoofFusionViewport,
+  roofFusionEndpointConstraintMetric,
   roofFusionImagePointFromViewportPoint,
   roofFusionScreenStableMarkerRadii,
   shouldHandleRoofFusionZoomWheel,
@@ -80,6 +81,29 @@ describe("Admin Next unified Roof Fusion workbench", () => {
         { scale: 2, offsetX: -0.5, offsetY: -0.25 },
       ),
     ).toEqual({ x: 0.5, y: 0.375 });
+  });
+
+  it("derives a pan-independent constant CSS-pixel endpoint tolerance", () => {
+    expect(
+      roofFusionEndpointConstraintMetric(
+        { width: 1_000, height: 500 },
+        DEFAULT_ROOF_FUSION_VIEWPORT,
+      ),
+    ).toEqual({
+      xPixelsPerImageUnit: 1_000,
+      yPixelsPerImageUnit: 500,
+      maxDistancePixels: 14,
+    });
+    expect(
+      roofFusionEndpointConstraintMetric(
+        { width: 1_000, height: 500 },
+        { scale: 3, offsetX: -1.7, offsetY: -0.4 },
+      ),
+    ).toEqual({
+      xPixelsPerImageUnit: 3_000,
+      yPixelsPerImageUnit: 1_500,
+      maxDistancePixels: 14,
+    });
   });
 
   it("leaves plain wheel scrolling alone and reserves Ctrl/Cmd-wheel for zoom", () => {

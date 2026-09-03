@@ -15,6 +15,8 @@ import {
 import {
   assertWorkbenchSkeletonLineLengthV1,
   constrainWorkbenchPointToOutlineV1,
+  type WorkbenchEndpointConstraintMetricV1,
+  WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX,
   WorkbenchSkeletonEndpointErrorV1,
   WorkbenchSkeletonZeroLengthErrorV1,
 } from "@/lib/roof-fusion/workbench-ui-client-v1";
@@ -255,6 +257,18 @@ export function roofFusionScreenStableMarkerRadii(
   };
 }
 
+export function roofFusionEndpointConstraintMetric(
+  bounds: Pick<DOMRect, "width" | "height">,
+  viewport: RoofFusionViewport,
+): WorkbenchEndpointConstraintMetricV1 {
+  const current = clampRoofFusionViewport(viewport);
+  return {
+    xPixelsPerImageUnit: Math.max(1, bounds.width) * current.scale,
+    yPixelsPerImageUnit: Math.max(1, bounds.height) * current.scale,
+    maxDistancePixels: WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX,
+  };
+}
+
 function formatNumber(value: number | undefined, suffix = "") {
   if (value === undefined || !Number.isFinite(value)) return "—";
   return `${new Intl.NumberFormat("lt-LT", { maximumFractionDigits: 1 }).format(value)}${suffix}`;
@@ -350,6 +364,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [lineCaptureProblem, setLineCaptureProblem] = useState<string | null>(
     null,
   );
+  const [lineCaptureNotice, setLineCaptureNotice] = useState<string | null>(
+    null,
+  );
   const [lineSequence, setLineSequence] = useState(1);
   const [draftLines, setDraftLines] = useState<readonly RoofFusionLine[]>(
     () => lines,
@@ -419,7 +436,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   );
 
   const activateCanvasPoint = useCallback(
-    (point: RoofFusionPoint) => {
+    (
+      point: RoofFusionPoint,
+      endpointMetric?: WorkbenchEndpointConstraintMetricV1,
+    ) => {
       if (stage === "outline" && addingVertex) {
         const next = [...draftOutline];
         const nearestIndex = next.reduce(
@@ -441,8 +461,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         constrainedPoint = constrainWorkbenchPointToOutlineV1(
           point,
           draftOutline,
+          endpointMetric,
         );
       } catch (error) {
+        setLineCaptureNotice(null);
         setLineCaptureProblem(
           error instanceof WorkbenchSkeletonEndpointErrorV1
             ? error.message
@@ -450,6 +472,13 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         );
         return;
       }
+      const snapped =
+        constrainedPoint.x !== point.x || constrainedPoint.y !== point.y;
+      setLineCaptureNotice(
+        snapped
+          ? `Taškas magnetiškai pritrauktas prie patvirtinto kontūro (${WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX} px).`
+          : null,
+      );
       setLineCaptureProblem(null);
       if (!pendingLinePoint) {
         setPendingLinePoint(constrainedPoint);
@@ -458,6 +487,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       try {
         assertWorkbenchSkeletonLineLengthV1(pendingLinePoint, constrainedPoint);
       } catch (error) {
+        setLineCaptureNotice(null);
         setLineCaptureProblem(
           error instanceof WorkbenchSkeletonZeroLengthErrorV1
             ? error.message
@@ -497,7 +527,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       }
       const bounds = getCanvasBounds();
       if (!bounds) return;
-      activateCanvasPoint(pointFromPointer(event, bounds, viewport));
+      activateCanvasPoint(
+        pointFromPointer(event, bounds, viewport),
+        roofFusionEndpointConstraintMetric(bounds, viewport),
+      );
     },
     [activateCanvasPoint, getCanvasBounds, viewport],
   );
@@ -575,7 +608,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         if (!moved) {
           const bounds = getCanvasBounds();
           if (bounds) {
-            activateCanvasPoint(pointFromPointer(event, bounds, viewport));
+            activateCanvasPoint(
+              pointFromPointer(event, bounds, viewport),
+              roofFusionEndpointConstraintMetric(bounds, viewport),
+            );
           }
         }
         // Zoomed pointer activation is completed on pointerup because a
@@ -673,6 +709,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       setLineMode(null);
       setPendingLinePoint(null);
       setLineCaptureProblem(null);
+      setLineCaptureNotice(null);
       setAddingVertex(false);
       onStageChange?.(nextStage);
     },
@@ -1138,6 +1175,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     setLineMode((current) => (current === kind ? null : kind));
                     setPendingLinePoint(null);
                     setLineCaptureProblem(null);
+                    setLineCaptureNotice(null);
                   }}
                   type="button"
                 >
@@ -1158,6 +1196,15 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   role="alert"
                 >
                   {lineCaptureProblem}
+                </span>
+              ) : null}
+              {lineCaptureNotice ? (
+                <span
+                  className="basis-full text-xs text-[#71e6b4]"
+                  data-roof-fusion-line-notice
+                  role="status"
+                >
+                  {lineCaptureNotice}
                 </span>
               ) : null}
             </div>
