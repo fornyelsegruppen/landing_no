@@ -93,7 +93,38 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       (button) => button.textContent?.includes(text),
     );
 
-  const captureLine = async (startX: number, endX: number) => {
+  const dispatchCanvasPointerActivation = async (clientX: number) => {
+    const canvas = container.querySelector<SVGSVGElement>(
+      "[data-roof-fusion-canvas]",
+    );
+    expect(canvas).not.toBeNull();
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX,
+          clientY: 200,
+          isPrimary: true,
+          pointerId: 1,
+        }),
+      );
+    });
+    await act(async () => {
+      canvas!.dispatchEvent(
+        new PointerEvent("pointerup", {
+          bubbles: true,
+          button: 0,
+          clientX,
+          clientY: 200,
+          isPrimary: true,
+          pointerId: 1,
+        }),
+      );
+    });
+  };
+
+  const dispatchCanvasClick = async (clientX: number) => {
     const canvas = container.querySelector<SVGSVGElement>(
       "[data-roof-fusion-canvas]",
     );
@@ -102,20 +133,21 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       canvas!.dispatchEvent(
         new MouseEvent("click", {
           bubbles: true,
-          clientX: startX,
+          clientX,
           clientY: 200,
         }),
       );
     });
-    await act(async () => {
-      canvas!.dispatchEvent(
-        new MouseEvent("click", {
-          bubbles: true,
-          clientX: endX,
-          clientY: 200,
-        }),
-      );
-    });
+  };
+
+  const activateCanvasPoint = async (clientX: number) => {
+    await dispatchCanvasPointerActivation(clientX);
+    await dispatchCanvasClick(clientX);
+  };
+
+  const captureLine = async (startX: number, endX: number) => {
+    await activateCanvasPoint(startX);
+    await activateCanvasPoint(endX);
   };
 
   beforeEach(async () => {
@@ -227,21 +259,57 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       }) satisfies DOMRect;
 
     await click('[aria-label="Didinti vaizdą"]');
-    expect(container.textContent).toContain("150%");
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    expect(container.textContent).toContain("300%");
 
-    await captureLine(300, 700);
+    await dispatchCanvasPointerActivation(300);
+    const pendingMarker = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-pending-line-point]",
+    );
+    expect(pendingMarker).not.toBeNull();
+    expect(Number(pendingMarker!.getAttribute("rx"))).toBeLessThan(0.002);
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
+    await dispatchCanvasClick(300);
+    expect(renderedLines()).toHaveLength(2);
+
+    await dispatchCanvasPointerActivation(700);
+    expect(renderedLines()).toHaveLength(2);
+    expect(renderedLines().item(1).getAttribute("x1")).not.toBe(
+      renderedLines().item(1).getAttribute("x2"),
+    );
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("3px");
+    expect(
+      container.querySelectorAll("[data-roof-fusion-line-endpoint]"),
+    ).toHaveLength(4);
+    await dispatchCanvasClick(700);
     expect(renderedLines()).toHaveLength(2);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
+    const saveButton = buttonWithText("Išsaugoti ir patvirtinti reviziją");
+    expect(saveButton).toBeDefined();
+    expect(saveButton!.disabled).toBe(false);
+    await act(async () => saveButton!.click());
     await act(async () => {
-      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
+      await vi.waitFor(() =>
+        expect(
+          vi
+            .mocked(fetch)
+            .mock.calls.some(
+              ([url, init]) =>
+                String(url) === "/api/admin/roof-fusion/workbench-draft" &&
+                init?.method === "POST",
+            ),
+        ).toBe(true),
+      );
       await flushAsyncWork();
     });
     expect(container.textContent).toContain("CAS revizija išsaugota");
     expect(renderedLines()).toHaveLength(2);
     expect(stage()).toBe("skeleton");
-    expect(container.textContent).toContain("150%");
+    expect(container.textContent).toContain("300%");
 
     await captureLine(350, 650);
     expect(renderedLines()).toHaveLength(3);
@@ -253,10 +321,18 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     });
     expect(renderedLines()).toHaveLength(2);
     expect(stage()).toBe("skeleton");
-    expect(container.textContent).toContain("150%");
+    expect(container.textContent).toContain("300%");
     expect(container.textContent).toContain(
       "Preview · CAS revizija išsaugota ir reload patvirtinta",
     );
+
+    await click('[data-roof-fusion-line-mode="valley"]');
+    await captureLine(400, 600);
+    expect(
+      container.querySelector('[data-roof-fusion-line-kind="valley"]'),
+    ).not.toBeNull();
+    expect(stage()).toBe("skeleton");
+    expect(container.textContent).toContain("300%");
 
     latest = null;
     await act(async () => {

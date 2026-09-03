@@ -409,16 +409,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     [draftOutline, updateOutline],
   );
 
-  const handleCanvasClick = useCallback(
-    (event: MouseEvent<SVGSVGElement>) => {
-      if (suppressCanvasClickRef.current) {
-        suppressCanvasClickRef.current = false;
-        event.preventDefault();
-        return;
-      }
-      const bounds = getCanvasBounds();
-      if (!bounds) return;
-      const point = pointFromPointer(event, bounds, viewport);
+  const activateCanvasPoint = useCallback(
+    (point: RoofFusionPoint) => {
       if (stage === "outline" && addingVertex) {
         const next = [...draftOutline];
         const nearestIndex = next.reduce(
@@ -459,9 +451,21 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       pendingLinePoint,
       stage,
       updateOutline,
-      getCanvasBounds,
-      viewport,
     ],
+  );
+
+  const handleCanvasClick = useCallback(
+    (event: MouseEvent<SVGSVGElement>) => {
+      if (suppressCanvasClickRef.current) {
+        suppressCanvasClickRef.current = false;
+        event.preventDefault();
+        return;
+      }
+      const bounds = getCanvasBounds();
+      if (!bounds) return;
+      activateCanvasPoint(pointFromPointer(event, bounds, viewport));
+    },
+    [activateCanvasPoint, getCanvasBounds, viewport],
   );
 
   const handlePointerMove = useCallback(
@@ -525,18 +529,23 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const finishPointerGesture = useCallback(
     (event: PointerEvent<SVGSVGElement>) => {
+      const ownsGesture = panGesture?.pointerId === event.pointerId;
       if (
-        panGesture?.pointerId === event.pointerId &&
+        ownsGesture &&
         event.currentTarget.hasPointerCapture?.(event.pointerId)
       ) {
         event.currentTarget.releasePointerCapture?.(event.pointerId);
       }
-      if (
-        event.type === "pointerup" &&
-        shouldSuppressRoofFusionCanvasClick({
-          moved: panGestureMovedRef.current || Boolean(panGesture?.moved),
-        })
-      ) {
+      const moved = panGestureMovedRef.current || Boolean(panGesture?.moved);
+      if (event.type === "pointerup" && ownsGesture) {
+        if (!moved) {
+          const bounds = getCanvasBounds();
+          if (bounds) {
+            activateCanvasPoint(pointFromPointer(event, bounds, viewport));
+          }
+        }
+        // Zoomed pointer activation is completed on pointerup because a
+        // preventDefault/pointer-capture sequence may not synthesize click.
         suppressCanvasClickRef.current = true;
         window.setTimeout(() => {
           suppressCanvasClickRef.current = false;
@@ -546,7 +555,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       setPanGesture(null);
       setDraggingVertex(null);
     },
-    [panGesture],
+    [activateCanvasPoint, getCanvasBounds, panGesture, viewport],
   );
 
   const handleWheel = useCallback(
@@ -689,6 +698,16 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   );
   const selectedVertexRadii = roofFusionScreenStableMarkerRadii(
     0.008,
+    canvasAspectRatio,
+    viewport.scale,
+  );
+  const lineEndpointRadii = roofFusionScreenStableMarkerRadii(
+    0.0035,
+    canvasAspectRatio,
+    viewport.scale,
+  );
+  const pendingLinePointRadii = roofFusionScreenStableMarkerRadii(
+    0.0045,
     canvasAspectRatio,
     viewport.scale,
   );
@@ -912,7 +931,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       strokeDasharray={
                         line.id === "pending-line" ? ".012 .009" : undefined
                       }
-                      strokeWidth=".008"
+                      strokeWidth={line.id === "pending-line" ? "2px" : "3px"}
                       vectorEffect="non-scaling-stroke"
                       x1={line.start.x}
                       x2={line.end.x}
@@ -920,6 +939,23 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       y2={line.end.y}
                     />
                   ))}
+                  {draftLines.flatMap((line) =>
+                    ([line.start, line.end] as const).map((point, index) => (
+                      <ellipse
+                        cx={point.x}
+                        cy={point.y}
+                        data-roof-fusion-line-endpoint={`${line.id}:${index}`}
+                        fill={line.kind === "ridge" ? "#f8d164" : "#8cb8ff"}
+                        key={`${line.id}:endpoint:${index}`}
+                        pointerEvents="none"
+                        rx={lineEndpointRadii.rx}
+                        ry={lineEndpointRadii.ry}
+                        stroke="#0b111a"
+                        strokeWidth=".002"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )),
+                  )}
                   {obstacles.map((obstacle) => (
                     <circle
                       cx={obstacle.point.x}
@@ -988,13 +1024,16 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   </g>
                 ))}
               {pendingLinePoint && (
-                <circle
+                <ellipse
                   cx={pendingLinePoint.x}
                   cy={pendingLinePoint.y}
+                  data-roof-fusion-pending-line-point
                   fill="#fff"
-                  r=".014"
+                  pointerEvents="none"
+                  rx={pendingLinePointRadii.rx}
+                  ry={pendingLinePointRadii.ry}
                   stroke="#e8a317"
-                  strokeWidth=".006"
+                  strokeWidth=".003"
                   vectorEffect="non-scaling-stroke"
                 />
               )}
