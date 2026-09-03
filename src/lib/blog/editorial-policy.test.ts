@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   availablePostLocales,
+  isSubstantiveBlogSourceUrl,
   prepareAdminPublication,
   prepareEditorialPost,
   validateEditorialPost,
@@ -190,6 +191,41 @@ describe("blog editorial policy", () => {
         reviewerName: "Kontrollør",
         reviewedAt: "2026-08-23T10:00:00.000Z",
         sources: [{ url: "https://www.sintef.no/" }],
+      }),
+    ).toThrow(/Minst én presis kilde/);
+  });
+
+  it("does not treat the generic TEK17 index as substantive evidence", () => {
+    expect(
+      isSubstantiveBlogSourceUrl(
+        "https://www.dibk.no/regelverk/byggteknisk-forskrift-tek17",
+      ),
+    ).toBe(false);
+    expect(
+      isSubstantiveBlogSourceUrl(
+        "https://dibk.no/regelverk/byggteknisk-forskrift-tek17/?preview=1",
+      ),
+    ).toBe(false);
+    expect(
+      isSubstantiveBlogSourceUrl(
+        "https://www.dibk.no/regelverk/byggteknisk-forskrift-tek17/13/vi/13-12",
+      ),
+    ).toBe(true);
+
+    expect(() =>
+      prepareEditorialPost(null, {
+        _status: "published",
+        editorialStatus: "approved",
+        titleNo: "Norsk",
+        contentNo: "Innhold",
+        authorName: "Fagperson",
+        reviewerName: "Kontrollør",
+        reviewedAt: "2026-09-03T10:00:00.000Z",
+        sources: [
+          {
+            url: "https://www.dibk.no/regelverk/byggteknisk-forskrift-tek17",
+          },
+        ],
       }),
     ).toThrow(/Minst én presis kilde/);
   });

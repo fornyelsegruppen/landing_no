@@ -51,7 +51,8 @@ const rawDatabaseUrl = process.env.DATABASE_URL || "file:./takfornying.db";
 // the `?` delimiter and corrupt the database name.
 const databaseUrl = rawDatabaseUrl;
 const usePostgres = databaseUrl.startsWith("postgres");
-const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+const publicMediaBlobToken =
+  process.env.PUBLIC_MEDIA_BLOB_READ_WRITE_TOKEN?.trim();
 const resendApiKey = process.env.RESEND_API_KEY?.trim();
 
 function payloadFromAddress() {
@@ -192,11 +193,13 @@ export default buildConfig({
   sharp,
   plugins: [
     vercelBlobStorage({
-      enabled: Boolean(blobToken),
+      // Payload's adapter writes public assets only. Never pass the private
+      // customer-document store token to this public media collection.
+      enabled: Boolean(publicMediaBlobToken),
       collections: {
         media: true,
       },
-      token: blobToken,
+      token: publicMediaBlobToken,
       // Bypass Vercel 4.5MB serverless body limit — upload goes client → Blob.
       clientUploads: true,
       addRandomSuffix: true,

@@ -120,6 +120,26 @@ export function isPreciseSourceUrl(url: string | null | undefined) {
   }
 }
 
+const genericSourceKeys = new Set([
+  "dibk.no/regelverk/byggteknisk-forskrift-tek17",
+]);
+
+function normalizedSourceKey(url: string) {
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  const path = parsed.pathname.toLowerCase().replace(/\/$/, "");
+  return `${host}${path}`;
+}
+
+export function isSubstantiveBlogSourceUrl(url: string | null | undefined) {
+  if (!isPreciseSourceUrl(url)) return false;
+  try {
+    return !genericSourceKeys.has(normalizedSourceKey(url || ""));
+  } catch {
+    return false;
+  }
+}
+
 export function publicationReadinessErrors(post: EditorialPost): string[] {
   const errors: string[] = [];
   const alreadyPublished =
@@ -149,7 +169,7 @@ export function publicationReadinessErrors(post: EditorialPost): string[] {
   }
 
   const preciseSourceCount = (post.sources || []).filter((source) =>
-    isPreciseSourceUrl(source?.url),
+    isSubstantiveBlogSourceUrl(source?.url),
   ).length;
   if (preciseSourceCount < 1) {
     errors.push("Minst én presis kilde må være lagt inn før publisering");

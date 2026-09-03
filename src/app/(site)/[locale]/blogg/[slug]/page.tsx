@@ -18,13 +18,14 @@ import {
 import { resolvePostImage } from "@/lib/blog/post-image";
 import { resolveMedia } from "@/lib/cms-content";
 import { redirectPathCandidates } from "@/lib/content-paths";
-import { siteConfig, type Locale } from "@/lib/site";
+import type { Locale } from "@/lib/site";
 import { safeContentHref } from "@/lib/safe-content-link";
 import { getSeoServiceHref } from "@/content/seo-landing-pages";
 import { blogPostLanguageUrls } from "@/lib/blog/routing";
 import { guideLabels } from "@/lib/public-navigation";
 import { publicRelatedPosts } from "@/lib/blog/related-posts";
 import { publicReviewerName } from "@/lib/blog/reviewer";
+import { canonicalBlogUrl, publicSeoOrigin } from "@/lib/blog/canonical";
 
 export const revalidate = 60;
 
@@ -56,12 +57,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const localized = localizeContent(post, loc);
   const hero = resolvePostImage(post, "hero", localized.title);
   const { isEnabled: isDraftMode } = await draftMode();
-  const postUrl = `${siteConfig.url}/${locale}/blogg/${slug}`;
+  const postUrl = canonicalBlogUrl(loc, slug);
   const heroUrl = hero
-    ? new URL(hero.url, siteConfig.url).toString()
+    ? new URL(hero.url, publicSeoOrigin).toString()
     : undefined;
   const availableLocales = availablePostLocales(post);
-  const languageUrls = blogPostLanguageUrls(post, siteConfig.url);
+  const languageUrls = blogPostLanguageUrls(post, publicSeoOrigin);
 
   return {
     title: localized.seoTitle,
@@ -71,7 +72,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       languages: {
         ...languageUrls,
         ...(availableLocales.includes("no")
-          ? { "x-default": `${siteConfig.url}/no/blogg/${slug}` }
+          ? { "x-default": canonicalBlogUrl("no", slug) }
           : {}),
       },
     },
@@ -169,9 +170,9 @@ export default async function BlogPostPage({ params }: Props) {
           }
         : null;
   const date = post.publishedAt || post.createdAt;
-  const postUrl = `${siteConfig.url}/${locale}/blogg/${slug}`;
+  const postUrl = canonicalBlogUrl(loc, slug);
   const heroUrl = hero
-    ? new URL(hero.url, siteConfig.url).toString()
+    ? new URL(hero.url, publicSeoOrigin).toString()
     : undefined;
   const reviewedDate = post.reviewedAt || post.updatedAt;
   const reviewerName = publicReviewerName(post.reviewerName);
@@ -211,12 +212,12 @@ export default async function BlogPostPage({ params }: Props) {
         author: {
           "@type": "Person",
           name: post.authorName,
-          worksFor: { "@id": `${siteConfig.url}/#organization` },
+          worksFor: { "@id": `${publicSeoOrigin}/#organization` },
         },
         reviewedBy: reviewerName
           ? { "@type": "Person", name: reviewerName }
           : undefined,
-        publisher: { "@id": `${siteConfig.url}/#organization` },
+        publisher: { "@id": `${publicSeoOrigin}/#organization` },
       },
       {
         "@type": "WebPage",
@@ -225,7 +226,7 @@ export default async function BlogPostPage({ params }: Props) {
         description: localized.seoDescription,
         url: postUrl,
         inLanguage: loc === "no" ? "nb-NO" : "en",
-        isPartOf: { "@id": `${siteConfig.url}/${locale}/blogg#collection` },
+        isPartOf: { "@id": `${publicSeoOrigin}/${locale}/blogg#collection` },
         breadcrumb: { "@id": `${postUrl}#breadcrumb` },
       },
       {
@@ -236,13 +237,13 @@ export default async function BlogPostPage({ params }: Props) {
             "@type": "ListItem",
             position: 1,
             name: loc === "no" ? "Forside" : "Home",
-            item: `${siteConfig.url}/${locale}`,
+            item: `${publicSeoOrigin}/${locale}`,
           },
           {
             "@type": "ListItem",
             position: 2,
             name: guideLabels[loc],
-            item: `${siteConfig.url}/${locale}/blogg`,
+            item: `${publicSeoOrigin}/${locale}/blogg`,
           },
           {
             "@type": "ListItem",

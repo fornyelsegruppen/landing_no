@@ -6,10 +6,87 @@ type Props = {
   locale?: "no" | "en";
 };
 
-function inlineMarkdown(
-  value: string,
-  locale: "no" | "en",
-): ReactNode[] {
+export type MarkdownBlock =
+  | { type: "heading"; level: 2 | 3; content: string }
+  | { type: "paragraph"; content: string }
+  | { type: "unordered-list"; items: string[] }
+  | { type: "ordered-list"; items: string[] }
+  | { type: "blockquote"; content: string };
+
+export function parseMarkdownBlocks(content: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let unordered: string[] = [];
+  let ordered: string[] = [];
+  let quote: string[] = [];
+
+  function flush() {
+    if (paragraph.length) {
+      blocks.push({ type: "paragraph", content: paragraph.join(" ") });
+      paragraph = [];
+    }
+    if (unordered.length) {
+      blocks.push({ type: "unordered-list", items: unordered });
+      unordered = [];
+    }
+    if (ordered.length) {
+      blocks.push({ type: "ordered-list", items: ordered });
+      ordered = [];
+    }
+    if (quote.length) {
+      blocks.push({ type: "blockquote", content: quote.join(" ") });
+      quote = [];
+    }
+  }
+
+  for (const rawLine of content.replace(/\r\n?/g, "\n").split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+
+    const heading = line.match(/^(#{2,3})\s+(.+)$/);
+    if (heading) {
+      flush();
+      blocks.push({
+        type: "heading",
+        level: heading[1]?.length === 3 ? 3 : 2,
+        content: heading[2] || "",
+      });
+      continue;
+    }
+
+    const unorderedItem = line.match(/^[-*]\s+(.+)$/);
+    if (unorderedItem) {
+      if (paragraph.length || ordered.length || quote.length) flush();
+      unordered.push(unorderedItem[1] || "");
+      continue;
+    }
+
+    const orderedItem = line.match(/^\d+\.\s+(.+)$/);
+    if (orderedItem) {
+      if (paragraph.length || unordered.length || quote.length) flush();
+      ordered.push(orderedItem[1] || "");
+      continue;
+    }
+
+    const quoteLine = line.match(/^>\s?(.+)$/);
+    if (quoteLine) {
+      if (paragraph.length || unordered.length || ordered.length) flush();
+      quote.push(quoteLine[1] || "");
+      continue;
+    }
+
+    if (unordered.length || ordered.length || quote.length) flush();
+    paragraph.push(line);
+  }
+
+  flush();
+  return blocks;
+}
+
+function inlineMarkdown(value: string, locale: "no" | "en"): ReactNode[] {
   const pattern = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
   return value.split(pattern).map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
@@ -23,10 +100,12 @@ function inlineMarkdown(
       const external = /^https?:\/\//.test(href);
       return (
         <a
-          className="text-accent underline decoration-accent/40 underline-offset-4 hover:text-accent-hover"
+          className="text-accent decoration-accent/40 hover:text-accent-hover underline underline-offset-4"
           href={href}
           key={index}
-          {...(external ? { rel: "noopener noreferrer", target: "_blank" } : {})}
+          {...(external
+            ? { rel: "noopener noreferrer", target: "_blank" }
+            : {})}
         >
           {link[1]}
         </a>
@@ -38,90 +117,73 @@ function inlineMarkdown(
 }
 
 export function MarkdownLite({ content, locale = "no" }: Props) {
-  const blocks = content.split(/\n{2,}/);
+  const blocks = parseMarkdownBlocks(content);
 
   return (
     <div className="space-y-5">
       {blocks.map((block, index) => {
-        const trimmed = block.trim();
-        if (!trimmed) return null;
-
-        if (trimmed.startsWith("### ")) {
+        if (block.type === "heading" && block.level === 3) {
           return (
             <h3
               key={index}
-              className="pt-3 text-xl font-semibold tracking-tight text-foreground"
+              className="text-foreground pt-3 text-xl font-semibold tracking-tight"
             >
-              {inlineMarkdown(trimmed.replace(/^###\s+/, ""), locale)}
+              {inlineMarkdown(block.content, locale)}
             </h3>
           );
         }
 
-        if (trimmed.startsWith("## ")) {
+        if (block.type === "heading") {
           return (
             <h2
               key={index}
-              className="pt-5 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+              className="text-foreground pt-5 text-2xl font-semibold tracking-tight sm:text-3xl"
             >
-              {inlineMarkdown(trimmed.replace(/^##\s+/, ""), locale)}
+              {inlineMarkdown(block.content, locale)}
             </h2>
           );
         }
 
-        const lines = trimmed.split("\n");
-        if (lines.every((line) => line.trimStart().startsWith("- "))) {
+        if (block.type === "unordered-list") {
           return (
             <ul
               key={index}
-              className="list-disc space-y-2 pl-6 text-muted-foreground"
+              className="text-muted-foreground list-disc space-y-2 pl-6"
             >
-              {lines.map((line, lineIndex) => (
-                <li key={lineIndex}>
-                  {inlineMarkdown(
-                    line.trimStart().replace(/^-\s+/, ""),
-                    locale,
-                  )}
-                </li>
+              {block.items.map((item, lineIndex) => (
+                <li key={lineIndex}>{inlineMarkdown(item, locale)}</li>
               ))}
             </ul>
           );
         }
 
-        if (lines.every((line) => /^\s*\d+\.\s+/.test(line))) {
+        if (block.type === "ordered-list") {
           return (
             <ol
               key={index}
-              className="list-decimal space-y-2 pl-6 text-muted-foreground"
+              className="text-muted-foreground list-decimal space-y-2 pl-6"
             >
-              {lines.map((line, lineIndex) => (
-                <li key={lineIndex}>
-                  {inlineMarkdown(line.replace(/^\s*\d+\.\s+/, ""), locale)}
-                </li>
+              {block.items.map((item, lineIndex) => (
+                <li key={lineIndex}>{inlineMarkdown(item, locale)}</li>
               ))}
             </ol>
           );
         }
 
-        if (lines.every((line) => line.trimStart().startsWith("> "))) {
+        if (block.type === "blockquote") {
           return (
             <blockquote
               key={index}
-              className="border-l-2 border-accent pl-5 italic text-muted-foreground"
+              className="border-accent text-muted-foreground border-l-2 pl-5 italic"
             >
-              {inlineMarkdown(
-                lines.map((line) => line.replace(/^\s*>\s?/, "")).join(" "),
-                locale,
-              )}
+              {inlineMarkdown(block.content, locale)}
             </blockquote>
           );
         }
 
         return (
-          <p
-            key={index}
-            className="whitespace-pre-line leading-8 text-muted-foreground"
-          >
-            {inlineMarkdown(trimmed, locale)}
+          <p key={index} className="text-muted-foreground leading-8">
+            {inlineMarkdown(block.content, locale)}
           </p>
         );
       })}
