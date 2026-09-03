@@ -491,7 +491,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         metrics?.horizontalAreaSquareMeters ?? horizontalAreaSquareMeters
       }
       initialLayers={{ approvedOutline: true, sourceOutline: true }}
-      key={`${capture.sourceId}:${confirmed?.draftHash ?? "unsaved"}`}
+      key={`${capture.sourceId ?? "missing-source"}:${capture.rawContentHash ?? "missing-content-hash"}`}
       lines={lines}
       onLineCapture={(line) => {
         setLines((current) => [...current, line]);
