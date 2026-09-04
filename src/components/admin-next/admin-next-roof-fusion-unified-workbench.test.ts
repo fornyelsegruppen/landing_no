@@ -9,15 +9,20 @@ import {
   MIN_ROOF_FUSION_ZOOM,
   ROOF_FUSION_PENDING_LINE_STROKE,
   ROOF_FUSION_ONE_CARD_STEPS,
+  ROOF_FUSION_SKELETON_ENDPOINT_CENTER_RADIUS,
   ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
+  ROOF_FUSION_SKELETON_HIT_RADIUS,
+  ROOF_FUSION_SKELETON_HIT_STROKE,
   ROOF_FUSION_SKELETON_LINE_STROKE,
   ROOF_FUSION_STAGES,
   clampRoofFusionPoint,
   clampRoofFusionViewport,
+  constrainRoofFusionDraggedEndpoint,
   hasRoofFusionPanGestureMoved,
   panRoofFusionViewport,
   roofFusionEndpointConstraintMetric,
   roofFusionImagePointFromViewportPoint,
+  roofFusionLineJunctionTargets,
   roofFusionScreenStableMarkerRadii,
   shouldHandleRoofFusionZoomWheel,
   shouldSuppressRoofFusionCanvasClick,
@@ -69,6 +74,79 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     ).toEqual(DEFAULT_ROOF_FUSION_VIEWPORT);
     expect(MIN_ROOF_FUSION_ZOOM).toBe(1);
     expect(MAX_ROOF_FUSION_ZOOM).toBe(4);
+  });
+
+  it("keeps endpoint drag inside the roof and uses screen-space boundary and junction magnets", () => {
+    const outline = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.9, y: 0.9 },
+      { x: 0.1, y: 0.9 },
+    ];
+    const metricAtOneX = {
+      xPixelsPerImageUnit: 1_000,
+      yPixelsPerImageUnit: 500,
+      maxDistancePixels: 14,
+    };
+    const metricAtThreeX = {
+      xPixelsPerImageUnit: 3_000,
+      yPixelsPerImageUnit: 1_500,
+      maxDistancePixels: 14,
+    };
+
+    expect(
+      constrainRoofFusionDraggedEndpoint(
+        { x: 0.5, y: 0.5 },
+        outline,
+        [],
+        metricAtOneX,
+      ),
+    ).toEqual({ x: 0.5, y: 0.5 });
+    expect(
+      constrainRoofFusionDraggedEndpoint(
+        { x: 0.95, y: 0.5 },
+        outline,
+        [],
+        metricAtOneX,
+      ),
+    ).toEqual({ x: 0.9, y: 0.5 });
+    expect(
+      constrainRoofFusionDraggedEndpoint(
+        { x: 0.104, y: 0.5 },
+        outline,
+        [],
+        metricAtThreeX,
+      ),
+    ).toEqual({ x: 0.1, y: 0.5 });
+    expect(
+      constrainRoofFusionDraggedEndpoint(
+        { x: 0.504, y: 0.5 },
+        outline,
+        [{ x: 0.5, y: 0.5 }],
+        metricAtThreeX,
+      ),
+    ).toEqual({ x: 0.5, y: 0.5 });
+
+    const junctionTargets = roofFusionLineJunctionTargets(
+      [
+        {
+          id: "horizontal",
+          kind: "ridge",
+          start: { x: 0.2, y: 0.5 },
+          end: { x: 0.8, y: 0.5 },
+        },
+        {
+          id: "vertical",
+          kind: "valley",
+          start: { x: 0.5, y: 0.2 },
+          end: { x: 0.5, y: 0.8 },
+        },
+      ],
+      undefined,
+      { x: 0.504, y: 0.6 },
+    );
+    expect(junctionTargets).toContainEqual({ x: 0.5, y: 0.5 });
+    expect(junctionTargets).toContainEqual({ x: 0.5, y: 0.6 });
   });
 
   it("keeps the image point under the zoom anchor and maps panned pointers back exactly", () => {
@@ -196,7 +274,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).not.toContain("data-roof-fusion-legacy-fallback-slot");
   });
 
-  it("places the change-building action beside progress without hiding it in Advanced", () => {
+  it("makes completed progress steps reachable while future steps stay unavailable", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
         onChangeBuilding: () => undefined,
@@ -207,9 +285,37 @@ describe("Admin Next unified Roof Fusion workbench", () => {
 
     expect(html).toContain("data-roof-fusion-one-card-progress");
     expect(html).toContain("data-roof-fusion-change-building");
-    expect(html).toContain("← Keisti pastatą");
+    expect(html).toContain("Grįžti į žingsnį Objektas");
+    expect(html).toContain(
+      'data-roof-fusion-one-card-step="object" data-roof-fusion-one-card-step-state="reachable"',
+    );
+    expect(html).toContain(
+      'data-roof-fusion-one-card-step="refine" data-roof-fusion-one-card-step-state="active" disabled=""',
+    );
+    expect(html).toContain(
+      'data-roof-fusion-one-card-step="result" data-roof-fusion-one-card-step-state="future" disabled=""',
+    );
     expect(html.indexOf("data-roof-fusion-change-building")).toBeLessThan(
       html.indexOf("data-roof-fusion-advanced-trigger"),
+    );
+
+    const reviewHtml = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        initialStage: "review",
+        onChangeBuilding: () => undefined,
+        onEditResult: () => undefined,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        sourceOutline,
+      }),
+    );
+    expect(reviewHtml).toContain(
+      'data-roof-fusion-one-card-step="object" data-roof-fusion-one-card-step-state="reachable"',
+    );
+    expect(reviewHtml).toContain(
+      'data-roof-fusion-one-card-step="refine" data-roof-fusion-one-card-step-state="reachable"',
+    );
+    expect(reviewHtml).toContain(
+      'data-roof-fusion-one-card-step="result" data-roof-fusion-one-card-step-state="active" disabled=""',
     );
   });
 
@@ -270,13 +376,16 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       MAX_ROOF_FUSION_ZOOM,
     );
 
-    expect(atOneX.rx).toBe(0.0025);
+    expect(atOneX.rx).toBe(0.003);
     expect(atThreeX.rx * 3).toBeCloseTo(atOneX.rx);
     expect(atThreeX.ry * 3).toBeCloseTo(atOneX.ry);
     expect(atMaxZoom.rx * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.rx);
     expect(atMaxZoom.ry * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.ry);
-    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("1.5px");
-    expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("1.5px");
+    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("1px");
+    expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("1px");
+    expect(ROOF_FUSION_SKELETON_ENDPOINT_CENTER_RADIUS).toBe(0.0015);
+    expect(ROOF_FUSION_SKELETON_HIT_RADIUS).toBe(0.022);
+    expect(ROOF_FUSION_SKELETON_HIT_STROKE).toBe("22px");
   });
 
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {
@@ -315,10 +424,23 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).toContain('data-roof-fusion-layer="skeleton"');
     expect(html).toContain('data-roof-fusion-line-kind="ridge"');
-    expect(html).toContain('stroke-width="1.5px"');
-    expect(html).toContain('data-roof-fusion-line-endpoint="ridge-a:0"');
-    expect(html).toContain('rx="0.0025"');
     expect(html).toContain('stroke-width="1px"');
+    expect(html).toContain('data-roof-fusion-line-hit-target="ridge-a"');
+    expect(html).toContain('stroke="transparent"');
+    expect(html).toContain('stroke-width="22px"');
+    expect(html).toContain('data-roof-fusion-line-endpoint="ridge-a:0"');
+    expect(html).toContain(
+      'data-roof-fusion-line-endpoint-hit-target="ridge-a:0"',
+    );
+    expect(html).toContain(
+      'data-roof-fusion-line-endpoint-outline="ridge-a:0" fill="#fffdf7"',
+    );
+    expect(html).toContain(
+      'data-roof-fusion-line-endpoint-center="ridge-a:0" fill="#e8a317"',
+    );
+    expect(html).toContain('rx="0.003"');
+    expect(html).toContain('rx="0.0015"');
+    expect(html).toContain('rx="0.022"');
     expect(html).toContain('data-roof-fusion-vertex-hit-target="0"');
     expect(html).toContain('rx="0.022"');
     expect(html).toContain('data-roof-fusion-obstacle="chimney"');

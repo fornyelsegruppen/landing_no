@@ -421,7 +421,10 @@ describe("Roof Fusion one-card Preview flow", () => {
     const changeBuilding = container.querySelector<HTMLButtonElement>(
       "[data-roof-fusion-change-building]",
     );
-    expect(changeBuilding?.textContent).toContain("← Keisti pastatą");
+    expect(changeBuilding?.textContent).toContain("01Objektas");
+    expect(changeBuilding?.getAttribute("aria-label")).toBe(
+      "Grįžti į žingsnį Objektas",
+    );
     expect(
       container
         .querySelector("[data-roof-fusion-one-card-progress]")

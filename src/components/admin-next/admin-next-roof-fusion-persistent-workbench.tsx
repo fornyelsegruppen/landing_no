@@ -974,8 +974,26 @@ export function AdminNextRoofFusionPersistentWorkbench({
         setHeightResult(null);
         setLegacyFallback(null);
       }}
+      onLineChange={(changedLine) => {
+        setLines((current) =>
+          current.map((line) =>
+            line.id === changedLine.id ? changedLine : line,
+          ),
+        );
+        setDirty(true);
+        setConfirmed(null);
+        setHeightResult(null);
+        setLegacyFallback(null);
+      }}
       onLastLineUndo={() => {
         setLines((current) => current.slice(0, -1));
+        setDirty(true);
+        setConfirmed(null);
+        setHeightResult(null);
+        setLegacyFallback(null);
+      }}
+      onLinesClear={() => {
+        setLines([]);
         setDirty(true);
         setConfirmed(null);
         setHeightResult(null);

@@ -414,6 +414,129 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
     ).toBe("ridge");
+    expect(container.textContent).toContain("Atkurtas ankstesnis žymėjimas");
+    expect(container.textContent).toContain("kraigai: 1 · slėniai: 0");
+  });
+
+  it("clears restored lines only from the dirty draft and reloads the confirmed revision", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+
+    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+    await click("[data-roof-fusion-redraw-lines]");
+    expect(stage()).toBe("skeleton");
+    expect(
+      container.querySelector("[data-roof-fusion-clear-lines-confirmation]"),
+    ).not.toBeNull();
+    await click("[data-roof-fusion-confirm-clear-lines]");
+
+    expect(renderedLines()).toHaveLength(0);
+    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+    expect(container.textContent).toContain(
+      "Linijos pašalintos tik iš neišsaugoto juodraščio",
+    );
+    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+
+    await openAdvanced();
+    await act(async () => {
+      buttonWithText("Perkrauti")!.click();
+      await flushAsyncWork();
+    });
+    expect(renderedLines()).toHaveLength(1);
+    expect(container.textContent).toContain("Atkurtas ankstesnis žymėjimas");
+    expect(stage()).toBe("skeleton");
+  });
+
+  it("drags a saved endpoint live with touch at 300% and fences it to the approved outline", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    const canvasShell = container.querySelector<HTMLDivElement>(
+      "[data-roof-fusion-canvas-shell]",
+    );
+    expect(canvasShell).not.toBeNull();
+    canvasShell!.getBoundingClientRect = () =>
+      ({
+        bottom: 500,
+        height: 500,
+        left: 0,
+        right: 1_000,
+        top: 0,
+        width: 1_000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    expect(container.textContent).toContain("300%");
+
+    const endpoint = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    const ridge = () =>
+      container.querySelector<SVGLineElement>(
+        '[data-roof-fusion-line-kind="ridge"]',
+      );
+    expect(endpoint).not.toBeNull();
+    expect(ridge()?.getAttribute("x1")).toBe("0.45");
+    await act(async () => {
+      endpoint!.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 350,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 41,
+          pointerType: "touch",
+        }),
+      );
+      endpoint!.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          button: 0,
+          clientX: 0,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 41,
+          pointerType: "touch",
+        }),
+      );
+    });
+
+    expect(ridge()?.getAttribute("x1")).toBe("0.4");
+    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+    const movedEndpoint = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    await act(async () => {
+      movedEndpoint!.dispatchEvent(
+        new PointerEvent("pointerup", {
+          bubbles: true,
+          button: 0,
+          clientX: 0,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 41,
+          pointerType: "touch",
+        }),
+      );
+    });
+    expect(ridge()?.getAttribute("x1")).toBe("0.4");
+    expect(container.textContent).toContain(
+      "Linijos galinis taškas patikslintas",
+    );
+    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).toBeNull();
   });
 
   it("carries persisted annotations across a same-footprint capture refresh", async () => {
@@ -822,6 +945,18 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       container.querySelector('[data-roof-fusion-line-kind="ridge"]'),
     ).not.toBeNull();
     expect(renderedLines()).toHaveLength(2);
+    expect(container.textContent).toContain("Nubrėžta: 1 slėnis");
+    expect(
+      container
+        .querySelector('[data-roof-fusion-line-mode="valley"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(buttonWithText("Dar vienas slėnis")).toBeDefined();
+    await clickCanvasAt(500);
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).toBeNull();
+    expect(renderedLines()).toHaveLength(2);
 
     await click('[data-roof-fusion-line-mode="ridge"]');
     await clickCanvasAt(10);
@@ -899,9 +1034,12 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe("0.4");
     await activateCanvasPoint(788);
     expect(renderedLines()).toHaveLength(2);
-    expect(container.textContent).toContain(
-      "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
-    );
+    expect(container.textContent).toContain("Nubrėžta: 2 kraigai");
+    expect(
+      container
+        .querySelector('[data-roof-fusion-line-mode="ridge"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("false");
 
     await click("[data-roof-fusion-undo-last-line]");
 
@@ -969,7 +1107,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(pendingMarker).not.toBeNull();
     expect(pendingMarker!.getAttribute("cx")).toBe("0.4");
     expect(Number(pendingMarker!.getAttribute("rx"))).toBeLessThan(0.002);
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1.5px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1px");
     expect(container.textContent).toContain(
       "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
     );
@@ -981,10 +1119,32 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(renderedLines().item(1).getAttribute("x1")).not.toBe(
       renderedLines().item(1).getAttribute("x2"),
     );
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1.5px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1px");
     expect(
       container.querySelectorAll("[data-roof-fusion-line-endpoint]"),
     ).toHaveLength(4);
+    const endpointOutline = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-outline]",
+    );
+    const endpointCenter = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-center]",
+    );
+    const endpointHitTarget = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    expect(Number(endpointOutline?.getAttribute("rx")) * 3).toBeCloseTo(0.003);
+    expect(endpointOutline?.getAttribute("fill")).toBe("#fffdf7");
+    expect(Number(endpointCenter?.getAttribute("rx")) * 3).toBeCloseTo(0.0015);
+    expect(endpointCenter?.getAttribute("fill")).toBe("#e8a317");
+    expect(Number(endpointHitTarget?.getAttribute("rx")) * 3).toBeCloseTo(
+      0.022,
+    );
+    expect(endpointHitTarget?.getAttribute("pointer-events")).toBe("all");
+    expect(
+      container
+        .querySelector("[data-roof-fusion-line-hit-target]")
+        ?.getAttribute("stroke-width"),
+    ).toBe("22px");
     await dispatchCanvasClick(700);
     expect(renderedLines()).toHaveLength(2);
     expect(
@@ -1028,6 +1188,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
 
+    await click('[data-roof-fusion-line-mode="ridge"]');
     await captureLine(350, 650);
     expect(renderedLines()).toHaveLength(3);
     expect(
