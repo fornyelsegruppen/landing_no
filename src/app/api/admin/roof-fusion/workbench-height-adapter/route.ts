@@ -13,6 +13,7 @@ import {
 import { PayloadRoofFusionWorkbenchDraftRepositoryV1 } from "@/lib/roof-fusion/workbench-draft-repository-v1";
 import { userIsAdmin } from "@/payload/access/roles";
 import { RoofSourceIntegrityError } from "@/lib/roof-fusion/source-adapter-v1";
+import { projectRoofFusionWorkbenchDetailedResultV1 } from "@/lib/roof-fusion/workbench-detailed-result-v1";
 
 const identifier = z
   .string()
@@ -171,6 +172,9 @@ export async function POST(request: Request) {
         pricingReady: false,
         summary: result.summary,
         metrics: responseMetrics(result),
+        detailedResult: projectRoofFusionWorkbenchDetailedResultV1(
+          result.snapshot,
+        ),
         snapshot: {
           snapshotId: result.snapshot.snapshotId,
           state: result.snapshot.state,

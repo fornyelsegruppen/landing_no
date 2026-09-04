@@ -33,6 +33,24 @@ const storedDraft = {
   actor: { actorId: "7" },
 };
 
+const confidence = {
+  level: "medium",
+  score: 0.72,
+  basis: "derived",
+  rationale: "Test fixture confidence",
+};
+
+function measurement(unit: "m" | "m2" | "deg", value: number) {
+  return {
+    mode: "exact",
+    unit,
+    min: value,
+    max: value,
+    sourceRefs: ["source-1"],
+    confidence,
+  };
+}
+
 vi.mock("@/lib/payload", () => ({
   getPayload: vi.fn(async () => ({ auth: mocks.auth })),
 }));
@@ -92,18 +110,82 @@ describe("POST /api/admin/roof-fusion/workbench-height-adapter", () => {
       summary: { status: "review_required", pricingReady: false, blockers: [] },
       snapshot: {
         snapshotId: "snapshot-1",
+        snapshotHash: "b".repeat(64),
+        revision: 2,
         state: "review_required",
-        measurement: { class: "preliminary" },
+        measurement: {
+          method: "manual_workbench",
+          class: "preliminary",
+          confidence,
+        },
         totals: {
-          grossHorizontalArea: { min: 100, max: 100 },
-          grossSurfaceArea: { min: 112, max: 112 },
-          footprintPerimeter: { min: 42, max: 42 },
+          grossHorizontalArea: measurement("m2", 100),
+          grossSurfaceArea: measurement("m2", 112),
+          netSurfaceArea: measurement("m2", 109),
+          footprintPerimeter: measurement("m", 42),
         },
         geometry: {
           surfaces: [
             {
-              pitch: { min: 26, max: 26 },
-              grossSurfaceArea: { min: 112, max: 112 },
+              surfaceId: "surface-1",
+              outerContourId: "contour-1",
+              openingIds: [],
+              edgeIds: ["edge-1"],
+              azimuthDegrees: 180,
+              pitch: measurement("deg", 26),
+              grossHorizontalArea: measurement("m2", 100),
+              grossSurfaceArea: measurement("m2", 112),
+              netSurfaceArea: measurement("m2", 109),
+              quality: "estimated",
+              sourceRefs: ["source-1"],
+            },
+          ],
+          edges: [
+            {
+              edgeId: "edge-1",
+              fromVertexId: "vertex-1",
+              toVertexId: "vertex-2",
+              adjacentSurfaceIds: ["surface-1"],
+              type: "eave",
+              length2d: measurement("m", 10),
+              length3d: measurement("m", 10),
+              gutterCandidate: true,
+              quality: "estimated",
+              sourceRefs: ["source-1"],
+            },
+          ],
+        },
+        provenance: {
+          sources: [
+            {
+              sourceId: "source-1",
+              kind: "lidar",
+              provider: "Kartverket",
+              retrievedAt: "2026-09-04T08:00:00.000Z",
+              rawContentHash: "c".repeat(64),
+              license: {
+                status: "authorized",
+                name: "NLOD 2.0",
+                attribution: "Kartverket",
+              },
+              visibility: "customer_safe",
+              quality: {
+                status: "usable",
+                score: 0.9,
+                reasons: ["Test fixture"],
+              },
+            },
+          ],
+          observations: [
+            {
+              observationId: "observation-1",
+              kind: "surface_pitch",
+              targetRef: "surface-1",
+              value: 26,
+              status: "accepted",
+              sourceRefs: ["source-1"],
+              confidence,
+              reasons: ["Test fixture"],
             },
           ],
         },
@@ -121,6 +203,37 @@ describe("POST /api/admin/roof-fusion/workbench-height-adapter", () => {
         totalSurfaceAreaSquareMeters: 112,
         averageSlopeDegrees: 26,
         footprintPerimeterMeters: 42,
+      },
+      detailedResult: {
+        schemaVersion: "roof-fusion-workbench-detailed-result.v1",
+        usage: "preview_only",
+        pricingReady: false,
+        snapshot: {
+          snapshotId: "snapshot-1",
+          snapshotHash: "b".repeat(64),
+          revision: 2,
+        },
+        surfaces: [
+          {
+            surfaceId: "surface-1",
+            edgeIds: ["edge-1"],
+            pitch: { min: 26, max: 26, confidence },
+          },
+        ],
+        edges: [
+          {
+            edgeId: "edge-1",
+            type: "eave",
+            adjacentSurfaceIds: ["surface-1"],
+          },
+        ],
+        sources: [
+          {
+            sourceId: "source-1",
+            provider: "Kartverket",
+            rawContentHash: "c".repeat(64),
+          },
+        ],
       },
     });
     expect(mocks.readDraft).toHaveBeenCalledWith("lead:13", "draft-1");
