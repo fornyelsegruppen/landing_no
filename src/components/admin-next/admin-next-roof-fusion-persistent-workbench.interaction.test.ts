@@ -637,11 +637,28 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
     ).toBe("ridge");
-    expect(container.textContent).toContain("Atkurtas ankstesnis žymėjimas");
+    expect(container.textContent).toContain(
+      "Atkurti ankstesni nebaigto matavimo pakeitimai",
+    );
     expect(container.textContent).toContain("kraigų: 1 · sąlajų: 0");
+    expect(
+      container.querySelector("[data-roof-fusion-continue-restored]"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-roof-fusion-redraw-lines]"),
+    ).not.toBeNull();
+
+    await click("[data-roof-fusion-continue-restored]");
+    expect(
+      container.querySelector("[data-roof-fusion-restored-marking]"),
+    ).toBeNull();
+    expect(renderedLines()).toHaveLength(1);
+    expect(container.textContent).toContain(
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
+    );
   });
 
-  it("clears restored lines only from the dirty draft and reloads the confirmed revision", async () => {
+  it("redraws restored geometry only in the dirty draft and reloads the confirmed revision", async () => {
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
@@ -656,9 +673,14 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     await click("[data-roof-fusion-confirm-clear-lines]");
 
     expect(renderedLines()).toHaveLength(0);
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.1,0.1 0.9,0.1 0.9,0.9 0.1,0.9");
     expect(latest?.geometry.skeletonEdges).toHaveLength(1);
     expect(container.textContent).toContain(
-      "Linijos pašalintos tik iš neišsaugoto juodraščio",
+      "Kontūras ir linijos pakeisti tik neišsaugotame juodraštyje",
     );
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
@@ -668,8 +690,71 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     expect(renderedLines()).toHaveLength(1);
-    expect(container.textContent).toContain("Atkurtas ankstesnis žymėjimas");
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.4,0.3 0.6,0.3 0.6,0.7 0.4,0.7");
+    expect(container.textContent).toContain(
+      "Atkurti ankstesni nebaigto matavimo pakeitimai",
+    );
     expect(stage()).toBe("skeleton");
+  });
+
+  it("auto-fits the selected roof once and preserves manual zoom across draft hydration", async () => {
+    const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.hasAttribute("data-roof-fusion-canvas-shell")) {
+        return {
+          bottom: 495,
+          height: 495,
+          left: 0,
+          right: 880,
+          top: 0,
+          width: 880,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } satisfies DOMRect;
+      }
+      return originalBounds.call(this);
+    };
+    try {
+      const compactSourceOutline = [
+        { x: 0.4, y: 0.35 },
+        { x: 0.6, y: 0.35 },
+        { x: 0.6, y: 0.65 },
+        { x: 0.4, y: 0.65 },
+      ] as const;
+      await act(async () => {
+        root.render(
+          renderWorkbench(capture, undefined, undefined, compactSourceOutline),
+        );
+        await flushAsyncWork();
+      });
+      const zoomPercent = () =>
+        Number.parseInt(
+          container
+            .querySelector("[data-roof-fusion-zoom-percent]")
+            ?.textContent?.replace("%", "") ?? "0",
+          10,
+        );
+      const fittedZoom = zoomPercent();
+      expect(fittedZoom).toBeGreaterThan(100);
+
+      await click('[aria-label="Didinti vaizdą"]');
+      const manualZoom = zoomPercent();
+      expect(manualZoom).toBeGreaterThan(fittedZoom);
+
+      await openAdvanced();
+      await act(async () => {
+        buttonWithText("Perkrauti")!.click();
+        await flushAsyncWork();
+      });
+      expect(zoomPercent()).toBe(manualZoom);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalBounds;
+    }
   });
 
   it("rolls a touch endpoint drag back on pointercancel without dirtying the confirmed revision", async () => {

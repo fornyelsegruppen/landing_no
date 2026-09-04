@@ -419,6 +419,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   const [unsupportedLatest, setUnsupportedLatest] = useState(false);
   const [sourceResetRequired, setSourceResetRequired] = useState(false);
   const [geometryHydrationSignal, setGeometryHydrationSignal] = useState(0);
+  const [restoredGeometrySignal, setRestoredGeometrySignal] = useState(0);
   const pendingDraft = useRef<RoofFusionWorkbenchDraftV1 | null>(null);
   const sourceOutlineIdentity = sourceOutline
     .map((point) => `${point.x}:${point.y}`)
@@ -477,6 +478,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
           setProblem(null);
         }
         setGeometryHydrationSignal((current) => current + 1);
+        setRestoredGeometrySignal((current) => current + 1);
         return;
       }
       setUnsupportedLatest(true);
@@ -975,6 +977,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
             : "Preview · neišsaugoti pakeitimai"
       }
       geometryHydrationSignal={geometryHydrationSignal}
+      restoredGeometrySignal={restoredGeometrySignal}
       horizontalAreaSquareMeters={
         metrics?.horizontalAreaSquareMeters ?? horizontalAreaSquareMeters
       }

@@ -18,6 +18,7 @@ import {
   clampRoofFusionPoint,
   clampRoofFusionViewport,
   constrainRoofFusionDraggedEndpoint,
+  fitRoofFusionViewportToOutline,
   hasRoofFusionPanGestureMoved,
   localizedRoofFusionTechnicalText,
   panRoofFusionViewport,
@@ -77,6 +78,38 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     ).toEqual(DEFAULT_ROOF_FUSION_VIEWPORT);
     expect(MIN_ROOF_FUSION_ZOOM).toBe(1);
     expect(MAX_ROOF_FUSION_ZOOM).toBe(4);
+  });
+
+  it("fits a small roof bbox into screen space with stable padding", () => {
+    const fitted = fitRoofFusionViewportToOutline(
+      [
+        { x: 0.42, y: 0.38 },
+        { x: 0.58, y: 0.38 },
+        { x: 0.58, y: 0.62 },
+        { x: 0.42, y: 0.62 },
+      ],
+      { width: 880, height: 495 },
+    );
+
+    expect(fitted.scale).toBeGreaterThan(2);
+    expect(fitted.scale).toBeLessThanOrEqual(MAX_ROOF_FUSION_ZOOM);
+    expect(fitted.offsetX + 0.42 * fitted.scale).toBeGreaterThan(0.05);
+    expect(fitted.offsetX + 0.58 * fitted.scale).toBeLessThan(0.95);
+    expect(fitted.offsetY + 0.38 * fitted.scale).toBeGreaterThan(0.05);
+    expect(fitted.offsetY + 0.62 * fitted.scale).toBeLessThan(0.95);
+
+    const narrowFitted = fitRoofFusionViewportToOutline(
+      [
+        { x: 0.42, y: 0.38 },
+        { x: 0.58, y: 0.38 },
+        { x: 0.58, y: 0.62 },
+        { x: 0.42, y: 0.62 },
+      ],
+      { width: 480, height: 360 },
+    );
+    expect(narrowFitted.offsetY + 0.38 * narrowFitted.scale).toBeGreaterThan(
+      0.25,
+    );
   });
 
   it("keeps endpoint drag inside the roof and uses screen-space boundary and junction magnets", () => {
@@ -391,7 +424,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(ROOF_FUSION_SKELETON_HIT_STROKE).toBe("22px");
   });
 
-  it("keeps essential skeleton actions inside a compact canvas toolbar at a 1280x720 CSS viewport", () => {
+  it("reflows all skeleton actions without horizontal scrolling at a 1280x720 CSS viewport", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
         initialStage: "skeleton",
@@ -417,11 +450,47 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(canvasIndex).toBeGreaterThan(-1);
     expect(toolbarIndex).toBeGreaterThan(canvasIndex);
     expect(html).toContain("absolute top-2 right-2 left-2");
-    expect(html).toContain("overflow-x-auto");
-    expect(html).toContain("min-h-11 shrink-0");
-    expect(html).toContain("Atšaukti paskutinę liniją");
-    expect(html).toContain("Perbraižyti visas linijas");
+    expect(html).not.toContain("overflow-x-auto");
+    expect(html).toContain("grid-cols-2");
+    expect(html).toContain("sm:grid-cols-4");
+    expect(html).toContain("min-h-11 min-w-0");
+    expect(html).toContain("Atšaukti paskutinę");
+    expect(html).toContain("Perbraižyti linijas");
+    expect(html).toContain(
+      'aria-label="Perbraižyti visas kraigų ir sąlajų linijas"',
+    );
     expect(html.match(/data-roof-fusion-undo-last-line/g)).toHaveLength(1);
+    expect(html).toContain('data-roof-fusion-responsive-layout="refine"');
+    expect(html).toContain("md:flex-row");
+    expect(html).toContain("md:w-[300px]");
+  });
+
+  it("keeps the narrow toolbar keyboard reachable in two rows with 44px actions", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        initialStage: "skeleton",
+        lines: [
+          {
+            id: "ridge-a",
+            kind: "ridge",
+            start: { x: 0.3, y: 0.5 },
+            end: { x: 0.7, y: 0.5 },
+          },
+        ],
+        orthoImageHeight: 720,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        orthoImageWidth: 960,
+        sourceOutline,
+      }),
+    );
+
+    expect(html).toContain('aria-label="Kraigų ir sąlajų žymėjimo įrankiai"');
+    expect(html).toContain("grid grid-cols-2");
+    expect(html).not.toContain("overflow-x");
+    expect(html.match(/min-h-11 min-w-0/g)).toHaveLength(4);
+    expect(html).toContain('aria-label="Žymėti kraigą"');
+    expect(html).toContain('aria-label="Žymėti sąlają"');
+    expect(html).toContain("title=");
   });
 
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {

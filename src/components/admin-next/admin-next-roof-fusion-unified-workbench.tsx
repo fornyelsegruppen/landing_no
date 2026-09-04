@@ -139,6 +139,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   guardNotice?: string;
   /** Changes only when the parent explicitly rehydrates persisted geometry. */
   geometryHydrationSignal?: string | number;
+  /** Changes only when that hydration restores an earlier measurement session. */
+  restoredGeometrySignal?: string | number;
   initialStage?: RoofFusionStage;
   initialLayers?: Partial<Record<RoofFusionLayer, boolean>>;
   onStageChange?: (stage: RoofFusionStage) => void;
@@ -321,6 +323,50 @@ export function roofFusionEndpointConstraintMetric(
     yPixelsPerImageUnit: Math.max(1, bounds.height) * current.scale,
     maxDistancePixels: WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX,
   };
+}
+
+export function fitRoofFusionViewportToOutline(
+  points: readonly RoofFusionPoint[],
+  bounds: Pick<DOMRect, "width" | "height">,
+  paddingPixels?: number,
+): RoofFusionViewport {
+  if (
+    points.length < 3 ||
+    bounds.width <= 0 ||
+    bounds.height <= 0 ||
+    !points.every(
+      (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+    )
+  ) {
+    return DEFAULT_ROOF_FUSION_VIEWPORT;
+  }
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxY = Math.max(...points.map((point) => point.y));
+  const width = Math.max(maxX - minX, 1e-6);
+  const height = Math.max(maxY - minY, 1e-6);
+  const safePadding = Math.max(
+    24,
+    paddingPixels ?? (bounds.width < 640 ? 112 : 72),
+  );
+  const horizontalPadding = Math.min(0.22, safePadding / bounds.width);
+  const verticalPadding = Math.min(0.32, safePadding / bounds.height);
+  const scale = Math.min(
+    MAX_ROOF_FUSION_ZOOM,
+    Math.max(
+      MIN_ROOF_FUSION_ZOOM,
+      Math.min(
+        (1 - horizontalPadding * 2) / width,
+        (1 - verticalPadding * 2) / height,
+      ),
+    ),
+  );
+  return clampRoofFusionViewport({
+    scale,
+    offsetX: 0.5 - ((minX + maxX) / 2) * scale,
+    offsetY: 0.5 - ((minY + maxY) / 2) * scale,
+  });
 }
 
 function distanceInConstraintPixels(
@@ -692,6 +738,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   stageBlockers,
   guardNotice = "Nieko neišsaugo, kol nepatvirtinta",
   geometryHydrationSignal,
+  restoredGeometrySignal,
   initialStage = "outline",
   initialLayers,
   onStageChange,
@@ -738,6 +785,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     restoredMarkingSummary(lines),
   );
   const [clearLinesArmed, setClearLinesArmed] = useState(false);
+  const [redrawRestoredGeometryArmed, setRedrawRestoredGeometryArmed] =
+    useState(false);
   const [draggingLineEndpoint, setDraggingLineEndpoint] =
     useState<RoofFusionLineEndpointDrag | null>(null);
   const draggingLineEndpointRef = useRef<RoofFusionLineEndpointDrag | null>(
@@ -745,9 +794,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   );
   const draftLinesRef = useRef(draftLines);
   const lastGeometryHydrationSignalRef = useRef(geometryHydrationSignal);
+  const lastRestoredGeometrySignalRef = useRef(restoredGeometrySignal);
   const [viewport, setViewport] = useState<RoofFusionViewport>(
     DEFAULT_ROOF_FUSION_VIEWPORT,
   );
+  const autoFitAppliedRef = useRef(false);
   const [panGesture, setPanGesture] = useState<RoofFusionPanGesture | null>(
     null,
   );
@@ -817,15 +868,31 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     )
       return;
     lastGeometryHydrationSignalRef.current = geometryHydrationSignal;
+    const restoredFromEarlierSession = !Object.is(
+      lastRestoredGeometrySignalRef.current,
+      restoredGeometrySignal,
+    );
+    lastRestoredGeometrySignalRef.current = restoredGeometrySignal;
     setDraftOutline(
       (approvedOutline?.length ? approvedOutline : sourceOutline).map(
         clampRoofFusionPoint,
       ),
     );
     setDraftLines(lines);
-    setRestoredMarkingNotice(restoredMarkingSummary(lines));
+    if (restoredFromEarlierSession) {
+      setRestoredMarkingNotice(
+        restoredMarkingSummary(lines) ?? "atkurtas patvirtintas kontūras",
+      );
+    }
     setClearLinesArmed(false);
-  }, [approvedOutline, geometryHydrationSignal, lines, sourceOutline]);
+    setRedrawRestoredGeometryArmed(false);
+  }, [
+    approvedOutline,
+    geometryHydrationSignal,
+    lines,
+    restoredGeometrySignal,
+    sourceOutline,
+  ]);
 
   useEffect(() => {
     draftLinesRef.current = draftLines;
@@ -987,19 +1054,34 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   }, [draftLines, onLastLineUndo]);
 
   const clearDraftLines = useCallback(() => {
-    if (draftLines.length === 0) return;
+    if (draftLines.length === 0 && !redrawRestoredGeometryArmed) return;
     const clearedLines = draftLines;
+    const redrawWholeDraft = redrawRestoredGeometryArmed;
+    if (redrawWholeDraft) {
+      const resetOutline = sourceOutline.map(clampRoofFusionPoint);
+      setDraftOutline(resetOutline);
+      onOutlineChange?.(resetOutline);
+    }
     setDraftLines([]);
     setRestoredMarkingNotice(null);
     setClearLinesArmed(false);
+    setRedrawRestoredGeometryArmed(false);
     setPendingLinePoint(null);
     setLineMode(null);
     setLineCaptureProblem(null);
     setLineCaptureNotice(
-      "Linijos pašalintos tik iš neišsaugoto juodraščio. Patvirtintą reviziją galima atkurti paspaudus „Perkrauti“.",
+      redrawWholeDraft
+        ? "Kontūras ir linijos pakeisti tik neišsaugotame juodraštyje. Patvirtintą reviziją galima atkurti paspaudus „Perkrauti“."
+        : "Linijos pašalintos tik iš neišsaugoto juodraščio. Patvirtintą reviziją galima atkurti paspaudus „Perkrauti“.",
     );
-    onLinesClear?.(clearedLines);
-  }, [draftLines, onLinesClear]);
+    if (clearedLines.length > 0) onLinesClear?.(clearedLines);
+  }, [
+    draftLines,
+    onLinesClear,
+    onOutlineChange,
+    redrawRestoredGeometryArmed,
+    sourceOutline,
+  ]);
 
   const startLineEndpointDrag = useCallback(
     (
@@ -1137,6 +1219,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         if (!panGesture.moved) {
           setPanGesture({ ...panGesture, moved: true });
         }
+        autoFitAppliedRef.current = true;
         setViewport(
           panRoofFusionViewport(panGesture.startViewport, {
             x: (event.clientX - panGesture.startClientX) / (bounds.width || 1),
@@ -1216,6 +1299,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     (event: WheelEvent<HTMLDivElement>) => {
       if (!shouldHandleRoofFusionZoomWheel(event)) return;
       event.preventDefault();
+      autoFitAppliedRef.current = true;
       const bounds = event.currentTarget.getBoundingClientRect();
       const anchor = clampRoofFusionPoint({
         x: (event.clientX - bounds.left) / (bounds.width || 1),
@@ -1238,6 +1322,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
   const changeZoom = useCallback(
     (delta: number) => {
+      autoFitAppliedRef.current = true;
       const next = zoomRoofFusionViewportAt(viewport, viewport.scale + delta);
       setViewport(next);
       if (next.scale === MIN_ROOF_FUSION_ZOOM) {
@@ -1248,9 +1333,33 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   );
 
   const resetViewport = useCallback(() => {
-    setViewport(DEFAULT_ROOF_FUSION_VIEWPORT);
+    autoFitAppliedRef.current = true;
+    const bounds = getCanvasBounds();
+    setViewport(
+      bounds
+        ? fitRoofFusionViewportToOutline(draftOutline, bounds)
+        : DEFAULT_ROOF_FUSION_VIEWPORT,
+    );
     setPanGesture(null);
-  }, []);
+  }, [draftOutline, getCanvasBounds]);
+
+  useEffect(() => {
+    if (
+      stage === "review" ||
+      autoFitAppliedRef.current ||
+      draftOutline.length < 3
+    ) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (autoFitAppliedRef.current) return;
+      const bounds = getCanvasBounds();
+      if (!bounds || bounds.width <= 0 || bounds.height <= 0) return;
+      autoFitAppliedRef.current = true;
+      setViewport(fitRoofFusionViewportToOutline(draftOutline, bounds));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [draftOutline, getCanvasBounds, stage]);
 
   const handleVertexKeyDown = useCallback(
     (event: KeyboardEvent<SVGGElement>, index: number) => {
@@ -1530,7 +1639,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       data-roof-fusion-workbench="unified"
       data-roof-fusion-stage={stage}
     >
-      <div className="flex flex-col gap-0 xl:flex-row">
+      <div
+        className={`flex flex-col gap-0 ${stage === "review" ? "xl:flex-row" : "md:flex-row"}`}
+        data-roof-fusion-responsive-layout={
+          stage === "review" ? "result" : "refine"
+        }
+      >
         <div
           className={`min-w-0 flex-1 bg-[#0c111a] p-3 ${stage === "review" ? "sm:p-3" : "sm:p-5"}`}
         >
@@ -1565,30 +1679,47 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
           {restoredMarkingNotice ? (
             <div
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#71e6b4]/30 bg-[#46d69a]/10 px-3 py-2 text-sm text-[#dff9ed]"
+              className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#71e6b4]/30 bg-[#46d69a]/10 px-3 py-2 text-sm text-[#dff9ed]"
               data-roof-fusion-restored-marking
             >
-              <span aria-live="polite" role="status">
-                <strong>Atkurtas ankstesnis žymėjimas</strong>
-                <span className="ml-2 text-xs text-[#b8dccc]">
+              <span aria-live="polite" className="min-w-0 flex-1" role="status">
+                <strong className="block text-xs sm:text-sm">
+                  Atkurti ankstesni nebaigto matavimo pakeitimai
+                </strong>
+                <span className="mt-0.5 block text-[11px] text-[#b8dccc]">
                   {restoredMarkingNotice.replace(
                     "Atkurtas ankstesnis žymėjimas · ",
                     "",
                   )}
                 </span>
               </span>
-              <button
-                className="min-h-10 rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-semibold text-white hover:bg-white/10"
-                data-roof-fusion-redraw-lines
-                onClick={() => {
-                  if (stage === "review") onEditResult?.();
-                  goToStage("skeleton");
-                  setClearLinesArmed(true);
-                }}
-                type="button"
-              >
-                Išvalyti / perbraižyti
-              </button>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  aria-label="Tęsti atkurtą nebaigtą matavimą"
+                  className="min-h-11 rounded-lg border border-white/20 bg-white/5 px-3 text-xs font-semibold text-white hover:bg-white/10"
+                  data-roof-fusion-continue-restored
+                  onClick={() => setRestoredMarkingNotice(null)}
+                  title="Tęsti su atkurta kontūro ir linijų geometrija"
+                  type="button"
+                >
+                  Tęsti
+                </button>
+                <button
+                  aria-label="Perbraižyti atkurtą matavimo geometriją"
+                  className="min-h-11 rounded-lg border border-[#f3c66b]/45 bg-[#e8a317]/10 px-3 text-xs font-semibold text-[#ffe2a3] hover:bg-[#e8a317]/20"
+                  data-roof-fusion-redraw-lines
+                  onClick={() => {
+                    if (stage === "review") onEditResult?.();
+                    goToStage("skeleton");
+                    setRedrawRestoredGeometryArmed(true);
+                    setClearLinesArmed(true);
+                  }}
+                  title="Pradėti nuo šaltinio kontūro; patvirtinta revizija liks saugi"
+                  type="button"
+                >
+                  Perbraižyti
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -1679,15 +1810,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             </button>
             <button
               className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-3 text-sm font-medium text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={
-                viewport.scale === MIN_ROOF_FUSION_ZOOM &&
-                viewport.offsetX === 0 &&
-                viewport.offsetY === 0
-              }
+              aria-label="Talpinti pasirinktą stogą darbo zonoje"
               onClick={resetViewport}
+              title="Talpinti pasirinktą stogą su saugiu tarpu aplink kontūrą"
               type="button"
             >
-              Talpinti
+              Talpinti stogą
             </button>
             <span className="text-xs text-[#aaa69d]">
               Ctrl/Cmd + ratukas keičia mastelį. Priartinus tempkite tuščią
@@ -2127,14 +2255,17 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             {stage === "skeleton" ? (
               <div
                 aria-label="Kraigų ir sąlajų žymėjimo įrankiai"
-                className="absolute top-2 right-2 left-2 z-30 flex min-h-12 [scrollbar-width:thin] items-center gap-1.5 overflow-x-auto rounded-xl border border-white/20 bg-[#09111d]/95 p-1.5 shadow-xl backdrop-blur-sm"
+                className="absolute top-2 right-2 left-2 z-30 grid grid-cols-2 gap-1.5 rounded-xl border border-white/20 bg-[#09111d]/95 p-1.5 shadow-xl backdrop-blur-sm sm:grid-cols-4"
                 data-roof-fusion-skeleton-toolbar="canvas-overlay"
                 role="group"
               >
                 {(["ridge", "valley"] as const).map((kind) => (
                   <button
                     aria-pressed={lineMode === kind}
-                    className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-semibold ${lineMode === kind ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
+                    aria-label={
+                      kind === "ridge" ? "Žymėti kraigą" : "Žymėti sąlają"
+                    }
+                    className={`min-h-11 min-w-0 rounded-lg border px-2 text-xs leading-tight font-semibold ${lineMode === kind ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
                     data-roof-fusion-line-mode={kind}
                     key={kind}
                     onClick={() => {
@@ -2145,6 +2276,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       setLineCaptureProblem(null);
                       setLineCaptureNotice(null);
                     }}
+                    title={
+                      kind === "ridge"
+                        ? "Pridėti kraigo liniją dviem paspaudimais"
+                        : "Pridėti sąlajos liniją dviem paspaudimais"
+                    }
                     type="button"
                   >
                     {kind === "ridge"
@@ -2157,22 +2293,29 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   </button>
                 ))}
                 <button
-                  className="min-h-11 shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Atšaukti paskutinę kraigo arba sąlajos liniją"
+                  className="min-h-11 min-w-0 rounded-lg border border-white/15 bg-white/5 px-2 text-xs leading-tight font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                   data-roof-fusion-undo-last-line
                   disabled={draftLines.length === 0}
                   onClick={undoLastLine}
+                  title="Atšaukti paskutinę nubrėžtą liniją"
                   type="button"
                 >
-                  Atšaukti paskutinę liniją
+                  Atšaukti paskutinę
                 </button>
                 <button
-                  className="min-h-11 shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Perbraižyti visas kraigų ir sąlajų linijas"
+                  className="min-h-11 min-w-0 rounded-lg border border-white/15 bg-white/5 px-2 text-xs leading-tight font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                   data-roof-fusion-clear-lines
                   disabled={draftLines.length === 0}
-                  onClick={() => setClearLinesArmed(true)}
+                  onClick={() => {
+                    setRedrawRestoredGeometryArmed(false);
+                    setClearLinesArmed(true);
+                  }}
+                  title="Išvalyti visas šio neišsaugoto juodraščio linijas"
                   type="button"
                 >
-                  Perbraižyti visas linijas
+                  Perbraižyti linijas
                 </button>
               </div>
             ) : null}
@@ -2282,7 +2425,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   role="alert"
                 >
                   <p>
-                    Bus išvalytos tik šio neišsaugoto juodraščio linijos.
+                    {redrawRestoredGeometryArmed
+                      ? "Bus atkurta pradinė šaltinio kontūro geometrija ir išvalytos šio neišsaugoto juodraščio linijos."
+                      : "Bus išvalytos tik šio neišsaugoto juodraščio linijos."}
                     Patvirtinta revizija liks saugi ir ją galėsite atkurti per
                     „Perkrauti“.
                   </p>
@@ -2297,7 +2442,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     </button>
                     <button
                       className="min-h-10 rounded-lg border border-white/15 px-3 text-[#ddd8cd]"
-                      onClick={() => setClearLinesArmed(false)}
+                      onClick={() => {
+                        setClearLinesArmed(false);
+                        setRedrawRestoredGeometryArmed(false);
+                      }}
                       type="button"
                     >
                       Atšaukti
@@ -2328,7 +2476,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         </div>
 
         <aside
-          className={`w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 xl:border-t-0 xl:border-l ${stage === "review" ? "xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:w-[390px] xl:overflow-hidden" : "sm:p-5 xl:w-[360px]"}`}
+          className={`w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 ${stage === "review" ? "xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:w-[390px] xl:overflow-hidden xl:border-t-0 xl:border-l" : "sm:p-5 md:w-[300px] md:border-t-0 md:border-l lg:w-[340px]"}`}
         >
           <div
             className={
