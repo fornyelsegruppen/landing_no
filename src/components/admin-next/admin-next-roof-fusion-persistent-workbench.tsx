@@ -177,17 +177,17 @@ const heightStatusCopy: Record<HeightResult["status"], string> = {
 
 const blockerCopy: Record<string, string> = {
   SKELETON_DANGLING_ENDPOINT:
-    "Kraigo arba slėnio galas nesujungtas su stogo riba ar kitu kraštu. Patikslinkite liniją.",
+    "Kraigo arba sąlajos galas nesujungtas su stogo riba ar kitu kraštu. Patikslinkite liniją.",
   SKELETON_EDGE_OUTSIDE_MASS:
-    "Kraigo arba slėnio linija išeina už patvirtinto stogo kontūro. Perkelkite jos galus.",
+    "Kraigo arba sąlajos linija išeina už patvirtinto stogo kontūro. Perkelkite jos galus.",
   SKELETON_DOES_NOT_SUBDIVIDE:
-    "Pažymėtos linijos saugiai nepadalija stogo į paviršius. Patikslinkite kraigus ir slėnius.",
+    "Pažymėtos linijos saugiai nepadalija stogo į paviršius. Patikslinkite kraigus ir sąlajas.",
   FACE_TOPOLOGY_INVALID:
     "Stogo paviršių ryšiai nėra vienareikšmiai. Reikalinga rankinė peržiūra.",
   MASS_COVERAGE_INVALID:
     "Apskaičiuoti paviršiai nepadengia viso patvirtinto stogo ploto. Reikalinga rankinė peržiūra.",
   MISSING_OR_AMBIGUOUS_SKELETON:
-    "Trūksta kraigo ar slėnio linijos arba jos reikšmė neaiški. Patikslinkite stogo schemą.",
+    "Trūksta kraigo ar sąlajos linijos arba jos reikšmė neaiški. Patikslinkite stogo schemą.",
   UNSTABLE_HEIGHT_PLANE:
     "Aukščio taškai neleidžia patikimai nustatyti stogo plokštumos. Reikalinga peržiūra.",
   TOO_FEW_HEIGHT_SAMPLES:
@@ -209,7 +209,7 @@ export function localizedWorkbenchHeightBlocker(blocker: string) {
   if (/review/iu.test(blocker)) {
     return "Prieš naudojant rezultatą būtina rankinė peržiūra.";
   }
-  return "Aukščio skaičiavimas grąžino techninį blokatorių. Patikrinkite kontūrą, kraigus ir slėnius; jei kartojasi, perduokite peržiūrai.";
+  return "Aukščio skaičiavimas grąžino techninį blokatorių. Patikrinkite kontūrą, kraigus ir sąlajas; jei kartojasi, perduokite peržiūrai.";
 }
 
 function localizedWorkbenchProblem(error: unknown, fallback: string) {
@@ -249,9 +249,9 @@ function localizedWorkbenchProblem(error: unknown, fallback: string) {
       "Aukščio skaičiavimo duomenys netinkami. Atnaujinkite Høydedata šaltinį.",
     HEIGHT_FAILED: "Aukščio skaičiavimas nepavyko. Bandykite dar kartą.",
     SKELETON_ENDPOINT_OUTSIDE_MASS:
-      "Kraigo arba slėnio galas yra už patvirtinto stogo kontūro.",
+      "Kraigo arba sąlajos galas yra už patvirtinto stogo kontūro.",
     SKELETON_ZERO_LENGTH:
-      "Kraigo arba slėnio pradžios ir pabaigos taškai turi skirtis.",
+      "Kraigo arba sąlajos pradžios ir pabaigos taškai turi skirtis.",
   };
   return `[${error.code}] ${messages[error.code] ?? fallback}`;
 }

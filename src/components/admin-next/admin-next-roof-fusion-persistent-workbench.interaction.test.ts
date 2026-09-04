@@ -638,7 +638,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
     ).toBe("ridge");
     expect(container.textContent).toContain("Atkurtas ankstesnis žymėjimas");
-    expect(container.textContent).toContain("kraigai: 1 · slėniai: 0");
+    expect(container.textContent).toContain("kraigų: 1 · sąlajų: 0");
   });
 
   it("clears restored lines only from the dirty draft and reloads the confirmed revision", async () => {
@@ -1117,7 +1117,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("outline");
     expect(container.textContent).toContain("SKELETON_DANGLING_ENDPOINT");
     expect(container.textContent).toContain(
-      "Kraigo arba slėnio galas nesujungtas",
+      "Kraigo arba sąlajos galas nesujungtas",
     );
     expect(container.textContent).not.toContain("Endpoint is not attached");
     await closeAdvanced();
@@ -1345,7 +1345,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("snaps a near valley endpoint at 100% and preserves pending on far/zero rejection", async () => {
+  it("snaps a near sąlaja endpoint at 100% and preserves pending on far/zero rejection", async () => {
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
@@ -1393,13 +1393,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       container.querySelector('[data-roof-fusion-line-kind="ridge"]'),
     ).not.toBeNull();
     expect(renderedLines()).toHaveLength(2);
-    expect(container.textContent).toContain("Nubrėžta: 1 slėnis");
+    expect(container.textContent).toContain("Nubrėžta: 1 sąlaja");
     expect(
       container
         .querySelector('[data-roof-fusion-line-mode="valley"]')
         ?.getAttribute("aria-pressed"),
     ).toBe("false");
-    expect(buttonWithText("Dar vienas slėnis")).toBeDefined();
+    expect(buttonWithText("Dar viena sąlaja")).toBeDefined();
     await clickCanvasAt(500);
     expect(
       container.querySelector("[data-roof-fusion-pending-line-point]"),
@@ -1433,7 +1433,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     await clickCanvasAt(500);
     expect(container.textContent).toContain("SKELETON_ZERO_LENGTH");
     expect(container.textContent).toContain(
-      "Antras kraigo arba slėnio taškas turi skirtis nuo pirmojo",
+      "Antras kraigo arba sąlajos taškas turi skirtis nuo pirmojo",
     );
     expect(
       container.querySelector("[data-roof-fusion-pending-line-point]"),
@@ -1498,7 +1498,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
     expect(container.textContent).toContain(
-      "Paskutinė kraigo arba slėnio linija pašalinta",
+      "Paskutinė kraigo arba sąlajos linija pašalinta",
     );
     expect(
       container.querySelector('img[src="/api/admin/media/91"]'),

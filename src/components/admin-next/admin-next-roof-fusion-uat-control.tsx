@@ -35,6 +35,7 @@ import { RoofFusionTransientR4Drawer } from "@/components/admin-next/admin-next-
 import { AdminNextRoofFusionPersistentWorkbench } from "@/components/admin-next/admin-next-roof-fusion-persistent-workbench";
 import {
   captureMatchesSelectedAddress,
+  norgeIBilderAddressCaptureKey,
   NorgeIBilderCaptureControl,
   type NorgeIBilderCaptureApi,
   type NorgeIBilderCaptureContext,
@@ -271,7 +272,7 @@ const copy = {
     addressEyebrow: "Objektas ir ortofoto",
     addressTitle: "Rasti adresą ir atverti ortofoto",
     addressIntro:
-      "Šis aiškus paspaudimas suranda adresą, parodo OpenStreetMap kandidatus ir gauna vieną licencijuotą Norge i bilder ortofoto testinei bylai. Matavimas dar nesukuriamas.",
+      "Paspaudus „Rasti adresą“ automatiškai gaunamas vienas licencijuotas Norge i bilder ortofoto pasirinkimo peržiūrai. Parodomi OpenStreetMap pastatų kandidatai; matavimas dar nesukuriamas.",
     addressLabel: "Adresas su namo numeriu ir miestu",
     addressPlaceholder: "Pavyzdžiui: Storgata 1, Oslo",
     addressAction: "Rasti adresą ir atverti ortofoto",
@@ -824,7 +825,6 @@ export function RealAddressResult({
   const [capturePhase, setCapturePhase] = useState<
     "loading" | "ready" | "error"
   >("loading");
-  const automaticCaptureStarted = useRef(false);
   const captureResult = captureBinding?.result ?? null;
   const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<Extract<
     RoofFusionHeightAnalysisState,
@@ -864,14 +864,6 @@ export function RealAddressResult({
   useEffect(() => {
     selectedCandidateIdRef.current = selected?.id ?? null;
   }, [selected?.id]);
-  useEffect(() => {
-    if (!leadId || automaticCaptureStarted.current) return;
-    automaticCaptureStarted.current = true;
-    const timeout = window.setTimeout(() => {
-      document.getElementById(`roof-fusion-norge-capture-${leadId}`)?.click();
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [leadId]);
   const enginePreview = result.enginePreviews.find(
     (preview) => preview.candidateId === selected?.id,
   );
@@ -1990,7 +1982,9 @@ export function RealAddressResult({
       ) : null}
       <NorgeIBilderCaptureControl
         api={captureApi}
+        automaticCapture={Boolean(leadId)}
         caseReference={caseReference}
+        captureKey={norgeIBilderAddressCaptureKey(leadId, result.address)}
         compactWhenWorkbenchActive={Boolean(leadId)}
         leadId={leadId}
         onCaptureResultChange={handleCaptureResultChange}

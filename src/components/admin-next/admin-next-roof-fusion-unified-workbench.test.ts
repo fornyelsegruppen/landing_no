@@ -327,7 +327,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       localizedWorkbenchHeightBlocker(
         "[SKELETON_DANGLING_ENDPOINT] Endpoint is not attached.",
       ),
-    ).toContain("Kraigo arba slėnio galas nesujungtas");
+    ).toContain("Kraigo arba sąlajos galas nesujungtas");
     expect(
       localizedWorkbenchHeightBlocker(
         "Manual ridge, valley, hip, and eave hints were used for explicit plane subdivision.",

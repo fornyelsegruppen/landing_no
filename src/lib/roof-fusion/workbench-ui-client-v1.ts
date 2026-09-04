@@ -29,7 +29,7 @@ export class WorkbenchSkeletonEndpointErrorV1 extends Error {
 
   constructor() {
     super(
-      "SKELETON_ENDPOINT_OUTSIDE_MASS: Kraigo arba slėnio taškas yra už patvirtinto kontūro. Patikslinkite kontūrą arba pasirinkite tašką jo viduje.",
+      "SKELETON_ENDPOINT_OUTSIDE_MASS: Kraigo arba sąlajos taškas yra už patvirtinto kontūro. Patikslinkite kontūrą arba pasirinkite tašką jo viduje.",
     );
     this.name = "WorkbenchSkeletonEndpointErrorV1";
   }
@@ -40,7 +40,7 @@ export class WorkbenchSkeletonZeroLengthErrorV1 extends Error {
 
   constructor() {
     super(
-      "SKELETON_ZERO_LENGTH: Antras kraigo arba slėnio taškas turi skirtis nuo pirmojo.",
+      "SKELETON_ZERO_LENGTH: Antras kraigo arba sąlajos taškas turi skirtis nuo pirmojo.",
     );
     this.name = "WorkbenchSkeletonZeroLengthErrorV1";
   }

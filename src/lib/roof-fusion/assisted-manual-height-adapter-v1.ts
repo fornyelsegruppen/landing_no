@@ -656,7 +656,7 @@ export function adaptAssistedManualRoofGeometryToSnapshotV1(
       input,
       subdivision.issues.map(
         (item) =>
-          `[${item.code}] Rankinis kraigas ar slėnis nesudaro saugaus uždaro stogo paviršių padalijimo. Pataisykite linijos galus arba pridėkite trūkstamą liniją.`,
+          `[${item.code}] Rankinis kraigas ar sąlaja nesudaro saugaus uždaro stogo paviršių padalijimo. Pataisykite linijos galus arba pridėkite trūkstamą liniją.`,
       ),
     );
   }

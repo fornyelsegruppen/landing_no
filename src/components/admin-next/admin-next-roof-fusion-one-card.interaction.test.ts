@@ -11,6 +11,11 @@ import type {
   NorgeIBilderCaptureApi,
   NorgeIBilderCaptureResult,
 } from "./norgeibilder-capture-control";
+import {
+  norgeIBilderAddressCaptureKey,
+  NorgeIBilderCaptureControl,
+  resetNorgeIBilderCaptureDedupeForTests,
+} from "./norgeibilder-capture-control";
 
 const address = {
   id: "0301-1-2-0-0-Lyngveien 28A",
@@ -48,6 +53,7 @@ describe("Roof Fusion one-card Preview flow", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
+    resetNorgeIBilderCaptureDedupeForTests();
     scrollIntoViewMock = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
@@ -78,6 +84,103 @@ describe("Roof Fusion one-card Preview flow", () => {
     vi.unstubAllGlobals();
     delete (HTMLElement.prototype as { scrollIntoView?: unknown })
       .scrollIntoView;
+  });
+
+  it("deduplicates automatic address capture across state changes and remounts, then retries only by explicit action", async () => {
+    let rejectCapture: (error: Error) => void = () => {};
+    let resolveRetry: (result: NorgeIBilderCaptureResult) => void = () => {};
+    const firstRequest = new Promise<NorgeIBilderCaptureResult>(
+      (_resolve, reject) => {
+        rejectCapture = reject;
+      },
+    );
+    const retryRequest = new Promise<NorgeIBilderCaptureResult>((resolve) => {
+      resolveRetry = resolve;
+    });
+    const captureApi = vi
+      .fn<NorgeIBilderCaptureApi>()
+      .mockReturnValueOnce(firstRequest)
+      .mockReturnValueOnce(retryRequest);
+    const captureKey = norgeIBilderAddressCaptureKey(13, address)!;
+    const renderCapture = (key: string, candidateId: string) =>
+      createElement(NorgeIBilderCaptureControl, {
+        address,
+        api: captureApi,
+        automaticCapture: true,
+        captureKey,
+        caseReference: "TF-13",
+        key,
+        leadId: 13,
+        selectedCandidateId: candidateId,
+        selectedFootprint: polygon,
+      });
+
+    await act(async () => {
+      root.render(renderCapture("first", "way/123"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root.render(renderCapture("first", "way/456"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root.render(renderCapture("remounted", "way/456"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rejectCapture(new Error("Provider unavailable"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Provider unavailable");
+
+    await act(async () => {
+      root.render(renderCapture("error-remount", "way/456"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(1);
+
+    const retry = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.includes("Bandyti dar kartą"));
+    expect(retry).toBeDefined();
+    await act(async () => {
+      retry!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveRetry({
+        address,
+        imageUrl: "/api/admin/media/91",
+        sourceId: "norge-i-bilder:91",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.textContent).toContain("Vaizdas pridėtas prie bylos");
+
+    await act(async () => {
+      root.render(renderCapture("success-remount", "way/123"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Vaizdas pridėtas prie bylos");
+  });
+
+  it("normalizes the address-level capture key without including a building candidate", () => {
+    expect(norgeIBilderAddressCaptureKey(13, address)).toBe(
+      norgeIBilderAddressCaptureKey(13, {
+        ...address,
+        id: `  ${address.id.toLocaleUpperCase("nb-NO")}  `,
+      }),
+    );
+    expect(norgeIBilderAddressCaptureKey(13, address)).not.toContain("way/");
   });
 
   it("automatically captures the address image, exposes every building polygon, and binds the chosen building to one workbench", async () => {

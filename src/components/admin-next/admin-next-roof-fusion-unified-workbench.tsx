@@ -564,7 +564,7 @@ const layerLabels: Record<RoofFusionLayer, string> = {
   approvedOutline: "Patvirtintas kontūras",
   hoydedata: "Høydedata",
   roofPlanes: "Stogo plokštumos",
-  skeleton: "Kraigai / slėniai / kliūtys",
+  skeleton: "Kraigai / sąlajos / kliūtys",
 };
 
 const confidenceLabels: Record<RoofFusionConfidence, string> = {
@@ -624,13 +624,13 @@ function restoredMarkingSummary(lines: readonly RoofFusionLine[]) {
   if (lines.length === 0) return null;
   const ridgeCount = lines.filter((line) => line.kind === "ridge").length;
   const valleyCount = lines.length - ridgeCount;
-  return `Atkurtas ankstesnis žymėjimas · kraigai: ${ridgeCount} · slėniai: ${valleyCount}`;
+  return `Atkurtas ankstesnis žymėjimas · kraigų: ${ridgeCount} · sąlajų: ${valleyCount}`;
 }
 
 function drawnLineSummary(kind: RoofFusionLineKind, count: number) {
-  const singular = kind === "ridge" ? "kraigas" : "slėnis";
-  const plural = kind === "ridge" ? "kraigai" : "slėniai";
-  const genitive = kind === "ridge" ? "kraigų" : "slėnių";
+  const singular = kind === "ridge" ? "kraigas" : "sąlaja";
+  const plural = kind === "ridge" ? "kraigai" : "sąlajos";
+  const genitive = kind === "ridge" ? "kraigų" : "sąlajų";
   const lastTwoDigits = count % 100;
   const lastDigit = count % 10;
   const noun =
@@ -982,7 +982,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     setClearLinesArmed(false);
     setPendingLinePoint(null);
     setLineCaptureProblem(null);
-    setLineCaptureNotice("Paskutinė kraigo arba slėnio linija pašalinta.");
+    setLineCaptureNotice("Paskutinė kraigo arba sąlajos linija pašalinta.");
     onLastLineUndo?.(lastLine);
   }, [draftLines, onLastLineUndo]);
 
@@ -2126,7 +2126,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             )}
             {stage === "skeleton" ? (
               <div
-                aria-label="Kraigų ir slėnių žymėjimo įrankiai"
+                aria-label="Kraigų ir sąlajų žymėjimo įrankiai"
                 className="absolute top-2 right-2 left-2 z-30 flex min-h-12 [scrollbar-width:thin] items-center gap-1.5 overflow-x-auto rounded-xl border border-white/20 bg-[#09111d]/95 p-1.5 shadow-xl backdrop-blur-sm"
                 data-roof-fusion-skeleton-toolbar="canvas-overlay"
                 role="group"
@@ -2152,8 +2152,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                         ? "＋ Dar vienas kraigas"
                         : "＋ Kraigas"
                       : draftLines.some((line) => line.kind === "valley")
-                        ? "⌄ Dar vienas slėnis"
-                        : "⌄ Slėnis"}
+                        ? "⌄ Dar viena sąlaja"
+                        : "⌄ Sąlaja"}
                   </button>
                 ))}
                 <button

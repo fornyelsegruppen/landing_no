@@ -67,8 +67,10 @@ describe("Admin Next Roof Fusion UAT control", () => {
     expect(html).toContain('data-roof-fusion-address="lookup-only"');
     expect(html).toContain('name="addressQuery"');
     expect(html).toContain("Rasti adresą ir atverti ortofoto");
-    expect(html).toContain("vieną licencijuotą Norge i bilder ortofoto");
-    expect(html).toContain("Matavimas dar nesukuriamas");
+    expect(html).toContain(
+      "Paspaudus „Rasti adresą“ automatiškai gaunamas vienas licencijuotas Norge i bilder ortofoto pasirinkimo peržiūrai",
+    );
+    expect(html).toContain("matavimas dar nesukuriamas");
   });
 
   it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {

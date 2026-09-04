@@ -11,6 +11,7 @@ import {
   type PointerEvent,
   type WheelEvent,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -61,6 +62,60 @@ export type NorgeIBilderCaptureResult = {
 export type NorgeIBilderCaptureApi = (
   request: NorgeIBilderCaptureRequest,
 ) => Promise<NorgeIBilderCaptureResult>;
+
+type CaptureDedupeEntry =
+  | { kind: "loading"; promise: Promise<NorgeIBilderCaptureResult> }
+  | { kind: "success"; result: NorgeIBilderCaptureResult }
+  | { kind: "error"; message: string };
+
+const defaultCaptureDedupe = new Map<string, CaptureDedupeEntry>();
+
+export function resetNorgeIBilderCaptureDedupeForTests() {
+  defaultCaptureDedupe.clear();
+}
+
+function normalizedCaptureKeyPart(value: string) {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("nb-NO")
+    .replace(/\s+/gu, " ");
+}
+
+export function norgeIBilderAddressCaptureKey(
+  leadId: number | undefined,
+  address: AddressCandidate | undefined,
+) {
+  if (!leadId || !address) return undefined;
+  return `lead:${leadId}:address:${normalizedCaptureKeyPart(address.id)}`;
+}
+
+async function requestNorgeIBilderCapture(request: NorgeIBilderCaptureRequest) {
+  const response = await fetch(
+    "/api/admin/roof-fusion/norge-i-bilder-capture",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    },
+  );
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as {
+      error?: string;
+      code?: string;
+      correlationId?: string;
+    } | null;
+    const reference = problem?.correlationId
+      ? ` (klaidos ID: ${problem.correlationId})`
+      : "";
+    throw new Error(
+      `${problem?.error || "Nepavyko gauti vaizdo iš Norge i bilder."}${
+        problem?.code ? ` [${problem.code}]` : ""
+      }${reference}`,
+    );
+  }
+  return (await response.json()) as NorgeIBilderCaptureResult;
+}
 
 export type NorgeIBilderCaptureContext = Readonly<{
   candidateId?: string;
@@ -383,6 +438,8 @@ export function NorgeIBilderCaptureViewport({
 export function NorgeIBilderCaptureControl({
   api,
   address,
+  automaticCapture = false,
+  captureKey,
   caseReference,
   compactWhenWorkbenchActive = false,
   leadId,
@@ -392,6 +449,8 @@ export function NorgeIBilderCaptureControl({
 }: {
   api?: NorgeIBilderCaptureApi;
   caseReference: string;
+  automaticCapture?: boolean;
+  captureKey?: string;
   compactWhenWorkbenchActive?: boolean;
   leadId?: number;
   onCaptureResultChange?: (
@@ -404,68 +463,127 @@ export function NorgeIBilderCaptureControl({
 }) {
   const [state, setState] = useState<CaptureState>({ kind: "idle" });
   const [overlayOpacity, setOverlayOpacity] = useState(42);
+  const automaticCaptureStarted = useRef(false);
+  const mounted = useRef(true);
 
-  async function capture() {
-    if (!leadId) return;
-    const clickId = crypto.randomUUID();
-    const requestedCandidateId = selectedCandidateId;
-    onCaptureResultChange?.(null, {
-      candidateId: requestedCandidateId,
-      phase: "loading",
-    });
-    setState({ kind: "loading", attempt: 1 });
-    try {
-      const captureApi =
-        api ??
-        (async (request: NorgeIBilderCaptureRequest) => {
-          const response = await fetch(
-            "/api/admin/roof-fusion/norge-i-bilder-capture",
-            {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(request),
-            },
-          );
-          if (!response.ok) {
-            const problem = (await response.json().catch(() => null)) as {
-              error?: string;
-              code?: string;
-              correlationId?: string;
-            } | null;
-            const reference = problem?.correlationId
-              ? ` (klaidos ID: ${problem.correlationId})`
-              : "";
-            throw new Error(
-              `${problem?.error || "Nepavyko gauti vaizdo iš Norge i bilder."}${
-                problem?.code ? ` [${problem.code}]` : ""
-              }${reference}`,
-            );
-          }
-          return (await response.json()) as NorgeIBilderCaptureResult;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const capture = useCallback(
+    async (reason: "automatic" | "explicit") => {
+      if (!leadId) return;
+      const requestedCandidateId = selectedCandidateId;
+      const registry = defaultCaptureDedupe;
+      const dedupeKey = captureKey?.trim();
+      const existing = dedupeKey ? registry.get(dedupeKey) : undefined;
+      if (existing?.kind === "loading") {
+        setState({ kind: "loading", attempt: 1 });
+        onCaptureResultChange?.(null, {
+          candidateId: requestedCandidateId,
+          phase: "loading",
         });
-      const result = await captureApi({ clickId, leadId });
-      if (!result.imageUrl) throw new Error("Tuščias vaizdo rezultatas");
-      setState({
-        kind: "success",
-        result,
-        ...(requestedCandidateId ? { candidateId: requestedCandidateId } : {}),
-      });
-      onCaptureResultChange?.(result, {
-        candidateId: requestedCandidateId,
-        phase: "success",
-      });
-    } catch (error) {
-      setState({
-        kind: "error",
-        message:
-          error instanceof Error ? error.message : "Nepavyko gauti vaizdo.",
-      });
+        try {
+          const result = await existing.promise;
+          if (!mounted.current) return;
+          setState({
+            kind: "success",
+            result,
+            candidateId: requestedCandidateId,
+          });
+          onCaptureResultChange?.(result, {
+            candidateId: requestedCandidateId,
+            phase: "success",
+          });
+        } catch (error) {
+          if (!mounted.current) return;
+          const message =
+            error instanceof Error ? error.message : "Nepavyko gauti vaizdo.";
+          setState({ kind: "error", message });
+          onCaptureResultChange?.(null, {
+            candidateId: requestedCandidateId,
+            phase: "error",
+          });
+        }
+        return;
+      }
+      if (reason === "automatic" && existing?.kind === "success") {
+        setState({
+          kind: "success",
+          result: existing.result,
+          candidateId: requestedCandidateId,
+        });
+        onCaptureResultChange?.(existing.result, {
+          candidateId: requestedCandidateId,
+          phase: "success",
+        });
+        return;
+      }
+      if (reason === "automatic" && existing?.kind === "error") {
+        setState({ kind: "error", message: existing.message });
+        onCaptureResultChange?.(null, {
+          candidateId: requestedCandidateId,
+          phase: "error",
+        });
+        return;
+      }
+      const clickId = crypto.randomUUID();
       onCaptureResultChange?.(null, {
         candidateId: requestedCandidateId,
-        phase: "error",
+        phase: "loading",
       });
-    }
-  }
+      setState({ kind: "loading", attempt: 1 });
+      const capturePromise = (api ?? requestNorgeIBilderCapture)({
+        clickId,
+        leadId,
+      }).then((result) => {
+        if (!result.imageUrl) throw new Error("Tuščias vaizdo rezultatas");
+        return result;
+      });
+      if (dedupeKey) {
+        registry.set(dedupeKey, { kind: "loading", promise: capturePromise });
+      }
+      try {
+        const result = await capturePromise;
+        if (dedupeKey) registry.set(dedupeKey, { kind: "success", result });
+        if (!mounted.current) return;
+        setState({
+          kind: "success",
+          result,
+          ...(requestedCandidateId
+            ? { candidateId: requestedCandidateId }
+            : {}),
+        });
+        onCaptureResultChange?.(result, {
+          candidateId: requestedCandidateId,
+          phase: "success",
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Nepavyko gauti vaizdo.";
+        if (dedupeKey) registry.set(dedupeKey, { kind: "error", message });
+        if (!mounted.current) return;
+        setState({
+          kind: "error",
+          message,
+        });
+        onCaptureResultChange?.(null, {
+          candidateId: requestedCandidateId,
+          phase: "error",
+        });
+      }
+    },
+    [api, captureKey, leadId, onCaptureResultChange, selectedCandidateId],
+  );
+
+  useEffect(() => {
+    if (!automaticCapture || automaticCaptureStarted.current) return;
+    automaticCaptureStarted.current = true;
+    void capture("automatic");
+  }, [automaticCapture, capture]);
 
   const busy = state.kind === "loading";
   const captureResult = state.kind === "success" ? state.result : undefined;
@@ -509,7 +627,7 @@ export function NorgeIBilderCaptureControl({
         <button
           type="button"
           id={leadId ? `roof-fusion-norge-capture-${leadId}` : undefined}
-          onClick={capture}
+          onClick={() => void capture("explicit")}
           disabled={busy || !leadId}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-sm font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
         >
@@ -540,7 +658,7 @@ export function NorgeIBilderCaptureControl({
           {state.message}
           <button
             type="button"
-            onClick={capture}
+            onClick={() => void capture("explicit")}
             className="ml-auto inline-flex items-center gap-1 underline"
           >
             <RotateCcw className="size-3" />
