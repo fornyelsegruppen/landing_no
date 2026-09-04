@@ -375,12 +375,14 @@ export function NorgeIBilderCaptureControl({
   api,
   address,
   caseReference,
+  compactWhenWorkbenchActive = false,
   leadId,
   onCaptureResultChange,
   selectedFootprint,
 }: {
   api?: NorgeIBilderCaptureApi;
   caseReference: string;
+  compactWhenWorkbenchActive?: boolean;
   leadId?: number;
   onCaptureResultChange?: (result: NorgeIBilderCaptureResult | null) => void;
   selectedFootprint?: GeoPoint[];
@@ -392,7 +394,7 @@ export function NorgeIBilderCaptureControl({
   async function capture() {
     if (!leadId) return;
     const clickId = crypto.randomUUID();
-    onCaptureResultChange?.(null);
+    if (!compactWhenWorkbenchActive) onCaptureResultChange?.(null);
     setState({ kind: "loading", attempt: 1 });
     try {
       const captureApi =
@@ -433,7 +435,7 @@ export function NorgeIBilderCaptureControl({
         message:
           error instanceof Error ? error.message : "Nepavyko gauti vaizdo.",
       });
-      onCaptureResultChange?.(null);
+      if (!compactWhenWorkbenchActive) onCaptureResultChange?.(null);
     }
   }
 
@@ -458,8 +460,11 @@ export function NorgeIBilderCaptureControl({
       : undefined;
   return (
     <section
-      className="mt-4 rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface)] p-4"
+      className={`${compactWhenWorkbenchActive && state.kind !== "error" ? "hidden" : "mt-4 rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface)] p-4"}`}
       data-norgeibilder-capture="single-case"
+      data-norgeibilder-capture-mode={
+        compactWhenWorkbenchActive ? "unified-hidden" : "standalone"
+      }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -475,6 +480,7 @@ export function NorgeIBilderCaptureControl({
         </div>
         <button
           type="button"
+          id={leadId ? `roof-fusion-norge-capture-${leadId}` : undefined}
           onClick={capture}
           disabled={busy || !leadId}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-sm font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
@@ -514,7 +520,7 @@ export function NorgeIBilderCaptureControl({
           </button>
         </div>
       ) : null}
-      {state.kind === "success" ? (
+      {state.kind === "success" && !compactWhenWorkbenchActive ? (
         <div
           className="mt-4 overflow-hidden rounded-xl border border-emerald-400/35 bg-emerald-400/10"
           data-norgeibilder-preview="ready"

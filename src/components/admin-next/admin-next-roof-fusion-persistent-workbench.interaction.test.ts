@@ -312,8 +312,12 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
                   summary: {
                     blockers:
                       heightResponse === "blocked"
-                        ? ["[SKELETON_DANGLING_ENDPOINT] Pataisykite kraigą."]
-                        : ["Peržiūra privaloma"],
+                        ? [
+                            "[SKELETON_DANGLING_ENDPOINT] Endpoint is not attached to the boundary.",
+                          ]
+                        : [
+                            "Manual ridge, valley, hip, and eave hints were used for explicit plane subdivision.",
+                          ],
                   },
                   metrics:
                     heightResponse === "review"
@@ -416,12 +420,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
 
-    expect(container.textContent).toContain(
-      "Rankinės anotacijos neišvalytos",
+    expect(container.textContent).toContain("Rankinės anotacijos neišvalytos");
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      true,
     );
-    expect(
-      buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled,
-    ).toBe(true);
     expect(
       container.querySelector("[data-roof-fusion-confirm-source-reset]"),
     ).not.toBeNull();
@@ -432,9 +434,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain(
       "ankstesnės rankinės anotacijos pašalintos tik iš naujos neišsaugotos geometrijos",
     );
-    expect(
-      buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled,
-    ).toBe(false);
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      false,
+    );
     expect(latest?.revision).toBe(1);
   });
 
@@ -451,7 +453,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     });
 
     expect(stage()).toBe("slopes");
-    expect(container.textContent).toContain("Šaltinių tapatybė nesutampa");
+    expect(container.textContent).toContain("Šaltinių tapatybė");
+    expect(container.textContent).not.toContain(
+      "Workbench height calculation could not be prepared",
+    );
 
     heightResponse = "blocked";
     await act(async () => {
@@ -461,6 +466,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
 
     expect(stage()).toBe("slopes");
     expect(container.textContent).toContain("SKELETON_DANGLING_ENDPOINT");
+    expect(container.textContent).toContain(
+      "Kraigo arba slėnio galas nesujungtas",
+    );
+    expect(container.textContent).not.toContain("Endpoint is not attached");
 
     heightResponse = "review";
     await act(async () => {
@@ -470,6 +479,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
 
     expect(stage()).toBe("review");
     expect(container.textContent).toContain("27°");
+    expect(container.textContent).toContain("Reikalinga peržiūra");
+    expect(container.textContent).not.toContain("review_required");
+    expect(container.textContent).not.toContain("Manual ridge");
   });
 
   it("snaps a near valley endpoint at 100% and preserves pending on far/zero rejection", async () => {
@@ -612,7 +624,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain(
       "Paskutinė kraigo arba slėnio linija pašalinta",
     );
-    expect(container.querySelector('img[src="/api/admin/media/91"]')).not.toBeNull();
+    expect(
+      container.querySelector('img[src="/api/admin/media/91"]'),
+    ).not.toBeNull();
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
     await act(async () => {
@@ -710,7 +724,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       );
       await flushAsyncWork();
     });
-    expect(container.textContent).toContain("CAS revizija išsaugota");
+    expect(container.textContent).toContain("Revizija saugiai išsaugota");
     expect(renderedLines()).toHaveLength(2);
     expect(
       Array.from(renderedLines()).some(
@@ -744,7 +758,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
     expect(container.textContent).toContain(
-      "Preview · CAS revizija išsaugota ir reload patvirtinta",
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
     );
 
     await click('[data-roof-fusion-line-mode="valley"]');

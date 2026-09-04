@@ -117,6 +117,10 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   onLastLineUndo?: (line: RoofFusionLine) => void;
   onLayerVisibilityChange?: (layer: RoofFusionLayer, visible: boolean) => void;
   persistencePanel?: ReactNode;
+  /** Secondary source actions supplied by the Preview UAT wrapper. */
+  advancedPanel?: ReactNode;
+  /** Reserved integration point for the legacy manual calculation fallback. */
+  legacyFallbackPanel?: ReactNode;
 }>;
 
 export const ROOF_FUSION_STAGES: readonly RoofFusionStage[] = [
@@ -320,6 +324,7 @@ function pointFromPointer(
 }
 
 export function AdminNextRoofFusionUnifiedWorkbench({
+  advancedPanel,
   orthoImageSrc,
   orthoImageAlt = "Namo ortofoto",
   orthoImageWidth,
@@ -350,6 +355,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onLastLineUndo,
   onLayerVisibilityChange,
   persistencePanel,
+  legacyFallbackPanel,
 }: RoofFusionUnifiedWorkbenchProps) {
   const canvasShellRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<RoofFusionStage>(initialStage);
@@ -1252,12 +1258,16 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
         <aside className="w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 sm:p-5 xl:w-[360px] xl:border-t-0 xl:border-l">
           <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-[#f5f0e8]">
-                Sluoksniai
-              </h3>
-              <p className="mt-1 text-xs text-[#aaa69d]">
-                Techniniai sluoksniai įjungti tik tada, kai jų reikia.
+            <details
+              className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
+              data-roof-fusion-advanced
+            >
+              <summary className="cursor-pointer text-sm font-semibold text-[#f5f0e8]">
+                Advanced · techniniai sluoksniai ir kontrolės
+              </summary>
+              <p className="mt-2 text-xs text-[#aaa69d]">
+                Papildomi šaltinio ir vaizdo valdikliai. Pirminiam matavimo
+                keliui jų atverti nereikia.
               </p>
               <div className="mt-3 grid grid-cols-1 gap-2">
                 {(Object.keys(layerLabels) as RoofFusionLayer[]).map(
@@ -1307,7 +1317,31 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   value={approvedOutlineFillOpacity}
                 />
               </label>
-            </div>
+              {advancedPanel ? (
+                <div
+                  className="mt-3 border-t border-white/10 pt-3"
+                  data-roof-fusion-advanced-source-actions
+                >
+                  {advancedPanel}
+                </div>
+              ) : null}
+              <div
+                className="mt-3 rounded-xl border border-dashed border-white/15 p-3 text-xs text-[#aaa69d]"
+                data-roof-fusion-legacy-fallback-slot
+              >
+                {legacyFallbackPanel ?? (
+                  <>
+                    <strong className="block text-[#ddd8cd]">
+                      Senas rankinis skaičiavimas (fallback)
+                    </strong>
+                    <span className="mt-1 block">
+                      Integracijos vieta paruošta. Kol kas naudokite unified
+                      kontūro, kraigo ir slėnio įrankius.
+                    </span>
+                  </>
+                )}
+              </div>
+            </details>
 
             <div
               aria-live="polite"

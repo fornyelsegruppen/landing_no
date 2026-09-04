@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  Camera,
   CheckCircle2,
   ExternalLink,
   Layers3,
@@ -845,11 +846,75 @@ export function RealAddressResult({
     Boolean(captureResult?.imageUrl) &&
     normalizedSourceOutline.length >= 3 &&
     captureMatchesSelection;
+  const unifiedSourceActions = (
+    <div className="grid gap-3" data-roof-fusion-unified-source-actions>
+      <strong className="text-xs tracking-[.12em] text-[var(--an-subtle)] uppercase">
+        Šaltinio veiksmai
+      </strong>
+      <label className="grid gap-2 text-xs font-bold">
+        {t.candidateLabel}
+        <select
+          className="min-h-11 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 text-sm"
+          onChange={(event) => setSelectedId(event.target.value)}
+          value={selected.id}
+        >
+          {result.candidates.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <a
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border)] px-4 text-xs font-black hover:border-[var(--an-amber)]"
+        href={selected.sourceUrl}
+        rel="noreferrer"
+        target="_blank"
+      >
+        {t.source}
+        <ExternalLink aria-hidden="true" className="size-4" />
+      </a>
+      <button
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border)] px-4 text-xs font-black hover:border-[var(--an-amber)]"
+        data-roof-fusion-refresh-norge-capture
+        onClick={() =>
+          document
+            .getElementById(`roof-fusion-norge-capture-${leadId}`)
+            ?.click()
+        }
+        type="button"
+      >
+        <Camera aria-hidden="true" className="size-4" />
+        Atnaujinti vaizdą iš Norge i bilder
+      </button>
+      <form action={heightFormAction}>
+        <input name="addressQuery" type="hidden" value={result.address.label} />
+        <input name="candidateId" type="hidden" value={selected.id} />
+        <button
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
+          disabled={heightPending}
+          type="submit"
+        >
+          {heightPending ? (
+            <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+          ) : (
+            <Mountain aria-hidden="true" className="size-4" />
+          )}
+          {heightPending ? t.heightWorking : t.heightAction}
+        </button>
+      </form>
+      <p className="text-[10px] leading-4 text-[var(--an-muted)]">
+        Šie veiksmai atnaujina tik pasirinkto pastato šaltinius. Matavimo
+        geometrija ir jos revizija lieka unified darbo vietoje.
+      </p>
+    </div>
+  );
   return (
     <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
       {canRenderUnifiedWorkbench ? (
         <div className="xl:col-span-2">
           <AdminNextRoofFusionPersistentWorkbench
+            advancedPanel={unifiedSourceActions}
             actorId={actorId}
             capture={captureResult!}
             caseId={`lead:${leadId}`}
@@ -862,357 +927,377 @@ export function RealAddressResult({
           />
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-canvas)]">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--an-border)] px-4 py-3">
-          <div>
-            <strong className="block text-sm">{result.address.label}</strong>
-            <span className="text-[10px] text-[var(--an-subtle)]">
-              {result.address.latitude.toFixed(6)},{" "}
-              {result.address.longitude.toFixed(6)} · Kartverket
+      {!canRenderUnifiedWorkbench ? (
+        <div className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-canvas)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--an-border)] px-4 py-3">
+            <div>
+              <strong className="block text-sm">{result.address.label}</strong>
+              <span className="text-[10px] text-[var(--an-subtle)]">
+                {result.address.latitude.toFixed(6)},{" "}
+                {result.address.longitude.toFixed(6)} · Kartverket
+              </span>
+            </div>
+            <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[9px] font-bold text-[var(--an-amber)]">
+              {t.imageryPending}
             </span>
           </div>
-          <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[9px] font-bold text-[var(--an-amber)]">
-            {t.imageryPending}
-          </span>
-        </div>
-        {activeHeight ? (
-          <div
-            aria-label={
-              hasSegmentedPlanes
-                ? `${t.heightTitle} · ${activePlanes.length} ${t.heightPlaneCount.toLowerCase()} · ${t.reviewRequired}`
-                : t.heightTitle
-            }
-            className="relative overflow-hidden bg-[#080d12] bg-cover bg-center"
-            role="img"
-            style={{
-              aspectRatio:
-                String(activeHeight.visualization.width) +
-                " / " +
-                String(activeHeight.visualization.height),
-              backgroundImage:
-                "url(" + activeHeight.visualization.dataUrl + ")",
-            }}
-          >
-            <button
-              aria-label={t.ridgeInstruction}
-              className={`absolute inset-0 z-10 ${manualRidgeAvailable ? "cursor-crosshair" : "cursor-default"}`}
-              disabled={!manualRidgeAvailable}
-              onClick={selectRidgePoint}
-              type="button"
-            />
-            <svg
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 size-full"
-              preserveAspectRatio="none"
-              viewBox={[
-                0,
-                0,
-                activeHeight.visualization.width,
-                activeHeight.visualization.height,
-              ].join(" ")}
+          {activeHeight ? (
+            <div
+              aria-label={
+                hasSegmentedPlanes
+                  ? `${t.heightTitle} · ${activePlanes.length} ${t.heightPlaneCount.toLowerCase()} · ${t.reviewRequired}`
+                  : t.heightTitle
+              }
+              className="relative overflow-hidden bg-[#080d12] bg-cover bg-center"
+              role="img"
+              style={{
+                aspectRatio:
+                  String(activeHeight.visualization.width) +
+                  " / " +
+                  String(activeHeight.visualization.height),
+                backgroundImage:
+                  "url(" + activeHeight.visualization.dataUrl + ")",
+              }}
             >
-              {showOverlay ? (
-                <>
-                  <polygon
-                    fill={
-                      hasSegmentedPlanes
-                        ? "transparent"
-                        : "rgba(244,182,63," + opacity / 100 + ")"
-                    }
-                    points={activeHeight.visualization.overlayPoints}
-                    stroke="#f4b63f"
-                    strokeLinejoin="round"
-                    strokeWidth={
-                      Math.max(
-                        activeHeight.visualization.width,
-                        activeHeight.visualization.height,
-                      ) / 125
-                    }
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  {activePlanes.map((plane, index) => {
-                    const palette =
-                      planeOverlayPalette[index % planeOverlayPalette.length];
-                    return (
-                      <polygon
-                        fill={overlayFill(palette.fill, opacity / 100)}
-                        key={plane.planeId}
-                        points={plane.overlayPoints}
-                        stroke={palette.stroke}
-                        strokeLinejoin="round"
+              <button
+                aria-label={t.ridgeInstruction}
+                className={`absolute inset-0 z-10 ${manualRidgeAvailable ? "cursor-crosshair" : "cursor-default"}`}
+                disabled={!manualRidgeAvailable}
+                onClick={selectRidgePoint}
+                type="button"
+              />
+              <svg
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 size-full"
+                preserveAspectRatio="none"
+                viewBox={[
+                  0,
+                  0,
+                  activeHeight.visualization.width,
+                  activeHeight.visualization.height,
+                ].join(" ")}
+              >
+                {showOverlay ? (
+                  <>
+                    <polygon
+                      fill={
+                        hasSegmentedPlanes
+                          ? "transparent"
+                          : "rgba(244,182,63," + opacity / 100 + ")"
+                      }
+                      points={activeHeight.visualization.overlayPoints}
+                      stroke="#f4b63f"
+                      strokeLinejoin="round"
+                      strokeWidth={
+                        Math.max(
+                          activeHeight.visualization.width,
+                          activeHeight.visualization.height,
+                        ) / 125
+                      }
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    {activePlanes.map((plane, index) => {
+                      const palette =
+                        planeOverlayPalette[index % planeOverlayPalette.length];
+                      return (
+                        <polygon
+                          fill={overlayFill(palette.fill, opacity / 100)}
+                          key={plane.planeId}
+                          points={plane.overlayPoints}
+                          stroke={palette.stroke}
+                          strokeLinejoin="round"
+                          strokeWidth={
+                            Math.max(
+                              activeHeight.visualization.width,
+                              activeHeight.visualization.height,
+                            ) / 150
+                          }
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      );
+                    })}
+                    {activeHeight.visualization.ridge ? (
+                      <polyline
+                        fill="none"
+                        points={activeHeight.visualization.ridge.overlayPoints}
+                        stroke="#f8fafc"
+                        strokeLinecap="round"
                         strokeWidth={
                           Math.max(
                             activeHeight.visualization.width,
                             activeHeight.visualization.height,
-                          ) / 150
+                          ) / 90
                         }
                         vectorEffect="non-scaling-stroke"
                       />
-                    );
-                  })}
-                  {activeHeight.visualization.ridge ? (
-                    <polyline
-                      fill="none"
-                      points={activeHeight.visualization.ridge.overlayPoints}
-                      stroke="#f8fafc"
-                      strokeLinecap="round"
-                      strokeWidth={
-                        Math.max(
-                          activeHeight.visualization.width,
-                          activeHeight.visualization.height,
-                        ) / 90
-                      }
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ) : null}
-                  {ridgePoints.length === 2 ? (
-                    <line
-                      stroke="#22d3ee"
-                      strokeDasharray="5 4"
-                      strokeWidth={
-                        Math.max(
-                          activeHeight.visualization.width,
-                          activeHeight.visualization.height,
-                        ) / 110
-                      }
-                      x1={ridgePoints[0].x * activeHeight.visualization.width}
-                      x2={ridgePoints[1].x * activeHeight.visualization.width}
-                      y1={ridgePoints[0].y * activeHeight.visualization.height}
-                      y2={ridgePoints[1].y * activeHeight.visualization.height}
-                    />
-                  ) : null}
-                  {ridgePoints.map((point, index) => (
-                    <circle
-                      cx={point.x * activeHeight.visualization.width}
-                      cy={point.y * activeHeight.visualization.height}
-                      fill="#22d3ee"
-                      key={`${point.x}:${point.y}:${index}`}
-                      r={
-                        Math.max(
-                          activeHeight.visualization.width,
-                          activeHeight.visualization.height,
-                        ) / 75
-                      }
-                      stroke="#082f49"
-                      strokeWidth={
-                        Math.max(
-                          activeHeight.visualization.width,
-                          activeHeight.visualization.height,
-                        ) / 180
-                      }
-                    />
-                  ))}
-                </>
-              ) : null}
-            </svg>
-            <span className="pointer-events-none absolute top-3 left-3 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] font-black text-white">
-              N ↑ · 1 m
-            </span>
-            {hasSegmentedPlanes ? (
-              <span className="pointer-events-none absolute top-3 right-3 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-[9px] font-black text-white">
-                {activePlanes.length} · {t.heightStatusPreview} ·{" "}
-                {t.reviewRequired}
-              </span>
-            ) : null}
-            <span className="pointer-events-none absolute right-3 bottom-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-[var(--an-border)] bg-black/70 px-2 py-1 text-right text-[9px] text-[var(--an-muted)]">
-              {activeHeight.visualization.attribution}
-            </span>
-          </div>
-        ) : (
-          <div className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3">
-            <svg
-              aria-label={t.candidateLabel}
-              className="h-auto w-full"
-              role="img"
-              viewBox="0 0 620 330"
-            >
-              {showOverlay
-                ? projected.candidates.map((candidate) => {
-                    const active = candidate.id === selected.id;
-                    return (
-                      <polygon
-                        fill={
-                          active
-                            ? `rgba(244,182,63,${opacity / 100})`
-                            : "rgba(111,132,151,.10)"
+                    ) : null}
+                    {ridgePoints.length === 2 ? (
+                      <line
+                        stroke="#22d3ee"
+                        strokeDasharray="5 4"
+                        strokeWidth={
+                          Math.max(
+                            activeHeight.visualization.width,
+                            activeHeight.visualization.height,
+                          ) / 110
                         }
-                        key={candidate.id}
-                        points={candidate.points}
-                        stroke={active ? "#f4b63f" : "#6f8497"}
-                        strokeWidth={active ? 4 : 2}
+                        x1={ridgePoints[0].x * activeHeight.visualization.width}
+                        x2={ridgePoints[1].x * activeHeight.visualization.width}
+                        y1={
+                          ridgePoints[0].y * activeHeight.visualization.height
+                        }
+                        y2={
+                          ridgePoints[1].y * activeHeight.visualization.height
+                        }
                       />
-                    );
-                  })
-                : null}
-              <circle
-                cx={projected.addressPoint.x}
-                cy={projected.addressPoint.y}
-                fill="#ef4444"
-                r="7"
-                stroke="#fff"
-                strokeWidth="3"
+                    ) : null}
+                    {ridgePoints.map((point, index) => (
+                      <circle
+                        cx={point.x * activeHeight.visualization.width}
+                        cy={point.y * activeHeight.visualization.height}
+                        fill="#22d3ee"
+                        key={`${point.x}:${point.y}:${index}`}
+                        r={
+                          Math.max(
+                            activeHeight.visualization.width,
+                            activeHeight.visualization.height,
+                          ) / 75
+                        }
+                        stroke="#082f49"
+                        strokeWidth={
+                          Math.max(
+                            activeHeight.visualization.width,
+                            activeHeight.visualization.height,
+                          ) / 180
+                        }
+                      />
+                    ))}
+                  </>
+                ) : null}
+              </svg>
+              <span className="pointer-events-none absolute top-3 left-3 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] font-black text-white">
+                N ↑ · 1 m
+              </span>
+              {hasSegmentedPlanes ? (
+                <span className="pointer-events-none absolute top-3 right-3 rounded-lg border border-white/10 bg-black/70 px-2 py-1 text-[9px] font-black text-white">
+                  {activePlanes.length} · {t.heightStatusPreview} ·{" "}
+                  {t.reviewRequired}
+                </span>
+              ) : null}
+              <span className="pointer-events-none absolute right-3 bottom-3 max-w-[calc(100%-1.5rem)] rounded-lg border border-[var(--an-border)] bg-black/70 px-2 py-1 text-right text-[9px] text-[var(--an-muted)]">
+                {activeHeight.visualization.attribution}
+              </span>
+            </div>
+          ) : (
+            <div className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3">
+              <svg
+                aria-label={t.candidateLabel}
+                className="h-auto w-full"
+                role="img"
+                viewBox="0 0 620 330"
+              >
+                {showOverlay
+                  ? projected.candidates.map((candidate) => {
+                      const active = candidate.id === selected.id;
+                      return (
+                        <polygon
+                          fill={
+                            active
+                              ? `rgba(244,182,63,${opacity / 100})`
+                              : "rgba(111,132,151,.10)"
+                          }
+                          key={candidate.id}
+                          points={candidate.points}
+                          stroke={active ? "#f4b63f" : "#6f8497"}
+                          strokeWidth={active ? 4 : 2}
+                        />
+                      );
+                    })
+                  : null}
+                <circle
+                  cx={projected.addressPoint.x}
+                  cy={projected.addressPoint.y}
+                  fill="#ef4444"
+                  r="7"
+                  stroke="#fff"
+                  strokeWidth="3"
+                />
+              </svg>
+              <span className="pointer-events-none absolute right-4 bottom-4 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] text-[var(--an-muted)]">
+                © OpenStreetMap contributors · ODbL 1.0
+              </span>
+            </div>
+          )}
+          <div className="grid gap-3 border-t border-[var(--an-border)] p-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-xs font-bold">
+              {t.opacity}: {opacity}%
+              <input
+                className="accent-[var(--an-amber)]"
+                max="80"
+                min="10"
+                onChange={(event) => setOpacity(Number(event.target.value))}
+                type="range"
+                value={opacity}
               />
-            </svg>
-            <span className="pointer-events-none absolute right-4 bottom-4 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] text-[var(--an-muted)]">
-              © OpenStreetMap contributors · ODbL 1.0
-            </span>
+            </label>
+            <label className="flex items-center gap-2 text-xs font-bold">
+              <input
+                checked={showOverlay}
+                className="size-4 accent-[var(--an-amber)]"
+                onChange={(event) => setShowOverlay(event.target.checked)}
+                type="checkbox"
+              />
+              {t.overlay}
+            </label>
           </div>
-        )}
-        <div className="grid gap-3 border-t border-[var(--an-border)] p-4 sm:grid-cols-2">
-          <label className="grid gap-2 text-xs font-bold">
-            {t.opacity}: {opacity}%
-            <input
-              className="accent-[var(--an-amber)]"
-              max="80"
-              min="10"
-              onChange={(event) => setOpacity(Number(event.target.value))}
-              type="range"
-              value={opacity}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs font-bold">
-            <input
-              checked={showOverlay}
-              className="size-4 accent-[var(--an-amber)]"
-              onChange={(event) => setShowOverlay(event.target.checked)}
-              type="checkbox"
-            />
-            {t.overlay}
-          </label>
         </div>
-      </div>
+      ) : null}
 
-      <div className="grid content-start gap-3">
-        <label className="grid gap-2 text-xs font-bold">
-          {t.candidateLabel}
-          <select
-            className="min-h-11 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 text-sm"
-            onChange={(event) => setSelectedId(event.target.value)}
-            value={selected.id}
+      {!canRenderUnifiedWorkbench ? (
+        <div className="grid content-start gap-3">
+          <label className="grid gap-2 text-xs font-bold">
+            {t.candidateLabel}
+            <select
+              className="min-h-11 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 text-sm"
+              onChange={(event) => setSelectedId(event.target.value)}
+              value={selected.id}
+            >
+              {result.candidates.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <dl className="grid gap-2 text-xs">
+            <div className="an-elevated rounded-xl border p-3">
+              <dt className="text-[var(--an-subtle)]">{t.footprint}</dt>
+              <dd className="mt-1 text-base font-black">
+                {formatMetric(locale, selected.horizontalAreaSquareMeters)} m²
+              </dd>
+            </div>
+            <div className="an-elevated rounded-xl border p-3">
+              <dt className="text-[var(--an-subtle)]">{t.distance}</dt>
+              <dd className="mt-1 font-bold">
+                {formatMetric(locale, selected.distanceToAddressMeters)} m
+              </dd>
+            </div>
+            <div className="an-elevated rounded-xl border p-3">
+              <dt className="text-[var(--an-subtle)]">{t.confidence}</dt>
+              <dd className="mt-1 font-bold uppercase">
+                {selected.confidence}
+              </dd>
+            </div>
+          </dl>
+          {selected.containsAddress ? (
+            <p className="an-success rounded-xl border p-3 text-xs font-bold">
+              <CheckCircle2 aria-hidden="true" className="mr-2 inline size-4" />
+              {t.contains}
+            </p>
+          ) : null}
+          <a
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border)] px-4 text-xs font-black hover:border-[var(--an-amber)]"
+            href={selected.sourceUrl}
+            rel="noreferrer"
+            target="_blank"
           >
-            {result.candidates.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <dl className="grid gap-2 text-xs">
-          <div className="an-elevated rounded-xl border p-3">
-            <dt className="text-[var(--an-subtle)]">{t.footprint}</dt>
-            <dd className="mt-1 text-base font-black">
-              {formatMetric(locale, selected.horizontalAreaSquareMeters)} m²
-            </dd>
-          </div>
-          <div className="an-elevated rounded-xl border p-3">
-            <dt className="text-[var(--an-subtle)]">{t.distance}</dt>
-            <dd className="mt-1 font-bold">
-              {formatMetric(locale, selected.distanceToAddressMeters)} m
-            </dd>
-          </div>
-          <div className="an-elevated rounded-xl border p-3">
-            <dt className="text-[var(--an-subtle)]">{t.confidence}</dt>
-            <dd className="mt-1 font-bold uppercase">{selected.confidence}</dd>
-          </div>
-        </dl>
-        {selected.containsAddress ? (
-          <p className="an-success rounded-xl border p-3 text-xs font-bold">
-            <CheckCircle2 aria-hidden="true" className="mr-2 inline size-4" />
-            {t.contains}
-          </p>
-        ) : null}
-        <a
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border)] px-4 text-xs font-black hover:border-[var(--an-amber)]"
-          href={selected.sourceUrl}
-          rel="noreferrer"
-          target="_blank"
-        >
-          {t.source}
-          <ExternalLink aria-hidden="true" className="size-4" />
-        </a>
-        <form action={heightFormAction}>
-          <input
-            name="addressQuery"
-            type="hidden"
-            value={result.address.label}
-          />
-          <input name="candidateId" type="hidden" value={selected.id} />
-          <button
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
-            disabled={heightPending}
-            type="submit"
-          >
-            {heightPending ? (
-              <LoaderCircle
-                aria-hidden="true"
-                className="size-4 animate-spin"
-              />
-            ) : (
-              <Mountain aria-hidden="true" className="size-4" />
-            )}
-            {heightPending ? t.heightWorking : t.heightAction}
-          </button>
-        </form>
-        {activeHeight && manualRidgeAvailable ? (
-          <form
-            action={heightFormAction}
-            className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-3"
-            data-roof-fusion-manual-ridge="two-click-preview"
-          >
+            {t.source}
+            <ExternalLink aria-hidden="true" className="size-4" />
+          </a>
+          <form action={heightFormAction}>
             <input
               name="addressQuery"
               type="hidden"
               value={result.address.label}
             />
             <input name="candidateId" type="hidden" value={selected.id} />
-            {ridgePoints.length === 2 ? (
-              <>
-                <input
-                  name="ridgeFromX"
-                  type="hidden"
-                  value={ridgePoints[0].x}
+            <button
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
+              disabled={heightPending}
+              type="submit"
+            >
+              {heightPending ? (
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="size-4 animate-spin"
                 />
-                <input
-                  name="ridgeFromY"
-                  type="hidden"
-                  value={ridgePoints[0].y}
-                />
-                <input name="ridgeToX" type="hidden" value={ridgePoints[1].x} />
-                <input name="ridgeToY" type="hidden" value={ridgePoints[1].y} />
-              </>
-            ) : null}
-            <p className="text-[10px] leading-4 text-[var(--an-muted)]">
-              {ridgePoints.length === 2 ? t.ridgeReady : t.ridgeInstruction}
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button
-                className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-cyan-300/40 px-3 text-[10px] font-black text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={heightPending || ridgePoints.length !== 2}
-                type="submit"
-              >
-                {heightPending ? t.ridgeWorking : t.ridgeSubmit}
-              </button>
-              <button
-                className="min-h-10 rounded-lg border border-[var(--an-border)] px-3 text-[10px] font-bold"
-                onClick={() => setRidgePoints([])}
-                type="button"
-              >
-                {t.ridgeClear}
-              </button>
-            </div>
+              ) : (
+                <Mountain aria-hidden="true" className="size-4" />
+              )}
+              {heightPending ? t.heightWorking : t.heightAction}
+            </button>
           </form>
-        ) : activeHeight ? (
-          <p
-            className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-3 text-[10px] leading-4 text-amber-100"
-            data-roof-fusion-manual-ridge="unsupported-footprint"
-          >
-            {t.ridgeUnsupported}
-          </p>
-        ) : null}
-      </div>
-      <p className="rounded-xl border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] p-3 text-xs font-semibold text-[var(--an-amber)] xl:col-span-2">
-        {t.preliminary}
-      </p>
+          {activeHeight && manualRidgeAvailable ? (
+            <form
+              action={heightFormAction}
+              className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-3"
+              data-roof-fusion-manual-ridge="two-click-preview"
+            >
+              <input
+                name="addressQuery"
+                type="hidden"
+                value={result.address.label}
+              />
+              <input name="candidateId" type="hidden" value={selected.id} />
+              {ridgePoints.length === 2 ? (
+                <>
+                  <input
+                    name="ridgeFromX"
+                    type="hidden"
+                    value={ridgePoints[0].x}
+                  />
+                  <input
+                    name="ridgeFromY"
+                    type="hidden"
+                    value={ridgePoints[0].y}
+                  />
+                  <input
+                    name="ridgeToX"
+                    type="hidden"
+                    value={ridgePoints[1].x}
+                  />
+                  <input
+                    name="ridgeToY"
+                    type="hidden"
+                    value={ridgePoints[1].y}
+                  />
+                </>
+              ) : null}
+              <p className="text-[10px] leading-4 text-[var(--an-muted)]">
+                {ridgePoints.length === 2 ? t.ridgeReady : t.ridgeInstruction}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-cyan-300/40 px-3 text-[10px] font-black text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={heightPending || ridgePoints.length !== 2}
+                  type="submit"
+                >
+                  {heightPending ? t.ridgeWorking : t.ridgeSubmit}
+                </button>
+                <button
+                  className="min-h-10 rounded-lg border border-[var(--an-border)] px-3 text-[10px] font-bold"
+                  onClick={() => setRidgePoints([])}
+                  type="button"
+                >
+                  {t.ridgeClear}
+                </button>
+              </div>
+            </form>
+          ) : activeHeight ? (
+            <p
+              className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-3 text-[10px] leading-4 text-amber-100"
+              data-roof-fusion-manual-ridge="unsupported-footprint"
+            >
+              {t.ridgeUnsupported}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {!canRenderUnifiedWorkbench ? (
+        <p className="rounded-xl border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] p-3 text-xs font-semibold text-[var(--an-amber)] xl:col-span-2">
+          {t.preliminary}
+        </p>
+      ) : null}
       {heightState.kind === "error" ? (
         <p
           className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
@@ -1226,139 +1311,145 @@ export function RealAddressResult({
           ) : null}
         </p>
       ) : null}
-      {activeHeight ? (
-        <>
-          <HeightAnalysisPanel locale={locale} state={activeHeight} />
-          <RoofFusionTransientR4Drawer
-            locale={locale}
-            visualization={activeHeight.visualization}
-            horizontalAreaSquareMeters={
-              activeHeight.summary.engineHorizontalAreaSquareMeters
-            }
-            surfaceAreaSquareMeters={r4SurfaceAreaSquareMeters}
-            pitchDegrees={r4PitchDegrees}
-            snapshotHash={activeHeight.summary.snapshotHash}
-          />
-        </>
-      ) : enginePreview?.kind === "success" ? (
-        <section
-          aria-label={t.engineTitle}
-          className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] xl:col-span-2"
-          data-roof-fusion-engine-contract="valid-review-required"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--an-border)] p-4">
-            <div>
-              <h3 className="flex items-center gap-2 text-base font-black">
-                <ShieldCheck
-                  aria-hidden="true"
-                  className="size-5 text-emerald-300"
-                />
-                {t.engineTitle}
-              </h3>
-              <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase">
-                <span className="rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2 py-1 text-emerald-300">
-                  {t.contractValid}
-                </span>
-                <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[var(--an-amber)]">
-                  {t.reviewRequired}
-                </span>
+      {!canRenderUnifiedWorkbench ? (
+        activeHeight ? (
+          <>
+            <HeightAnalysisPanel locale={locale} state={activeHeight} />
+            <RoofFusionTransientR4Drawer
+              locale={locale}
+              visualization={activeHeight.visualization}
+              horizontalAreaSquareMeters={
+                activeHeight.summary.engineHorizontalAreaSquareMeters
+              }
+              surfaceAreaSquareMeters={r4SurfaceAreaSquareMeters}
+              pitchDegrees={r4PitchDegrees}
+              snapshotHash={activeHeight.summary.snapshotHash}
+            />
+          </>
+        ) : enginePreview?.kind === "success" ? (
+          <section
+            aria-label={t.engineTitle}
+            className="overflow-hidden rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] xl:col-span-2"
+            data-roof-fusion-engine-contract="valid-review-required"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--an-border)] p-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-base font-black">
+                  <ShieldCheck
+                    aria-hidden="true"
+                    className="size-5 text-emerald-300"
+                  />
+                  {t.engineTitle}
+                </h3>
+                <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase">
+                  <span className="rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2 py-1 text-emerald-300">
+                    {t.contractValid}
+                  </span>
+                  <span className="rounded-full border border-[color:rgba(244,182,63,.3)] bg-[var(--an-amber-soft)] px-2 py-1 text-[var(--an-amber)]">
+                    {t.reviewRequired}
+                  </span>
+                </div>
               </div>
-            </div>
-            <strong className="rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs text-red-200">
-              {t.notPricingReady}
-            </strong>
-          </div>
-
-          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)]">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
-                <span className="text-[10px] text-[var(--an-subtle)]">
-                  {t.engineFootprint}
-                </span>
-                <strong className="mt-1 block text-lg">
-                  {formatMetric(
-                    locale,
-                    enginePreview.summary.engineHorizontalAreaSquareMeters,
-                  )}{" "}
-                  m²
-                </strong>
-              </div>
-              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
-                <span className="text-[10px] text-[var(--an-subtle)]">
-                  {t.enginePerimeter}
-                </span>
-                <strong className="mt-1 block text-lg">
-                  {formatMetric(
-                    locale,
-                    enginePreview.summary.footprintPerimeterMeters,
-                  )}{" "}
-                  m
-                </strong>
-              </div>
-              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
-                <span className="text-[10px] text-[var(--an-subtle)]">
-                  {t.areaParity}
-                </span>
-                <strong className="mt-1 block text-lg">
-                  {formatMetric(locale, enginePreview.summary.areaDeltaPercent)}
-                  %
-                </strong>
-              </div>
+              <strong className="rounded-xl border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+                {t.notPricingReady}
+              </strong>
             </div>
 
-            <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
-              <strong className="text-xs">{t.blockersTitle}</strong>
-              <ul className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]">
-                {enginePreview.summary.blockers.map((blocker) => (
-                  <li className="flex gap-2" key={blocker}>
-                    <TriangleAlert
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"
-                    />
-                    {t.blockers[blocker]}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+            <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.9fr)]">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                  <span className="text-[10px] text-[var(--an-subtle)]">
+                    {t.engineFootprint}
+                  </span>
+                  <strong className="mt-1 block text-lg">
+                    {formatMetric(
+                      locale,
+                      enginePreview.summary.engineHorizontalAreaSquareMeters,
+                    )}{" "}
+                    m²
+                  </strong>
+                </div>
+                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                  <span className="text-[10px] text-[var(--an-subtle)]">
+                    {t.enginePerimeter}
+                  </span>
+                  <strong className="mt-1 block text-lg">
+                    {formatMetric(
+                      locale,
+                      enginePreview.summary.footprintPerimeterMeters,
+                    )}{" "}
+                    m
+                  </strong>
+                </div>
+                <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                  <span className="text-[10px] text-[var(--an-subtle)]">
+                    {t.areaParity}
+                  </span>
+                  <strong className="mt-1 block text-lg">
+                    {formatMetric(
+                      locale,
+                      enginePreview.summary.areaDeltaPercent,
+                    )}
+                    %
+                  </strong>
+                </div>
+              </div>
 
-          <details className="border-t border-[var(--an-border)] px-4 py-3 text-xs">
-            <summary className="cursor-pointer font-bold text-[var(--an-muted)]">
-              {t.integrity}
-            </summary>
-            <dl className="mt-3 grid gap-2 font-mono text-[10px] text-[var(--an-subtle)] sm:grid-cols-3">
-              <div>
-                <dt>{t.calculationHash}</dt>
-                <dd title={enginePreview.summary.calculationHash}>
-                  {enginePreview.summary.calculationHash.slice(0, 16)}…
-                </dd>
+              <div className="rounded-xl border border-[var(--an-border)] bg-[var(--an-canvas)] p-3">
+                <strong className="text-xs">{t.blockersTitle}</strong>
+                <ul className="mt-3 grid gap-2 text-xs text-[var(--an-muted)]">
+                  {enginePreview.summary.blockers.map((blocker) => (
+                    <li className="flex gap-2" key={blocker}>
+                      <TriangleAlert
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-[var(--an-amber)]"
+                      />
+                      {t.blockers[blocker]}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div>
-                <dt>{t.snapshotHash}</dt>
-                <dd title={enginePreview.summary.snapshotHash}>
-                  {enginePreview.summary.snapshotHash.slice(0, 16)}…
-                </dd>
-              </div>
-              <div>
-                <dt>{t.renderHash}</dt>
-                <dd title={enginePreview.summary.renderHash}>
-                  {enginePreview.summary.renderHash.slice(0, 16)}…
-                </dd>
-              </div>
-            </dl>
-          </details>
-        </section>
-      ) : (
-        <p
-          className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
-          role="alert"
-        >
-          {t.engineUnavailable}
-        </p>
-      )}
+            </div>
+
+            <details className="border-t border-[var(--an-border)] px-4 py-3 text-xs">
+              <summary className="cursor-pointer font-bold text-[var(--an-muted)]">
+                {t.integrity}
+              </summary>
+              <dl className="mt-3 grid gap-2 font-mono text-[10px] text-[var(--an-subtle)] sm:grid-cols-3">
+                <div>
+                  <dt>{t.calculationHash}</dt>
+                  <dd title={enginePreview.summary.calculationHash}>
+                    {enginePreview.summary.calculationHash.slice(0, 16)}…
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.snapshotHash}</dt>
+                  <dd title={enginePreview.summary.snapshotHash}>
+                    {enginePreview.summary.snapshotHash.slice(0, 16)}…
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.renderHash}</dt>
+                  <dd title={enginePreview.summary.renderHash}>
+                    {enginePreview.summary.renderHash.slice(0, 16)}…
+                  </dd>
+                </div>
+              </dl>
+            </details>
+          </section>
+        ) : (
+          <p
+            className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
+            role="alert"
+          >
+            {t.engineUnavailable}
+          </p>
+        )
+      ) : null}
       <NorgeIBilderCaptureControl
         api={captureApi}
         caseReference={caseReference}
+        compactWhenWorkbenchActive={canRenderUnifiedWorkbench}
         leadId={leadId}
         onCaptureResultChange={setCaptureResult}
         address={result.address}

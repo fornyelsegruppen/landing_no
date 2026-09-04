@@ -7,7 +7,14 @@ import {
   Save,
   TriangleAlert,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import {
@@ -40,6 +47,83 @@ type HeightResult = {
     footprintPerimeterMeters?: number;
   };
 };
+
+const heightStatusCopy: Record<HeightResult["status"], string> = {
+  ready: "Parengta peržiūrai",
+  review_required: "Reikalinga peržiūra",
+  blocked: "Skaičiavimas užblokuotas",
+};
+
+const blockerCopy: Record<string, string> = {
+  SKELETON_DANGLING_ENDPOINT:
+    "Kraigo arba slėnio galas nesujungtas su stogo riba ar kitu kraštu. Patikslinkite liniją.",
+  SKELETON_EDGE_OUTSIDE_MASS:
+    "Kraigo arba slėnio linija išeina už patvirtinto stogo kontūro. Perkelkite jos galus.",
+  SKELETON_DOES_NOT_SUBDIVIDE:
+    "Pažymėtos linijos saugiai nepadalija stogo į paviršius. Patikslinkite kraigus ir slėnius.",
+  FACE_TOPOLOGY_INVALID:
+    "Stogo paviršių ryšiai nėra vienareikšmiai. Reikalinga rankinė peržiūra.",
+  MASS_COVERAGE_INVALID:
+    "Apskaičiuoti paviršiai nepadengia viso patvirtinto stogo ploto. Reikalinga rankinė peržiūra.",
+  MISSING_OR_AMBIGUOUS_SKELETON:
+    "Trūksta kraigo ar slėnio linijos arba jos reikšmė neaiški. Patikslinkite stogo schemą.",
+  UNSTABLE_HEIGHT_PLANE:
+    "Aukščio taškai neleidžia patikimai nustatyti stogo plokštumos. Reikalinga peržiūra.",
+  TOO_FEW_HEIGHT_SAMPLES:
+    "Stogo paviršiui nepakanka patikimų aukščio taškų. Patikrinkite Høydedata aprėptį.",
+  SHARED_EDGE_HEIGHT_CONFLICT:
+    "Bendro krašto aukščiai tarp gretimų paviršių nesutampa. Reikalinga peržiūra.",
+  OBSTACLE_SURFACE_OWNERSHIP_REQUIRED:
+    "Kliūties negalima saugiai priskirti konkrečiam stogo paviršiui. Reikalinga peržiūra.",
+};
+
+export function localizedWorkbenchHeightBlocker(blocker: string) {
+  const code = /\[([A-Z][A-Z0-9_]+)\]/u.exec(blocker)?.[1];
+  if (code && blockerCopy[code]) return `[${code}] ${blockerCopy[code]}`;
+  if (
+    /manual ridge|valley|hip|eave|explicit plane subdivision/iu.test(blocker)
+  ) {
+    return "Rankinės stogo linijos panaudotos paviršiams atskirti. Rezultatą būtina peržiūrėti.";
+  }
+  if (/review/iu.test(blocker)) {
+    return "Prieš naudojant rezultatą būtina rankinė peržiūra.";
+  }
+  return "Aukščio skaičiavimas grąžino techninį blokatorių. Patikrinkite kontūrą, kraigus ir slėnius; jei kartojasi, perduokite peržiūrai.";
+}
+
+function localizedWorkbenchProblem(error: unknown, fallback: string) {
+  if (!(error instanceof WorkbenchUiApiErrorV1)) return fallback;
+  const messages: Record<string, string> = {
+    LOAD_FAILED: "Juodraščio įkelti nepavyko.",
+    SAVE_FAILED: "Juodraščio išsaugoti nepavyko.",
+    INVALID_DRAFT:
+      "Juodraščio geometrija netinkama. Patikrinkite kontūrą ir stogo linijas.",
+    INVALID_GEOMETRY:
+      "Juodraščio geometrija netinkama. Patikrinkite kontūrą ir stogo linijas.",
+    REVISION_CONFLICT:
+      "Revizija pasikeitė. Perkraukite naujausią versiją ir pakartokite pakeitimą.",
+    RELOAD_MISMATCH:
+      "Išsaugotos revizijos kontrolinė suma nepatvirtinta pakartotiniu įkėlimu.",
+    ACTOR_MISMATCH:
+      "Veiksmą turi atlikti prie bylos prisijungęs administratorius.",
+    STALE_DRAFT:
+      "Juodraštis paseno arba nebebuvo rastas. Perkraukite reviziją.",
+    TRUSTED_INPUT_REQUIRED:
+      "Trūksta patikimos ortofoto registracijos arba pilno aukščio paviršiaus.",
+    SOURCE_INTEGRITY_INVALID:
+      "Šaltinių tapatybė arba kontrolinės sumos nesutampa. Atnaujinkite šaltinius ir peržiūrėkite reviziją.",
+    HEIGHT_CALCULATION_INVALID:
+      "Stogo paviršių nepavyko apskaičiuoti saugiai. Patikslinkite geometriją arba perduokite peržiūrai.",
+    INVALID_HEIGHT_INPUT:
+      "Aukščio skaičiavimo duomenys netinkami. Atnaujinkite Høydedata šaltinį.",
+    HEIGHT_FAILED: "Aukščio skaičiavimas nepavyko. Bandykite dar kartą.",
+    SKELETON_ENDPOINT_OUTSIDE_MASS:
+      "Kraigo arba slėnio galas yra už patvirtinto stogo kontūro.",
+    SKELETON_ZERO_LENGTH:
+      "Kraigo arba slėnio pradžios ir pabaigos taškai turi skirtis.",
+  };
+  return `[${error.code}] ${messages[error.code] ?? fallback}`;
+}
 
 function reference(
   draft: RoofFusionWorkbenchDraftV1,
@@ -140,6 +224,7 @@ function sourceFootprintMatchesCapture(
 }
 
 export function AdminNextRoofFusionPersistentWorkbench({
+  advancedPanel,
   actorId,
   capture,
   caseId,
@@ -149,6 +234,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   sourceOutline,
   sourceFootprintId,
 }: {
+  advancedPanel?: ReactNode;
   actorId: string;
   capture: NorgeIBilderCaptureResult;
   caseId: string;
@@ -248,7 +334,9 @@ export function AdminNextRoofFusionPersistentWorkbench({
       setProblem(
         "Atnaujinto vaizdo stogo kontūro tapatybė nesutampa su išsaugota revizija. Rankinės anotacijos neišvalytos; patvirtinkite naujos geometrijos pradžią tik jei tikrai norite jų atsisakyti.",
       );
-    }, [capture, registeredSourceOutline, sourceFootprintId]);
+    },
+    [capture, registeredSourceOutline, sourceFootprintId],
+  );
 
   const loadLatest = useCallback(async () => {
     setLoadState("loading");
@@ -261,7 +349,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     } catch (error) {
       setLoadState("error");
       setProblem(
-        error instanceof Error ? error.message : "Juodraščio įkelti nepavyko",
+        localizedWorkbenchProblem(error, "Juodraščio įkelti nepavyko."),
       );
     }
   }, [applyLoadedDraft, caseId]);
@@ -279,7 +367,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         if (cancelled) return;
         setLoadState("error");
         setProblem(
-          error instanceof Error ? error.message : "Juodraščio įkelti nepavyko",
+          localizedWorkbenchProblem(error, "Juodraščio įkelti nepavyko."),
         );
       });
     return () => {
@@ -339,13 +427,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       pendingDraft.current = null;
     } catch (error) {
       setSaveState("error");
-      const message =
-        error instanceof WorkbenchUiApiErrorV1
-          ? `${error.code}: ${error.message}`
-          : error instanceof Error
-            ? error.message
-            : "Išsaugoti nepavyko";
-      setProblem(message);
+      setProblem(localizedWorkbenchProblem(error, "Išsaugoti nepavyko."));
     }
   }, [
     actorId,
@@ -413,9 +495,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       return body.status !== "blocked";
     } catch (error) {
       setHeightState("error");
-      setProblem(
-        error instanceof Error ? error.message : "Skaičiavimas nepavyko",
-      );
+      setProblem(localizedWorkbenchProblem(error, "Skaičiavimas nepavyko."));
       return false;
     }
   }, [capture, caseId, confirmed, dirty, heightSurface]);
@@ -424,13 +504,13 @@ export function AdminNextRoofFusionPersistentWorkbench({
     () => [
       ...(!evidenceReady
         ? [
-            "Trūksta tikslaus išsaugoto vaizdo hash arba patikimos actual-visible-extent EPSG:25833 registracijos.",
+            "Trūksta tikslios išsaugoto vaizdo kontrolinės sumos arba patikimos faktiškai matomo vaizdo EPSG:25833 registracijos.",
           ]
         : []),
       ...(unsupportedLatest
         ? [
             sourceResetRequired
-              ? "Atnaujinto vaizdo footprint tapatybė nepatvirtinta; anotacijų išvalymas laukia aiškaus patvirtinimo."
+              ? "Atnaujinto vaizdo stogo kontūro tapatybė nepatvirtinta; anotacijų išvalymas laukia aiškaus patvirtinimo."
               : "Sudėtingos revizijos paviršių, angų ar kliūčių priklausomybės šioje drobėje negali būti saugiai atkurtos — reikalinga peržiūra.",
           ]
         : []),
@@ -444,11 +524,11 @@ export function AdminNextRoofFusionPersistentWorkbench({
   });
   const calculationBlockerCopy = {
     TRUSTED_ORTHOPHOTO_REQUIRED:
-      "Trūksta patikimos actual-visible-extent EPSG:25833 ortofoto registracijos.",
+      "Trūksta patikimos faktiškai matomo vaizdo EPSG:25833 ortofoto registracijos.",
     COMPLETE_HEIGHT_SURFACE_REQUIRED:
       "Trūksta pilno EPSG:25833 DOM + DTM aukščio paviršiaus.",
     STORED_DRAFT_HASH_REQUIRED:
-      "Pirmiausia išsaugokite ir pakartotinai patvirtinkite tikslų juodraščio hash.",
+      "Pirmiausia išsaugokite ir pakartotinai patvirtinkite tikslią juodraščio kontrolinę sumą.",
   } as const;
   const calculationBlockers = calculationBlockerCodes.map(
     (code) => calculationBlockerCopy[code],
@@ -499,8 +579,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
           <CheckCircle2 aria-hidden className="mr-1 inline size-4" />
           {saveState === "replayed"
             ? "Idempotentinis pakartojimas patvirtintas"
-            : "CAS revizija išsaugota"}
-          ; reload hash sutampa.
+            : "Revizija saugiai išsaugota"}
+          ; pakartotinai įkelta kontrolinė suma sutampa.
         </p>
       ) : null}
       {problem ? (
@@ -542,11 +622,12 @@ export function AdminNextRoofFusionPersistentWorkbench({
           className={`mt-3 rounded-xl border p-2 text-xs ${heightResult.status === "blocked" ? "border-red-400/35 text-red-200" : "border-amber-300/30 text-amber-100"}`}
           data-roof-fusion-height-result={heightResult.status}
         >
-          <strong>{heightResult.status}</strong> · kainodarai: ne
+          <strong>{heightStatusCopy[heightResult.status]}</strong> · kainodarai
+          nenaudojama
           {heightResult.summary.blockers.length ? (
             <ul className="mt-1 list-disc pl-4">
               {heightResult.summary.blockers.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item}>{localizedWorkbenchHeightBlocker(item)}</li>
               ))}
             </ul>
           ) : null}
@@ -572,18 +653,19 @@ export function AdminNextRoofFusionPersistentWorkbench({
   return (
     <AdminNextRoofFusionUnifiedWorkbench
       approvedOutline={outline}
+      advancedPanel={advancedPanel}
       averageSlopeDegrees={metrics?.averageSlopeDegrees}
       blockers={blockers}
       confidence={heightResult?.status === "blocked" ? "low" : "medium"}
       confidenceReason={
         heightResult
-          ? `${heightResult.status}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
+          ? `${heightStatusCopy[heightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
           : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
       }
       footprintPerimeterMeters={metrics?.footprintPerimeterMeters}
       guardNotice={
         confirmed && !dirty
-          ? "Preview · CAS revizija išsaugota ir reload patvirtinta"
+          ? "Preview · revizija išsaugota ir pakartotinai patvirtinta"
           : "Preview · neišsaugoti pakeitimai"
       }
       geometryHydrationSignal={geometryHydrationSignal}

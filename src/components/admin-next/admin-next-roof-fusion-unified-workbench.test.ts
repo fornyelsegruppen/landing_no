@@ -19,7 +19,10 @@ import {
   shouldSuppressRoofFusionCanvasClick,
   zoomRoofFusionViewportAt,
 } from "./admin-next-roof-fusion-unified-workbench";
-import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
+import {
+  AdminNextRoofFusionPersistentWorkbench,
+  localizedWorkbenchHeightBlocker,
+} from "./admin-next-roof-fusion-persistent-workbench";
 
 const sourceOutline = [
   { x: 0.16, y: 0.18 },
@@ -169,6 +172,48 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).not.toContain('data-roof-fusion-layer="hoydedata"');
     expect(html).not.toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).not.toContain('data-roof-fusion-layer="skeleton"');
+  });
+
+  it("keeps technical controls and the legacy fallback slot in a closed Advanced panel", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        advancedPanel: createElement("button", null, "Atnaujinti šaltinį"),
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        sourceOutline,
+      }),
+    );
+
+    const advancedStart = html.indexOf("data-roof-fusion-advanced");
+    const advancedTagStart = html.lastIndexOf("<details", advancedStart);
+    const advancedEnd = html.indexOf("</details>", advancedStart);
+    const advanced = html.slice(advancedStart, advancedEnd);
+    expect(advancedStart).toBeGreaterThan(-1);
+    expect(
+      html.slice(advancedTagStart, html.indexOf(">", advancedTagStart)),
+    ).not.toContain(" open");
+    expect(advanced).toContain("Advanced · techniniai sluoksniai ir kontrolės");
+    expect(advanced).toContain("data-roof-fusion-layer-toggle");
+    expect(advanced).toContain("Atnaujinti šaltinį");
+    expect(advanced).toContain("data-roof-fusion-legacy-fallback-slot");
+    expect(advanced).toContain("Senas rankinis skaičiavimas (fallback)");
+  });
+
+  it("localizes adapter blocker prose and never exposes unknown English reasons", () => {
+    expect(
+      localizedWorkbenchHeightBlocker(
+        "[SKELETON_DANGLING_ENDPOINT] Endpoint is not attached.",
+      ),
+    ).toContain("Kraigo arba slėnio galas nesujungtas");
+    expect(
+      localizedWorkbenchHeightBlocker(
+        "Manual ridge, valley, hip, and eave hints were used for explicit plane subdivision.",
+      ),
+    ).toBe(
+      "Rankinės stogo linijos panaudotos paviršiams atskirti. Rezultatą būtina peržiūrėti.",
+    );
+    expect(
+      localizedWorkbenchHeightBlocker("Unknown adapter failure in plane fit"),
+    ).not.toContain("Unknown adapter failure");
   });
 
   it("renders Høydedata samples as small aspect-corrected points", () => {
