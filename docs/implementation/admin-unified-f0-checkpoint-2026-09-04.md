@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-04
 **Bazinis commit:** `4d03b94`
-**Rezultatas:** `CONDITIONAL — F0 ĮRODYMAI SURINKTI / F1 NO-GO`
+**Rezultatas:** `CONDITIONAL — F0 CI GREEN / PREVIEW UAT PENDING / F1 NO-GO`
 **Production:** `NO-GO`; Production aplinka, duomenys, schemos, kainodara,
 siuntimai ir automatizacijos nepakeisti
 
@@ -14,11 +14,11 @@ paruošti. Kodo pakeitimai apsiriboja izoliuoto Playwright serverio worker featu
 vartu, CI generatorių atitinkančiu `payload-types.ts` ir pakartojamu vizualinių
 įrodymų fiksavimo skriptu; domeno logika nepakeista.
 
-F0 dar nėra besąlygiškai uždaryta ir F1 nepradedama. Repo jau turi pilną
-`ubuntu-latest` + PostgreSQL quality gate su sintetinėmis admin/worker paskyromis,
-tačiau bazinio commit CI sustojo prieš testus dėl nesinchronizuoto generuoto
-`payload-types.ts`; pataisa paruošta lokaliai ir turi būti patvirtinta nauju CI
-paleidimu. Stabilios Preview apsaugos autorizuotas smoke praėjo, bet joje nėra
+F0 dar nėra besąlygiškai uždaryta ir F1 nepradedama. Repo pilnas
+`ubuntu-latest` + PostgreSQL quality gate su sintetinėmis admin/worker paskyromis
+praėjo commit `938f45b`: generuoti tipai, lint, typecheck, unit/API, migracijos,
+production build, visi 11 browser scenarijų ir backup/restore yra žali.
+Stabilios Preview apsaugos autorizuotas smoke taip pat praėjo, bet joje nėra
 sintetinių aplikacijos paskyrų pilnai UAT/parity sesijai.
 
 ## 2. Paruošti įrodymai
@@ -44,44 +44,43 @@ Ji yra tikslinis acceptance kontraktas, o ne teiginys, kad F1–F7 jau
 |---|---|---|
 | `npm ci` | PASS | 902 paketai įdiegti; lockfile nepakeistas. Audit: 6 moderate; 6 dependency script leidimai laukia atskiro review. |
 | `npm audit --omit=dev --audit-level=high` | PASS | 6 moderate transitive `esbuild` radiniai; high/critical nėra, todėl quality policy praeina. |
-| Payload generated types sync | FIX PARUOŠTAS | Bazinio commit CI run `33843634021` sustojo šiame žingsnyje; `payload-types.ts` regeneruotas ir antras generavimas deterministiškas. Naujas remote CI dar nepaleistas. |
+| Payload generated types sync | PASS | Bazinio commit CI run `33843634021` sustojo šiame žingsnyje; pataisytas commit `938f45b` praėjo tame pačiame Ubuntu quality gate. |
 | `npm run typecheck` | PASS | Exit 0. |
 | `npm run lint` | PASS su 1 esamu warning | 0 klaidų; `<img>` warning `admin-next-r4-measurement-review.tsx:153`. |
 | `npm run test:ci:unit` | PASS | 296 failai, 1401 testas. |
 | `npm run test:ci:migrations` | PASS | 22 failai, 42 testai, izoliuotas PGlite. |
-| Playwright E2E | PASS / 2 SKIP | 9 passed, 2 skipped; skip tik autentifikuotiems admin/worker scenarijams, nes synthetic prisijungimai nesukonfigūruoti. |
+| Playwright E2E | PASS | Lokaliai 9 passed / 2 credential-dependent skipped; Ubuntu/PostgreSQL CI užsėjo synthetic paskyras ir užbaigė visus 11/11. |
 | `next build` | PASS dokumentuotame laikiname x64 procese | Compile, TypeScript, page data ir 78 statiniai puslapiai; Production DB nenaudota. |
 | `npm run test:preview:auth-smoke` | PASS | Vercel CLI autorizuotas `https://takfornyelse-staging.vercel.app/no` atsakė HTTP 200; Production nekeista. |
-| Repo Linux CI kontraktas | YRA / LAUKIA RUN | `.github/workflows/quality.yml`: Ubuntu, PostgreSQL 16, švarus `npm ci`, build, 11 browser testų ir backup/restore rehearsal. |
-| Windows ARM64 švarus native restore | FAIL / OPEN | `libsql@0.4.7` neturi publikuoto `@libsql/win32-arm64-msvc`; vietiniam įrodymui naudotas Node 22.12.0 x64 ir tikslūs x64 prebuilt paketai. |
+| Repo Linux CI kontraktas | PASS | GitHub Actions run `33865453230`: Ubuntu, PostgreSQL 16, švarus `npm ci`, build, 11 browser testų ir backup/restore rehearsal; trukmė 6 min. 57 sek. |
+| Windows ARM64 švarus native restore | DEFERRED / NON-BLOCKING | `libsql@0.4.7` neturi publikuoto `@libsql/win32-arm64-msvc`; oficialus projekto release runneris yra žalias Ubuntu/Linux, todėl vietinis ARM apribojimas dokumentuotas, bet neblokuoja F1. |
 
-E2E testų matricoje iš viso yra 11 scenarijų. Du skip nevadinami žaliais:
-jiems reikia saugiai sukonfigūruotų `E2E_ADMIN_*` ir `E2E_WORKER_*` synthetic
-paskyrų arba lygiaverčio testinio identity mechanizmo.
+E2E testų matricoje iš viso yra 11 scenarijų. CI ephemeral PostgreSQL bazėje
+saugiai užsėtos `example.invalid` admin/worker paskyros, todėl visi 11 scenarijų
+praėjo. Lokalus 9/2 rezultatas paliekamas kaip Windows aplinkos istorinis
+įrodymas, ne kaip galutinis release vartas.
 
 ## 4. UAT / leidimo būsena
 
 | Sritis | Būsena |
 |---|---|
 | Vartotojo testavimas | Preview Deployment Protection autorizuotas smoke praėjo, tačiau pilna aplikacijos sesija neatlikta, nes Preview aplinkoje nėra `E2E_ADMIN_*` / `E2E_WORKER_*` paskyrų. |
-| Agentų pataisos | Playwright feature gate, CI generuotų Payload tipų sinchronizacija ir F0 įrodymai; domeno/UI F1 implementacija nepradėta. |
-| Sujungta | Nieko; pakeitimai šiame worktree dar nesujungti. |
-| Stabili Preview | Esamas remote deployment nekeistas. |
+| Agentų pataisos | Playwright feature gate, CI generuotų Payload tipų sinchronizacija ir F0 įrodymai commit `938f45b`; domeno/UI F1 implementacija nepradėta. |
+| Sujungta | Šaka `codex/unified-admin-f0` pushinta; į pagrindinę šaką dar nesujungta. |
+| Stabili Preview | Esamas remote deployment nekeistas; šiam commit naujas Preview kandidatas automatiškai nesukurtas. |
 | Production | Nepaliesta; `NO-GO`. |
 
 ## 5. Atviri vartai prieš F1
 
-1. Commit/push šiame worktree paruoštą generated-types pataisą ir paleisti esamą
-   Ubuntu/PostgreSQL quality gate iki žalios būsenos; jis pats sukuria
-   `example.invalid` admin/worker paskyras ir vykdo visus 11 E2E.
-2. Preview aplinkoje saugiai sukurti atskiras sintetines aplikacijos paskyras
+1. Preview aplinkoje saugiai sukurti atskiras sintetines aplikacijos paskyras
    arba pasirinkti lygiavertį read-only identity mechanizmą, tada atlikti V2 ↔
    Next parity ir click/time baseline. Vercel apsaugos smoke jau žalias.
-3. Uždaryti arba aiškiai priimti `UA-FND-014` mobile etapų indikatoriaus riziką
+2. Uždaryti arba aiškiai priimti `UA-FND-014` mobile etapų indikatoriaus riziką
    prieš įvardijant Case mobile kaip acceptance-ready.
 
 ## 6. Vienas kitas operatoriaus veiksmas
 
-Patvirtinkite `codex/unified-admin-f0` šakos sukūrimą ir push, kad esamas
-Ubuntu/PostgreSQL quality gate realiai patikrintų generated-types pataisą, build
-ir visus 11 E2E. Tai nekeis Production.
+Pasirinkite: leisti sukurti tik sintetines `example.invalid` paskyras Preview
+UAT aplinkoje, arba priimti žalią 11/11 CI kaip pakankamą F1 pradžiai ir palikti
+Preview identity patikrą privalomu F7 rollout vartu. Abu variantai neliečia
+Production.

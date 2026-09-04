@@ -2,7 +2,7 @@
 
 **Owner:** PLATFORM
 **Technologijos partneris:** RF
-**Statusas:** PATVIRTINTA · F0 CHECKPOINT PARUOŠTAS · F1 NO-GO
+**Statusas:** PATVIRTINTA · F0 CI GREEN · PREVIEW UAT PENDING · F1 NO-GO
 **Data:** 2026-09-04
 **Bazinis commit:** `4d03b94` (`feat(rf): implement one-card preview workflow`)
 **Apimtis:** visa administravimo kelionė, darbuotojo mobili eiga ir susiję
@@ -62,9 +62,9 @@ build praėjo su laikinu Node x64 runneriu, tačiau švarus Windows ARM64 restor
 tebėra atviras dėl nepaskelbto `@libsql/win32-arm64-msvc`. Pilna įrodymų ir
 vartų būsena pateikta
 [F0 checkpoint](../implementation/admin-unified-f0-checkpoint-2026-09-04.md).
-Repo esamas Ubuntu/PostgreSQL CI jau turi sintetinių paskyrų seed ir visų 11 E2E
-kontraktą; bazinio commit run sustabdė generated Payload tipų drift, kuris šiame
-worktree pataisytas ir laukia naujo remote CI patvirtinimo.
+Repo Ubuntu/PostgreSQL CI turi sintetinių paskyrų seed ir visų 11 E2E kontraktą;
+bazinio commit generated Payload tipų drift pataisytas, o commit `938f45b`
+quality run `33865453230` užbaigė visus vartus žaliai.
 
 ### Esamos sistemos įrodymų žemėlapis
 

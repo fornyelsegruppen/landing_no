@@ -2,7 +2,7 @@
 
 **Artefaktas:** F0 planavimo rezultatas
 **Data:** 2026-09-04
-**Statusas:** `PLANNED / F0 CHECKPOINT READY / F1 NO-GO`
+**Statusas:** `PLANNED / F0 CI GREEN / PREVIEW UAT PENDING / F1 NO-GO`
 **Owner:** PLATFORM
 **Pagrindinis planas:** [Takfornyelse vientisos administravimo UI/UX sistemos planas](../product/takfornyelse-unified-admin-ui-ux-system-plan-2026-09-04.md)
 **Bazinis commit:** `4d03b94` (`feat(rf): implement one-card preview workflow`)
