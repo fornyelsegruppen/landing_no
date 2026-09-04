@@ -16,6 +16,7 @@ data.
 - `case-360-delivery-details-1440.png` — expanded historical delivery journey
 - `case-360-question-focus-1440.png` — exact desktop unresolved-question focus
 - `case-360-question-focus-375.png` — exact mobile unresolved-question focus
+- `case-360-commercial-versions-1440.png` — expanded quote/contract version chain
 
 The case summary and next action stay visible above a sticky, keyboard-accessible
 three-panel switcher. Only one of customer dialogue, evidence, or history is
@@ -34,6 +35,8 @@ without removing any record data.
   target;
 - quote and contract versions, supersession reference, signature times and
   document hash;
+- localized active quote/contract reference, state and effective/working role
+  remain visible even while the full version chain is collapsed;
 - every document returned by the current Admin V2 case read model;
 - business chronology separated from the technical audit trail;
 - links back to the exact working Admin V2 case/message or whitelisted PDF/media

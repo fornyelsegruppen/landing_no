@@ -123,6 +123,25 @@ const copy = {
     openThread: "Åpne i Admin V2",
     commercialVersions: "Tilbud og kontrakter",
     commercialVersionsEmpty: "Ingen tilbuds- eller kontraktsversjoner.",
+    activeCommercialVersions: "Aktive versjoner",
+    commercialStatuses: {
+      draft: "Utkast",
+      approved: "Godkjent",
+      sent: "Sendt",
+      viewed: "Åpnet av kunden",
+      accepted: "Akseptert",
+      issued: "Utstedt",
+      signed: "Signert",
+      declined: "Avslått",
+      expired: "Utløpt",
+      revoked: "Tilbakekalt",
+      superseded: "Erstattet",
+    },
+    commercialRoles: {
+      effective: "Gjeldende",
+      working: "Under arbeid",
+      historical: "Historisk",
+    },
     quote: "Tilbud",
     contract: "Kontrakt",
     versionShort: "v",
@@ -272,6 +291,25 @@ const copy = {
     openThread: "Atidaryti Admin V2",
     commercialVersions: "Pasiūlymai ir sutartys",
     commercialVersionsEmpty: "Pasiūlymų ar sutarčių versijų nėra.",
+    activeCommercialVersions: "Aktyvios versijos",
+    commercialStatuses: {
+      draft: "Juodraštis",
+      approved: "Patvirtinta",
+      sent: "Išsiųsta",
+      viewed: "Klientas atidarė",
+      accepted: "Priimta",
+      issued: "Pateikta pasirašyti",
+      signed: "Pasirašyta",
+      declined: "Atmesta",
+      expired: "Nebegalioja",
+      revoked: "Atšaukta",
+      superseded: "Pakeista nauja versija",
+    },
+    commercialRoles: {
+      effective: "Galiojanti",
+      working: "Rengiama",
+      historical: "Istorinė",
+    },
     quote: "Pasiūlymas",
     contract: "Sutartis",
     versionShort: "v",
@@ -420,6 +458,25 @@ const copy = {
     openThread: "Open in Admin V2",
     commercialVersions: "Quotes and contracts",
     commercialVersionsEmpty: "No quote or contract versions.",
+    activeCommercialVersions: "Active versions",
+    commercialStatuses: {
+      draft: "Draft",
+      approved: "Approved",
+      sent: "Sent",
+      viewed: "Opened by customer",
+      accepted: "Accepted",
+      issued: "Issued for signing",
+      signed: "Signed",
+      declined: "Declined",
+      expired: "Expired",
+      revoked: "Revoked",
+      superseded: "Superseded",
+    },
+    commercialRoles: {
+      effective: "Effective",
+      working: "In progress",
+      historical: "Historical",
+    },
     quote: "Quote",
     contract: "Contract",
     versionShort: "v",
@@ -563,6 +620,11 @@ function auditActor(
   return audit.actor.display ? `${kind} · ${audit.actor.display}` : kind;
 }
 
+function commercialStatusLabel(locale: PanelLocale, status: string) {
+  const labels = copy[locale].commercialStatuses as Record<string, string>;
+  return labels[status] || status;
+}
+
 export function AdminNextCaseWorkspace({
   locale,
   source = "fixture",
@@ -591,6 +653,15 @@ export function AdminNextCaseWorkspace({
         ? "ready"
         : "empty"
       : value.timelineState.status;
+  const commercialVersions = value.customerRecord?.commercialVersions || [];
+  const nonHistoricalCommercialVersions = commercialVersions.filter(
+    ({ role }) => role !== "historical",
+  );
+  const commercialVersionSummary = (
+    nonHistoricalCommercialVersions.length
+      ? nonHistoricalCommercialVersions
+      : commercialVersions
+  ).slice(0, 3);
 
   return (
     <div
@@ -987,20 +1058,40 @@ export function AdminNextCaseWorkspace({
                 <div className="min-w-0 space-y-5">
                   <details className="an-elevated group rounded-2xl border">
                     <summary
-                      className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
+                      className="flex min-h-14 cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 text-sm font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
                       id="case-commercial-versions-title"
                     >
-                      <span className="flex items-center gap-2">
-                        <FileSignature
-                          aria-hidden="true"
-                          className="size-4 text-[var(--an-amber)]"
-                        />
-                        {t.commercialVersions} ·{" "}
-                        {value.customerRecord.commercialVersions.length}
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <FileSignature
+                            aria-hidden="true"
+                            className="size-4 text-[var(--an-amber)]"
+                          />
+                          {t.commercialVersions} ·{" "}
+                          {value.customerRecord.commercialVersions.length}
+                        </span>
+                        {commercialVersionSummary.length ? (
+                          <span className="mt-2 flex flex-wrap gap-1.5">
+                            <span className="sr-only">
+                              {t.activeCommercialVersions}:
+                            </span>
+                            {commercialVersionSummary.map((item) => (
+                              <span
+                                className="rounded-full border border-[var(--an-border)] bg-[var(--an-surface-base)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]"
+                                key={`summary-${item.id}`}
+                              >
+                                {item.kind === "quote" ? t.quote : t.contract}{" "}
+                                {item.reference} ·{" "}
+                                {commercialStatusLabel(locale, item.status)} ·{" "}
+                                {t.commercialRoles[item.role]}
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
                       </span>
                       <ChevronDown
                         aria-hidden="true"
-                        className="size-4 shrink-0 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
+                        className="mt-1 size-4 shrink-0 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
                       />
                     </summary>
                     <div className="px-3 pb-3">
@@ -1029,7 +1120,8 @@ export function AdminNextCaseWorkspace({
                                     </strong>
                                   </div>
                                   <span className="shrink-0 rounded-full border border-[var(--an-border)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
-                                    {item.status} · {item.role}
+                                    {commercialStatusLabel(locale, item.status)}{" "}
+                                    · {t.commercialRoles[item.role]}
                                   </span>
                                 </div>
                                 <dl className="mt-2 space-y-1 text-[11px] text-[var(--an-subtle)]">

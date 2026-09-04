@@ -71,6 +71,10 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("Atidaryti atsakymo darbo vietą");
     expect(html).toContain('data-commercial-versions="true"');
     expect(html).toContain("K-1042-V1");
+    expect(html).toContain("Aktyvios versijos");
+    expect(html).toContain("Juodraštis");
+    expect(html).toContain("Rengiama");
+    expect(html).not.toContain("draft · working");
     expect(html).toContain("sha256:demo-contract-1042-v1");
     expect(html).toContain('data-document-register="true"');
     expect(html).toContain("kontrakt-K-1042-V1.pdf");
@@ -78,6 +82,47 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("Kundespørsmål mottatt");
     expect(html.match(/<details/gu)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain("group-open:rotate-180");
+  });
+
+  it("keeps the effective signed contract visible in the collapsed commercial summary", () => {
+    const record = adminNextCaseWorkspaceFixture.customerRecord;
+    if (!record) throw new Error("Expected fixture customer record");
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "lt",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          customerRecord: {
+            ...record,
+            commercialVersions: [
+              {
+                id: "contract-104201",
+                kind: "contract",
+                reference: "K-1042-V2",
+                version: 2,
+                status: "signed",
+                role: "effective",
+                supersedesReference: "K-1042-V1",
+                createdAt: "2026-09-03T15:12:00.000Z",
+                signedAt: "2026-09-03T16:00:00.000Z",
+                companySignedAt: "2026-09-03T16:05:00.000Z",
+                documentHash: "sha256:signed-contract-v2",
+                pdfHref: "/api/admin/quotes/104201/pdf",
+                fallbackHref: "/admin-v2/cases/1042",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain("Sutartis K-1042-V2");
+    expect(html).toContain("Pasirašyta");
+    expect(html).toContain("Galiojanti");
+    expect(html).toContain("Klientas pasirašė");
+    expect(html).toContain("Įmonė pasirašė");
+    expect(html).toContain("Pakeičia");
+    expect(html).toContain("sha256:signed-contract-v2");
   });
 
   it("uses one native disclosure for the history rail without duplicating audit content", () => {
