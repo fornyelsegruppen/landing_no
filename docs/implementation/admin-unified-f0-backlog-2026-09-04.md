@@ -1,0 +1,309 @@
+# Takfornyelse vieningo administravimo F1–F7 backlogas
+
+**Artefaktas:** F0 planavimo rezultatas
+**Data:** 2026-09-04
+**Statusas:** `PLANNED / F0 CHECKPOINT READY / F1 NO-GO`
+**Owner:** PLATFORM
+**Pagrindinis planas:** [Takfornyelse vientisos administravimo UI/UX sistemos planas](../product/takfornyelse-unified-admin-ui-ux-system-plan-2026-09-04.md)
+**Bazinis commit:** `4d03b94` (`feat(rf): implement one-card preview workflow`)
+**Production:** `NO-GO`; šis backlogas neleidžia pradėti F1–F7, diegti, keisti Production, schemų, kainodaros, laiškų ar klientų duomenų
+
+## 1. Paskirtis ir naudojimo taisyklės
+
+Šis dokumentas paverčia patvirtintą kryptį konkrečia, prioritetizuota F1–F7 darbų
+eile. Jis sukuriamas F0 metu, tačiau nė vienas žemiau esantis implementacijos
+darbas nepradedamas, kol F0 vartai nėra uždaryti ir savininkas neduoda atskiro
+`GO` atitinkamai fazei.
+
+Stabilių ID taisyklės:
+
+- formatas yra `UA-F<fazė>-<trijų skaitmenų numeris>`;
+- ID niekada nepernaudojamas kitam darbui; atšauktas darbas lieka registre kaip
+  `CANCELLED` arba `SUPERSEDED`;
+- numeris nurodo rekomenduojamą seką fazėje, ne commit ar sprinto numerį;
+- darbą galima laikyti užbaigtu tik pateikus acceptance ir testų įrodymus;
+- produkto/UI testas negali pakeisti serverinio authorization, transition,
+  CAS, idempotency ar audito testo.
+
+Prioritetai:
+
+| Prioritetas | Reikšmė |
+|---|---|
+| `P0` | Fazės vartas arba saugos/duomenų vientisumo blokatorius. |
+| `P1` | Būtina funkciniam parity ir pagrindinei operatoriaus kelionei. |
+| `P2` | Efektyvumas ar kokybės pagerinimas, galimas po P0/P1, bet prieš F7 uždarymą, jei nurodyta vartų kriterijuje. |
+
+Rizikos skalė: `H` – gali pažeisti duomenis, teises, klientų komunikaciją ar
+Production vartus; `M` – tikėtina funkcinė/UX regresija; `L` – lokali ir lengvai
+grąžinama rizika.
+
+Owner sritys:
+
+- `PLATFORM/DESIGN` – shell, tokenai, bendri komponentai, rollout;
+- `CASE/WORKFLOW` – Today, bylos būsena, NextAction, blokatoriai, istorija;
+- `RF` – Roof Fusion One Card ir Phase E/F techninė riba;
+- `COMMERCIAL/DOCS/COMMS` – pasiūlymai, sutartys, dokumentai ir komunikacija;
+- `FIELD OPS` – dispečeris, WorkOrder ir darbuotojo mobile;
+- `SEO` – turinio pipeline, publikavimas ir analitika;
+- `OPS/SECURITY/DATA` – operacijos, teisės, archyvas, auditai ir projekcijos;
+- `QA/RELEASE` – E2E, performance, a11y, UAT ir rollout įrodymai.
+
+## 2. Vykdymo seka ir fazių vartai
+
+Rekomenduojama kritinė seka:
+
+1. `F1` sukuria bendrą shell, semantiką ir sąveikos kontraktus.
+2. `F2` sukuria vieną kanoninį NextAction modelį, Today eilę ir bylos One Card.
+3. Po F2 kontraktų užšaldymo `F3`, `F4`, `F5` ir dalis `F6` gali vykti
+   lygiagrečiai, nekeisdami bendrų būsenų ar komponentų savavališkai.
+4. `F7` testų karkasas kuriamas kartu su kiekviena vertikalia dalimi, tačiau
+   galutinis rollout vartas uždaromas tik po atitinkamų F2–F6 darbų.
+5. Kiekvienas modulis išlaiko legacy fallback iki atskiro owner UAT ir
+   Production `GO`.
+
+| Fazė | Įėjimo vartas | Išėjimo vartas |
+|---|---|---|
+| F1 | F0 inventorius, žodynas, IA, capability ir URL ADR patvirtinti | Viena semantinė tema, shell, a11y/overlay/async kontraktai ir modulio fallback įrodyti izoliuotai. |
+| F2 | F1 kontraktai stabilūs; F0 transition matrica pilna | Visi realūs `CaseNextActionKind` atvaizduojami; aktyvi byla turi vieną veiksmą arba konkretų blokatorių; RF randamas iš bylos vienu pasirinkimu. |
+| F3 | F2 state/history; atskiras RF Phase E owner approval | Exact RF snapshot kilmė atsekama iki quote/package; retry nedubliuoja; niekas nesiunčiama be atskiros komandos. |
+| F4 | F1 komponentai; F2 blocker/history; esami WorkOrder guard'ai | Serveris ir mobile naudoja tą patį lifecycle; offline nerodo false success; exception keliai audituojami. |
+| F5 | F1 shell; F2 queue/history kontraktai | UI, cron ir API naudoja tą pačią SEO transition politiką; quality/reviewer/time vartai neapeinami. |
+| F6 | F0 duomenų ADR; F1 shell; F2 history/capability | Retry autorizuotas/idempotentiškas; retention neapeinama; projekcijos neapsimeta kanoninėmis esybėmis. |
+| F7 | Atitinkamas F2–F6 modulis funkciškai užbaigtas | Nulis P0/P1, priimti UAT/parity/performance/a11y/fallback įrodymai; Production tik po atskiro `GO`. |
+
+## 3. Universalus asinchroninės sąveikos kontraktas
+
+Šis kontraktas yra `UA-F1-006` rezultatas ir privalomas visiems F2–F7 ekranams,
+navigacijoms bei komandoms.
+
+### 3.1 >150 ms taisyklė
+
+1. Paspaudimas iškart gauna vizualų ir programinį patvirtinimą; valdiklis
+   nepriima nekontroliuojamo dvigubo paspaudimo.
+2. Jei naujas teisingas rezultatas nepateiktas per **150 ms**, tame pačiame
+   kontekste parodoma lokalizuota, konkrečiai pavadinta būsena, pvz.
+   `Atveriamas matavimas R4`, `Tikrinamas matavimo hash`, `Kuriamas pasiūlymo
+   juodraštis`, o ne vien `Kraunama...`.
+3. `Skeleton` naudojamas tik numatomai skaitomai struktūrai; `overlay` –
+   mutacijos ar workbench sričiai, kurios tiesa keičiasi. Shell ir nesusijusi
+   bylos informacija neblokuojami be būtinybės.
+4. Senas turinys negali atrodyti kaip nauja dabartinė būsena: keičiamai sričiai
+   taikomas `aria-busy`, aiškus pending žymėjimas arba ją pakeičia skeleton.
+5. Pending būsena išsaugo case ID, pasirinktą tab/filtrą, scroll/focus kontekstą
+   ir nepatvirtintą įvestį, jei jos išsaugojimas yra saugus.
+6. Sėkmė atnaujina tik paveiktas projekcijas, grąžina fokusą į prasmingą vietą
+   ir parodo rezultatą, ne vien bendrinį toast.
+7. Klaida pateikia žmogui suprantamą priežastį, sanitizuotą correlation ID ir:
+   - `Bandyti dar kartą`, tik jei komanda yra idempotentiška arba prieš retry
+     patikrinama jos būsena;
+   - `Grįžti į bylą` / ankstesnį sąrašą, išlaikant navigacijos kontekstą;
+   - `Koreguoti`, jei klaida pašalinama keičiant įvestį ar įrodymą.
+8. Retry negali kurti antro matavimo, pasiūlymo, dokumentų paketo, laiško,
+   darbo, publikacijos ar operacinio job.
+9. `Esc`, browser Back, matomas `Grįžti` ir uždarymas turi vienodą unsaved-change
+   politiką; modalas/drawer grąžina fokusą į jį atidariusį valdiklį.
+10. Offline ar nežinoma komandos būsena niekada nerodoma kaip sėkmė; pirmiausia
+    atliekamas status reconciliation.
+
+### 3.2 Universalūs acceptance ir testai
+
+- Su fake timer 149 ms rezultatas nesukelia mirksinčio skeleton; ties 150 ms
+  riba atsiranda konkretaus veiksmo lokalizuota būsena.
+- Slow 3G, 2 s API ir 30 s job scenarijai palieka aiškų progresą ir pasiekiamą
+  grįžimo kelią.
+- 400/500/timeout/offline/stale revision/hash mismatch atsakymai turi teisingą
+  retry arba koregavimo veiksmą ir neištrina įvesties.
+- Dvigubas paspaudimas, refresh ir retry po proceso restart sukuria vieną
+  domeno rezultatą bei vieną koreliacijos grandinę.
+- Keyboard, screen reader, 200/400 % zoom ir `prefers-reduced-motion` testai
+  patvirtina focus, live-region ir neperpildytą lokalizuotą tekstą.
+- Browser Back ir matomas `Grįžti` iš RF, pasiūlymo, dokumento, mobile darbo bei
+  SEO workbench grąžina į tą patį case/list kontekstą.
+
+## 4. RF discoverability incidentas
+
+**Incidento ID:** `UA-INC-RF-001`
+**Klasė:** P1 produkto navigacijos / randamumo defektas
+**Šaltinis:** realus operatoriaus bandymas F0 metu
+**Pagrindinis owner:** `CASE/WORKFLOW`; partneriai `RF`, `PLATFORM/DESIGN`
+
+### Dabartinis kelias: keturi techniniai pasirinkimai
+
+Operatorius RF rado tik žinodamas šią techninę seką:
+
+1. `Admin Next · Apsaugota peržiūra`;
+2. `Modulių būsena`;
+3. `Stogo matavimas ir R4`;
+4. `Atidaryti RF UAT`.
+
+Tai nėra mokymų trūkumas. Kelias kalba release/modulio diagnostikos, o ne bylos
+darbo kalba, neperduoda natūralaus konkrečios bylos konteksto ir verčia
+operatorių žinoti vidinę architektūrą.
+
+### Tikslas: vienas bylos NextAction
+
+Aktyvioje byloje kanoninis `NextActionCard` rodo `Atverti matavimą` arba `Tęsti
+matavimą`. Vienas pasirinkimas atveria teisingą RF matavimą ir perduoda:
+
+- case ID bei case revision;
+- dabartinį measurement/RF ID, reviziją ir leidžiamą režimą;
+- veiksmui reikalingą blocker/evidence kontekstą;
+- saugų, patikrintą `returnTo` į tą pačią bylą ir tab/anchor.
+
+Vienas matomas `Grįžti į bylą` pasirinkimas grąžina į tą pačią vietą. Jei RF
+nepasiekiamas, neautorizuotas ar uždarytas rollout gate, operatorius mato konkretų
+blokatorių ir recovery/fallback, o ne techninį 404 ar aklą redirect.
+
+`Modulių būsena` lieka tik techninio administratoriaus rollout, capability ir
+diagnostikos paviršiumi. Ji nerodoma operatoriaus pagrindinėje navigacijoje,
+Today eilėje ar bylos NextAction kelyje.
+
+### Incidento uždarymo kriterijai
+
+- `UA-F2-006` įgyvendina vieno pasirinkimo deep link ir vieno pasirinkimo
+  grįžimą; `UA-F7-001` bei `UA-F7-006` pateikia E2E ir be-instrukcijų UAT
+  įrodymus.
+- Operatorius, gavęs tik konkrečią bylą, be URL ar žodinės instrukcijos vienu
+  pasirinkimu pasiekia teisingą RF matavimą.
+- Testai apima naują, tęsiamą, užblokuotą, stale, neautorizuotą ir be RF
+  konteksto bylą, browser Back bei matomą `Grįžti į bylą`.
+- Telemetrija skiria `case_next_action → rf_opened`, klaidingą kontekstą,
+  uždarytą gate, atšaukimą ir sėkmingą grįžimą; PII nerenkama.
+- Operatorius nė viename acceptance scenarijuje neprivalo atverti `Modulių
+  būsena`.
+
+## 5. Prioritetizuotas F1 backlogas – bendras foundation ir shell
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F1-001` | P0 | PLATFORM/DESIGN | `admin-next` tokenus paversti vienu semantiniu dark/gintaro kontraktu (`canvas`, `surface-*`, `text-*`, `focus/action`, `danger`, `success`, `info`); uždrausti naujus raw HEX domeno komponentuose. | F0 žodynas | M – gintaras gali likti perkrautas keliomis reikšmėmis | Gintaras reiškia fokusą/aktyvų etapą/vieną primary CTA; blocker nėra gintarinis; reikšmė nėra perduodama vien spalva. | WCAG 2.2 AA matrica, lint/static scan, dark visual regression, forced-colors. | V1, V3, V5 |
+| `UA-F1-002` | P0 | PLATFORM/DESIGN | Vienas `AppShell`: responsive kairė/mobile navigacija, globalus header, skip link, utility/account zona; nekuriamas trečias shell. | UA-F1-001; F0 IA/URL ADR | H – trečias shell sukeltų nuolatinį drift | Admin V2 ir perkelti moduliai naudoja tą patį shell; Payload `/admin` aiškiai techninis; legacy route veikia per fallback. | Route/navigation contract, keyboard landmarks, 1440/1024/768/375 visual, fallback smoke. | V1, V3, V5 |
+| `UA-F1-003` | P1 | PLATFORM/DESIGN | Globalios paieškos kontraktas bylai, klientui/adresui, telefonui/el. paštui, dokumentui, darbui ir stabiliam ID; permission-aware grupės ir keyboard palette. | UA-F1-002; F0 search inventory | H – paieška gali atskleisti PII ar neegzistuojančias teises | Rezultatas rodo tipą, svarbiausią kontekstą ir leidžiamą veiksmą; neleistini įrašai negrąžinami; pasirinkus išlaikomas grįžimo kontekstas. | Authorization/PII, ranking, locale/diacritics, empty/error/loading >150 ms, keyboard/E2E. | V1, V3, V5 |
+| `UA-F1-004` | P0 | PLATFORM/DESIGN | Bendri `StatusBadge`, `OwnerChip`, `DueIndicator`, `BlockerSummary`, `VersionBadge`, `SyncState` pagal vieną semantiką. | UA-F1-001; F0 terminology ADR | M – etapas/būsena/rizika gali vėl būti sumaišyti | Komponentai reikalauja typed kind; „aktyvus“, „išspręstas“ ir „0 atvirų“ negali būti pateikti kaip prieštaringa viena būsena. | Exhaustive type/render tests, color-independent a11y, locale snapshots, invalid-state assertions. | V1, V2, V3, V4, V5 |
+| `UA-F1-005` | P0 | PLATFORM/DESIGN | Vienas modal/drawer/side-panel manager su focus trap/return, `Esc`, inert background, scroll lock ir `UnsavedChangesGuard`. | UA-F1-002 | H – fokusas ar uždarymas gali prarasti įvestį | Modalas naudojamas trumpam review/commit, drawer – kontekstui, pilnas puslapis – workbench; visi uždarymo keliai turi vienodą unsaved politiką. | Keyboard/screen-reader, nested overlay rejection, browser Back, dirty/clean form, 375 px/400 % zoom. | V3, V6 |
+| `UA-F1-006` | P0 | PLATFORM/DESIGN | Įgyvendinti 3 skyriaus universalų >150 ms localized loading/skeleton/overlay, retry ir grįžimo/koregavimo kontraktą. | UA-F1-001, UA-F1-005 | H – senas ekranas gali apsimesti current arba retry dubliuoti komandą | Visi bendri async komponentai atitinka 3.1; generic spinner be veiksmo pavadinimo nepraeina review; retry API reikalauja idempotency/status-check deklaracijos. | 3.2 matrica, fake timers 149/150 ms, slow/failure/offline, duplicate/restart, focus/live region. | V1, V2, V6 |
+| `UA-F1-007` | P0 | PLATFORM/DESIGN | Bendras `ReviewAndCommit` su preflight, before/after pasekme, risk-specific acknowledgement ir idempotency būsena; bendrinis ritualinis checkbox nėra default. | UA-F1-005, UA-F1-006 | H – negrįžtamas veiksmas arba pakartotinis siuntimas | UI parodo kas pasikeis, kam, kokia versija, ir kas nebus padaryta; double click/retry saugus; destruktyvus veiksmas vizualiai atskirtas. | Component states, authorization, idempotency, duplicate click, failure/recovery, focus/a11y. | V6 |
+| `UA-F1-008` | P0 | PLATFORM/DESIGN | Izoliuotas komponentų katalogas ir modulio rollout registry: `legacy_only`, `shadow_read`, `preview`, `canonical`; fail-closed Production ir per-modulį fallback. | UA-F1-001–007; F0 capability registry audit | H – fixture/preview gali patekti į canonical ar Production | Kiekvienas komponentas turi loading/empty/error/offline/blocked/disabled/success pavyzdžius; nė viena preview mutacija neveikia Production; fallback patikrintas. | Story/fixture isolation, visual/a11y CI, rollout matrix, environment/authorization deny, legacy smoke. | V1–V6 |
+
+## 6. Prioritetizuotas F2 backlogas – Today ir bylos One Card
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F2-001` | P0 | CASE/WORKFLOW | Vienas typed `CaseNextActionPresentation` virš realaus Admin V2 resolverio ir Admin Next adapterio; padengti visą `CaseNextActionKind`. | F0 transition matrica; UA-F1-004 | H – stored ir derived veiksmai gali išsiskirti | Kiekvienas realus kind turi label, reason, CTA, target, owner/due, blocker ir capability; laisvas tekstas nėra vykdomo veiksmo truth. | Exhaustive mapping, property/prioritization, null/legacy data, locale, authorization deny. | V1, V3, V5 |
+| `UA-F2-002` | P0 | CASE/WORKFLOW | Explainable prioritization resolveris: safety, overdue, today SLA, blocker, waiting-party ir unassigned yra atskiros dimensijos. | UA-F2-001 | H – neteisinga eilė gali slėpti riziką | Kiekviena eilutė paaiškina „kodėl dabar“; deterministic tie-break; timezone/SLA ribos dokumentuotos. | Property tests, DST/timezone, ties, overdue boundaries, stored-vs-derived invariant. | V5 |
+| `UA-F2-003` | P1 | CASE/WORKFLOW | `WorkQueue` master–detail su inline/review veiksmu, blocker signalu ir pasirinkimo/scroll išlaikymu. | UA-F2-001–002; UA-F1-006–007 | M – tanki lentelė gali tapti dar viena pasyvia lentyna | Operatorius gali atlikti saugų kitą veiksmą neieškodamas bylos; sudėtingas veiksmas atveria case/workbench; selected state nėra perduodama vien gintaru. | Keyboard/table semantics, pagination, 1024/768/mobile transform, loading/error, action E2E. | V5 |
+| `UA-F2-004` | P1 | CASE/WORKFLOW | URL pagrįsti filtrai, aiškiai atskirtos metrikos ir filtrai, asmeniniai/komandos saved views su owner ir capability. | UA-F2-003; UA-F1-003 | M – filtrų/KPI dubliai klaidins operatorių | Refresh/Back išlaiko rodinį; badge count atitinka filtrą; share neapeina teisių; yra „Atstatyti“. | Query serialization, permissions, stale/deleted view, count parity, E2E Back/refresh. | V5 |
+| `UA-F2-005` | P0 | CASE/WORKFLOW | Kanoninis `CaseWorkspace`: stabilus header/process bar, vienas `NextActionCard`, kontekstiniai tabai ir susitraukiantis utility rail; blocker nedubliuojamas. | UA-F2-001; UA-F1-002,004,006 | H – didelio case monolito regresija | Pirmame ekrane yra vienas veiksmas arba konkretus blocker su owner, terminu ir recovery; stage/state/risk/version atskirti; tas pats šablonas visoms bylos būsenoms. | Golden-state fixtures, responsive/zoom, keyboard/tabs, real-data parity, no-duplicate-blocker assertion. | V1, V3, V4 |
+| `UA-F2-006` | P0 | CASE/WORKFLOW + RF | Uždaryti `UA-INC-RF-001`: bylos `Atverti/Tęsti matavimą` deep link, tikslus RF kontekstas ir vieno pasirinkimo `Grįžti į bylą`; modulių statusas – tik diagnostikai. | UA-F2-001,005; UA-F1-006; RF route contract | H – neteisinga byla/matavimas arba techninis dead end | Incidento 4 skyriaus kriterijai įvykdyti; wrong/missing context fail-closed; diagnostic route nėra operatoriaus IA. | New/resume/blocked/stale/unauthorized/missing-context E2E, browser Back, telemetry privacy, fallback gate. | V1, V3 |
+| `UA-F2-007` | P1 | CASE/WORKFLOW | Skaidyti bylos monolitą vertikaliomis dalimis į loader/read-model/workbench ribas, nekeičiant komandų saugos. | UA-F2-005; F0 mutation inventory | H – refactor gali apeiti esamus command guard'us | Kiekvienas perkeltas blokas naudoja esamą arba aiškiai patvirtintą serverinę komandą; legacy parity išlieka; rollback yra modulio lygio. | Contract/integration, command authorization/CAS/idempotency, shadow-read parity, rollback smoke. | V1, V3, V4 |
+| `UA-F2-008` | P0 | CASE/WORKFLOW + OPS/SECURITY/DATA | Privacy-safe istorijos projekcija ir timeline: kas/ką/nuo→į/kada/kodėl/rezultatas, versija ir source link. | F0 audit ADR; UA-F1-004 | H – PII nutekėjimas arba neaudituojamas pokytis | Allowlist/redaction taikoma serveryje; generic „atnaujinta“ svarbiai mutacijai nepakanka; hash/correlation vientisumas išlieka. | PII/redaction, actor/system events, old/new, missing actor, chronology/timezone, tamper/hash. | V3, V4 |
+| `UA-F2-009` | P0 | CASE/WORKFLOW + DATA | Legacy free-text nextAction/blocker migracinis adapteris, parity ataskaita ir canonical/demo fixture atskyrimas. | UA-F2-001,002,008 | H – preview gali slėpti realių duomenų spragas | Canonical režime nėra demo konstantų; nežinomas legacy atvejis tampa konkrečiu diagnostiniu blocker, ne klaidingu CTA. | Dataset parity, unknown/null/old records, fixture leakage deny, invariant report. | V5 |
+
+## 7. Prioritetizuotas F3 backlogas – RF, komercija, dokumentai ir komunikacija
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F3-001` | P0 | RF | Patvirtinti Phase E exact-hash sutartį: `snapshot ID + revision + schema + snapshotHash + inputHash + evidenceHash + approval actor/time`; užfiksuoti owner ribą su platforma. | F0 RF sprendimas; RF One Card A–D baseline | H – komercija gali naudoti stale ar nepatvirtintą rezultatą | Pasirašytas kontraktas atmeta Preview-only, stale, changed, blocked ir hash mismatch; jokios implementacijos be RF owner approval. | Schema/contract fixtures, hash recomputation, stale/blocked/unauthorized deny. | V1, V6 |
+| `UA-F3-002` | P0 | RF + COMMERCIAL/DOCS/COMMS | Idempotentiška komanda `approved RF snapshot → immutable RoofMeasurement → quote draft`, naudojanti DB transaction arba resumable command ledger. | UA-F3-001; UA-F2-008; atskiras implementation GO | H – dalinis įrašas, dublikatas ar neteisinga kaina | Vienas paspaudimas sukuria vieną measurement ir vieną quote draft; nieko nesiunčia/nepatvirtina; retry grąžina tą patį rezultatą; ankstesnės versijos nekinta. | Authorization, CAS, hash mismatch, double click, crash tarp žingsnių, resume/compensate, audit lineage. | V6 |
+| `UA-F3-003` | P0 | RF + PLATFORM/DESIGN | Visuose RF open/load/capture/calculate/hash-check/add-to-offer žingsniuose taikyti `UA-F1-006`, su išsaugotomis anotacijomis ir guided recovery. | UA-F1-006; UA-F2-006; UA-F3-001 | H – klaida gali prarasti darbą ar palikti false current rezultatą | >150 ms būsena įvardija tikrą žingsnį; failure išsaugo draft; retry saugus; `Grįžti į bylą` ir `Koreguoti` visada pasiekiami. | 149/150 ms, provider timeout, capture change, stale hash/CAS, retry/restart, Back/restore annotations. | V1, V6 |
+| `UA-F3-004` | P0 | COMMERCIAL/DOCS/COMMS | Bendras nekintamas `VersionedArtifact` quote/contract/change/invoice/warranty/measurement artefaktams su current/superseded ir compare kontraktu. | UA-F2-008; esami immutable invariantai | H – patvirtintas artefaktas gali būti perrašytas | Patvirtinta/išduota/pasirašyta versija nekinta; nauja korekcija supersede'ina; sena aiškiai pažymėta; lineage turi stable ID/hash. | Mutation deny, version chain, concurrent edit/CAS, compare redaction, old-link rendering. | V1, V6 |
+| `UA-F3-005` | P1 | COMMERCIAL/DOCS/COMMS | Server-side paginuojamas dokumentų registras su tipais, byla, current/old, RF evidence, owner, datomis ir permission-aware filtrais. | UA-F3-004; UA-F1-003,006 | M – lėtas ar nepilnas registras | Skaičiai sutampa su duomenų šaltiniu; RF snapshot/measurement matomi kaip kilmė; senos versijos neatrodo current; URL filtrai išlieka. | Pagination/sort/filter, permissions, large dataset performance, loading/error, parity. | V6 |
+| `UA-F3-006` | P0 | COMMERCIAL/DOCS/COMMS | `DocumentManifest` ir package `ReviewAndCommit`: gavėjas, kanalas, kalba, turinio preview, priedų versijos/hash, šaltinis, būsena po veiksmo ir draft. | UA-F1-007; UA-F3-004,005 | H – ne tas gavėjas/versija arba ritualinis patvirtinimas | Automatinis preflight pakeičia bendrinį checkbox; žmogus tvirtina tik realią išimtį; duplicate send negalimas; RF exact provenance matoma. | Recipient/version mismatch, missing attachment, duplicate click, draft restore, delivery failure, a11y. | V6 |
+| `UA-F3-007` | P0 | COMMERCIAL/DOCS/COMMS | Vienas bylos komunikacijos thread su recipient/content preview, queued/sent/delivered/failed įvykiais ir retry/cancel/recovery. | UA-F1-006,007; UA-F2-008 | H – dviguba ar ne tam klientui išsiųsta žinutė | UI skiria draft/approval/queue/delivery; retry remiasi tuo pačiu message ID; istorija rodo pasekmę; teisės tikrinamos serveryje. | Authorization, schedule/timezone, provider timeout/webhook duplicate, retry/cancel race, PII/redaction. | V1, V6 |
+| `UA-F3-008` | P1 | COMMERCIAL/DOCS/COMMS | Pakeisti `window.confirm` svarbiuose quote/contract/document veiksmuose risk-specific review/commit; mažos rizikos veiksmams palikti tiesioginį feedback. | UA-F1-007; UA-F3-004,006,007 | M – per daug modalų arba per silpnas patvirtinimas | Patvirtinimo lygis proporcingas rizikai; primary/secondary/danger vietos pastovios; X/Back turi vienodą dirty politiką. | UX contract matrix, keyboard/focus, cancel/no-mutation, dangerous action visual, mobile. | V6 |
+| `UA-F3-009` | P0 | RF + COMMERCIAL/DOCS/COMMS + QA/RELEASE | Integracinė kilmės ir nekintamumo matrica snapshot→measurement→quote→package→delivery. | UA-F3-001–008 | H – grandinės dalys gali būti lokaliai žalios, bet bendrai klaidingos | Iš bet kurio paketo atsekamas exact snapshot; sumos/versijos nekinta retry metu; add-to-offer nieko nesiunčia; send nekeičia measurement. | Happy/blocked/stale/hash mismatch, partial failure/restart, duplicate, audit/correlation, legacy fallback. | V6 |
+
+## 8. Prioritetizuotas F4 backlogas – darbų planavimas ir field mobile
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F4-001` | P0 | FIELD OPS | Vienas typed `VisitStatePresentation` virš esamų WorkOrder transition guard'ų: assigned→travelling→arrived→working→handoff/completed ir exception būsenos. | F0 WorkOrder matrica; UA-F1-004 | H – UI ir API gali leisti skirtingus perėjimus | Kiekvienas CTA turi serverio leidžiamą transition, prerequisites, actor/source ir būsimą būseną; UI negali išrasti transition. | Exhaustive transition, authorization, invalid order, timezone, concurrent supervisor/worker. | V2 |
+| `UA-F4-002` | P1 | FIELD OPS | `DispatchWorkspace`: nepriskirti darbai, grafikas, brigados pajėgumas/kompetencija, konfliktai ir master–detail priskyrimas. | UA-F2-003,004; UA-F4-001 | H – dvigubas ar netinkamas paskyrimas | Konfliktas rodomas prieš commit; assignment turi capacity/capability paaiškinimą; pakeitimas audituojamas; sąrašas nepraranda konteksto. | Scheduling overlap/DST, authorization, optimistic concurrency, keyboard/drag alternative, responsive. | V5 |
+| `UA-F4-003` | P0 | FIELD OPS | Required evidence modelis pagal darbo tipą/etapą: tipo, kokybės, autoriaus, laiko, objekto ir upload/sync būsena; blocker išvedamas serveryje. | UA-F4-001; UA-F2-008 | H – klaidingas užbaigimas be įrodymų | CTA neleidžiamas, kol trūksta konkretaus įrodymo; kiekviena miniatiūra turi pavadinimą/statusą; admin ir mobile rodo tą patį blocker. | Missing/wrong/duplicate/large upload, metadata, server guard, admin-mobile parity. | V1, V2 |
+| `UA-F4-004` | P1 | FIELD OPS | `MobileTaskRunner`: dabartinis etapas, tik aktuali informacija, vienas sticky CTA, quick contact ir matomas statusas atskirai nuo siūlomo veiksmo. | UA-F1-006; UA-F4-001,003 | M – suspaustas desktop arba būsenos/veiksmo painiava | Darbuotojas kiekviename etape mato vieną geriausią veiksmą; „Vykstu“ negali būti kartu nepaaiškinta būsena ir action; 44×44 px targetai. | 375 px, landscape, 200/400 % zoom, screen reader, stage E2E, no-color-only. | V1, V2 |
+| `UA-F4-005` | P0 | FIELD OPS + OPS/SECURITY/DATA | PWA/offline threat modelis ir minimali lokali duomenų apimtis: šifravimas, expiry, remote revoke, PII klasės ir telemetry. | F0 security inventory; UA-F4-001 | H – jautrūs klientų duomenys įrenginyje | Patvirtintas ADR prieš kuriant offline cache; jokie pertekliniai dokumentai/PII necachuojami; logout/revoke/expiry išvalo leidžiamą apimtį. | Threat-model review, device loss/logout/revoke, cache inspection, permission change, expiry. | V1, V2 |
+| `UA-F4-006` | P0 | FIELD OPS | Pending command/upload queue su stable command ID, local pending būsena, retry/backoff ir reconnect reconciliation. | UA-F1-006; UA-F4-003,005 | H – false success, dublikatai ar prarastos nuotraukos | Offline veiksmas rodomas `Laukia ryšio`, ne success; reconnect nekuria dublikatų; konfliktas sustabdo automatinį perėjimą. | Offline/reconnect, app kill/restart, duplicate, out-of-order upload, expired auth, partial sync. | V1, V2 |
+| `UA-F4-007` | P0 | FIELD OPS | Pirmos klasės exception keliai: `Negaliu tęsti`, saugos incidentas, pause, scope change, cancellation, reschedule, klaidingo perėjimo korekcija ir supervisor handoff. | UA-F4-001,002,006; UA-F2-008 | H – happy path gali slėpti saugos ar sutarties pokytį | Exception veiksmai pasiekiami ne vien overflow; nepatvirtintas scope change blokuoja darbą UI/API; korekcija nekeičia istorijos, o prideda audit event. | Kiekvienas exception E2E, authorization, audit, notification side effects, offline conflict. | V2 |
+| `UA-F4-008` | P0 | FIELD OPS + QA/RELEASE | End-to-end dispatch→travel→arrival→evidence→handoff/completion matrica su offline ir exception šakomis. | UA-F4-001–007 | H – atskiri komponentai gali nesudaryti vientisos kelionės | Admin, worker ir istorija sutaria dėl būsenos/owner/time/source; false success nėra; kokybės patikra prasideda tik įvykdžius vartus. | Happy path, offline, safety, reschedule, scope change, concurrent edit, retry/restart, a11y/mobile visual. | V1, V2 |
+
+## 9. Prioritetizuotas F5 backlogas – SEO studija
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F5-001` | P0 | SEO | Kanoninis SEO lifecycle/NextAction kontraktas virš esamų blog transition ir quality gate taisyklių. | F0 SEO matrica; UA-F2-001 modelio principai | H – UI, cron ir API gali publikuoti skirtingai | Kiekviena būsena turi owner/due/next action/blocker; UI, API ir scheduler naudoja tą pačią transition politiką. | Exhaustive transitions, authorization, reviewer/time gate, API/cron/UI parity. | V3, V5 |
+| `UA-F5-002` | P1 | SEO | Turinio `WorkQueue` su saved views: idėjos, generuojama, review, suplanuota, publikuota, reikia dėmesio. | UA-F1-003,006; UA-F2-003,004; UA-F5-001 | M – dar viena pasyvi turinio lentyna | Eilė rodo temą, būseną, kitą veiksmą, owner, due ir generation/publication blocker; veiksmai pasiekiami inline arba workbench. | Filters/count parity, pagination, keyboard, role views, loading/error, responsive. | V5 |
+| `UA-F5-003` | P1 | SEO | Topic backlog/import ir generation job stebėjimas su dedup, source/license metaduomenimis ir recovery. | UA-F5-001,002; UA-F1-006 | H – dubliuotas turinys ar prarasta šaltinio kilmė | Importas/generavimas idempotentiškas; klaida turi retry/koreguoti; šaltinis ir naudojimo teisė išlieka prie draft. | Duplicate import, provider timeout, retry/restart, source/license validation, authorization. | V6 |
+| `UA-F5-004` | P0 | SEO | Vienas editor workbench su draft, desktop/mobile preview, šaltiniais/licencijomis, SEO/quality vartais ir unsaved guard. | UA-F1-005–007; UA-F5-001,003 | H – publikuojamas nepatikrintas ar neišsaugotas turinys | Dabartinis blocker ir kitas veiksmas matomi; preview nėra painiojamas su published; dirty turinys neprarandamas; review pasekmė aiški. | Autosave/CAS, dirty navigation, source/quality blockers, preview responsive, a11y. | V3, V6 |
+| `UA-F5-005` | P0 | SEO | Kalendorius ir schedule/publish `ReviewAndCommit`, išlaikant timezone, reviewer ir quality vartus. | UA-F5-001,004; UA-F1-007 | H – publikacija ne tuo metu arba apeinant review | Rodoma vietinė/UTC data, kas publikuos ir kas pasikeis; negalimas publish be gate; retry nedubliuoja publication job. | DST/timezone, past/future, authorization, duplicate scheduler, cancel/reschedule, provider failure. | V6 |
+| `UA-F5-006` | P1 | SEO | Publikuoto įrašo performance loop: Search Console/lead metrikos, freshness/audit rekomendacija ir aiškus duomenų laikotarpis. | UA-F5-001,002; integrations contract | M – rekomendacijos iš nepilnų ar pasenusių duomenų | Kiekviena metrika turi šaltinį, intervalą ir freshness; rekomendacija tampa review užduotimi, ne automatiniu publish. | Missing/stale/partial integration, permission, date range/timezone, no-data/error/loading. | V3, V5 |
+| `UA-F5-007` | P0 | SEO + OPS/SECURITY/DATA + QA/RELEASE | SEO editor/reviewer capability atskyrimas ir pilna topic→draft→review→schedule→publish→performance E2E matrica. | UA-F5-001–006; UA-F6-006 capability contract | H – UI paslepia mygtuką, bet backend leidžia veiksmą | Editor negali pats apeiti reviewer, jei politika to neleidžia; auditorius read-only; scheduler ir UI auditas koreliuojami. | Backend deny, role-switch, direct API, full E2E, retry/duplicate, audit/redaction. | V5, V6 |
+
+## 10. Prioritetizuotas F6 backlogas – operacijos, archyvas, komanda ir projekcijos
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F6-001` | P0 | OPS/SECURITY/DATA | `OperationsConsole` read modelis jobs, integrations, invariants ir release health: severity, affected entity, attempts, last safe error, correlation ID ir policy. | F0 operations inventory; UA-F1-002,004,006 | H – techninės klaidos gali patekti operatoriui arba slėpti incidentą | Operacijos atskirtos nuo Settings; PII/secrets redacted; techninis statusas turi owner/runbook ir neveikia kaip kasdienė bylos navigacija. | Redaction/authorization, severity ordering, stale health, pagination/performance, loading/error. | V5 |
+| `UA-F6-002` | P0 | OPS/SECURITY/DATA | Job detail su autorizuotu idempotentišku retry, cancel/acknowledge ir būsenos reconciliation. | UA-F6-001; UA-F1-007 | H – pakartotinis job gali sukelti dvigubą išorinį poveikį | Retry galimas tik pagal policy ir stable job/command ID; unknown būsena pirma tikrinama; cancel pasekmė aiški ir audituojama. | Duplicate/restart/race, unauthorized direct API, partial external failure, audit/correlation. | V6 |
+| `UA-F6-003` | P1 | OPS/SECURITY/DATA | Integracijų/invariantų problemą susieti su paveikta byla/dokumentu/darbu ir saugiu diagnostiniu drawer, nepaverčiant jo operatoriaus NextAction pakaitalu. | UA-F6-001; UA-F2-005,008 | M – techniniai detailai užterš operatoriaus eigą | Operatorius mato verslo blocker ir recovery; techninis administratorius – correlation/source/runbook; teisės ir PII atskirtos. | Role views, deep-link authorization, missing entity, redaction, Back/context. | V1, V3, V5 |
+| `UA-F6-004` | P0 | OPS/SECURITY/DATA | Vienas archive/trash/retention lifecycle su priežastimi, actor/time, restore eligibility, legal hold ir purge būsena. | F0 retention ADR; UA-F2-008 | H – negrįžtamas duomenų praradimas ar retention pažeidimas | UI aiškiai skiria archive, trash, restore ir purge; legal hold/terminas neapeinami; masinis veiksmas turi scope preview. | Authorization, retention dates/DST, legal hold deny, restore conflicts, audit, dry-run preview. | V6 |
+| `UA-F6-005` | P1 | OPS/SECURITY/DATA | Archyvo master–detail ir recovery paaiškinimas su filtrais, current status, priežastimi ir related artefact impact. | UA-F6-004; UA-F2-003,004 | M – atkūrimas gali grąžinti nepilną bylą | Prieš restore rodoma kas bus atkurta/neatkurta ir naujas NextAction; užblokuota priežastis turi owner/recovery. | Search/filter, restore happy/blocked/partial, responsive/a11y, fallback. | V5, V6 |
+| `UA-F6-006` | P0 | OPS/SECURITY/DATA | Backend capability bundles komercijai, field, SEO, ops ir auditoriaus read-only profiliui; UI veiksmai tik jų projekcija. | F0 capability ADR; existing admin/worker roles | H – role UX imituoja saugumą | Kiekviena komanda server-side tikrina capability; paslėpto mygtuko nėra laikoma apsauga; deny auditas koreliuojamas. | Direct API deny/allow, mixed capabilities, role change/session refresh, least privilege, audit. | V1, V5, V6 |
+| `UA-F6-007` | P1 | FIELD OPS + OPS/SECURITY/DATA | Darbuotojo competence/capacity projekcija ir auditoriaus read-only darbo erdvė, be mutacijų. | UA-F6-006; UA-F4-002 | M – neteisingas pajėgumas ar auditoriaus mutacija | Dispečeris mato duomenų freshness/source; auditorius gali skaityti istoriją/dokumentus, bet nė vienos mutacijos; PII minimizuota. | Capacity freshness, authorization, direct API deny, screen-reader/keyboard, audit access. | V5 |
+| `UA-F6-008` | P0 | OPS/SECURITY/DATA | `Customer` ir `Property` read-model projekcijos su canonical-source žyma; atskiras ADR/prototipas dedup, multi-property, backfill/rollback, be automatinės kanoninės migracijos. | F0 data ADR; UA-F2-008 | H – klaidingas „vienas klientas“ identitetas ir istorijos sugadinimas | UI aiškiai nurodo projekcijos šaltinį; abejotini sutapimai nesujungiami; schema/migracija nevykdoma be atskiro GO. | Ambiguous identity, shared phone/email/address, multi-property, backfill dry-run, rollback, PII. | V1, V3 |
+
+## 11. Prioritetizuotas F7 backlogas – hardening, UAT ir rollout
+
+| ID | P | Owner sritis | Konkretus rezultatas | Priklausomybės | Rizika | Acceptance | Būtini testai | Vizualai |
+|---|---:|---|---|---|---|---|---|---|
+| `UA-F7-001` | P0 | QA/RELEASE + domeno owneriai | Kritinių grandinių E2E: inquiry→measurement→offer; offer→contract→work; worker→evidence→completion; question/recovery; SEO; archive; operational retry. | Atitinkami F2–F6 P0/P1 | H – lokaliai žali moduliai gali nesudaryti verslo grandinės | Kiekviena grandinė turi happy path, blocker, failure, retry, stale/concurrent ir audit assertion; `UA-INC-RF-001` uždaromas E2E. | Autentifikuoti browser E2E, API side-effect assertions, audit/correlation, fallback. | V1–V6 |
+| `UA-F7-002` | P0 | QA/RELEASE + PLATFORM/DESIGN | Visual regression matrica 1440/1024/768/375, dark tema, ilgų lokalizacijų ir empty/loading/error/offline būsenos. | UA-F1-008; atitinkami ekranai | M – dizaino drift ir nevaldomas tankis | Baseline priimtas owner; One Card išlieka pirmu fokusu; nėra horizontalaus overflow ar nukirsto CTA; gintaro semantika stabili. | Screenshot diff visoms būsenoms, Windows/browser, long strings, reduced motion. | V1–V6 |
+| `UA-F7-003` | P0 | QA/RELEASE + PLATFORM/DESIGN | A11y matrica: keyboard, focus, screen reader, contrast, touch, zoom 200/400 %, forced colors ir reduced motion. | UA-F1-001–007; visi moduliai | H – operatorius negali atlikti kritinio veiksmo | Kritinės grandinės įvykdomos be pelės; focus nepametamas; ne spalvinės etiketės; 44×44 mobile; overlay semantika teisinga. | axe + rankinis NVDA/Windows, keyboard-only, contrast, zoom, touch. | V1–V6 |
+| `UA-F7-004` | P0 | QA/RELEASE + PLATFORM/DESIGN | Performance biudžetai ir apkrovos testai Today, global search, document registry, timeline, RF open ir OperationsConsole; privalomas >150 ms feedback. | UA-F1-006; F2/F3/F6 read modeliai | M – lėtas ekranas atrodys užstrigęs arba rodys stale tiesą | P95/P99 biudžetai patvirtinti F0 baseline pagrindu; virš 150 ms visada matoma lokali būsena; didelė apkrova nepažeidžia teisingumo. | Load/soak, slow network, pagination, cache cold/warm, stale response race, 149/150 ms UI. | V3, V5, V6 |
+| `UA-F7-005` | P0 | QA/RELEASE + DATA | Canonical vs legacy shadow-read parity ir migracijos ataskaita kiekvienam rollout moduliui; fixture leakage gate. | UA-F1-008; UA-F2-009; atitinkami F3–F6 adapteriai | H – preview sėkmė neatitiks realių duomenų | Neatitikimai klasifikuoti, owner ir sprendimas dokumentuoti; canonical neįjungiamas su nežinomais P0/P1; fixtures Production nepasiekiami. | Representative dataset, null/legacy/edge cases, automated diff, environment deny. | V1, V3, V5 |
+| `UA-F7-006` | P0 | QA/RELEASE + produkto owneriai | Rolėmis pagrįstas owner UAT be žodinių maršrutų instrukcijų; paspaudimų/time-to-action baseline palyginimas. | UA-F7-001–005; atitinkami capability darbai | H – sistema techniškai veikia, bet operatorius neranda veiksmo | Case owner RF pasiekia 1 pasirinkimu; pagrindinės kelionės pasiekia plano click tikslus; observer nefasilituoja; painiava registruojama defektu, ne mokymu. | Scripted UAT, screen recording/event metrics be PII, SUS/task success, role deny, browser Back. | V1, V2, V5, V6 |
+| `UA-F7-007` | P0 | QA/RELEASE + PLATFORM/DESIGN | Per-modulį rollback/fallback repeticija su duomenų/komandų suderinamumu ir runbook. | UA-F1-008; UA-F7-005 | H – rollout po klaidos negalės saugiai grįžti | Modulis grįžta į legacy be duomenų praradimo ar dublikatų; in-flight komanda reconciled; route neaklas; įrodytas RTO/RPO. | Toggle under load, in-flight command, session refresh, rollback/re-enable, audit continuity. | V1–V6 |
+| `UA-F7-008` | P0 | QA/RELEASE + PLATFORM | Moduliai leidžiami seka `internal preview → owner UAT → limited pilot → explicit Production GO → observe → legacy read-only`; kiekvienas turi atskirą gate report. | UA-F7-001–007 | H – vienos fazės GO bus palaikytas Production GO | Nulis P0/P1; priimti parity/performance/a11y/UAT/fallback įrodymai; release reference ir monitoring owner aiškūs; be atskiro GO nėra redirect ar Production mutacijos. | Gate automation/deny, approval provenance, alert/rollback drill, post-release smoke. | V1–V6 |
+
+## 12. Šešių vizualinių nuorodų atsekamumas
+
+Vizualai yra proceso ir hierarchijos nuorodos, ne pixel-perfect specifikacija.
+
+| Ref. | Failas | Perimamas principas | Nekopijuojamas trūkumas | Backlog ryšys |
+|---|---|---|---|---|
+| `V1` | `exec-20a113a0-2523-40b0-b5e0-42cb2ed60a0e.png` | Bylos blocker tampa tiesiogine mobile užduotimi; versijos ir offline signalas; vienas kitas veiksmas. | Vienodo svorio kortelių gausa, blocker dubliavimas, gintaro perkrova, mobile būsenos/veiksmo painiava. | UA-F1-001,004,006; UA-F2-001,005,006; UA-F4-003,004,006. |
+| `V2` | `exec-ba952dfb-4b2e-4476-80d9-66fb4edd02b8.png` | Keturi aiškūs lauko etapai, vienas sticky CTA, įrodymai ir automatizacijų pasekmės. | Happy path be offline, pause, safety, correction, handoff ir reschedule kelių. | UA-F4-001,003–008; UA-F7-001,003. |
+| `V3` | `exec-51f11b86-7411-4bbd-9aa5-237ca32b5c13.png` | NextAction dominuoja; stabilus bylos shell, proceso juosta, utility rail ir timeline. | „Aktyvus/išspręstas/0 atvirų“ prieštara, stage/state painiava, per platus rail. | UA-F1-004; UA-F2-005,007,008; UA-F7-002. |
+| `V4` | `exec-82d7c43b-e777-4898-948d-2268b678330d.png` | Tas pats šablonas gali rodyti kitą veiklos įvykį. | Generic „atnaujinta“ nepaaiškina kas pasikeitė, nuo→į ir pasekmės; neturi tapti atskiru ekranu. | UA-F2-005,008. |
+| `V5` | `exec-14225b20-c440-45c2-b141-941c358b7df7.png` | Today master–detail, kodėl dabar, due, owner ir pasirinktos bylos kontekstas. | KPI/filtrų dubliavimas, priority sąvokų maišymas, blocker tik side rail ir papildomas „Atverti bylą“ paspaudimas. | UA-F2-002–004; UA-F4-002; UA-F5-002; UA-F7-006. |
+| `V6` | `exec-a153ab87-fd88-4e29-8257-11311b1e75d5.png` | Review/commit, versijuotas manifestas, būsena po veiksmo ir idempotency. | Ritualinis checkbox, nepakankamas laiško preview/recovery, RF šaltinis be exact stable ID/revision/hash, X/Back dublis. | UA-F1-005–007; UA-F3-001–009; UA-F5-005; UA-F6-002,004. |
+
+## 13. Bendras Definition of Done
+
+Kiekvienam backlog ID pateikiama:
+
+1. PR/commit ir pakeistų kontraktų sąrašas;
+2. acceptance kriterijų įrodymas su ekrano arba API/audito rezultatu;
+3. automatinių testų pavadinimai ir žalias vykdymo logas patvirtintoje
+   izoliuotoje aplinkoje;
+4. jei taikoma – 1440/1024/768/375 vaizdai ir keyboard/screen-reader įrodymas;
+5. authorization, idempotency, CAS/hash, PII/redaction bei audit testai pagal
+   riziką;
+6. `UA-F1-006` >150 ms, failure, retry ir grįžimo/koregavimo įrodymas kiekvienai
+   naujai navigacijai ar komandai;
+7. legacy parity ir patikrintas modulio fallback;
+8. žinomi nukrypimai, jų owner, rizika ir sprendimo data;
+9. aiškus `GO/NO-GO` tik tai fazei ar moduliui.
+
+„Veikia Preview“, gražus screenshot, paslėptas neleistinas mygtukas ar vien
+laimingas E2E kelias nėra pakankamas užbaigimo įrodymas.
+
+## 14. Dabartinis vartų rezultatas
+
+- F0 planavimo artefaktas: **sukurtas**.
+- F1–F7 implementacija: **neautorizuota / nepradėta**.
+- RF Phase E/F ir RF→pasiūlymas: **neautorizuota šiame darbe**.
+- Duomenų ar Payload schemos migracija: **neautorizuota**.
+- Production konfigūracija, duomenys, laiškai, kainodara, routes ir deploy:
+  **nepakeisti / NO-GO**.
+- Kitas sprendimo taškas: uždaryti likusius F0 inventoriaus, ADR, testų baseline
+  ir parity įrodymus, tada gauti atskirą savininko `GO` F1.

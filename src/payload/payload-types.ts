@@ -1665,7 +1665,9 @@ export interface RoofFusionWorkbenchDraft {
   state: string;
   sourceContentHash: string;
   draft:
-    | { [k: string]: unknown }
+    | {
+        [k: string]: unknown;
+      }
     | unknown[]
     | string
     | number
@@ -1821,6 +1823,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'roof-fusion-commands';
         value: number | RoofFusionCommand;
+      } | null)
+    | ({
+        relationTo: 'roof-fusion-workbench-drafts';
+        value: number | RoofFusionWorkbenchDraft;
       } | null);
   globalSlug?: string | null;
   user: {
