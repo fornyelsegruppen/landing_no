@@ -9,6 +9,15 @@ data.
 
 - `case-360-1440.png` — desktop, full page
 - `case-360-375.png` — mobile, full page
+- `case-360-evidence-1440.png` — evidence workspace panel
+- `case-360-history-1440.png` — audit-history workspace panel
+
+The case summary and next action stay visible above a sticky, keyboard-accessible
+three-panel switcher. Only one of customer dialogue, evidence, or history is
+rendered visibly at a time. Secondary commercial versions, the document
+register, and the complete business chronology are native disclosures inside
+the customer panel. This replaces the previous all-sections-at-once long page
+without removing any record data.
 
 ## Visible read parity added
 

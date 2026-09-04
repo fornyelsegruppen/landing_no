@@ -6,6 +6,7 @@ import {
   Camera,
   Check,
   CheckCircle2,
+  ChevronDown,
   CircleAlert,
   FileCheck2,
   FileSignature,
@@ -33,8 +34,8 @@ import type {
   AdminNextTimelineKind,
 } from "@/lib/admin-next/case-workspace-contract";
 import {
-  AdminNextCaseWorkspaceContextNav,
   AdminNextCaseWorkspaceHistoryRail,
+  AdminNextCaseWorkspacePanelSwitcher,
 } from "./admin-next-case-workspace-navigation";
 import {
   BlockerSummary,
@@ -550,16 +551,6 @@ export function AdminNextCaseWorkspace({
         {t.back}
       </Link>
 
-      <AdminNextCaseWorkspaceContextNav
-        labels={{
-          "case-summary": t.contextSummary,
-          "case-customer-record": t.contextCustomerRecord,
-          "case-evidence": t.contextEvidence,
-          "case-history": t.contextHistory,
-        }}
-        navigationLabel={t.contextNavigation}
-      />
-
       <header
         className="an-surface scroll-mt-28 overflow-hidden rounded-3xl border focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)]"
         data-case-context-target
@@ -761,627 +752,698 @@ export function AdminNextCaseWorkspace({
         </ol>
       </section>
 
-      {value.customerRecord ? (
-        <section
-          className="an-surface scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
-          aria-labelledby="case-customer-record-title"
-          data-case-context-target
-          data-customer-record
-          id="case-customer-record"
-          tabIndex={-1}
-        >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2
-                className="text-lg font-bold text-[var(--an-text)]"
-                id="case-customer-record-title"
-              >
-                {t.customerRecord}
-              </h2>
-              <p className="mt-1 max-w-3xl text-sm text-[var(--an-muted)]">
-                {t.customerRecordIntro}
-              </p>
-            </div>
-            <div
-              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-bold ${value.customerRecord.questions.unresolved ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" : "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]"}`}
-              data-customer-question-state={
-                value.customerRecord.questions.unresolved
-                  ? "unresolved"
-                  : "resolved"
-              }
-            >
-              <MessageCircleQuestion aria-hidden="true" className="size-4" />
-              <span>
-                {t.questions}: {value.customerRecord.questions.total} ·{" "}
-                {value.customerRecord.questions.unresolved
-                  ? t.unresolvedQuestion
-                  : t.questionsResolved}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.85fr)]">
+      <AdminNextCaseWorkspacePanelSwitcher
+        labels={{
+          "case-customer-record": t.contextCustomerRecord,
+          "case-evidence": t.contextEvidence,
+          "case-history": t.contextHistory,
+        }}
+        navigationLabel={t.contextNavigation}
+      >
+        <div>
+          {value.customerRecord ? (
             <section
-              className="min-w-0"
-              aria-labelledby="case-communications-title"
+              className="an-surface scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
+              aria-labelledby="case-customer-record-title"
+              data-customer-record
+              id="case-customer-record"
+              tabIndex={-1}
             >
-              <h3
-                className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
-                id="case-communications-title"
-              >
-                <MessageSquareText
-                  aria-hidden="true"
-                  className="size-4 text-[var(--an-amber)]"
-                />
-                {t.communications} ·{" "}
-                {value.customerRecord.communications.length}
-              </h3>
-              {value.customerRecord.communications.length ? (
-                <ol
-                  className="mt-3 max-h-[42rem] space-y-3 overflow-auto pr-1"
-                  data-customer-communications
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2
+                    className="text-lg font-bold text-[var(--an-text)]"
+                    id="case-customer-record-title"
+                  >
+                    {t.customerRecord}
+                  </h2>
+                  <p className="mt-1 max-w-3xl text-sm text-[var(--an-muted)]">
+                    {t.customerRecordIntro}
+                  </p>
+                </div>
+                <div
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-bold ${value.customerRecord.questions.unresolved ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" : "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]"}`}
+                  data-customer-question-state={
+                    value.customerRecord.questions.unresolved
+                      ? "unresolved"
+                      : "resolved"
+                  }
                 >
-                  {value.customerRecord.communications.map((message) => {
-                    const DirectionIcon =
-                      message.direction === "inbound" ? Inbox : Send;
-                    return (
-                      <li key={message.id}>
-                        <article className="an-elevated rounded-2xl border p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="flex items-center gap-2 text-xs font-bold text-[var(--an-amber)]">
-                                <DirectionIcon
-                                  aria-hidden="true"
-                                  className="size-4 shrink-0"
-                                />
-                                {message.direction === "inbound"
-                                  ? t.inbound
-                                  : t.outbound}
+                  <MessageCircleQuestion
+                    aria-hidden="true"
+                    className="size-4"
+                  />
+                  <span>
+                    {t.questions}: {value.customerRecord.questions.total} ·{" "}
+                    {value.customerRecord.questions.unresolved
+                      ? t.unresolvedQuestion
+                      : t.questionsResolved}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.85fr)]">
+                <section
+                  className="min-w-0"
+                  aria-labelledby="case-communications-title"
+                >
+                  <h3
+                    className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
+                    id="case-communications-title"
+                  >
+                    <MessageSquareText
+                      aria-hidden="true"
+                      className="size-4 text-[var(--an-amber)]"
+                    />
+                    {t.communications} ·{" "}
+                    {value.customerRecord.communications.length}
+                  </h3>
+                  {value.customerRecord.communications.length ? (
+                    <ol
+                      className="mt-3 max-h-[42rem] space-y-3 overflow-auto pr-1"
+                      data-customer-communications
+                    >
+                      {value.customerRecord.communications.map((message) => {
+                        const DirectionIcon =
+                          message.direction === "inbound" ? Inbox : Send;
+                        return (
+                          <li key={message.id}>
+                            <article className="an-elevated rounded-2xl border p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="flex items-center gap-2 text-xs font-bold text-[var(--an-amber)]">
+                                    <DirectionIcon
+                                      aria-hidden="true"
+                                      className="size-4 shrink-0"
+                                    />
+                                    {message.direction === "inbound"
+                                      ? t.inbound
+                                      : t.outbound}
+                                  </p>
+                                  <h4 className="mt-2 text-sm font-bold break-words text-[var(--an-text)]">
+                                    {message.subject}
+                                  </h4>
+                                </div>
+                                <span className="shrink-0 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
+                                  {message.status}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-[11px] text-[var(--an-subtle)]">
+                                {message.channel} · {message.category} ·{" "}
+                                {auditTimestamp(locale, message.at)}
                               </p>
-                              <h4 className="mt-2 text-sm font-bold break-words text-[var(--an-text)]">
-                                {message.subject}
-                              </h4>
-                            </div>
-                            <span className="shrink-0 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
-                              {message.status}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-[11px] text-[var(--an-subtle)]">
-                            {message.channel} · {message.category} ·{" "}
-                            {auditTimestamp(locale, message.at)}
-                          </p>
-                          <p className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
-                            {message.bodyText || "—"}
-                          </p>
-                          {message.attachments.length ? (
-                            <div className="mt-3">
-                              <p className="text-[10px] font-bold tracking-wider text-[var(--an-subtle)] uppercase">
-                                {t.attachments} · {message.attachments.length}
+                              <p className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
+                                {message.bodyText || "—"}
                               </p>
-                              <ul className="mt-2 flex flex-wrap gap-2">
-                                {message.attachments.map((attachment) => (
-                                  <li key={attachment.id}>
+                              {message.attachments.length ? (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-bold tracking-wider text-[var(--an-subtle)] uppercase">
+                                    {t.attachments} ·{" "}
+                                    {message.attachments.length}
+                                  </p>
+                                  <ul className="mt-2 flex flex-wrap gap-2">
+                                    {message.attachments.map((attachment) => (
+                                      <li key={attachment.id}>
+                                        <Link
+                                          className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-[var(--an-border)] bg-[var(--an-surface)] px-2 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)] hover:text-[var(--an-amber)]"
+                                          href={attachment.href}
+                                          target="_blank"
+                                        >
+                                          <FileCheck2
+                                            aria-hidden="true"
+                                            className="size-3.5 shrink-0"
+                                          />
+                                          <span className="truncate">
+                                            {attachment.filename}
+                                          </span>
+                                        </Link>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                                <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
+                                  {message.sentAt ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.sentAt}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {auditTimestamp(locale, message.sentAt)}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {message.deliveredAt ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.deliveredAt}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {auditTimestamp(
+                                          locale,
+                                          message.deliveredAt,
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {message.replyToMessageId ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.replyTo}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        #{message.replyToMessageId}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                </dl>
+                                <Link
+                                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                                  href={message.fallbackHref}
+                                >
+                                  {t.openThread}
+                                  <ArrowRight
+                                    aria-hidden="true"
+                                    className="size-3.5"
+                                  />
+                                </Link>
+                              </div>
+                            </article>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  ) : (
+                    <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+                      {t.communicationsEmpty}
+                    </p>
+                  )}
+                </section>
+
+                <div className="min-w-0 space-y-5">
+                  <details className="an-elevated group rounded-2xl border">
+                    <summary
+                      className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
+                      id="case-commercial-versions-title"
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileSignature
+                          aria-hidden="true"
+                          className="size-4 text-[var(--an-amber)]"
+                        />
+                        {t.commercialVersions} ·{" "}
+                        {value.customerRecord.commercialVersions.length}
+                      </span>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
+                      />
+                    </summary>
+                    <div className="px-3 pb-3">
+                      {value.customerRecord.commercialVersions.length ? (
+                        <ol
+                          className="mt-3 max-h-[24rem] space-y-2 overflow-auto pr-1"
+                          data-commercial-versions
+                        >
+                          {value.customerRecord.commercialVersions.map(
+                            (item) => (
+                              <li
+                                className="an-elevated rounded-2xl border p-3"
+                                key={item.id}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-bold tracking-wider text-[var(--an-amber)] uppercase">
+                                      {item.kind === "quote"
+                                        ? t.quote
+                                        : t.contract}{" "}
+                                      · {t.versionShort}
+                                      {item.version}
+                                    </p>
+                                    <strong className="mt-1 block truncate text-sm text-[var(--an-text)]">
+                                      {item.reference}
+                                    </strong>
+                                  </div>
+                                  <span className="shrink-0 rounded-full border border-[var(--an-border)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
+                                    {item.status} · {item.role}
+                                  </span>
+                                </div>
+                                <dl className="mt-2 space-y-1 text-[11px] text-[var(--an-subtle)]">
+                                  <div>
+                                    <dt className="sr-only">{t.version}</dt>
+                                    <dd>
+                                      {auditTimestamp(locale, item.createdAt)}
+                                    </dd>
+                                  </div>
+                                  {item.supersedesReference ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.supersedes}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {item.supersedesReference}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {item.signedAt ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.customerSigned}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {auditTimestamp(locale, item.signedAt)}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {item.companySignedAt ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.companySigned}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {auditTimestamp(
+                                          locale,
+                                          item.companySignedAt,
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {item.documentHash ? (
+                                    <div className="break-all">
+                                      <dt className="inline font-bold">
+                                        Hash:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {item.documentHash}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                </dl>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {item.pdfHref ? (
                                     <Link
-                                      className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-[var(--an-border)] bg-[var(--an-surface)] px-2 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)] hover:text-[var(--an-amber)]"
-                                      href={attachment.href}
+                                      className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                                      href={item.pdfHref}
                                       target="_blank"
                                     >
-                                      <FileCheck2
+                                      {t.openPdf}
+                                      <ArrowRight
                                         aria-hidden="true"
-                                        className="size-3.5 shrink-0"
+                                        className="size-3.5"
                                       />
-                                      <span className="truncate">
-                                        {attachment.filename}
-                                      </span>
                                     </Link>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-                          <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-                            <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
-                              {message.sentAt ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.sentAt}:{" "}
-                                  </dt>
-                                  <dd className="inline">
-                                    {auditTimestamp(locale, message.sentAt)}
-                                  </dd>
+                                  ) : null}
+                                  <Link
+                                    className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[var(--an-muted)] hover:bg-[var(--an-soft)]"
+                                    href={item.fallbackHref}
+                                  >
+                                    {t.openThread}
+                                  </Link>
                                 </div>
-                              ) : null}
-                              {message.deliveredAt ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.deliveredAt}:{" "}
-                                  </dt>
-                                  <dd className="inline">
-                                    {auditTimestamp(
-                                      locale,
-                                      message.deliveredAt,
-                                    )}
-                                  </dd>
-                                </div>
-                              ) : null}
-                              {message.replyToMessageId ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.replyTo}:{" "}
-                                  </dt>
-                                  <dd className="inline">
-                                    #{message.replyToMessageId}
-                                  </dd>
-                                </div>
-                              ) : null}
-                            </dl>
+                              </li>
+                            ),
+                          )}
+                        </ol>
+                      ) : (
+                        <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+                          {t.commercialVersionsEmpty}
+                        </p>
+                      )}
+                    </div>
+                  </details>
+
+                  <details className="an-elevated group rounded-2xl border">
+                    <summary
+                      className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
+                      id="case-document-register-title"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Files
+                          aria-hidden="true"
+                          className="size-4 text-[var(--an-amber)]"
+                        />
+                        {t.documentRegister} ·{" "}
+                        {value.customerRecord.documents.length}
+                      </span>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
+                      />
+                    </summary>
+                    <div className="px-3 pb-3">
+                      {value.customerRecord.documents.length ? (
+                        <ul
+                          className="mt-3 max-h-64 space-y-2 overflow-auto pr-1"
+                          data-document-register
+                        >
+                          {value.customerRecord.documents.map((document) => (
+                            <li key={document.id}>
+                              <Link
+                                className="an-elevated flex min-h-14 items-center justify-between gap-3 rounded-xl border p-3 hover:border-[var(--an-amber)]"
+                                href={document.href}
+                                target="_blank"
+                              >
+                                <span className="min-w-0">
+                                  <strong className="block truncate text-xs text-[var(--an-text)]">
+                                    {document.filename}
+                                  </strong>
+                                  <small className="mt-1 block truncate text-[var(--an-subtle)]">
+                                    {document.classification} ·{" "}
+                                    {document.mimeType} ·{" "}
+                                    {auditTimestamp(locale, document.createdAt)}
+                                    {document.ownerType
+                                      ? ` · ${t.relatedTo}: ${document.ownerType}${document.ownerId ? ` #${document.ownerId}` : ""}`
+                                      : ""}
+                                  </small>
+                                </span>
+                                <ArrowRight
+                                  aria-hidden="true"
+                                  className="size-4 shrink-0 text-[var(--an-amber)]"
+                                />
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+                          {t.documentRegisterEmpty}
+                        </p>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              </div>
+
+              <details className="group mt-6 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)]">
+                <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
+                  <span>
+                    <strong
+                      className="block text-sm text-[var(--an-text)]"
+                      id="case-business-history-title"
+                    >
+                      {t.businessHistory} ·{" "}
+                      {value.customerRecord.history.length}
+                    </strong>
+                    <span className="mt-1 block text-xs text-[var(--an-muted)]">
+                      {t.businessHistoryIntro}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
+                  />
+                </summary>
+                <div className="px-4 pb-4">
+                  {value.customerRecord.history.length ? (
+                    <ol
+                      className="mt-3 grid max-h-80 gap-2 overflow-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
+                      data-business-history
+                    >
+                      {value.customerRecord.history.map((item) => (
+                        <li
+                          className="an-elevated flex min-w-0 items-start justify-between gap-3 rounded-xl border p-3"
+                          key={item.id}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold text-[var(--an-text)]">
+                              {item.title}
+                            </p>
+                            <p className="mt-1 text-[10px] text-[var(--an-subtle)]">
+                              {item.kind} · {item.status} ·{" "}
+                              {auditTimestamp(locale, item.at)}
+                            </p>
+                          </div>
+                          {item.href ? (
                             <Link
-                              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
-                              href={message.fallbackHref}
+                              aria-label={`${t.openSource}: ${item.title}`}
+                              className="grid size-9 shrink-0 place-items-center rounded-lg text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                              href={item.href}
                             >
-                              {t.openThread}
                               <ArrowRight
                                 aria-hidden="true"
-                                className="size-3.5"
+                                className="size-4"
                               />
                             </Link>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-3 text-sm text-[var(--an-muted)]">
+                      {t.timelineEmpty}
+                    </p>
+                  )}
+                </div>
+              </details>
+            </section>
+          ) : (
+            <section
+              className="an-surface rounded-3xl border p-5 sm:p-6"
+              id="case-customer-record"
+            >
+              <h2 className="text-lg font-bold text-[var(--an-text)]">
+                {t.customerRecord}
+              </h2>
+              <p className="mt-3 text-sm text-[var(--an-muted)]">
+                {t.communicationsEmpty}
+              </p>
+            </section>
+          )}
+        </div>
+
+        <div>
+          <section
+            className="an-surface min-w-0 rounded-3xl border p-5 sm:p-6"
+            aria-labelledby="case-evidence-title"
+            id="case-evidence"
+            tabIndex={-1}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  className="text-lg font-bold text-[var(--an-text)]"
+                  id="case-evidence-title"
+                >
+                  {t.evidence}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--an-muted)]">
+                  {t.evidenceIntro}
+                </p>
+              </div>
+              <ShieldCheck
+                aria-hidden="true"
+                className="size-5 shrink-0 text-[var(--an-success)]"
+              />
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {value.evidence.map((item) => {
+                const Icon = evidenceIcons[item.kind];
+                const evidenceHref = item.previewHref || item.fallbackHref;
+                const actionLabel =
+                  item.previewAction === "review_measurement"
+                    ? t.reviewMeasurement
+                    : item.previewAction === "document_preflight"
+                      ? t.documentPreflight
+                      : t.openEvidence;
+                return (
+                  <article
+                    className="an-elevated flex min-h-56 flex-col rounded-2xl border p-4"
+                    key={item.id}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="grid size-10 place-items-center rounded-xl bg-[var(--an-amber-soft)] text-[var(--an-amber)]">
+                        <Icon aria-hidden="true" className="size-5" />
+                      </span>
+                      <span
+                        className={`rounded-full border px-2 py-1 text-[10px] font-bold ${evidenceStateStyles[item.state]}`}
+                      >
+                        {t.evidenceStates[item.state]}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 font-bold text-[var(--an-text)]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-[var(--an-muted)]">
+                      {item.summary}
+                    </p>
+                    {item.metric ? (
+                      <strong className="mt-3 block text-sm text-[var(--an-amber)]">
+                        {item.metric}
+                      </strong>
+                    ) : null}
+                    <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+                      <small className="text-[var(--an-subtle)]">
+                        {item.recordedAt}
+                      </small>
+                      {evidenceHref ? (
+                        <Link
+                          aria-label={`${actionLabel}: ${item.title}`}
+                          className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                          href={evidenceHref}
+                        >
+                          {actionLabel}
+                          <ArrowRight aria-hidden="true" className="size-3.5" />
+                        </Link>
+                      ) : (
+                        <span className="text-right text-xs font-semibold text-[var(--an-text-subtle)]">
+                          {t.evidenceUnavailable}
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+
+        <div>
+          <aside
+            className="an-surface min-w-0 scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
+            aria-labelledby="case-timeline-title"
+            id="case-history"
+            tabIndex={-1}
+          >
+            <AdminNextCaseWorkspaceHistoryRail
+              controlsId="case-history-content"
+              state={historyState}
+              stateLabel={t.historyStates[historyState]}
+              toggleLabel={t.historyToggle}
+            >
+              <h2
+                className="text-lg font-bold text-[var(--an-text)]"
+                id="case-timeline-title"
+              >
+                {t.timeline}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--an-muted)]">
+                {t.timelineIntro}
+              </p>
+              {value.timelineState.status === "ready" &&
+              value.timeline.length > 0 ? (
+                <ol className="mt-6 space-y-0" data-audit-history-state="ready">
+                  {value.timeline.map((item, index) => {
+                    const Icon = timelineIcons[item.kind];
+                    const audit = item.audit;
+                    return (
+                      <li
+                        className="relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3 pb-6 last:pb-0"
+                        key={item.id}
+                      >
+                        {index < value.timeline.length - 1 ? (
+                          <span
+                            aria-hidden="true"
+                            className="absolute top-10 bottom-0 left-5 w-px bg-[var(--an-border)]"
+                          />
+                        ) : null}
+                        <span className="relative z-10 grid size-10 place-items-center rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-amber)]">
+                          <Icon aria-hidden="true" className="size-[18px]" />
+                        </span>
+                        <div className="min-w-0 pt-0.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <strong className="text-sm text-[var(--an-text)]">
+                              {audit?.action || item.title}
+                            </strong>
+                            <small className="shrink-0 text-[var(--an-subtle)]">
+                              {audit
+                                ? auditTimestamp(locale, audit.atUtc)
+                                : item.at}
+                            </small>
                           </div>
-                        </article>
+                          {audit ? (
+                            <div className="mt-2 space-y-2 text-xs leading-5 text-[var(--an-muted)]">
+                              <p>
+                                <strong className="text-[var(--an-text)]">
+                                  {t.changedFields}:
+                                </strong>{" "}
+                                {audit.changedFields.length
+                                  ? audit.changedFields.join(", ")
+                                  : t.changedFieldsStatuses[
+                                      audit.changedFieldsStatus
+                                    ]}
+                              </p>
+                              <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--an-subtle)]">
+                                {audit.result ? (
+                                  <div>
+                                    <dt className="inline font-bold">
+                                      {t.result}:{" "}
+                                    </dt>
+                                    <dd className="inline">{audit.result}</dd>
+                                  </div>
+                                ) : null}
+                                {audit.reason ? (
+                                  <div>
+                                    <dt className="inline font-bold">
+                                      {t.reason}:{" "}
+                                    </dt>
+                                    <dd className="inline">{audit.reason}</dd>
+                                  </div>
+                                ) : null}
+                                {audit.version !== null ? (
+                                  <div>
+                                    <dt className="inline font-bold">
+                                      {t.version}:{" "}
+                                    </dt>
+                                    <dd className="inline">{audit.version}</dd>
+                                  </div>
+                                ) : null}
+                                {audit.source ? (
+                                  <div>
+                                    <dt className="inline font-bold">
+                                      {t.sourceLabel}:{" "}
+                                    </dt>
+                                    <dd className="inline">{audit.source}</dd>
+                                  </div>
+                                ) : null}
+                              </dl>
+                              <p className="text-[10px] break-all text-[var(--an-subtle)]">
+                                {t.correlation}: {audit.correlationId} ·{" "}
+                                {t.hashStatus}:{" "}
+                                {t.hashStatuses[audit.integrity.hashStatus]} ·{" "}
+                                {t.tamperStatuses[audit.integrity.tamperStatus]}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-xs leading-5 text-[var(--an-muted)]">
+                              {item.summary}
+                            </p>
+                          )}
+                          <small className="mt-2 flex items-center gap-1.5 font-semibold text-[var(--an-subtle)]">
+                            <CircleAlert
+                              aria-hidden="true"
+                              className="size-3"
+                            />
+                            {audit ? auditActor(audit, t) : item.actor}
+                          </small>
+                        </div>
                       </li>
                     );
                   })}
                 </ol>
+              ) : value.timelineState.status === "ready" ? (
+                <p
+                  className="mt-5 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]"
+                  data-audit-history-state="empty"
+                  role="status"
+                >
+                  {t.timelineEmpty}
+                </p>
               ) : (
-                <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
-                  {t.communicationsEmpty}
+                <p
+                  className="mt-5 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]"
+                  data-audit-history-state={value.timelineState.status}
+                  role="status"
+                >
+                  {value.timelineState.status === "denied"
+                    ? t.timelineDenied
+                    : t.timelineUnavailable}
                 </p>
               )}
-            </section>
-
-            <div className="min-w-0 space-y-5">
-              <section aria-labelledby="case-commercial-versions-title">
-                <h3
-                  className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
-                  id="case-commercial-versions-title"
-                >
-                  <FileSignature
-                    aria-hidden="true"
-                    className="size-4 text-[var(--an-amber)]"
-                  />
-                  {t.commercialVersions} ·{" "}
-                  {value.customerRecord.commercialVersions.length}
-                </h3>
-                {value.customerRecord.commercialVersions.length ? (
-                  <ol
-                    className="mt-3 max-h-[24rem] space-y-2 overflow-auto pr-1"
-                    data-commercial-versions
-                  >
-                    {value.customerRecord.commercialVersions.map((item) => (
-                      <li
-                        className="an-elevated rounded-2xl border p-3"
-                        key={item.id}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold tracking-wider text-[var(--an-amber)] uppercase">
-                              {item.kind === "quote" ? t.quote : t.contract} ·{" "}
-                              {t.versionShort}
-                              {item.version}
-                            </p>
-                            <strong className="mt-1 block truncate text-sm text-[var(--an-text)]">
-                              {item.reference}
-                            </strong>
-                          </div>
-                          <span className="shrink-0 rounded-full border border-[var(--an-border)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
-                            {item.status} · {item.role}
-                          </span>
-                        </div>
-                        <dl className="mt-2 space-y-1 text-[11px] text-[var(--an-subtle)]">
-                          <div>
-                            <dt className="sr-only">{t.version}</dt>
-                            <dd>{auditTimestamp(locale, item.createdAt)}</dd>
-                          </div>
-                          {item.supersedesReference ? (
-                            <div>
-                              <dt className="inline font-bold">
-                                {t.supersedes}:{" "}
-                              </dt>
-                              <dd className="inline">
-                                {item.supersedesReference}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {item.signedAt ? (
-                            <div>
-                              <dt className="inline font-bold">
-                                {t.customerSigned}:{" "}
-                              </dt>
-                              <dd className="inline">
-                                {auditTimestamp(locale, item.signedAt)}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {item.companySignedAt ? (
-                            <div>
-                              <dt className="inline font-bold">
-                                {t.companySigned}:{" "}
-                              </dt>
-                              <dd className="inline">
-                                {auditTimestamp(locale, item.companySignedAt)}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {item.documentHash ? (
-                            <div className="break-all">
-                              <dt className="inline font-bold">Hash: </dt>
-                              <dd className="inline">{item.documentHash}</dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {item.pdfHref ? (
-                            <Link
-                              className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
-                              href={item.pdfHref}
-                              target="_blank"
-                            >
-                              {t.openPdf}
-                              <ArrowRight
-                                aria-hidden="true"
-                                className="size-3.5"
-                              />
-                            </Link>
-                          ) : null}
-                          <Link
-                            className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[var(--an-muted)] hover:bg-[var(--an-soft)]"
-                            href={item.fallbackHref}
-                          >
-                            {t.openThread}
-                          </Link>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
-                    {t.commercialVersionsEmpty}
-                  </p>
-                )}
-              </section>
-
-              <section aria-labelledby="case-document-register-title">
-                <h3
-                  className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
-                  id="case-document-register-title"
-                >
-                  <Files
-                    aria-hidden="true"
-                    className="size-4 text-[var(--an-amber)]"
-                  />
-                  {t.documentRegister} · {value.customerRecord.documents.length}
-                </h3>
-                {value.customerRecord.documents.length ? (
-                  <ul
-                    className="mt-3 max-h-64 space-y-2 overflow-auto pr-1"
-                    data-document-register
-                  >
-                    {value.customerRecord.documents.map((document) => (
-                      <li key={document.id}>
-                        <Link
-                          className="an-elevated flex min-h-14 items-center justify-between gap-3 rounded-xl border p-3 hover:border-[var(--an-amber)]"
-                          href={document.href}
-                          target="_blank"
-                        >
-                          <span className="min-w-0">
-                            <strong className="block truncate text-xs text-[var(--an-text)]">
-                              {document.filename}
-                            </strong>
-                            <small className="mt-1 block truncate text-[var(--an-subtle)]">
-                              {document.classification} · {document.mimeType} ·{" "}
-                              {auditTimestamp(locale, document.createdAt)}
-                              {document.ownerType
-                                ? ` · ${t.relatedTo}: ${document.ownerType}${document.ownerId ? ` #${document.ownerId}` : ""}`
-                                : ""}
-                            </small>
-                          </span>
-                          <ArrowRight
-                            aria-hidden="true"
-                            className="size-4 shrink-0 text-[var(--an-amber)]"
-                          />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
-                    {t.documentRegisterEmpty}
-                  </p>
-                )}
-              </section>
-            </div>
-          </div>
-
-          <section
-            className="mt-6 border-t border-[var(--an-border)] pt-5"
-            aria-labelledby="case-business-history-title"
-          >
-            <h3
-              className="text-sm font-bold text-[var(--an-text)]"
-              id="case-business-history-title"
-            >
-              {t.businessHistory} · {value.customerRecord.history.length}
-            </h3>
-            <p className="mt-1 text-xs text-[var(--an-muted)]">
-              {t.businessHistoryIntro}
-            </p>
-            {value.customerRecord.history.length ? (
-              <ol
-                className="mt-3 grid max-h-80 gap-2 overflow-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
-                data-business-history
-              >
-                {value.customerRecord.history.map((item) => (
-                  <li
-                    className="an-elevated flex min-w-0 items-start justify-between gap-3 rounded-xl border p-3"
-                    key={item.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-bold text-[var(--an-text)]">
-                        {item.title}
-                      </p>
-                      <p className="mt-1 text-[10px] text-[var(--an-subtle)]">
-                        {item.kind} · {item.status} ·{" "}
-                        {auditTimestamp(locale, item.at)}
-                      </p>
-                    </div>
-                    {item.href ? (
-                      <Link
-                        aria-label={`${t.openSource}: ${item.title}`}
-                        className="grid size-9 shrink-0 place-items-center rounded-lg text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
-                        href={item.href}
-                      >
-                        <ArrowRight aria-hidden="true" className="size-4" />
-                      </Link>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="mt-3 text-sm text-[var(--an-muted)]">
-                {t.timelineEmpty}
-              </p>
-            )}
-          </section>
-        </section>
-      ) : null}
-
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.75fr)]">
-        <section
-          className="an-surface min-w-0 rounded-3xl border p-5 sm:p-6"
-          aria-labelledby="case-evidence-title"
-          data-case-context-target
-          id="case-evidence"
-          tabIndex={-1}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2
-                className="text-lg font-bold text-[var(--an-text)]"
-                id="case-evidence-title"
-              >
-                {t.evidence}
-              </h2>
-              <p className="mt-1 text-sm text-[var(--an-muted)]">
-                {t.evidenceIntro}
-              </p>
-            </div>
-            <ShieldCheck
-              aria-hidden="true"
-              className="size-5 shrink-0 text-[var(--an-success)]"
-            />
-          </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {value.evidence.map((item) => {
-              const Icon = evidenceIcons[item.kind];
-              const evidenceHref = item.previewHref || item.fallbackHref;
-              const actionLabel =
-                item.previewAction === "review_measurement"
-                  ? t.reviewMeasurement
-                  : item.previewAction === "document_preflight"
-                    ? t.documentPreflight
-                    : t.openEvidence;
-              return (
-                <article
-                  className="an-elevated flex min-h-56 flex-col rounded-2xl border p-4"
-                  key={item.id}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="grid size-10 place-items-center rounded-xl bg-[var(--an-amber-soft)] text-[var(--an-amber)]">
-                      <Icon aria-hidden="true" className="size-5" />
-                    </span>
-                    <span
-                      className={`rounded-full border px-2 py-1 text-[10px] font-bold ${evidenceStateStyles[item.state]}`}
-                    >
-                      {t.evidenceStates[item.state]}
-                    </span>
-                  </div>
-                  <h3 className="mt-4 font-bold text-[var(--an-text)]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-sm text-[var(--an-muted)]">
-                    {item.summary}
-                  </p>
-                  {item.metric ? (
-                    <strong className="mt-3 block text-sm text-[var(--an-amber)]">
-                      {item.metric}
-                    </strong>
-                  ) : null}
-                  <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-                    <small className="text-[var(--an-subtle)]">
-                      {item.recordedAt}
-                    </small>
-                    {evidenceHref ? (
-                      <Link
-                        aria-label={`${actionLabel}: ${item.title}`}
-                        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
-                        href={evidenceHref}
-                      >
-                        {actionLabel}
-                        <ArrowRight aria-hidden="true" className="size-3.5" />
-                      </Link>
-                    ) : (
-                      <span className="text-right text-xs font-semibold text-[var(--an-text-subtle)]">
-                        {t.evidenceUnavailable}
-                      </span>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <aside
-          className="an-surface min-w-0 scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
-          aria-labelledby="case-timeline-title"
-          data-case-context-target
-          id="case-history"
-          tabIndex={-1}
-        >
-          <AdminNextCaseWorkspaceHistoryRail
-            controlsId="case-history-content"
-            state={historyState}
-            stateLabel={t.historyStates[historyState]}
-            toggleLabel={t.historyToggle}
-          >
-            <h2
-              className="text-lg font-bold text-[var(--an-text)]"
-              id="case-timeline-title"
-            >
-              {t.timeline}
-            </h2>
-            <p className="mt-1 text-sm text-[var(--an-muted)]">
-              {t.timelineIntro}
-            </p>
-            {value.timelineState.status === "ready" &&
-            value.timeline.length > 0 ? (
-              <ol className="mt-6 space-y-0" data-audit-history-state="ready">
-                {value.timeline.map((item, index) => {
-                  const Icon = timelineIcons[item.kind];
-                  const audit = item.audit;
-                  return (
-                    <li
-                      className="relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3 pb-6 last:pb-0"
-                      key={item.id}
-                    >
-                      {index < value.timeline.length - 1 ? (
-                        <span
-                          aria-hidden="true"
-                          className="absolute top-10 bottom-0 left-5 w-px bg-[var(--an-border)]"
-                        />
-                      ) : null}
-                      <span className="relative z-10 grid size-10 place-items-center rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-amber)]">
-                        <Icon aria-hidden="true" className="size-[18px]" />
-                      </span>
-                      <div className="min-w-0 pt-0.5">
-                        <div className="flex items-start justify-between gap-3">
-                          <strong className="text-sm text-[var(--an-text)]">
-                            {audit?.action || item.title}
-                          </strong>
-                          <small className="shrink-0 text-[var(--an-subtle)]">
-                            {audit
-                              ? auditTimestamp(locale, audit.atUtc)
-                              : item.at}
-                          </small>
-                        </div>
-                        {audit ? (
-                          <div className="mt-2 space-y-2 text-xs leading-5 text-[var(--an-muted)]">
-                            <p>
-                              <strong className="text-[var(--an-text)]">
-                                {t.changedFields}:
-                              </strong>{" "}
-                              {audit.changedFields.length
-                                ? audit.changedFields.join(", ")
-                                : t.changedFieldsStatuses[
-                                    audit.changedFieldsStatus
-                                  ]}
-                            </p>
-                            <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--an-subtle)]">
-                              {audit.result ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.result}:{" "}
-                                  </dt>
-                                  <dd className="inline">{audit.result}</dd>
-                                </div>
-                              ) : null}
-                              {audit.reason ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.reason}:{" "}
-                                  </dt>
-                                  <dd className="inline">{audit.reason}</dd>
-                                </div>
-                              ) : null}
-                              {audit.version !== null ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.version}:{" "}
-                                  </dt>
-                                  <dd className="inline">{audit.version}</dd>
-                                </div>
-                              ) : null}
-                              {audit.source ? (
-                                <div>
-                                  <dt className="inline font-bold">
-                                    {t.sourceLabel}:{" "}
-                                  </dt>
-                                  <dd className="inline">{audit.source}</dd>
-                                </div>
-                              ) : null}
-                            </dl>
-                            <p className="text-[10px] break-all text-[var(--an-subtle)]">
-                              {t.correlation}: {audit.correlationId} ·{" "}
-                              {t.hashStatus}:{" "}
-                              {t.hashStatuses[audit.integrity.hashStatus]} ·{" "}
-                              {t.tamperStatuses[audit.integrity.tamperStatus]}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="mt-1 text-xs leading-5 text-[var(--an-muted)]">
-                            {item.summary}
-                          </p>
-                        )}
-                        <small className="mt-2 flex items-center gap-1.5 font-semibold text-[var(--an-subtle)]">
-                          <CircleAlert aria-hidden="true" className="size-3" />
-                          {audit ? auditActor(audit, t) : item.actor}
-                        </small>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : value.timelineState.status === "ready" ? (
-              <p
-                className="mt-5 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]"
-                data-audit-history-state="empty"
-                role="status"
-              >
-                {t.timelineEmpty}
-              </p>
-            ) : (
-              <p
-                className="mt-5 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]"
-                data-audit-history-state={value.timelineState.status}
-                role="status"
-              >
-                {value.timelineState.status === "denied"
-                  ? t.timelineDenied
-                  : t.timelineUnavailable}
-              </p>
-            )}
-          </AdminNextCaseWorkspaceHistoryRail>
-        </aside>
-      </div>
+            </AdminNextCaseWorkspaceHistoryRail>
+          </aside>
+        </div>
+      </AdminNextCaseWorkspacePanelSwitcher>
 
       <section
         className="an-success flex flex-col gap-4 rounded-3xl border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"

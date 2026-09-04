@@ -8,23 +8,11 @@ import { parseAdminNextRfRoute } from "@/lib/admin-next/rf-route-contract";
 
 describe("Admin Next Case Workspace preview", () => {
   it.each([
-    [
-      "nb",
-      "Navigasjon i saken",
-      ["Sammendrag", "Kundedialog", "Dokumentasjon", "Historikk"],
-    ],
-    [
-      "lt",
-      "Navigacija byloje",
-      ["Santrauka", "Kliento dialogas", "Įrodymai", "Istorija"],
-    ],
-    [
-      "en",
-      "Case navigation",
-      ["Summary", "Customer dialogue", "Evidence", "History"],
-    ],
+    ["nb", "Navigasjon i saken", ["Kundedialog", "Dokumentasjon", "Historikk"]],
+    ["lt", "Navigacija byloje", ["Kliento dialogas", "Įrodymai", "Istorija"]],
+    ["en", "Case navigation", ["Customer dialogue", "Evidence", "History"]],
   ] as const)(
-    "renders native, localized in-page navigation landmarks for %s",
+    "renders a localized, bounded workspace panel switcher for %s",
     (locale, navigationLabel, labels) => {
       const html = renderToStaticMarkup(
         createElement(AdminNextCaseWorkspace, {
@@ -33,19 +21,23 @@ describe("Admin Next Case Workspace preview", () => {
         }),
       );
 
-      expect(html).toContain(`<nav aria-label="${navigationLabel}"`);
-      expect(html.match(/data-case-context-link=/gu)).toHaveLength(4);
-      expect(html.match(/aria-current="location"/gu)).toHaveLength(1);
-      expect(html).not.toContain('role="tab"');
+      expect(html).toContain(`aria-label="${navigationLabel}"`);
+      expect(html).toContain('role="tablist"');
+      expect(html.match(/data-case-context-link=/gu)).toHaveLength(3);
+      expect(html.match(/aria-selected="true"/gu)).toHaveLength(1);
+      expect(html.match(/role="tab"/gu)).toHaveLength(3);
+      expect(html.match(/role="tabpanel"/gu)).toHaveLength(3);
+      expect(html.match(/ hidden=""/gu)).toHaveLength(2);
       for (const [index, target] of [
-        "case-summary",
         "case-customer-record",
         "case-evidence",
         "case-history",
       ].entries()) {
-        expect(html).toContain(`href="#${target}"`);
         expect(html).toContain(`id="${target}"`);
-        expect(html).toContain(`>${labels[index]}</a>`);
+        expect(html).toContain(
+          `aria-controls="case-workspace-panel-${target}"`,
+        );
+        expect(html).toContain(`>${labels[index]}</button>`);
       }
     },
   );
@@ -73,6 +65,8 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("kontrakt-K-1042-V1.pdf");
     expect(html).toContain('data-business-history="true"');
     expect(html).toContain("Kundespørsmål mottatt");
+    expect(html.match(/<details/gu)?.length).toBeGreaterThanOrEqual(4);
+    expect(html).toContain("group-open:rotate-180");
   });
 
   it("uses one native disclosure for the history rail without duplicating audit content", () => {
@@ -172,7 +166,7 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).not.toContain("/admin/collections/");
   });
 
-  it("contains only working links and no fake active controls", () => {
+  it("contains only working links and three real workspace controls", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextCaseWorkspace, {
         locale: "lt",
@@ -180,7 +174,7 @@ describe("Admin Next Case Workspace preview", () => {
       }),
     );
 
-    expect(html).not.toContain("<button");
+    expect(html.match(/<button/gu)).toHaveLength(3);
     expect(html.match(/href="\/admin-v2\//g)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain(">Peržiūrėti R4<");
     expect(html).toContain(
