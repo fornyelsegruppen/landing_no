@@ -44,6 +44,7 @@ import {
 } from "@/components/admin-next/norgeibilder-capture-control";
 import { projectWgs84ToOrthoPixels } from "@/components/admin-next/norgeibilder-projection";
 import { reduceRoofFusionOneCardStateV2 } from "@/lib/roof-fusion/one-card-workflow-v2";
+import { AdminNextRoofFusionAddressAutocomplete } from "./admin-next-roof-fusion-address-autocomplete";
 
 export type RoofFusionUatActionState =
   | { kind: "idle" }
@@ -2031,6 +2032,8 @@ export function AdminNextRoofFusionUatControl({
     addressLookupAction,
     initialAddressState,
   );
+  const [addressAutocompleteBlocked, setAddressAutocompleteBlocked] =
+    useState(false);
 
   return (
     <div
@@ -2160,25 +2163,15 @@ export function AdminNextRoofFusionUatControl({
           action={addressFormAction}
           className="mt-7 grid gap-4 sm:grid-cols-[1fr_auto]"
         >
-          <label
-            className="grid gap-2 text-sm font-bold"
-            htmlFor="roof-fusion-address-query"
-          >
-            {t.addressLabel}
-            <input
-              autoComplete="street-address"
-              className="min-h-12 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-4 text-[var(--an-text)] outline-none focus:border-[var(--an-amber)]"
-              id="roof-fusion-address-query"
-              maxLength={180}
-              minLength={4}
-              name="addressQuery"
-              placeholder={t.addressPlaceholder}
-              required
-            />
-          </label>
+          <AdminNextRoofFusionAddressAutocomplete
+            inputClassName="min-h-12 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-4 text-[var(--an-text)] outline-none focus:border-[var(--an-amber)]"
+            label={t.addressLabel}
+            onMeasurementBlockedChange={setAddressAutocompleteBlocked}
+            placeholder={t.addressPlaceholder}
+          />
           <button
             className="mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-5 font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
-            disabled={addressPending}
+            disabled={addressPending || addressAutocompleteBlocked}
             type="submit"
           >
             {addressPending ? (
@@ -2194,7 +2187,7 @@ export function AdminNextRoofFusionUatControl({
         </form>
         <p className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--an-subtle)]">
           <Layers3 aria-hidden="true" className="size-4" />
-          {t.addressGuard}
+          {t.addressGuard} · Adresai: Kartverket per Entur
         </p>
         {addressState.kind === "success" ? (
           <RealAddressResult

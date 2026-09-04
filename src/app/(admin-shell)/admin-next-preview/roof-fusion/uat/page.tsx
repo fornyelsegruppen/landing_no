@@ -14,6 +14,7 @@ import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
+import { resolveRoofFusionAddressQueryV1 } from "@/lib/providers/entur-geocoder-v3";
 import { KartverketHeightDataProvider } from "@/lib/providers/kartverket-hoydedata-provider";
 import { OpenStreetMapBuildingProvider } from "@/lib/providers/osm-building-provider";
 import { buildRoofFusionHeightSurfacePreviewV1 } from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
@@ -121,10 +122,11 @@ export default async function AdminNextRoofFusionUatPage() {
     }
 
     try {
-      const addresses = await new KartverketAddressProvider().searchAddress(
-        query,
+      const address = await resolveRoofFusionAddressQueryV1(
+        formData,
+        (fallbackQuery) =>
+          new KartverketAddressProvider().searchAddress(fallbackQuery),
       );
-      const address = addresses[0];
       if (!address) return { kind: "error", code: "ADDRESS_NOT_FOUND" };
 
       const candidates =
