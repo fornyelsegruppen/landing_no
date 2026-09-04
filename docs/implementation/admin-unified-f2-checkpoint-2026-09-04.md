@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-04  
 **Branch:** `codex/unified-admin-f0`  
-**Būsena:** `READ FOUNDATION IMPLEMENTED / LOCAL QUALITY GATE GREEN / PREVIEW DATA GATE PENDING`  
+**Būsena:** `READ FOUNDATION IMPLEMENTED / LOCAL + BRANCH CI GREEN / PREVIEW DATA GATE PENDING`  
 **Production:** `NO-GO`; Production aplinka, bendri duomenys ir schemos nepakeisti
 
 ## Rezultatas
@@ -55,16 +55,20 @@ breakpoint ir fail-closed būsenų mašininį rezultatą.
 - `npm run typecheck` — PASS.
 - `npm run lint` — PASS, 0 klaidų; lieka vienas žinomas R4 `<img>` našumo
   perspėjimas.
-- `npm run test:ci:unit` — PASS, 324 failai / 1 799 testai.
+- `npm run test:ci:unit` — PASS, 325 testų failai / 1 801 testas.
 - `npm run test:ci:migrations` — PASS, 22 failai / 42 testai.
 - `npm audit --omit=dev --audit-level=high` — PASS; 0 high/critical, 6 moderate
   dev/migration įrankių grandinėje be prieinamo fix.
 - WQ, Case golden ir F1 source-rendered capture vartai — PASS.
 - Vietinis Turbopack production build sustojo Windows pnpm junction skaityme
-  (`@libsql/client`, OS error 5), dar prieš aplikacijos compile verdictą.
-  Lygiavertis Webpack fallback šiam repo netinka dėl esamo `node:crypto` client
-  importo. Švarus Ubuntu `npm ci` branch CI yra autoritetingas build vartas ir
-  šiame checkpointe dar pažymėtas kaip pending.
+  (`@libsql/client`, OS error 5), dar prieš aplikacijos compile verdictą;
+  lygiavertis Webpack fallback šiam repo netinka dėl esamo `node:crypto` client
+  importo. Autoritetingas švarus Ubuntu `npm ci` branch CI production buildas
+  prieš PostgreSQL — PASS.
+- Branch CI `33888477645` — PASS: dependency audit, Payload type sync, lint,
+  typecheck, unit/API, migration up/down, empty PostgreSQL bootstrap,
+  deterministic seed, production build, 11/11 public/authenticated Chromium
+  smoke ir PostgreSQL backup/restore rehearsal.
 
 ## Vartotojo žingsniai, kurių reikės po saugaus lokalaus vartelio
 
