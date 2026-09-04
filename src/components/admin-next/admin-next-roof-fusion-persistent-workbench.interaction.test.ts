@@ -482,6 +482,46 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain("Reikalinga peržiūra");
     expect(container.textContent).not.toContain("review_required");
     expect(container.textContent).not.toContain("Manual ridge");
+
+    const fallback = container.querySelector<HTMLElement>(
+      "[data-roof-fusion-legacy-fallback]",
+    );
+    const fallbackButton = fallback?.querySelector<HTMLButtonElement>(
+      "[data-roof-fusion-select-legacy-fallback]",
+    );
+    expect(fallbackButton?.disabled).toBe(true);
+    await act(async () =>
+      fallback!
+        .querySelector<HTMLInputElement>("input[type='checkbox']")!
+        .click(),
+    );
+    const reason = fallback!.querySelector<HTMLTextAreaElement>("textarea")!;
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      valueSetter?.call(reason, "Aukščio modelį užstoja medžiai");
+      reason.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(fallbackButton?.disabled).toBe(false);
+    await act(async () => fallbackButton!.click());
+    expect(container.textContent).toContain(
+      "Preview · aktyvus senas rankinis fallback",
+    );
+
+    await act(async () => {
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
+      await flushAsyncWork();
+    });
+    expect(JSON.stringify(latest)).not.toContain("legacy_manual_pitch");
+    await act(async () => {
+      buttonWithText("Perkrauti")!.click();
+      await flushAsyncWork();
+    });
+    expect(
+      container.querySelector("[data-roof-fusion-legacy-fallback-active]"),
+    ).toBeNull();
   });
 
   it("snaps a near valley endpoint at 100% and preserves pending on far/zero rejection", async () => {
@@ -781,5 +821,40 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     expect(stage()).toBe("outline");
+  });
+
+  it("lets the guarded old manual fallback reach review without a height surface", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+
+    const fallbackButton = buttonWithText(
+      "Naudoti rankinį rezultatą peržiūrai",
+    );
+    expect(fallbackButton).toBeDefined();
+    expect(fallbackButton!.disabled).toBe(false);
+    await act(async () => fallbackButton!.click());
+    expect(container.textContent).toContain(
+      "Preview · aktyvus senas rankinis fallback",
+    );
+
+    await click('[data-roof-fusion-stage-tab="slopes"]');
+    const primary = container.querySelector<HTMLButtonElement>(
+      '[data-roof-fusion-primary-action="slopes"]',
+    );
+    expect(primary).not.toBeNull();
+    expect(primary!.disabled).toBe(false);
+    await act(async () => primary!.click());
+
+    expect(stage()).toBe("review");
+    expect(container.textContent).toContain(
+      "Aktyvus senas rankinis nuolydžio fallback",
+    );
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        '[data-roof-fusion-primary-action="review"]',
+      )?.disabled,
+    ).toBe(true);
   });
 });

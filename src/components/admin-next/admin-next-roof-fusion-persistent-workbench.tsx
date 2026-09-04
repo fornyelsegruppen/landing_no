@@ -35,6 +35,10 @@ import type {
   RoofFusionWorkbenchDraftReferenceV1,
   RoofFusionWorkbenchDraftV1,
 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
+import {
+  AdminNextRoofFusionLegacyFallbackPanel,
+  type RoofFusionLegacyFallbackSelection,
+} from "./admin-next-roof-fusion-legacy-fallback-panel";
 
 type HeightResult = {
   status: "ready" | "review_required" | "blocked";
@@ -263,6 +267,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
     "idle",
   );
   const [heightResult, setHeightResult] = useState<HeightResult | null>(null);
+  const [legacyFallback, setLegacyFallback] =
+    useState<RoofFusionLegacyFallbackSelection | null>(null);
   const [unsupportedLatest, setUnsupportedLatest] = useState(false);
   const [sourceResetRequired, setSourceResetRequired] = useState(false);
   const [geometryHydrationSignal, setGeometryHydrationSignal] = useState(0);
@@ -291,6 +297,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
 
   const applyLoadedDraft = useCallback(
     (draft: RoofFusionWorkbenchDraftV1) => {
+      setLegacyFallback(null);
       const hydrated = hydrateDraft(draft, capture);
       const exactCapture =
         draft.source.sourceId === capture.sourceId &&
@@ -491,6 +498,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
           body?.error ?? "Skaičiavimas nepavyko",
         );
       setHeightResult(body);
+      setLegacyFallback(null);
       setHeightState("idle");
       return body.status !== "blocked";
     } catch (error) {
@@ -533,7 +541,19 @@ export function AdminNextRoofFusionPersistentWorkbench({
   const calculationBlockers = calculationBlockerCodes.map(
     (code) => calculationBlockerCopy[code],
   );
-  const metrics = heightResult?.metrics;
+  const roofFusionMetrics = heightResult?.metrics;
+  const metrics = legacyFallback
+    ? {
+        horizontalAreaSquareMeters: legacyFallback.horizontalAreaM2,
+        totalSurfaceAreaSquareMeters: legacyFallback.surfaceAreaM2,
+        averageSlopeDegrees: legacyFallback.pitchDegrees,
+        footprintPerimeterMeters: roofFusionMetrics?.footprintPerimeterMeters,
+      }
+    : roofFusionMetrics;
+  const protectedResultId =
+    heightResult && heightResult.status !== "blocked"
+      ? (confirmed?.draftHash ?? `${caseId}:height-result`)
+      : undefined;
   const confirmSourceReset = useCallback(() => {
     if (!sourceResetRequired) return;
     setOutline(sourceOutline);
@@ -543,6 +563,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     setUnsupportedLatest(false);
     setSourceResetRequired(false);
     setHeightResult(null);
+    setLegacyFallback(null);
     pendingDraft.current = null;
     setGeometryHydrationSignal((current) => current + 1);
     setProblem(
@@ -646,7 +667,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   );
 
   async function primaryAction(stage: RoofFusionStage) {
-    if (stage === "slopes") return calculate();
+    if (stage === "slopes") return legacyFallback ? true : calculate();
     return true;
   }
 
@@ -656,17 +677,23 @@ export function AdminNextRoofFusionPersistentWorkbench({
       advancedPanel={advancedPanel}
       averageSlopeDegrees={metrics?.averageSlopeDegrees}
       blockers={blockers}
-      confidence={heightResult?.status === "blocked" ? "low" : "medium"}
+      confidence={
+        legacyFallback || heightResult?.status === "blocked" ? "low" : "medium"
+      }
       confidenceReason={
-        heightResult
-          ? `${heightStatusCopy[heightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
-          : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
+        legacyFallback
+          ? "Naudojamas operatoriaus pasirinktas senas rankinis nuolydžio metodas; rezultatas yra preliminarus ir lieka Preview peržiūrai."
+          : heightResult
+            ? `${heightStatusCopy[heightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
+            : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
       }
       footprintPerimeterMeters={metrics?.footprintPerimeterMeters}
       guardNotice={
-        confirmed && !dirty
-          ? "Preview · revizija išsaugota ir pakartotinai patvirtinta"
-          : "Preview · neišsaugoti pakeitimai"
+        legacyFallback
+          ? "Preview · aktyvus senas rankinis fallback · kainodarai nenaudojama"
+          : confirmed && !dirty
+            ? "Preview · revizija išsaugota ir pakartotinai patvirtinta"
+            : "Preview · neišsaugoti pakeitimai"
       }
       geometryHydrationSignal={geometryHydrationSignal}
       horizontalAreaSquareMeters={
@@ -675,23 +702,37 @@ export function AdminNextRoofFusionPersistentWorkbench({
       initialLayers={{ approvedOutline: true, sourceOutline: true }}
       key={`${capture.sourceId ?? "missing-source"}:${capture.rawContentHash ?? "missing-content-hash"}`}
       lines={lines}
+      legacyFallbackPanel={
+        <AdminNextRoofFusionLegacyFallbackPanel
+          horizontalAreaSquareMeters={
+            roofFusionMetrics?.horizontalAreaSquareMeters ??
+            horizontalAreaSquareMeters
+          }
+          onSelectionChange={setLegacyFallback}
+          protectedResultId={protectedResultId}
+          selection={legacyFallback}
+        />
+      }
       onLineCapture={(line) => {
         setLines((current) => [...current, line]);
         setDirty(true);
         setConfirmed(null);
         setHeightResult(null);
+        setLegacyFallback(null);
       }}
       onLastLineUndo={() => {
         setLines((current) => current.slice(0, -1));
         setDirty(true);
         setConfirmed(null);
         setHeightResult(null);
+        setLegacyFallback(null);
       }}
       onOutlineChange={(points) => {
         setOutline(points);
         setDirty(true);
         setConfirmed(null);
         setHeightResult(null);
+        setLegacyFallback(null);
       }}
       onPrimaryAction={primaryAction}
       orthoAttribution={capture.attribution ?? "©norgeibilder.no"}
@@ -702,9 +743,14 @@ export function AdminNextRoofFusionPersistentWorkbench({
       persistencePanel={persistencePanel}
       sourceOutline={sourceOutline}
       stageBlockers={{
-        slopes: calculationBlockers,
+        slopes: legacyFallback ? [] : calculationBlockers,
         review: [
           "Preview rezultatas visada reikalauja peržiūros ir negali būti perduotas kainodarai.",
+          ...(legacyFallback
+            ? [
+                "Aktyvus senas rankinis nuolydžio fallback. Rezultatas yra preliminarus ir negali būti automatiškai perduotas kainodarai.",
+              ]
+            : []),
         ],
       }}
       totalSurfaceAreaSquareMeters={metrics?.totalSurfaceAreaSquareMeters}

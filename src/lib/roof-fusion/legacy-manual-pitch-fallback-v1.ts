@@ -3,14 +3,23 @@ import {
   canonicalSha256V1,
   compareCanonicalStringsV1,
 } from "./canonicalization-v1";
+import {
+  calculateLegacyManualPitchGeometryV1,
+  LEGACY_MANUAL_PITCH_MAX_DEGREES,
+  LEGACY_MANUAL_PITCH_MAX_HORIZONTAL_AREA_M2,
+  LEGACY_MANUAL_PITCH_MIN_DEGREES,
+  LEGACY_MANUAL_PITCH_MIN_HORIZONTAL_AREA_M2,
+} from "./legacy-manual-pitch-calculation-v1";
+
+export {
+  LEGACY_MANUAL_PITCH_MAX_DEGREES,
+  LEGACY_MANUAL_PITCH_MAX_HORIZONTAL_AREA_M2,
+  LEGACY_MANUAL_PITCH_MIN_DEGREES,
+  LEGACY_MANUAL_PITCH_MIN_HORIZONTAL_AREA_M2,
+} from "./legacy-manual-pitch-calculation-v1";
 
 export const LEGACY_MANUAL_PITCH_FALLBACK_VERSION =
   "legacy-manual-pitch-fallback.v1" as const;
-export const LEGACY_MANUAL_PITCH_MIN_HORIZONTAL_AREA_M2 = 10;
-export const LEGACY_MANUAL_PITCH_MAX_HORIZONTAL_AREA_M2 = 5_000;
-export const LEGACY_MANUAL_PITCH_MIN_DEGREES = 0;
-/** Legacy UI presets stop at 45 degrees; the existing domain safety ceiling is 60. */
-export const LEGACY_MANUAL_PITCH_MAX_DEGREES = 60;
 export const LEGACY_MANUAL_PITCH_SOURCES = [
   "customer",
   "drawing",
@@ -125,12 +134,6 @@ export type LegacyManualPitchFallbackResultV1 =
       issues: [];
     });
 
-function round(value: number, decimals: number) {
-  const factor = 10 ** decimals;
-  const result = Math.round((value + Number.EPSILON) * factor) / factor;
-  return Object.is(result, -0) ? 0 : result;
-}
-
 function blocked(
   issues: LegacyManualPitchFallbackIssueV1[],
 ): LegacyManualPitchFallbackResultV1 {
@@ -204,16 +207,15 @@ export function calculateLegacyManualPitchFallbackV1(
     });
   if (issues.length) return blocked(issues);
 
-  const horizontalAreaM2 = round(input.horizontalAreaM2, 3);
-  const pitchDegrees = round(input.pitchDegrees, 3);
-  const slopeFactor = 1 / Math.cos((pitchDegrees * Math.PI) / 180);
-  const calculation = {
-    method: "legacy_manual_pitch" as const,
-    horizontalAreaM2,
-    pitchDegrees,
-    slopeFactor: round(slopeFactor, 6),
-    surfaceAreaM2: round(horizontalAreaM2 * slopeFactor, 3),
-  };
+  const calculation = calculateLegacyManualPitchGeometryV1(input);
+  if (!calculation)
+    return blocked([
+      {
+        code: "INPUT_INVALID",
+        field: "input",
+        message: "Manual-pitch geometry could not be calculated.",
+      },
+    ]);
   const higherAccuracyOverrideConfirmed = Boolean(
     input.useIntent === "propose_for_storage" &&
     input.roofFusionContext.state === "protected_result" &&

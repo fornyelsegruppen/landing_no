@@ -178,8 +178,9 @@ describe("Roof Fusion one-card Preview flow", () => {
     expect(advanced!.textContent).toContain(
       "Atnaujinti vaizdą iš Norge i bilder",
     );
+    expect(advanced!.textContent).toContain("Senas rankinis skaičiavimas");
     expect(advanced!.textContent).toContain(
-      "Senas rankinis skaičiavimas (fallback)",
+      "Naudoti rankinį rezultatą peržiūrai",
     );
     expect(captureButton!.isConnected).toBe(true);
 

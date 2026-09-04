@@ -903,6 +903,19 @@ export function RealAddressResult({
           {heightPending ? t.heightWorking : t.heightAction}
         </button>
       </form>
+      {heightState.kind === "error" ? (
+        <p
+          className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200"
+          role="alert"
+        >
+          {t.heightErrors[heightState.code]}
+          {heightState.correlationId ? (
+            <span className="mt-1 block font-mono text-[10px] font-normal">
+              ID: {heightState.correlationId}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
       <p className="text-[10px] leading-4 text-[var(--an-muted)]">
         Šie veiksmai atnaujina tik pasirinkto pastato šaltinius. Matavimo
         geometrija ir jos revizija lieka unified darbo vietoje.
@@ -1298,7 +1311,7 @@ export function RealAddressResult({
           {t.preliminary}
         </p>
       ) : null}
-      {heightState.kind === "error" ? (
+      {!canRenderUnifiedWorkbench && heightState.kind === "error" ? (
         <p
           className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
           role="alert"
