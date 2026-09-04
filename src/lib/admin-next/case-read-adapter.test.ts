@@ -73,6 +73,130 @@ const truncatedPageMetadata = [
   ["totalPages", { hasNextPage: false, totalDocs: 1, totalPages: 2 }],
 ] as const;
 
+describe("Admin Next canonical customer record projection", () => {
+  it("preserves message bodies, question state, commercial lineage, signatures and documents", () => {
+    const value = {
+      ...workspace(),
+      messages: [
+        {
+          id: 41,
+          reference: "Customer reply",
+          href: "/admin/collections/messages/41",
+          direction: "inbound",
+          channel: "email",
+          category: "customer_question",
+          status: "received",
+          subject: "Re: Quote",
+          bodyText: "Is scaffolding included?",
+          createdAt: "2026-09-04T10:00:00.000Z",
+          replyToMessageId: 40,
+        },
+      ],
+      commercial: {
+        quoteVersions: [],
+        contractVersions: [
+          {
+            id: 51,
+            kind: "contract",
+            reference: "K-13-V2",
+            version: 2,
+            status: "signed",
+            role: "effective",
+            supersedesReference: "K-13-V1",
+            createdAt: "2026-09-04T09:30:00.000Z",
+            signedAt: "2026-09-04T09:40:00.000Z",
+            companySignedAt: "2026-09-04T09:45:00.000Z",
+            documentHash: "sha256:contract-v2",
+            pdfHref: "/api/admin/media/501",
+            technicalHref: "/admin/collections/contracts/51",
+          },
+        ],
+      },
+      customerQuestionContext: {
+        latest: null,
+        status: "pending",
+        threads: [
+          {
+            question: {
+              id: 41,
+              subject: "Re: Quote",
+              bodyText: "Is scaffolding included?",
+              aiAssisted: false,
+            },
+            reply: null,
+          },
+        ],
+        unresolved: {
+          question: {
+            id: 41,
+            subject: "Re: Quote",
+            bodyText: "Is scaffolding included?",
+            aiAssisted: false,
+          },
+          reply: null,
+        },
+      },
+      documents: [
+        {
+          id: 501,
+          filename: "contract-v2.pdf",
+          classification: "contract",
+          mimeType: "application/pdf",
+          ownerType: "contract",
+          ownerId: "51",
+          createdAt: "2026-09-04T09:30:00.000Z",
+          href: "/api/admin/media/501",
+        },
+      ],
+    } as unknown as AdminCaseWorkspace;
+
+    const projected = projectAdminCaseWorkspace(
+      value,
+      new Date("2026-09-04T11:00:00.000Z"),
+      "lt",
+    );
+
+    expect(projected.customerRecord).toMatchObject({
+      questions: { total: 1, unresolved: true },
+      communications: [
+        {
+          direction: "inbound",
+          subject: "Re: Quote",
+          bodyText: "Is scaffolding included?",
+          replyToMessageId: 40,
+          fallbackHref: "/admin-v2/cases/13#message-41",
+        },
+      ],
+      commercialVersions: [
+        {
+          reference: "K-13-V2",
+          version: 2,
+          supersedesReference: "K-13-V1",
+          signedAt: "2026-09-04T09:40:00.000Z",
+          companySignedAt: "2026-09-04T09:45:00.000Z",
+          documentHash: "sha256:contract-v2",
+          pdfHref: "/api/admin/media/501",
+        },
+      ],
+      documents: [
+        {
+          filename: "contract-v2.pdf",
+          ownerType: "contract",
+          ownerId: "51",
+          href: "/api/admin/media/501",
+        },
+      ],
+    });
+    expect(projected.customerRecord?.history).toContainEqual(
+      expect.objectContaining({
+        id: "quote-21",
+        kind: "quote",
+        href: "/admin-v2/cases/13",
+      }),
+    );
+  });
+});
+
 describe("Admin Next canonical case audit read", () => {
   it("reads exact case entities and projects correlated events without PII", async () => {
     const seed = [

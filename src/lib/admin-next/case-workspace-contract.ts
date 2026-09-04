@@ -17,6 +17,72 @@ export type AdminNextEvidenceState = "verified" | "review" | "missing";
 export type AdminNextTimelineKind =
   "automation" | "measurement" | "message" | "assignment";
 
+export type AdminNextCustomerRecord = {
+  questions: {
+    total: number;
+    unresolved: boolean;
+  };
+  communications: readonly {
+    id: string;
+    direction: "inbound" | "outbound";
+    channel: string;
+    category: string;
+    status: string;
+    subject: string;
+    bodyText: string;
+    at: string;
+    sentAt?: string;
+    deliveredAt?: string;
+    replyToMessageId?: number;
+    fallbackHref: string;
+  }[];
+  commercialVersions: readonly {
+    id: string;
+    kind: "quote" | "contract";
+    reference: string;
+    version: number;
+    status: string;
+    role: "effective" | "working" | "historical";
+    supersedesReference?: string;
+    createdAt: string;
+    signedAt?: string;
+    companySignedAt?: string;
+    documentHash?: string;
+    pdfHref: string | null;
+    fallbackHref: string;
+  }[];
+  documents: readonly {
+    id: string;
+    filename: string;
+    classification: string;
+    mimeType: string;
+    createdAt: string;
+    ownerType?: string;
+    ownerId?: string;
+    href: string;
+  }[];
+  history: readonly {
+    id: string;
+    kind:
+      | "change"
+      | "contract"
+      | "contract_request"
+      | "document"
+      | "invoice"
+      | "lead"
+      | "measurement"
+      | "message"
+      | "price"
+      | "quote"
+      | "warranty"
+      | "work";
+    title: string;
+    status: string;
+    at: string;
+    href: string | null;
+  }[];
+};
+
 export type AdminNextCaseInteraction =
   | { mode: "executable"; activation: "open_workbench" }
   | { mode: "waiting"; waitingParty: "customer" | "system" | "worker" }
@@ -88,6 +154,7 @@ export type AdminNextCaseWorkspaceView = {
     };
   };
   stages: readonly AdminNextCaseStage[];
+  customerRecord?: AdminNextCustomerRecord;
   evidence: readonly {
     id: string;
     kind: AdminNextEvidenceKind;

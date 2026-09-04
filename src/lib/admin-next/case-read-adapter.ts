@@ -56,6 +56,8 @@ const auditActorPopulate = {
 } as const;
 const auditReadLimit = 200;
 const operatorHrefPattern = /^\/(?:admin-v2|admin-next-preview)(?:[/?]|$)/u;
+const artifactHrefPattern =
+  /^\/api\/admin\/(?:media|quotes|change-agreements)\//u;
 
 const diagnosticBlockerRecovery = {
   nb: "Åpne saken i dagens arbeidsflate og avklar blokkeringen før videre arbeid.",
@@ -65,6 +67,22 @@ const diagnosticBlockerRecovery = {
 
 function operatorHref(value?: string | null) {
   return value && operatorHrefPattern.test(value) ? value : null;
+}
+
+function artifactHref(value?: string | null) {
+  return value && artifactHrefPattern.test(value) ? value : null;
+}
+
+function caseRecordHref(caseHref: string, value?: string | null) {
+  if (value?.startsWith("#")) return `${caseHref}${value}`;
+  return operatorHref(value);
+}
+
+function newestFirst(left: { at: string }, right: { at: string }) {
+  const leftTime = Date.parse(left.at);
+  const rightTime = Date.parse(right.at);
+  if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) return 0;
+  return rightTime - leftTime;
 }
 
 type AuditPayloadPage = {
@@ -507,6 +525,85 @@ export function projectAdminCaseWorkspace(
     fallbackHref: operatorHref(document.href),
   }));
   const auditTimeline = projectAuditTimeline(auditHistory);
+  const messages = value.messages || [];
+  const commercial = value.commercial || {
+    quoteVersions: [],
+    contractVersions: [],
+  };
+  const customerQuestionContext = value.customerQuestionContext || {
+    threads: [],
+    unresolved: null,
+  };
+  const communications = messages
+    .map((message) => ({
+      id: `message-${message.id}`,
+      direction:
+        message.direction === "inbound"
+          ? ("inbound" as const)
+          : ("outbound" as const),
+      channel: message.channel || "—",
+      category: message.category || "—",
+      status: message.status || "—",
+      subject: message.subject || message.reference,
+      bodyText: message.bodyText,
+      at:
+        message.deliveredAt ||
+        message.sentAt ||
+        message.updatedAt ||
+        message.createdAt ||
+        "—",
+      ...(message.sentAt ? { sentAt: message.sentAt } : {}),
+      ...(message.deliveredAt ? { deliveredAt: message.deliveredAt } : {}),
+      ...(message.replyToMessageId
+        ? { replyToMessageId: message.replyToMessageId }
+        : {}),
+      fallbackHref: `${caseHref}#message-${message.id}`,
+    }))
+    .sort(newestFirst);
+  const commercialVersions = [
+    ...(commercial.quoteVersions || []),
+    ...(commercial.contractVersions || []),
+  ]
+    .map((item) => ({
+      id: `${item.kind}-${item.id}`,
+      kind: item.kind,
+      reference: item.reference,
+      version: item.version,
+      status: item.status,
+      role: item.role,
+      ...(item.supersedesReference
+        ? { supersedesReference: item.supersedesReference }
+        : {}),
+      createdAt: item.createdAt || "—",
+      ...(item.signedAt ? { signedAt: item.signedAt } : {}),
+      ...(item.companySignedAt
+        ? { companySignedAt: item.companySignedAt }
+        : {}),
+      ...(item.documentHash ? { documentHash: item.documentHash } : {}),
+      pdfHref: artifactHref(item.pdfHref),
+      fallbackHref: caseHref,
+    }))
+    .sort((left, right) =>
+      newestFirst({ at: left.createdAt }, { at: right.createdAt }),
+    );
+  const customerDocuments = value.documents.map((document) => ({
+    id: `document-${document.id}`,
+    filename: document.filename,
+    classification: document.classification || "—",
+    mimeType: document.mimeType || "—",
+    createdAt: document.createdAt || "—",
+    ...(document.ownerType ? { ownerType: document.ownerType } : {}),
+    ...(document.ownerId ? { ownerId: document.ownerId } : {}),
+    href: artifactHref(document.href) || caseHref,
+  }));
+  const businessHistory = (value.timeline || []).map((item) => ({
+    id: item.id,
+    kind: item.type,
+    title: item.title,
+    status: item.status || "—",
+    at: item.at,
+    href: caseRecordHref(caseHref, item.href) || caseHref,
+  }));
 
   return {
     reference: `TF-${value.lead.id}`,
@@ -560,6 +657,16 @@ export function projectAdminCaseWorkspace(
       ...(diagnosticBlocker ? { diagnosticBlocker } : {}),
     },
     stages: projectAdminNextCaseStages(value),
+    customerRecord: {
+      questions: {
+        total: customerQuestionContext.threads.length,
+        unresolved: Boolean(customerQuestionContext.unresolved),
+      },
+      communications,
+      commercialVersions,
+      documents: customerDocuments,
+      history: businessHistory,
+    },
     evidence: [...measurementEvidence, ...documentEvidence],
     ...auditTimeline,
     fallback: {

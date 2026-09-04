@@ -8,9 +8,21 @@ import { parseAdminNextRfRoute } from "@/lib/admin-next/rf-route-contract";
 
 describe("Admin Next Case Workspace preview", () => {
   it.each([
-    ["nb", "Navigasjon i saken", ["Sammendrag", "Dokumentasjon", "Historikk"]],
-    ["lt", "Navigacija byloje", ["Santrauka", "Įrodymai", "Istorija"]],
-    ["en", "Case navigation", ["Summary", "Evidence", "History"]],
+    [
+      "nb",
+      "Navigasjon i saken",
+      ["Sammendrag", "Kundedialog", "Dokumentasjon", "Historikk"],
+    ],
+    [
+      "lt",
+      "Navigacija byloje",
+      ["Santrauka", "Kliento dialogas", "Įrodymai", "Istorija"],
+    ],
+    [
+      "en",
+      "Case navigation",
+      ["Summary", "Customer dialogue", "Evidence", "History"],
+    ],
   ] as const)(
     "renders native, localized in-page navigation landmarks for %s",
     (locale, navigationLabel, labels) => {
@@ -22,11 +34,12 @@ describe("Admin Next Case Workspace preview", () => {
       );
 
       expect(html).toContain(`<nav aria-label="${navigationLabel}"`);
-      expect(html.match(/data-case-context-link=/gu)).toHaveLength(3);
+      expect(html.match(/data-case-context-link=/gu)).toHaveLength(4);
       expect(html.match(/aria-current="location"/gu)).toHaveLength(1);
       expect(html).not.toContain('role="tab"');
       for (const [index, target] of [
         "case-summary",
+        "case-customer-record",
         "case-evidence",
         "case-history",
       ].entries()) {
@@ -36,6 +49,28 @@ describe("Admin Next Case Workspace preview", () => {
       }
     },
   );
+
+  it("renders the customer conversation, commercial version chain and document register", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "lt",
+        value: adminNextCaseWorkspaceFixture,
+      }),
+    );
+
+    expect(html).toContain("Kliento dialogas ir sutarčių istorija");
+    expect(html).toContain('data-customer-communications="true"');
+    expect(html).toContain("Re: Tilbud på takfornyelse");
+    expect(html).toContain("Takk. Kan dere sende tilbudet i dag");
+    expect(html).toContain('data-customer-question-state="resolved"');
+    expect(html).toContain('data-commercial-versions="true"');
+    expect(html).toContain("K-1042-V1");
+    expect(html).toContain("sha256:demo-contract-1042-v1");
+    expect(html).toContain('data-document-register="true"');
+    expect(html).toContain("kontrakt-K-1042-V1.pdf");
+    expect(html).toContain('data-business-history="true"');
+    expect(html).toContain("Kundespørsmål mottatt");
+  });
 
   it("uses one native disclosure for the history rail without duplicating audit content", () => {
     const html = renderToStaticMarkup(

@@ -8,12 +8,17 @@ import {
   CheckCircle2,
   CircleAlert,
   FileCheck2,
+  FileSignature,
+  Files,
   FolderOpen,
   ImageIcon,
+  Inbox,
   Mail,
   MapPin,
+  MessageCircleQuestion,
   MessageSquareText,
   Ruler,
+  Send,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -56,7 +61,8 @@ const copy = {
     next: "Neste nødvendige handling",
     currentFallback: "Åpne fungerende sak",
     interactionReasons: {
-      capability_denied: "Handlingen er skrivebeskyttet uten bekreftet tilgang.",
+      capability_denied:
+        "Handlingen er skrivebeskyttet uten bekreftet tilgang.",
       no_action: "Saken krever ingen handling nå.",
       target_unavailable: "Et eksakt operatørmål er ikke tilgjengelig.",
     },
@@ -64,6 +70,7 @@ const copy = {
     processIntro: "Ett felles bilde av fremdrift og blokkeringer.",
     contextNavigation: "Navigasjon i saken",
     contextSummary: "Sammendrag",
+    contextCustomerRecord: "Kundedialog",
     contextEvidence: "Dokumentasjon",
     contextHistory: "Historikk",
     historyToggle: "Vis eller skjul historikk",
@@ -81,8 +88,38 @@ const copy = {
     evidenceUnavailable: "Ingen operatorflate",
     reviewMeasurement: "Kontroller R4",
     documentPreflight: "Kontroller pakke",
+    customerRecord: "Kundedialog og avtalehistorikk",
+    customerRecordIntro:
+      "Meldinger, spørsmål, tilbud, kontrakter og dokumentversjoner i samme saksbilde.",
+    communications: "Meldinger",
+    communicationsEmpty: "Ingen kundemeldinger er registrert.",
+    questions: "Kundespørsmål",
+    unresolvedQuestion: "Ett eller flere spørsmål venter på svar",
+    questionsResolved: "Alle registrerte spørsmål er besvart",
+    inbound: "Fra kunden",
+    outbound: "Til kunden",
+    sentAt: "Sendt",
+    deliveredAt: "Levert",
+    replyTo: "Svar på melding",
+    openThread: "Åpne i Admin V2",
+    commercialVersions: "Tilbud og kontrakter",
+    commercialVersionsEmpty: "Ingen tilbuds- eller kontraktsversjoner.",
+    quote: "Tilbud",
+    contract: "Kontrakt",
+    versionShort: "v",
+    supersedes: "Erstatter",
+    customerSigned: "Kunde signerte",
+    companySigned: "Selskapet signerte",
+    openPdf: "Åpne PDF",
+    documentRegister: "Dokumentregister",
+    documentRegisterEmpty: "Ingen dokumenter er registrert.",
+    relatedTo: "Tilknyttet",
+    businessHistory: "Full saksrekkefølge",
+    businessHistoryIntro:
+      "Forretningshendelser fra forespørsel til siste dokument- eller avtaleendring.",
+    openSource: "Åpne kilde",
     timeline: "Tidslinje",
-    timelineIntro: "Siste hendelser med kilde og tidspunkt.",
+    timelineIntro: "Teknisk revisjonsspor med kilde og tidspunkt.",
     timelineEmpty: "Ingen revisjonshendelser er registrert for denne saken.",
     timelineUnavailable: "Revisjonshistorikken er midlertidig utilgjengelig.",
     timelineDenied: "Du har ikke tilgang til revisjonshistorikken.",
@@ -162,6 +199,7 @@ const copy = {
     processIntro: "Vienas bendras eigos ir blokavimų vaizdas.",
     contextNavigation: "Navigacija byloje",
     contextSummary: "Santrauka",
+    contextCustomerRecord: "Kliento dialogas",
     contextEvidence: "Įrodymai",
     contextHistory: "Istorija",
     historyToggle: "Rodyti arba slėpti istoriją",
@@ -179,8 +217,38 @@ const copy = {
     evidenceUnavailable: "Operatoriaus darbo vietos nėra",
     reviewMeasurement: "Peržiūrėti R4",
     documentPreflight: "Tikrinti paketą",
+    customerRecord: "Kliento dialogas ir sutarčių istorija",
+    customerRecordIntro:
+      "Žinutės, klausimai, pasiūlymai, sutartys ir dokumentų versijos vienoje byloje.",
+    communications: "Žinutės",
+    communicationsEmpty: "Kliento žinučių neužregistruota.",
+    questions: "Kliento klausimai",
+    unresolvedQuestion: "Vienas ar daugiau klausimų laukia atsakymo",
+    questionsResolved: "Į visus užregistruotus klausimus atsakyta",
+    inbound: "Nuo kliento",
+    outbound: "Klientui",
+    sentAt: "Išsiųsta",
+    deliveredAt: "Pristatyta",
+    replyTo: "Atsakymas į žinutę",
+    openThread: "Atidaryti Admin V2",
+    commercialVersions: "Pasiūlymai ir sutartys",
+    commercialVersionsEmpty: "Pasiūlymų ar sutarčių versijų nėra.",
+    quote: "Pasiūlymas",
+    contract: "Sutartis",
+    versionShort: "v",
+    supersedes: "Pakeičia",
+    customerSigned: "Klientas pasirašė",
+    companySigned: "Įmonė pasirašė",
+    openPdf: "Atidaryti PDF",
+    documentRegister: "Dokumentų registras",
+    documentRegisterEmpty: "Dokumentų neužregistruota.",
+    relatedTo: "Susieta su",
+    businessHistory: "Visa bylos chronologija",
+    businessHistoryIntro:
+      "Veiklos įvykiai nuo užklausos iki paskutinio dokumento ar sutarties pakeitimo.",
+    openSource: "Atidaryti šaltinį",
     timeline: "Įvykių seka",
-    timelineIntro: "Naujausi įvykiai su šaltiniu ir laiku.",
+    timelineIntro: "Techninis audito pėdsakas su šaltiniu ir laiku.",
     timelineEmpty: "Šiai bylai audito įvykių neužregistruota.",
     timelineUnavailable: "Audito istorija laikinai nepasiekiama.",
     timelineDenied: "Neturite teisės peržiūrėti audito istorijos.",
@@ -260,6 +328,7 @@ const copy = {
     processIntro: "One shared view of progress and blockers.",
     contextNavigation: "Case navigation",
     contextSummary: "Summary",
+    contextCustomerRecord: "Customer dialogue",
     contextEvidence: "Evidence",
     contextHistory: "History",
     historyToggle: "Show or hide history",
@@ -277,8 +346,38 @@ const copy = {
     evidenceUnavailable: "No operator workspace",
     reviewMeasurement: "Review R4",
     documentPreflight: "Check package",
+    customerRecord: "Customer dialogue and agreement history",
+    customerRecordIntro:
+      "Messages, questions, quotes, contracts and document versions in one case record.",
+    communications: "Messages",
+    communicationsEmpty: "No customer messages are recorded.",
+    questions: "Customer questions",
+    unresolvedQuestion: "One or more questions are awaiting a reply",
+    questionsResolved: "All recorded questions have been answered",
+    inbound: "From customer",
+    outbound: "To customer",
+    sentAt: "Sent",
+    deliveredAt: "Delivered",
+    replyTo: "Reply to message",
+    openThread: "Open in Admin V2",
+    commercialVersions: "Quotes and contracts",
+    commercialVersionsEmpty: "No quote or contract versions.",
+    quote: "Quote",
+    contract: "Contract",
+    versionShort: "v",
+    supersedes: "Supersedes",
+    customerSigned: "Customer signed",
+    companySigned: "Company signed",
+    openPdf: "Open PDF",
+    documentRegister: "Document register",
+    documentRegisterEmpty: "No documents are recorded.",
+    relatedTo: "Related to",
+    businessHistory: "Full case sequence",
+    businessHistoryIntro:
+      "Business events from inquiry to the latest document or agreement change.",
+    openSource: "Open source",
     timeline: "Timeline",
-    timelineIntro: "Latest events with source and time.",
+    timelineIntro: "Technical audit trail with source and time.",
     timelineEmpty: "No audit events are recorded for this case.",
     timelineUnavailable: "Audit history is temporarily unavailable.",
     timelineDenied: "You do not have access to audit history.",
@@ -451,6 +550,7 @@ export function AdminNextCaseWorkspace({
       <AdminNextCaseWorkspaceContextNav
         labels={{
           "case-summary": t.contextSummary,
+          "case-customer-record": t.contextCustomerRecord,
           "case-evidence": t.contextEvidence,
           "case-history": t.contextHistory,
         }}
@@ -521,9 +621,7 @@ export function AdminNextCaseWorkspace({
                   label={slaLabel(value.sla, t)}
                   locale={locale}
                   state={
-                    value.sla.state === "unknown"
-                      ? "on_track"
-                      : value.sla.state
+                    value.sla.state === "unknown" ? "on_track" : value.sla.state
                   }
                 />
               </dd>
@@ -552,11 +650,7 @@ export function AdminNextCaseWorkspace({
             {value.nextAction.interaction.mode === "read_only" &&
             value.nextAction.interaction.reason !== "diagnostic_blocker" ? (
               <p className="mt-2 max-w-3xl text-xs font-semibold text-[var(--an-text-subtle)]">
-                {
-                  t.interactionReasons[
-                    value.nextAction.interaction.reason
-                  ]
-                }
+                {t.interactionReasons[value.nextAction.interaction.reason]}
               </p>
             ) : null}
             {value.nextAction.diagnosticBlocker ? (
@@ -663,6 +757,373 @@ export function AdminNextCaseWorkspace({
           ))}
         </ol>
       </section>
+
+      {value.customerRecord ? (
+        <section
+          className="an-surface scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
+          aria-labelledby="case-customer-record-title"
+          data-case-context-target
+          data-customer-record
+          id="case-customer-record"
+          tabIndex={-1}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2
+                className="text-lg font-bold text-[var(--an-text)]"
+                id="case-customer-record-title"
+              >
+                {t.customerRecord}
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm text-[var(--an-muted)]">
+                {t.customerRecordIntro}
+              </p>
+            </div>
+            <div
+              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-bold ${value.customerRecord.questions.unresolved ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" : "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]"}`}
+              data-customer-question-state={
+                value.customerRecord.questions.unresolved
+                  ? "unresolved"
+                  : "resolved"
+              }
+            >
+              <MessageCircleQuestion aria-hidden="true" className="size-4" />
+              <span>
+                {t.questions}: {value.customerRecord.questions.total} ·{" "}
+                {value.customerRecord.questions.unresolved
+                  ? t.unresolvedQuestion
+                  : t.questionsResolved}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.85fr)]">
+            <section
+              className="min-w-0"
+              aria-labelledby="case-communications-title"
+            >
+              <h3
+                className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
+                id="case-communications-title"
+              >
+                <MessageSquareText
+                  aria-hidden="true"
+                  className="size-4 text-[var(--an-amber)]"
+                />
+                {t.communications} ·{" "}
+                {value.customerRecord.communications.length}
+              </h3>
+              {value.customerRecord.communications.length ? (
+                <ol
+                  className="mt-3 max-h-[42rem] space-y-3 overflow-auto pr-1"
+                  data-customer-communications
+                >
+                  {value.customerRecord.communications.map((message) => {
+                    const DirectionIcon =
+                      message.direction === "inbound" ? Inbox : Send;
+                    return (
+                      <li key={message.id}>
+                        <article className="an-elevated rounded-2xl border p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-2 text-xs font-bold text-[var(--an-amber)]">
+                                <DirectionIcon
+                                  aria-hidden="true"
+                                  className="size-4 shrink-0"
+                                />
+                                {message.direction === "inbound"
+                                  ? t.inbound
+                                  : t.outbound}
+                              </p>
+                              <h4 className="mt-2 text-sm font-bold break-words text-[var(--an-text)]">
+                                {message.subject}
+                              </h4>
+                            </div>
+                            <span className="shrink-0 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
+                              {message.status}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-[11px] text-[var(--an-subtle)]">
+                            {message.channel} · {message.category} ·{" "}
+                            {auditTimestamp(locale, message.at)}
+                          </p>
+                          <p className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
+                            {message.bodyText || "—"}
+                          </p>
+                          <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                            <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
+                              {message.sentAt ? (
+                                <div>
+                                  <dt className="inline font-bold">
+                                    {t.sentAt}:{" "}
+                                  </dt>
+                                  <dd className="inline">
+                                    {auditTimestamp(locale, message.sentAt)}
+                                  </dd>
+                                </div>
+                              ) : null}
+                              {message.deliveredAt ? (
+                                <div>
+                                  <dt className="inline font-bold">
+                                    {t.deliveredAt}:{" "}
+                                  </dt>
+                                  <dd className="inline">
+                                    {auditTimestamp(
+                                      locale,
+                                      message.deliveredAt,
+                                    )}
+                                  </dd>
+                                </div>
+                              ) : null}
+                              {message.replyToMessageId ? (
+                                <div>
+                                  <dt className="inline font-bold">
+                                    {t.replyTo}:{" "}
+                                  </dt>
+                                  <dd className="inline">
+                                    #{message.replyToMessageId}
+                                  </dd>
+                                </div>
+                              ) : null}
+                            </dl>
+                            <Link
+                              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                              href={message.fallbackHref}
+                            >
+                              {t.openThread}
+                              <ArrowRight
+                                aria-hidden="true"
+                                className="size-3.5"
+                              />
+                            </Link>
+                          </div>
+                        </article>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+                  {t.communicationsEmpty}
+                </p>
+              )}
+            </section>
+
+            <div className="min-w-0 space-y-5">
+              <section aria-labelledby="case-commercial-versions-title">
+                <h3
+                  className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
+                  id="case-commercial-versions-title"
+                >
+                  <FileSignature
+                    aria-hidden="true"
+                    className="size-4 text-[var(--an-amber)]"
+                  />
+                  {t.commercialVersions} ·{" "}
+                  {value.customerRecord.commercialVersions.length}
+                </h3>
+                {value.customerRecord.commercialVersions.length ? (
+                  <ol
+                    className="mt-3 max-h-[24rem] space-y-2 overflow-auto pr-1"
+                    data-commercial-versions
+                  >
+                    {value.customerRecord.commercialVersions.map((item) => (
+                      <li
+                        className="an-elevated rounded-2xl border p-3"
+                        key={item.id}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold tracking-wider text-[var(--an-amber)] uppercase">
+                              {item.kind === "quote" ? t.quote : t.contract} ·{" "}
+                              {t.versionShort}
+                              {item.version}
+                            </p>
+                            <strong className="mt-1 block truncate text-sm text-[var(--an-text)]">
+                              {item.reference}
+                            </strong>
+                          </div>
+                          <span className="shrink-0 rounded-full border border-[var(--an-border)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
+                            {item.status} · {item.role}
+                          </span>
+                        </div>
+                        <dl className="mt-2 space-y-1 text-[11px] text-[var(--an-subtle)]">
+                          <div>
+                            <dt className="sr-only">{t.version}</dt>
+                            <dd>{auditTimestamp(locale, item.createdAt)}</dd>
+                          </div>
+                          {item.supersedesReference ? (
+                            <div>
+                              <dt className="inline font-bold">
+                                {t.supersedes}:{" "}
+                              </dt>
+                              <dd className="inline">
+                                {item.supersedesReference}
+                              </dd>
+                            </div>
+                          ) : null}
+                          {item.signedAt ? (
+                            <div>
+                              <dt className="inline font-bold">
+                                {t.customerSigned}:{" "}
+                              </dt>
+                              <dd className="inline">
+                                {auditTimestamp(locale, item.signedAt)}
+                              </dd>
+                            </div>
+                          ) : null}
+                          {item.companySignedAt ? (
+                            <div>
+                              <dt className="inline font-bold">
+                                {t.companySigned}:{" "}
+                              </dt>
+                              <dd className="inline">
+                                {auditTimestamp(locale, item.companySignedAt)}
+                              </dd>
+                            </div>
+                          ) : null}
+                          {item.documentHash ? (
+                            <div className="break-all">
+                              <dt className="inline font-bold">Hash: </dt>
+                              <dd className="inline">{item.documentHash}</dd>
+                            </div>
+                          ) : null}
+                        </dl>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {item.pdfHref ? (
+                            <Link
+                              className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                              href={item.pdfHref}
+                              target="_blank"
+                            >
+                              {t.openPdf}
+                              <ArrowRight
+                                aria-hidden="true"
+                                className="size-3.5"
+                              />
+                            </Link>
+                          ) : null}
+                          <Link
+                            className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[var(--an-muted)] hover:bg-[var(--an-soft)]"
+                            href={item.fallbackHref}
+                          >
+                            {t.openThread}
+                          </Link>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+                    {t.commercialVersionsEmpty}
+                  </p>
+                )}
+              </section>
+
+              <section aria-labelledby="case-document-register-title">
+                <h3
+                  className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
+                  id="case-document-register-title"
+                >
+                  <Files
+                    aria-hidden="true"
+                    className="size-4 text-[var(--an-amber)]"
+                  />
+                  {t.documentRegister} · {value.customerRecord.documents.length}
+                </h3>
+                {value.customerRecord.documents.length ? (
+                  <ul
+                    className="mt-3 max-h-64 space-y-2 overflow-auto pr-1"
+                    data-document-register
+                  >
+                    {value.customerRecord.documents.map((document) => (
+                      <li key={document.id}>
+                        <Link
+                          className="an-elevated flex min-h-14 items-center justify-between gap-3 rounded-xl border p-3 hover:border-[var(--an-amber)]"
+                          href={document.href}
+                          target="_blank"
+                        >
+                          <span className="min-w-0">
+                            <strong className="block truncate text-xs text-[var(--an-text)]">
+                              {document.filename}
+                            </strong>
+                            <small className="mt-1 block truncate text-[var(--an-subtle)]">
+                              {document.classification} · {document.mimeType} ·{" "}
+                              {auditTimestamp(locale, document.createdAt)}
+                              {document.ownerType
+                                ? ` · ${t.relatedTo}: ${document.ownerType}${document.ownerId ? ` #${document.ownerId}` : ""}`
+                                : ""}
+                            </small>
+                          </span>
+                          <ArrowRight
+                            aria-hidden="true"
+                            className="size-4 shrink-0 text-[var(--an-amber)]"
+                          />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+                    {t.documentRegisterEmpty}
+                  </p>
+                )}
+              </section>
+            </div>
+          </div>
+
+          <section
+            className="mt-6 border-t border-[var(--an-border)] pt-5"
+            aria-labelledby="case-business-history-title"
+          >
+            <h3
+              className="text-sm font-bold text-[var(--an-text)]"
+              id="case-business-history-title"
+            >
+              {t.businessHistory} · {value.customerRecord.history.length}
+            </h3>
+            <p className="mt-1 text-xs text-[var(--an-muted)]">
+              {t.businessHistoryIntro}
+            </p>
+            {value.customerRecord.history.length ? (
+              <ol
+                className="mt-3 grid max-h-80 gap-2 overflow-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
+                data-business-history
+              >
+                {value.customerRecord.history.map((item) => (
+                  <li
+                    className="an-elevated flex min-w-0 items-start justify-between gap-3 rounded-xl border p-3"
+                    key={item.id}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-[var(--an-text)]">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-[10px] text-[var(--an-subtle)]">
+                        {item.kind} · {item.status} ·{" "}
+                        {auditTimestamp(locale, item.at)}
+                      </p>
+                    </div>
+                    {item.href ? (
+                      <Link
+                        aria-label={`${t.openSource}: ${item.title}`}
+                        className="grid size-9 shrink-0 place-items-center rounded-lg text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                        href={item.href}
+                      >
+                        <ArrowRight aria-hidden="true" className="size-4" />
+                      </Link>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--an-muted)]">
+                {t.timelineEmpty}
+              </p>
+            )}
+          </section>
+        </section>
+      ) : null}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.75fr)]">
         <section

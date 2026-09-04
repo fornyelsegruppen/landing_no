@@ -2,7 +2,12 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-const sectionIds = ["case-summary", "case-evidence", "case-history"] as const;
+const sectionIds = [
+  "case-summary",
+  "case-customer-record",
+  "case-evidence",
+  "case-history",
+] as const;
 type SectionId = (typeof sectionIds)[number];
 
 function sectionFromHash(hash: string): SectionId {
@@ -32,7 +37,7 @@ export function AdminNextCaseWorkspaceContextNav({
   return (
     <nav
       aria-label={navigationLabel}
-      className="an-surface grid grid-cols-3 gap-1 rounded-2xl border p-1.5 sm:flex sm:w-fit"
+      className="an-surface grid grid-cols-2 gap-1 rounded-2xl border p-1.5 sm:flex sm:w-fit"
       data-case-context-nav
     >
       {sectionIds.map((sectionId) => (
