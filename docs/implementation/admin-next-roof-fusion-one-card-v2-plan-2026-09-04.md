@@ -14,8 +14,8 @@ authorized by this plan
 Implemented in the isolated RF Preview branch:
 
 - the state-driven `Objektas → Patikslinimas → Rezultatas` card;
-- one disclosed address action that resolves the address and obtains one Norge
-  orthophoto;
+- one disclosed diagnostic address action that resolves the address and obtains
+  one Norge orthophoto in the isolated UAT tool;
 - direct pointer and keyboard building selection on that orthophoto;
 - automatic height preparation only after building selection;
 - one `Apskaičiuoti` action for CAS save, reload/hash proof, and calculation;
@@ -40,7 +40,7 @@ state-driven work card.
 The normal successful journey has four deliberate operator clicks, plus only
 the annotation gestures genuinely required by the roof:
 
-1. `Rasti adresą ir atverti ortofoto`;
+1. `Gauti ortofoto bylos adresui`;
 2. click the correct building directly on the orthophoto;
 3. `Apskaičiuoti`;
 4. after reviewing the result, `Įkelti matavimą į pasiūlymą`.
@@ -54,6 +54,29 @@ operator chores.
 normal-path prerequisite fails and shows the recovery actions in recommended
 order. The legacy area-plus-pitch model is the last explicit fallback, never a
 parallel default and never a silent replacement for a better result.
+
+### Owner-approved live address contract
+
+This section supersedes every earlier suggestion that the normal live RF
+workbench should begin with a free address field.
+
+1. The public enquiry form resolves a Norwegian address through the approved
+   Kartverket/Entur autocomplete, or accepts an explicitly marked manual entry.
+2. That value becomes the authoritative case address. A case-bound RF workbench
+   displays `Bylos adresas: …` as immutable measurement context and never asks
+   the operator to enter it again.
+3. A separate `Taisyti bylos adresą` action belongs to the case, not the RF
+   canvas. Its `ReviewAndCommit` must show that the prior orthophoto, DOM/DTM,
+   selected building, geometry and every unapproved result will become stale.
+4. Confirming the correction creates a new case/measurement revision, obtains
+   sources again and preserves the old address, sources, drafts and results in
+   history. Nothing is overwritten or deleted.
+5. A restored RF draft first offers `Tęsti ankstesnį` or `Pradėti naują` and
+   shows its exact address/source/revision binding. A changed address makes the
+   old draft non-current and prevents it from reaching pricing or an offer.
+6. The free address field in the current RF UAT remains a diagnostic-only test
+   tool. A future `Matavimas be bylos` must be visibly sandboxed and cannot reach
+   pricing or offers until it is explicitly assigned to a case.
 
 ## 2. Why the current screen is not a real one-card flow
 
@@ -108,16 +131,17 @@ measurement reference rather than copied UI numbers.
 
 ## 4. One Card v2 state machine
 
-| State             | What the operator sees                             | Primary transition                                      |
-| ----------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| `address`         | one address field and one CTA                      | explicit `Rasti adresą ir atverti ortofoto`             |
-| `acquiring`       | one progress sequence inside the same card         | resolve address, capture ortho, project candidates      |
-| `building_select` | Norge orthophoto with every candidate footprint    | click one polygon; no extra Continue button             |
-| `annotate`        | same image, selected outline, only needed tools    | draw/correct only missing geometry, then `Apskaičiuoti` |
-| `calculating`     | `Išsaugoma → tikrinama → skaičiuojama`             | one idempotent orchestration, no extra clicks           |
-| `result`          | image/diagram plus total and per-slope results     | `Keisti žymėjimą` or `Įkelti matavimą į pasiūlymą`      |
-| `adding_to_offer` | target proposal and immutable measurement identity | exact-hash server command                               |
-| `offer_added`     | success, measurement ID, proposal ID/link          | end state; nothing sent to the customer                 |
+| State             | What the operator sees                                          | Primary transition                                         |
+| ----------------- | --------------------------------------------------------------- | ---------------------------------------------------------- |
+| `case_address`    | immutable case address, revision and separate correction action | explicit `Gauti ortofoto bylos adresui`                    |
+| `draft_restore`   | exact saved draft binding and continue/start-new choice         | continue current revision or create a new draft            |
+| `acquiring`       | one progress sequence inside the same card                      | revalidate case address, capture ortho, project candidates |
+| `building_select` | Norge orthophoto with every candidate footprint                 | click one polygon; no extra Continue button                |
+| `annotate`        | same image, selected outline, only needed tools                 | draw/correct only missing geometry, then `Apskaičiuoti`    |
+| `calculating`     | `Išsaugoma → tikrinama → skaičiuojama`                          | one idempotent orchestration, no extra clicks              |
+| `result`          | image/diagram plus total and per-slope results                  | `Keisti žymėjimą` or `Įkelti matavimą į pasiūlymą`         |
+| `adding_to_offer` | target proposal and immutable measurement identity              | exact-hash server command                                  |
+| `offer_added`     | success, measurement ID, proposal ID/link                       | end state; nothing sent to the customer                    |
 
 `blocked` is not a dead-end page. It returns to `annotate`, preserves the
 operator's work, highlights the exact missing item, and opens the recovery
@@ -128,18 +152,21 @@ The stage indicator is informational, not a row of freely navigable tabs:
 
 ## 5. Address, licensed image, and building selection
 
-### Combined first click
+### Case-bound provider action
 
 The first button must honestly disclose that it does two things:
 
-> **Rasti adresą ir atverti ortofoto**  
-> Bus gautas vienas licencijuotas Norge i bilder vaizdas šiai bylai.
+> **Gauti ortofoto bylos adresui**
+>
+> Bylos adresas: Lyngveien 28A. Bus gautas vienas licencijuotas Norge i bilder
+> vaizdas šiai bylos ir matavimo revizijai.
 
-This click is the explicit provider action. Merely typing in the field must not
-contact the paid/licensed provider. The server sequence is:
+This click is the explicit provider action. Rendering or revisiting the case
+must not contact the paid/licensed provider. The server sequence is:
 
-1. validate and resolve the address;
-2. bind the request to case/lead, actor, and idempotency key;
+1. revalidate the authoritative case address and expected case revision;
+2. bind the request to case/lead, measurement revision, actor, and idempotency
+   key;
 3. obtain one Norge capture centered on the resolved address;
 4. project all nearby OSM candidates into that same trusted extent;
 5. show the orthophoto selection state.
@@ -148,6 +175,10 @@ Double-click, reload, and safe retry must not create duplicate paid captures.
 If the Norge contract requires a separate consent action, keep one additional
 explicit capture step; do not hide a contractual/provider charge behind a
 generic free search label.
+
+Changing the case address is not this retry. It is a separate audited command
+that invalidates the current source binding and creates a new revision before a
+new licensed capture can be requested.
 
 ### Direct candidate selection
 
@@ -192,8 +223,16 @@ what it cannot determine safely.
 
 ### Agreed interaction details
 
+- approved geometry uses a screen-stable `1.75 px` line; the immutable source
+  uses a muted screen-stable `1 px` dashed line and is rendered below the
+  approved line, so coincident paths never form a doubled heavy outline;
 - saved ridge/valley line: screen-stable `1.5 px`; pending line: `1.5 px`;
-- small screen-stable endpoints with the larger invisible hit target retained;
+- editable vertices are `7 px` visually (`8 px` selected), while their invisible
+  pointer target remains `26 px`; saved endpoints remain `6 px` visually;
+- line and marker sizing is calculated from the measured canvas and inverse RF
+  zoom, so it stays stable at 100 %, 300 %, Windows 150 % scaling and mobile;
+- no black casing or thick white halo is used. Only a sub-pixel light marker
+  edge may be used where the image requires contrast;
 - boundary magnet/tolerance: a near-edge endpoint snaps to the approved contour;
 - a far outside endpoint is rejected with a clear reason;
 - Google-Maps-like pan/zoom: normal wheel scrolls the page, Ctrl/Cmd + wheel
@@ -247,6 +286,11 @@ The result screen uses the agreed R4 pattern:
 - selecting a slope row highlights the same polygon on the image;
 - the right side shows total area, pitch, perimeter, and all slope rows grouped
   by roof mass;
+- the four primary measurement indicators keep their text labels and use one
+  Lucide line-icon language: grid/plan for horizontal area, layers for true roof
+  area, angle for average pitch and dashed outline for perimeter; all use the
+  same `16 px` size and `1.75` stroke;
+- slope rows do not repeat decorative icons that add no new meaning;
 - it supports any number of slopes, not only four `S1–S4` cards;
 - gross versus net area and openings are explicit;
 - source/evidence/history stays available in a compact expandable section;
@@ -343,7 +387,8 @@ it is not bound to the exact workbench draft/result hash.
 
 ### Phase B — address, ortho, and clickable candidates
 
-- Combine explicit address search + one disclosed Norge capture.
+- Bind the workbench to the authoritative case address and one disclosed Norge
+  capture. Keep free address search only in the isolated diagnostic UAT.
 - Project every candidate into the trusted ortho extent.
 - Add polygon hit-testing, keyboard selection, stale-response protection, and
   candidate invalidation tests.
@@ -400,11 +445,17 @@ it is not bound to the exact workbench draft/result hash.
 ## 15. Acceptance criteria
 
 - The successful simple-roof path needs exactly four deliberate operator clicks
-  after typing the address.
+  after the authoritative address is available on the case.
 - No normal-path action is hidden below `Advanced`.
 - No completed stage remains stacked on the page.
 - The correct building can be selected directly on the Norge orthophoto.
 - A building click is visibly reflected and can be undone with `Keisti pastatą`.
+- Coincident source and approved geometry reads as one dominant approved line,
+  not a double outline; source remains available through its dashed/opacity
+  treatment and the `Advanced` layer controls.
+- At 100 %, 300 %, Windows 150 % scaling and 375 px mobile, the approved/source
+  outline, ridge/valley lines and vertices stay within the agreed CSS-pixel
+  ranges and do not thicken with RF map zoom.
 - Free height preparation is automatic and visible after selection.
 - The system asks for annotations only when confidence/topology requires them.
 - Multiple ridges and complex masses can be represented without a two-plane
@@ -424,11 +475,9 @@ it is not bound to the exact workbench draft/result hash.
 - Success explicitly says that the measurement was recorded and added to the
   named proposal; nothing is sent to the customer.
 
-## 16. Start condition
+## 16. Historical start condition and remaining gate
 
-Do not implement this plan during the current planning step.
-
-Start Phase A only after:
+The Phase A–D start condition was:
 
 1. the current RF baseline calculation test is closed and its known findings are
    recorded;
@@ -436,3 +485,7 @@ Start Phase A only after:
 3. the combined first-click Norge disclosure is confirmed compatible with the
    provider contract;
 4. work continues on the isolated RF branch/Preview with Production untouched.
+
+Those conditions were satisfied for the protected Preview implementation.
+Phase E still requires a separate mutation/schema GO; Phase F and every
+Production change still require their own explicit release decision.

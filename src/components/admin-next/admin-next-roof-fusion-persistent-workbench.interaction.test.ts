@@ -795,7 +795,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(pendingMarker).not.toBeNull();
     expect(pendingMarker!.getAttribute("cx")).toBe("0.4");
     expect(Number(pendingMarker!.getAttribute("rx"))).toBeLessThan(0.002);
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1.5px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("0.5px");
     expect(container.textContent).toContain(
       "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
     );
@@ -807,7 +807,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(renderedLines().item(1).getAttribute("x1")).not.toBe(
       renderedLines().item(1).getAttribute("x2"),
     );
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1.5px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("0.5px");
     expect(
       container.querySelectorAll("[data-roof-fusion-line-endpoint]"),
     ).toHaveLength(4);

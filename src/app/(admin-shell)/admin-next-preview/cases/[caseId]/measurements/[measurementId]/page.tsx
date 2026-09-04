@@ -221,10 +221,13 @@ export default async function AdminNextR4MeasurementPage({
     return (
       <AdminNextR4MeasurementReview
         address={adminNextCaseWorkspaceFixture.address}
+        addressEditHref={`/admin-v2/cases/${routeContext.case.id}#measurement-section`}
+        caseRevision={routeContext.case.revision}
         caseReference={caseId}
         customer={adminNextCaseWorkspaceFixture.customer}
         locale={user.interfaceLanguage}
         measurement={result.value}
+        measurementRevision={routeContext.measurement.revision}
         owner={adminNextCaseWorkspaceFixture.owner.name}
         returnTo={routeContext.returnTo}
         source="fixture"
@@ -276,10 +279,13 @@ export default async function AdminNextR4MeasurementPage({
   return (
     <AdminNextR4MeasurementReview
       address={address}
+      addressEditHref={`/admin-v2/cases/${identity.leadId}#measurement-section`}
+      caseRevision={routeContext.case.revision}
       caseReference={caseId}
       customer={lead.name}
       locale={user.interfaceLanguage}
       measurement={measurement}
+      measurementRevision={result.binding.measurement.revision}
       owner={canonicalOwner(assignedTo, user.interfaceLanguage)}
       returnTo={routeContext.returnTo}
       source="canonical"

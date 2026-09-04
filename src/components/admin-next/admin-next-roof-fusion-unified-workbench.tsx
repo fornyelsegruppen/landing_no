@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Grid3X3, Layers3, SquareDashed, TriangleRight } from "lucide-react";
 import {
   assertWorkbenchSkeletonLineLengthV1,
   constrainWorkbenchPointToOutlineV1,
@@ -34,9 +35,14 @@ export type RoofFusionViewport = Readonly<{
 export const MIN_ROOF_FUSION_ZOOM = 1;
 export const MAX_ROOF_FUSION_ZOOM = 4;
 export const ROOF_FUSION_PAN_THRESHOLD_PX = 5;
-export const ROOF_FUSION_SKELETON_LINE_STROKE = "1.5px";
-export const ROOF_FUSION_PENDING_LINE_STROKE = "1.5px";
-export const ROOF_FUSION_SKELETON_ENDPOINT_RADIUS = 0.0025;
+export const ROOF_FUSION_SOURCE_OUTLINE_STROKE_PX = 1;
+export const ROOF_FUSION_APPROVED_OUTLINE_STROKE_PX = 1.75;
+export const ROOF_FUSION_SKELETON_LINE_STROKE_PX = 1.5;
+export const ROOF_FUSION_PENDING_LINE_STROKE_PX = 1.5;
+export const ROOF_FUSION_VERTEX_RADIUS_PX = 3.5;
+export const ROOF_FUSION_SELECTED_VERTEX_RADIUS_PX = 4;
+export const ROOF_FUSION_VERTEX_HIT_RADIUS_PX = 13;
+export const ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX = 3;
 export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
   scale: MIN_ROOF_FUSION_ZOOM,
   offsetX: 0,
@@ -135,6 +141,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   persistencePanel?: ReactNode;
   /** Primary-flow source loading/success/retry status. */
   sourceStatusPanel?: ReactNode;
+  /** Immutable case/address/revision binding supplied by a case-bound route. */
+  caseAddressContext?: ReactNode;
   /** Secondary source actions supplied by the Preview UAT wrapper. */
   advancedPanel?: ReactNode;
   /** Reserved integration point for the legacy manual calculation fallback. */
@@ -272,23 +280,43 @@ export function shouldSuppressRoofFusionCanvasClick(
   return gesture?.moved === true;
 }
 
-export function roofFusionScreenStableMarkerRadii(
-  baseRadius: number,
-  canvasAspectRatio: number,
+export function roofFusionScreenStableMarkerRadiiPx(
+  radiusPx: number,
+  canvasSize: Readonly<{ width: number; height: number }>,
   scale: number,
 ) {
   const safeScale = Math.min(
     MAX_ROOF_FUSION_ZOOM,
     Math.max(MIN_ROOF_FUSION_ZOOM, scale),
   );
-  const safeAspectRatio =
-    Number.isFinite(canvasAspectRatio) && canvasAspectRatio > 0
-      ? canvasAspectRatio
-      : 1;
+  const width = Math.max(1, canvasSize.width);
+  const height = Math.max(1, canvasSize.height);
   return {
-    rx: baseRadius / safeScale,
-    ry: (baseRadius * safeAspectRatio) / safeScale,
+    rx: radiusPx / width / safeScale,
+    ry: radiusPx / height / safeScale,
   };
+}
+
+export function roofFusionScreenStableStrokeWidthPx(
+  strokeWidthPx: number,
+  scale: number,
+) {
+  const safeScale = Math.min(
+    MAX_ROOF_FUSION_ZOOM,
+    Math.max(MIN_ROOF_FUSION_ZOOM, scale),
+  );
+  return `${strokeWidthPx / safeScale}px`;
+}
+
+export function roofFusionScreenStableDashArrayPx(
+  dashPx: readonly number[],
+  scale: number,
+) {
+  const safeScale = Math.min(
+    MAX_ROOF_FUSION_ZOOM,
+    Math.max(MIN_ROOF_FUSION_ZOOM, scale),
+  );
+  return dashPx.map((value) => `${value / safeScale}px`).join(" ");
 }
 
 export function roofFusionEndpointConstraintMetric(
@@ -350,6 +378,7 @@ function pointFromPointer(
 
 export function AdminNextRoofFusionUnifiedWorkbench({
   advancedPanel,
+  caseAddressContext,
   sourceStatusPanel,
   orthoImageSrc,
   orthoImageAlt = "Namo ortofoto",
@@ -387,6 +416,13 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onEditResult,
 }: RoofFusionUnifiedWorkbenchProps) {
   const canvasShellRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState(() => ({
+    width: Math.max(1, orthoImageWidth ?? 1_000),
+    height: Math.max(
+      1,
+      orthoImageHeight ?? (orthoImageWidth ? orthoImageWidth * 0.75 : 750),
+    ),
+  }));
   const [stage, setStage] = useState<RoofFusionStage>(initialStage);
   const [layerVisibility, setLayerVisibility] = useState(() => ({
     ...DEFAULT_ROOF_FUSION_LAYERS,
@@ -429,6 +465,28 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [selectedRoofPlaneId, setSelectedRoofPlaneId] = useState<string | null>(
     null,
   );
+
+  useEffect(() => {
+    const canvas = canvasShellRef.current;
+    if (!canvas) return;
+    const updateCanvasSize = () => {
+      const bounds = canvas.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      setCanvasSize((current) =>
+        current.width === bounds.width && current.height === bounds.height
+          ? current
+          : { width: bounds.width, height: bounds.height },
+      );
+    };
+    updateCanvasSize();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateCanvasSize);
+      return () => window.removeEventListener("resize", updateCanvasSize);
+    }
+    const observer = new ResizeObserver(updateCanvasSize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!advancedOpen) return;
@@ -880,38 +938,58 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         ]
       : []),
   ];
-  const canvasAspectRatio =
-    orthoImageWidth && orthoImageHeight
-      ? orthoImageWidth / orthoImageHeight
-      : 4 / 3;
-  const heightPointRadii = roofFusionScreenStableMarkerRadii(
-    0.0035,
-    canvasAspectRatio,
+  const heightPointRadii = roofFusionScreenStableMarkerRadiiPx(
+    3,
+    canvasSize,
     viewport.scale,
   );
-  const vertexHitRadii = roofFusionScreenStableMarkerRadii(
-    0.022,
-    canvasAspectRatio,
+  const vertexHitRadii = roofFusionScreenStableMarkerRadiiPx(
+    ROOF_FUSION_VERTEX_HIT_RADIUS_PX,
+    canvasSize,
     viewport.scale,
   );
-  const vertexRadii = roofFusionScreenStableMarkerRadii(
-    0.006,
-    canvasAspectRatio,
+  const vertexRadii = roofFusionScreenStableMarkerRadiiPx(
+    ROOF_FUSION_VERTEX_RADIUS_PX,
+    canvasSize,
     viewport.scale,
   );
-  const selectedVertexRadii = roofFusionScreenStableMarkerRadii(
-    0.008,
-    canvasAspectRatio,
+  const selectedVertexRadii = roofFusionScreenStableMarkerRadiiPx(
+    ROOF_FUSION_SELECTED_VERTEX_RADIUS_PX,
+    canvasSize,
     viewport.scale,
   );
-  const lineEndpointRadii = roofFusionScreenStableMarkerRadii(
-    ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
-    canvasAspectRatio,
+  const lineEndpointRadii = roofFusionScreenStableMarkerRadiiPx(
+    ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+    canvasSize,
     viewport.scale,
   );
-  const pendingLinePointRadii = roofFusionScreenStableMarkerRadii(
-    0.0035,
-    canvasAspectRatio,
+  const pendingLinePointRadii = roofFusionScreenStableMarkerRadiiPx(
+    3.5,
+    canvasSize,
+    viewport.scale,
+  );
+  const sourceOutlineStrokeWidth = roofFusionScreenStableStrokeWidthPx(
+    ROOF_FUSION_SOURCE_OUTLINE_STROKE_PX,
+    viewport.scale,
+  );
+  const approvedOutlineStrokeWidth = roofFusionScreenStableStrokeWidthPx(
+    ROOF_FUSION_APPROVED_OUTLINE_STROKE_PX,
+    viewport.scale,
+  );
+  const sourceOutlineDashArray = roofFusionScreenStableDashArrayPx(
+    [5, 4],
+    viewport.scale,
+  );
+  const skeletonStrokeWidth = roofFusionScreenStableStrokeWidthPx(
+    ROOF_FUSION_SKELETON_LINE_STROKE_PX,
+    viewport.scale,
+  );
+  const pendingLineStrokeWidth = roofFusionScreenStableStrokeWidthPx(
+    ROOF_FUSION_PENDING_LINE_STROKE_PX,
+    viewport.scale,
+  );
+  const subtleMarkerStrokeWidth = roofFusionScreenStableStrokeWidthPx(
+    0.75,
     viewport.scale,
   );
 
@@ -920,6 +998,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       aria-label="Roof Fusion vieno lango matavimo darbo vieta"
       className="overflow-hidden rounded-3xl border border-white/10 bg-[#111722] text-[#f4f1ea] shadow-2xl shadow-black/30"
       data-roof-fusion-workbench="unified"
+      data-roof-fusion-geometry-markers="screen-stable-v2"
       data-roof-fusion-stage={stage}
     >
       <div className="flex flex-col gap-0 xl:flex-row">
@@ -941,6 +1020,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               {guardNotice}
             </span>
           </div>
+
+          {caseAddressContext ? (
+            <div className="mb-4" data-roof-fusion-case-address-slot>
+              {caseAddressContext}
+            </div>
+          ) : null}
 
           {sourceStatusPanel}
 
@@ -1131,9 +1216,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       points={pointsAttribute(plane.points)}
                       role={stage === "review" ? "button" : undefined}
                       stroke={index % 2 ? "#ef9b4f" : "#55c7a3"}
-                      strokeWidth={
-                        activeSelectedRoofPlaneId === plane.id ? "3px" : "2px"
-                      }
+                      strokeWidth={roofFusionScreenStableStrokeWidthPx(
+                        activeSelectedRoofPlaneId === plane.id ? 2 : 1.5,
+                        viewport.scale,
+                      )}
                       tabIndex={stage === "review" ? 0 : undefined}
                       vectorEffect="non-scaling-stroke"
                     >
@@ -1148,10 +1234,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 <polygon
                   data-roof-fusion-layer="sourceOutline"
                   fill="none"
+                  opacity=".62"
                   points={pointsAttribute(sourceOutline)}
                   stroke="#f3c66b"
-                  strokeDasharray=".012 .009"
-                  strokeWidth=".006"
+                  strokeDasharray={sourceOutlineDashArray}
+                  strokeLinecap="round"
+                  strokeWidth={sourceOutlineStrokeWidth}
                   vectorEffect="non-scaling-stroke"
                 />
               )}
@@ -1162,7 +1250,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   fillOpacity={approvedOutlineFillOpacity / 100}
                   points={pointsAttribute(draftOutline)}
                   stroke="#46d69a"
-                  strokeWidth=".007"
+                  strokeLinejoin="round"
+                  strokeWidth={approvedOutlineStrokeWidth}
                   vectorEffect="non-scaling-stroke"
                 />
               )}
@@ -1174,12 +1263,17 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       key={line.id}
                       stroke={line.kind === "ridge" ? "#f8d164" : "#8cb8ff"}
                       strokeDasharray={
-                        line.id === "pending-line" ? ".012 .009" : undefined
+                        line.id === "pending-line"
+                          ? roofFusionScreenStableDashArrayPx(
+                              [5, 4],
+                              viewport.scale,
+                            )
+                          : undefined
                       }
                       strokeWidth={
                         line.id === "pending-line"
-                          ? ROOF_FUSION_PENDING_LINE_STROKE
-                          : ROOF_FUSION_SKELETON_LINE_STROKE
+                          ? pendingLineStrokeWidth
+                          : skeletonStrokeWidth
                       }
                       vectorEffect="non-scaling-stroke"
                       x1={line.start.x}
@@ -1199,8 +1293,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                         pointerEvents="none"
                         rx={lineEndpointRadii.rx}
                         ry={lineEndpointRadii.ry}
-                        stroke="#0b111a"
-                        strokeWidth="1px"
+                        stroke="#f4f1ea"
+                        strokeOpacity=".72"
+                        strokeWidth={subtleMarkerStrokeWidth}
                         vectorEffect="non-scaling-stroke"
                       />
                     )),
@@ -1214,7 +1309,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       key={obstacle.id}
                       r=".015"
                       stroke="#fff"
-                      strokeWidth=".003"
+                      strokeWidth={roofFusionScreenStableStrokeWidthPx(
+                        1,
+                        viewport.scale,
+                      )}
                       vectorEffect="non-scaling-stroke"
                     >
                       <title>{obstacle.label ?? "Kliūtis"}</title>
@@ -1266,8 +1364,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                           ? selectedVertexRadii.ry
                           : vertexRadii.ry
                       }
-                      stroke="#0b111a"
-                      strokeWidth=".003"
+                      stroke="#dffbef"
+                      strokeOpacity=".82"
+                      strokeWidth={subtleMarkerStrokeWidth}
                       vectorEffect="non-scaling-stroke"
                     />
                   </g>
@@ -1282,7 +1381,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   rx={pendingLinePointRadii.rx}
                   ry={pendingLinePointRadii.ry}
                   stroke="#e8a317"
-                  strokeWidth=".003"
+                  strokeWidth={subtleMarkerStrokeWidth}
                   vectorEffect="non-scaling-stroke"
                 />
               )}
@@ -1491,19 +1590,41 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
             <dl className="grid grid-cols-2 gap-2" data-roof-fusion-metrics>
               <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">Horizontalus</dt>
+                <dt className="flex items-center gap-2 text-[11px] text-[#aaa69d]">
+                  <Grid3X3
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[var(--an-amber)]"
+                    data-roof-fusion-metric-icon="horizontal-grid"
+                    strokeWidth={1.75}
+                  />
+                  Horizontalus
+                </dt>
                 <dd className="mt-1 text-lg font-semibold">
                   {formatNumber(horizontalAreaSquareMeters, " m²")}
                 </dd>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">Tikras paviršius</dt>
+                <dt className="flex items-center gap-2 text-[11px] text-[#aaa69d]">
+                  <Layers3
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[var(--an-amber)]"
+                    data-roof-fusion-metric-icon="surface-layers"
+                    strokeWidth={1.75}
+                  />
+                  Tikras paviršius
+                </dt>
                 <dd className="mt-1 text-lg font-semibold text-[#f3c66b]">
                   {formatNumber(totalSurfaceAreaSquareMeters, " m²")}
                 </dd>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">
+                <dt className="flex items-center gap-2 text-[11px] text-[#aaa69d]">
+                  <TriangleRight
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[var(--an-amber)]"
+                    data-roof-fusion-metric-icon="average-pitch-angle"
+                    strokeWidth={1.75}
+                  />
                   Vidutinis nuolydis
                 </dt>
                 <dd className="mt-1 text-lg font-semibold">
@@ -1511,7 +1632,15 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 </dd>
               </div>
               <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">Perimetras</dt>
+                <dt className="flex items-center gap-2 text-[11px] text-[#aaa69d]">
+                  <SquareDashed
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[var(--an-amber)]"
+                    data-roof-fusion-metric-icon="perimeter-outline"
+                    strokeWidth={1.75}
+                  />
+                  Perimetras
+                </dt>
                 <dd className="mt-1 text-lg font-semibold">
                   {formatNumber(footprintPerimeterMeters, " m")}
                 </dd>

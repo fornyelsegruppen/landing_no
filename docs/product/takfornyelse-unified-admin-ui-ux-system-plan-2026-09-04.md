@@ -68,50 +68,50 @@ quality run `33865453230` užbaigė visus vartus žaliai.
 
 ### Esamos sistemos įrodymų žemėlapis
 
-| Sritis | Patikrinta kode | Išvada |
-|---|---|---|
-| Bendras shell | `src/app/(admin-shell)/admin-v2/layout.tsx:19`, `src/components/admin-v2/admin-navigation.tsx:8` | Veikiantis tamsus custom admin turi 11 aukšto lygio nuorodų, atskirą mobilų meniu ir nuorodą į techninį Payload admin. |
-| Antras shell | `src/app/(admin-shell)/admin-next-preview/layout.tsx:8`, `src/components/admin-next/admin-next-shell.tsx:83` | Preview kuria antrą navigacijos ir semantikos sluoksnį; dalis nuorodų grįžta į `admin-v2`, o „Cases“ šiuo metu veda į „Today“. |
-| Dizaino tokenai | `src/lib/admin-next/design-tokens.ts:1` | Tamsus/gintarinis pagrindas, focus ir semantinės spalvos jau aprašyti; jį reikia paversti bendru, ne preview-only kontraktu. |
-| Rollout sauga | `src/lib/admin-next/rollout-view.ts:52`, `src/lib/admin-next/capability-registry.ts:110` | Preview turi fail-closed Production vartus ir modulio lygio fallback. Tai tinkamas laipsniško perėjimo pagrindas. |
-| Dashboard/eilės | `src/app/(admin-shell)/admin-v2/page.tsx:21`, `src/lib/admin-v2/dashboard.ts:114` | Duomenų eilės plačios, bet pateikiamos kaip atskiri skydeliai ir nuorodos, ne viena vykdoma darbo eilė. |
-| Today preview | `src/lib/admin-next/today-contract.ts:1`, `src/lib/admin-next/today-read-adapter.ts:12` | Kontraktas susiaurintas iki keturių etapų ir keturių legacy eilių; neapima viso esamo `nextAction` žodyno. |
-| Bylos sprendimas | `src/lib/admin-v2/case-read-model.ts:12`, `src/lib/admin-v2/case-workspace-view-model.ts:24` | Jau yra deterministinis kito veiksmo medis ir prioritetizuotas pateikimo modelis. Tai turi tapti vieninteliu bendru šaltiniu. |
-| Bylos UI | `src/app/(admin-shell)/admin-v2/cases/[id]/page.tsx:1` | Turtinga, bet beveik 3 000 eilučių serverio darbo erdvė didina dubliavimo, regresijų ir netolygios hierarchijos riziką. |
-| Bylos komandos | `src/lib/cases/case-command.ts:34` | Yra idempotency/correlation hash, optimistinis `caseRevision` konfliktas ir audito įvykis; UI turi remtis šia riba, jos neapeiti. |
-| Bylos duomenys | `src/payload/collections/Leads.ts:114`, `src/lib/admin-next/capability-registry.ts:28` | Klientas ir objektas dabar yra `leads` projekcijos, ne atskiros kanoninės esybės. IA gali juos rodyti atskirai, bet ankstyvoje fazėje neturi apsimesti, kad schema jau atskirta. |
-| Rolės | `src/payload/access/roles.ts:3` | Backend šiandien turi tik `admin` ir `worker`; smulkesnės rolės yra tikslinis teisių modelis, ne dabartinė galimybė. |
-| Auditas | `src/payload/collections/AuditEvents.ts:4`, `src/lib/audit/audit-event.ts:36` | Įrašai append-only ir saugo hash bei pakeistų laukų pavadinimus, bet ne pakankamą privatumą saugantį `nuo → į` paaiškinimą UI. |
-| RF | `docs/implementation/admin-next-roof-fusion-one-card-v2-plan-2026-09-04.md:1`, `src/payload/collections/RoofFusion.ts:44` | One Card A–D yra Preview; nekintamo patvirtinimo ir „į pasiūlymą“ komanda tebėra aiškiai užrakinta E fazėje. |
-| Matavimai | `src/payload/collections/RoofMeasurements.ts:37`, `src/payload/collections/RoofMeasurements.ts:230` | Patvirtintos versijos nekintamos, turi šaltinio/evidence/input hash ir approval vartus. |
-| Pasiūlymai/sutartys | `src/payload/collections/Quotes.ts:6`, `src/payload/collections/Contracts.ts:6` | Po patvirtinimo/išdavimo saugomos nekintamos versijos, hash, supersedes ir pasirašymo įrodymai. |
-| Dokumentai | `src/lib/admin-v2/documents.ts:3`, `src/components/admin-v2/case-version-history.tsx:58` | Vienas loaderis apima 11 tipų ir yra quote/contract versijų grandinė, bet nėra universalaus dabartinės/senos versijos ir diff modelio. |
-| Darbai/mobile | `src/payload/collections/WorkOrders.ts:159`, `src/components/worker/worker-order-actions.tsx:406` | Plati būsenų mašina ir įrodymų eiga jau egzistuoja; mobilus klientas stambus ir happy-path orientuotas, offline konfliktas nėra pirmos klasės būsena. |
-| Komunikacija | `src/payload/collections/Messages.ts:36`, `src/components/admin-v2/customer-question-workbench.tsx:1` | Yra draft/approval/queue/send/delivery/error ir idempotency duomenys, bet veiksmai išskaidyti per bylos panelius. |
-| SEO | `src/lib/blog/transitions.ts:7`, `src/components/admin-v2/blog-editor.tsx:17`, `src/app/api/admin/blog/performance/route.ts:20` | Kokybės vartai ir leidybos perėjimai yra, tačiau trūksta vientisos turinio eilės, kalendoriaus ir analizės darbo erdvės. |
-| Operacijos | `src/payload/collections/OperationalJobs.ts:4`, `src/components/admin-v2/platform-health-panel.tsx:19` | Yra darbų/idempotency/klaidų ir platformos sveikatos duomenys, bet operacinis centras sumaišytas su bendrais nustatymais. |
+| Sritis              | Patikrinta kode                                                                                                                 | Išvada                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bendras shell       | `src/app/(admin-shell)/admin-v2/layout.tsx:19`, `src/components/admin-v2/admin-navigation.tsx:8`                                | Veikiantis tamsus custom admin turi 11 aukšto lygio nuorodų, atskirą mobilų meniu ir nuorodą į techninį Payload admin.                                                           |
+| Antras shell        | `src/app/(admin-shell)/admin-next-preview/layout.tsx:8`, `src/components/admin-next/admin-next-shell.tsx:83`                    | Preview kuria antrą navigacijos ir semantikos sluoksnį; dalis nuorodų grįžta į `admin-v2`, o „Cases“ šiuo metu veda į „Today“.                                                   |
+| Dizaino tokenai     | `src/lib/admin-next/design-tokens.ts:1`                                                                                         | Tamsus/gintarinis pagrindas, focus ir semantinės spalvos jau aprašyti; jį reikia paversti bendru, ne preview-only kontraktu.                                                     |
+| Rollout sauga       | `src/lib/admin-next/rollout-view.ts:52`, `src/lib/admin-next/capability-registry.ts:110`                                        | Preview turi fail-closed Production vartus ir modulio lygio fallback. Tai tinkamas laipsniško perėjimo pagrindas.                                                                |
+| Dashboard/eilės     | `src/app/(admin-shell)/admin-v2/page.tsx:21`, `src/lib/admin-v2/dashboard.ts:114`                                               | Duomenų eilės plačios, bet pateikiamos kaip atskiri skydeliai ir nuorodos, ne viena vykdoma darbo eilė.                                                                          |
+| Today preview       | `src/lib/admin-next/today-contract.ts:1`, `src/lib/admin-next/today-read-adapter.ts:12`                                         | Kontraktas susiaurintas iki keturių etapų ir keturių legacy eilių; neapima viso esamo `nextAction` žodyno.                                                                       |
+| Bylos sprendimas    | `src/lib/admin-v2/case-read-model.ts:12`, `src/lib/admin-v2/case-workspace-view-model.ts:24`                                    | Jau yra deterministinis kito veiksmo medis ir prioritetizuotas pateikimo modelis. Tai turi tapti vieninteliu bendru šaltiniu.                                                    |
+| Bylos UI            | `src/app/(admin-shell)/admin-v2/cases/[id]/page.tsx:1`                                                                          | Turtinga, bet beveik 3 000 eilučių serverio darbo erdvė didina dubliavimo, regresijų ir netolygios hierarchijos riziką.                                                          |
+| Bylos komandos      | `src/lib/cases/case-command.ts:34`                                                                                              | Yra idempotency/correlation hash, optimistinis `caseRevision` konfliktas ir audito įvykis; UI turi remtis šia riba, jos neapeiti.                                                |
+| Bylos duomenys      | `src/payload/collections/Leads.ts:114`, `src/lib/admin-next/capability-registry.ts:28`                                          | Klientas ir objektas dabar yra `leads` projekcijos, ne atskiros kanoninės esybės. IA gali juos rodyti atskirai, bet ankstyvoje fazėje neturi apsimesti, kad schema jau atskirta. |
+| Rolės               | `src/payload/access/roles.ts:3`                                                                                                 | Backend šiandien turi tik `admin` ir `worker`; smulkesnės rolės yra tikslinis teisių modelis, ne dabartinė galimybė.                                                             |
+| Auditas             | `src/payload/collections/AuditEvents.ts:4`, `src/lib/audit/audit-event.ts:36`                                                   | Įrašai append-only ir saugo hash bei pakeistų laukų pavadinimus, bet ne pakankamą privatumą saugantį `nuo → į` paaiškinimą UI.                                                   |
+| RF                  | `docs/implementation/admin-next-roof-fusion-one-card-v2-plan-2026-09-04.md:1`, `src/payload/collections/RoofFusion.ts:44`       | One Card A–D yra Preview; nekintamo patvirtinimo ir „į pasiūlymą“ komanda tebėra aiškiai užrakinta E fazėje.                                                                     |
+| Matavimai           | `src/payload/collections/RoofMeasurements.ts:37`, `src/payload/collections/RoofMeasurements.ts:230`                             | Patvirtintos versijos nekintamos, turi šaltinio/evidence/input hash ir approval vartus.                                                                                          |
+| Pasiūlymai/sutartys | `src/payload/collections/Quotes.ts:6`, `src/payload/collections/Contracts.ts:6`                                                 | Po patvirtinimo/išdavimo saugomos nekintamos versijos, hash, supersedes ir pasirašymo įrodymai.                                                                                  |
+| Dokumentai          | `src/lib/admin-v2/documents.ts:3`, `src/components/admin-v2/case-version-history.tsx:58`                                        | Vienas loaderis apima 11 tipų ir yra quote/contract versijų grandinė, bet nėra universalaus dabartinės/senos versijos ir diff modelio.                                           |
+| Darbai/mobile       | `src/payload/collections/WorkOrders.ts:159`, `src/components/worker/worker-order-actions.tsx:406`                               | Plati būsenų mašina ir įrodymų eiga jau egzistuoja; mobilus klientas stambus ir happy-path orientuotas, offline konfliktas nėra pirmos klasės būsena.                            |
+| Komunikacija        | `src/payload/collections/Messages.ts:36`, `src/components/admin-v2/customer-question-workbench.tsx:1`                           | Yra draft/approval/queue/send/delivery/error ir idempotency duomenys, bet veiksmai išskaidyti per bylos panelius.                                                                |
+| SEO                 | `src/lib/blog/transitions.ts:7`, `src/components/admin-v2/blog-editor.tsx:17`, `src/app/api/admin/blog/performance/route.ts:20` | Kokybės vartai ir leidybos perėjimai yra, tačiau trūksta vientisos turinio eilės, kalendoriaus ir analizės darbo erdvės.                                                         |
+| Operacijos          | `src/payload/collections/OperationalJobs.ts:4`, `src/components/admin-v2/platform-health-panel.tsx:19`                          | Yra darbų/idempotency/klaidų ir platformos sveikatos duomenys, bet operacinis centras sumaišytas su bendrais nustatymais.                                                        |
 
 ## 1. Dabartinės būklės ir UX skolos žemėlapis
 
 ### Dabartiniai paviršiai
 
-| Kelias / modulis | Dabartinė paskirtis | Išsaugoti | UX / architektūros skola |
-|---|---|---|---|
-| `/admin-v2` | KPI, eilės, paieška | Platus operacinis padengimas ir serveriniai skaičiavimai | Kortelių katalogas reikalauja modulių medžioklės; nėra vienos prioritetizuotos darbo eilės. |
-| `/admin-v2/cases` | Bylų paieška ir filtrai | Paieška, būsenos, savininkas, datos | Kortelės neatlieka darbo; filtrai neišsaugomi kaip bendri rodiniai. |
-| `/admin-v2/cases/[id]` | Visa bylos darbo erdvė | Platus domeno funkcionalumas ir saugios komandos | Per didelis puslapis, daug vienodo svorio panelių, keli konkuruojantys CTA, nevienoda progressive disclosure. |
-| `/admin-v2/contract-requests` | Kliento sutarčių prašymai | Atskira įeinanti eilė | Semantiškai tai Today/Case užduotys, bet pateikta kaip atskiras modulis. |
-| `/admin-v2/offers` | Pasiūlymų sąrašas | Būsenos ir bylos ryšys | Plona įrašų nuorodų lentyna; nėra review/commit, versijų palyginimo ar inline darbo. |
-| `/admin-v2/contracts` | Sutarčių sąrašas | Būsenos ir bylos ryšys | Toks pats šablonas kaip pasiūlymams, nors rizikos ir leidžiami veiksmai skiriasi. |
-| `/admin-v2/work` | Darbų sąrašas | Operacinės būsenos | Nėra pilno grafiko/dispečerio darbo stalo; priskyrimas ir planavimas lieka bylos kontekste. |
-| `/admin-v2/documents` | 11 dokumentų tipų, filtrai, eksportas | Vienas agreguotas loaderis, versijos ir hash | Trūksta vienodo manifest/diff/current-old modelio ir su byla susieto veiksmo konteksto. |
-| `/admin-v2/archive` | Archyvas / šiukšlinė | Saugūs lifecycle vartai ir retention | Atskira lentyna be universalaus istorijos/atkūrimo paaiškinimo. |
-| `/admin-v2/blog`, `/blog/[id]` | Turinys, redagavimas, QA, publikavimas | Kokybės vartai, perėjimai, performance duomenys | Sąrašas nėra turinio pipeline; redagavimas, peržiūra, grafikas ir analitika nėra viena darbo erdvė. |
-| `/admin-v2/employees` | Darbuotojai | Admin/worker valdymo pradžia | UI rolės negali būti smulkesnės už dabartinį dviejų rolių backend. |
-| `/admin-v2/settings` | Įmonė, terminai, release/health, techninis admin | Svarbios Production ir sveikatos apsaugos | Nustatymai ir operacinis monitoringas yra skirtingi darbai, dabar sumaišyti. |
-| `/admin-next-preview/*` | Today, Case, RF, preflight, field visit preview | Tokenai, rollout guard, adapteriai, One Card kryptis | Antras shell, dalinis kanoninis padengimas ir fixtures gali maskuoti realių duomenų spragas. |
-| `/user`, `/user/arbeid/[id]` | Darbuotojo darbų sąrašas ir vykdymas | Aiški būsenų seka, nuotraukos, laikai, checklist | Nėra pilno offline/pending/conflict ir išimčių modelio; per daug logikos viename klientiniame komponente. |
-| `/admin` | Payload techninis administravimas | Galingas backoffice / avarinis kelias | Neturi tapti kasdienio operatoriaus IA dalimi; paliekamas tik autorizuotam techniniam administravimui. |
+| Kelias / modulis               | Dabartinė paskirtis                              | Išsaugoti                                                | UX / architektūros skola                                                                                      |
+| ------------------------------ | ------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `/admin-v2`                    | KPI, eilės, paieška                              | Platus operacinis padengimas ir serveriniai skaičiavimai | Kortelių katalogas reikalauja modulių medžioklės; nėra vienos prioritetizuotos darbo eilės.                   |
+| `/admin-v2/cases`              | Bylų paieška ir filtrai                          | Paieška, būsenos, savininkas, datos                      | Kortelės neatlieka darbo; filtrai neišsaugomi kaip bendri rodiniai.                                           |
+| `/admin-v2/cases/[id]`         | Visa bylos darbo erdvė                           | Platus domeno funkcionalumas ir saugios komandos         | Per didelis puslapis, daug vienodo svorio panelių, keli konkuruojantys CTA, nevienoda progressive disclosure. |
+| `/admin-v2/contract-requests`  | Kliento sutarčių prašymai                        | Atskira įeinanti eilė                                    | Semantiškai tai Today/Case užduotys, bet pateikta kaip atskiras modulis.                                      |
+| `/admin-v2/offers`             | Pasiūlymų sąrašas                                | Būsenos ir bylos ryšys                                   | Plona įrašų nuorodų lentyna; nėra review/commit, versijų palyginimo ar inline darbo.                          |
+| `/admin-v2/contracts`          | Sutarčių sąrašas                                 | Būsenos ir bylos ryšys                                   | Toks pats šablonas kaip pasiūlymams, nors rizikos ir leidžiami veiksmai skiriasi.                             |
+| `/admin-v2/work`               | Darbų sąrašas                                    | Operacinės būsenos                                       | Nėra pilno grafiko/dispečerio darbo stalo; priskyrimas ir planavimas lieka bylos kontekste.                   |
+| `/admin-v2/documents`          | 11 dokumentų tipų, filtrai, eksportas            | Vienas agreguotas loaderis, versijos ir hash             | Trūksta vienodo manifest/diff/current-old modelio ir su byla susieto veiksmo konteksto.                       |
+| `/admin-v2/archive`            | Archyvas / šiukšlinė                             | Saugūs lifecycle vartai ir retention                     | Atskira lentyna be universalaus istorijos/atkūrimo paaiškinimo.                                               |
+| `/admin-v2/blog`, `/blog/[id]` | Turinys, redagavimas, QA, publikavimas           | Kokybės vartai, perėjimai, performance duomenys          | Sąrašas nėra turinio pipeline; redagavimas, peržiūra, grafikas ir analitika nėra viena darbo erdvė.           |
+| `/admin-v2/employees`          | Darbuotojai                                      | Admin/worker valdymo pradžia                             | UI rolės negali būti smulkesnės už dabartinį dviejų rolių backend.                                            |
+| `/admin-v2/settings`           | Įmonė, terminai, release/health, techninis admin | Svarbios Production ir sveikatos apsaugos                | Nustatymai ir operacinis monitoringas yra skirtingi darbai, dabar sumaišyti.                                  |
+| `/admin-next-preview/*`        | Today, Case, RF, preflight, field visit preview  | Tokenai, rollout guard, adapteriai, One Card kryptis     | Antras shell, dalinis kanoninis padengimas ir fixtures gali maskuoti realių duomenų spragas.                  |
+| `/user`, `/user/arbeid/[id]`   | Darbuotojo darbų sąrašas ir vykdymas             | Aiški būsenų seka, nuotraukos, laikai, checklist         | Nėra pilno offline/pending/conflict ir išimčių modelio; per daug logikos viename klientiniame komponente.     |
+| `/admin`                       | Payload techninis administravimas                | Galingas backoffice / avarinis kelias                    | Neturi tapti kasdienio operatoriaus IA dalimi; paliekamas tik autorizuotam techniniam administravimui.        |
 
 ### Sisteminės skolos prioritetas
 
@@ -138,7 +138,7 @@ quality run `33865453230` užbaigė visus vartus žaliai.
    perdavimą, perplanavimą ir klaidingo perėjimo taisymą.
 6. Realiame operatoriaus bandyme RF buvo randamas tik žinant techninį kelią
    `Admin Next · Apsaugota peržiūra → Modulių būsena → Stogo matavimas ir R4 →
-   Atidaryti RF UAT`. Be instrukcijos operatorius RF nebūtų radęs. Tai P1
+Atidaryti RF UAT`. Be instrukcijos operatorius RF nebūtų radęs. Tai P1
    navigation/discoverability defektas, o ne mokymų problema.
 
 **P2 – efektyvumas ir analizė**
@@ -163,27 +163,27 @@ elementai:
 - techninis hash be patikimo stabilaus šaltinio ID, revizijos ir approval;
 - bendrinis patvirtinimo checkbox, kuris gali tapti ritualiniu paspaudimu.
 
-| Pateiktas vaizdas | Kas veikia | Ką planas taiso |
-|---|---|---|
-| `exec-20a113a0-2523-40b0-b5e0-42cb2ed60a0e.png` | bylos blocker tiesiogiai tampa darbuotojo užduotimi; matomos RF/quote versijos ir offline signalas | mažina vienodo svorio korteles, nedubliuoja blocker, atskiria mobile būseną nuo siūlomo veiksmo |
-| `exec-ba952dfb-4b2e-4476-80d9-66fb4edd02b8.png` | keturi aiškūs mobile žingsniai, vienas lipnus CTA, įrodymai ir automatizacijos | prideda offline, pause, saugos, klaidos, handoff, reschedule ir sync conflict kelius |
-| `exec-51f11b86-7411-4bbd-9aa5-237ca32b5c13.png` | stiprus Next Action, evidence, proceso ir utility rail modelis | suderina „aktyvus/išspręstas“ blocker semantiką, stage pavadinimus ir utility rail dydį |
-| `exec-82d7c43b-e777-4898-948d-2268b678330d.png` | tas pats shell stabiliai rodo kitą bylos įvykį | timeline papildoma `kas / ką / nuo → į / pasekmė`, ne kuriamas dar vienas šablonas |
-| `exec-14225b20-c440-45c2-b141-941c358b7df7.png` | Today master–detail, „kodėl dabar“, terminas ir owner | KPI paverčia aiškiais filtrais arba metrika, struktūruoja prioritetą, rodo inline CTA, saved views ir mobile transformaciją |
-| `exec-a153ab87-fd88-4e29-8257-11311b1e75d5.png` | review/commit, manifestas, būsena po veiksmo ir idempotency | rodo turinio/siuntėjo/gavėjų preview, klaidos/recovery kelią ir RF exact ID/revision/hash kilmę |
+| Pateiktas vaizdas                               | Kas veikia                                                                                         | Ką planas taiso                                                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `exec-20a113a0-2523-40b0-b5e0-42cb2ed60a0e.png` | bylos blocker tiesiogiai tampa darbuotojo užduotimi; matomos RF/quote versijos ir offline signalas | mažina vienodo svorio korteles, nedubliuoja blocker, atskiria mobile būseną nuo siūlomo veiksmo                             |
+| `exec-ba952dfb-4b2e-4476-80d9-66fb4edd02b8.png` | keturi aiškūs mobile žingsniai, vienas lipnus CTA, įrodymai ir automatizacijos                     | prideda offline, pause, saugos, klaidos, handoff, reschedule ir sync conflict kelius                                        |
+| `exec-51f11b86-7411-4bbd-9aa5-237ca32b5c13.png` | stiprus Next Action, evidence, proceso ir utility rail modelis                                     | suderina „aktyvus/išspręstas“ blocker semantiką, stage pavadinimus ir utility rail dydį                                     |
+| `exec-82d7c43b-e777-4898-948d-2268b678330d.png` | tas pats shell stabiliai rodo kitą bylos įvykį                                                     | timeline papildoma `kas / ką / nuo → į / pasekmė`, ne kuriamas dar vienas šablonas                                          |
+| `exec-14225b20-c440-45c2-b141-941c358b7df7.png` | Today master–detail, „kodėl dabar“, terminas ir owner                                              | KPI paverčia aiškiais filtrais arba metrika, struktūruoja prioritetą, rodo inline CTA, saved views ir mobile transformaciją |
+| `exec-a153ab87-fd88-4e29-8257-11311b1e75d5.png` | review/commit, manifestas, būsena po veiksmo ir idempotency                                        | rodo turinio/siuntėjo/gavėjų preview, klaidos/recovery kelią ir RF exact ID/revision/hash kilmę                             |
 
 ## 2. Tikslinė informacijos architektūra ir navigacija
 
 ### Viena pirminė navigacija
 
-| Grupė | Punktas | Atsakomas klausimas | Dabartinių paviršių šaltinis |
-|---|---|---|---|
-| Darbas | **Šiandien** | Ką turiu atlikti dabar ir kodėl? | dashboard, contract requests, klausimai, quote review, signing, upcoming work, failures |
-| Ryšiai | **Bylos** | Kokia visa kliento/objekto darbo būsena? | cases ir visa bylos darbo erdvė |
-| Ryšiai | **Klientai ir objektai** | Kokios bylos, kontaktai, adresai ir istorija susiję? | pradžioje – saugios `leads` projekcijos; vėliau galima kanoninė migracija |
-| Vykdymas | **Darbai** | Kas priskirta, suplanuota, vyksta ar blokuojama? | work, WorkOrders, worker visit |
-| Artefaktai | **Dokumentai** | Kokia dabartinė patvirtinta versija ir kas ją panaudojo? | documents, offers, contracts, invoice, warranty, work evidence |
-| Turinys | **SEO studija** | Ką generuoti, peržiūrėti, suplanuoti ir optimizuoti? | blog list/editor/review/performance |
+| Grupė      | Punktas                  | Atsakomas klausimas                                      | Dabartinių paviršių šaltinis                                                            |
+| ---------- | ------------------------ | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Darbas     | **Šiandien**             | Ką turiu atlikti dabar ir kodėl?                         | dashboard, contract requests, klausimai, quote review, signing, upcoming work, failures |
+| Ryšiai     | **Bylos**                | Kokia visa kliento/objekto darbo būsena?                 | cases ir visa bylos darbo erdvė                                                         |
+| Ryšiai     | **Klientai ir objektai** | Kokios bylos, kontaktai, adresai ir istorija susiję?     | pradžioje – saugios `leads` projekcijos; vėliau galima kanoninė migracija               |
+| Vykdymas   | **Darbai**               | Kas priskirta, suplanuota, vyksta ar blokuojama?         | work, WorkOrders, worker visit                                                          |
+| Artefaktai | **Dokumentai**           | Kokia dabartinė patvirtinta versija ir kas ją panaudojo? | documents, offers, contracts, invoice, warranty, work evidence                          |
+| Turinys    | **SEO studija**          | Ką generuoti, peržiūrėti, suplanuoti ir optimizuoti?     | blog list/editor/review/performance                                                     |
 
 ### Antrinė, kontekstinė navigacija
 
@@ -200,13 +200,13 @@ atitinkamos darbo erdvės kontekste:
 
 ### Administravimo grupė
 
-| Punktas | Turinys |
-|---|---|
-| **Operacijos** | platformos sveikata, darbų eilės, integracijų būsena, klaidos, retry/recovery, backup/release gate |
-| **Archyvas** | archyvuotos ir išmestos bylos, retention, atkūrimas ir purge statusas |
-| **Komanda ir teisės** | darbuotojai, profiliai, kompetencijos, darbo pajėgumas ir capability bundles |
-| **Nustatymai** | įmonės profilis, darbo laikas, šablonai, kanalai ir konfigūracija |
-| **Techninis administravimas** | Payload `/admin`; atskira, tik privilegijuota nuoroda, ne kasdienė navigacija |
+| Punktas                       | Turinys                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Operacijos**                | platformos sveikata, darbų eilės, integracijų būsena, klaidos, retry/recovery, backup/release gate |
+| **Archyvas**                  | archyvuotos ir išmestos bylos, retention, atkūrimas ir purge statusas                              |
+| **Komanda ir teisės**         | darbuotojai, profiliai, kompetencijos, darbo pajėgumas ir capability bundles                       |
+| **Nustatymai**                | įmonės profilis, darbo laikas, šablonai, kanalai ir konfigūracija                                  |
+| **Techninis administravimas** | Payload `/admin`; atskira, tik privilegijuota nuoroda, ne kasdienė navigacija                      |
 
 ### Navigacijos taisyklės
 
@@ -223,7 +223,7 @@ atitinkamos darbo erdvės kontekste:
    tol, kol visas modulis pereina rollout vartus; vėliau sprendžiamas alias arba
    redirect. `/admin` konfliktas su Payload neapeinamas savavališkai.
 7. RF kasdienis kelias prasideda konkrečioje byloje: `Kitas veiksmas → Atverti
-   matavimą` arba `Tęsti matavimą`. Atveriant perduodamas case ID, measurement/RF
+matavimą` arba `Tęsti matavimą`. Atveriant perduodamas case ID, measurement/RF
    kontekstas ir grįžimo URL. „Modulių būsena“ lieka diagnostikos paviršius
    techniniam administratoriui, ne operatoriaus navigacijos žingsnis.
 
@@ -279,16 +279,16 @@ Esami `admin-next` tokenai yra pradinis šaltinis, ne atskira tema. Galutinė
 sistema turi turėti semantinius tokenus, kad komponentas nenaudotų žalių HEX
 reikšmių:
 
-| Semantika | Naudojimas |
-|---|---|
-| `canvas` | beveik juodas aplikacijos fonas |
-| `surface-1/2/3` | pagrindas, pakelta kortelė, modalas/drawer |
-| `border-subtle/strong` | struktūra ir aktyvus kontekstas |
-| `text-primary/secondary/muted` | aiški tipografijos hierarchija |
-| `focus` / `action-primary` | gintarinis fokusas ir vienas pagrindinis CTA |
-| `danger` | atviras blokatorius, nepavykęs veiksmas, destruktyvus sprendimas |
-| `success` | užbaigta/patvirtinta, bet ne kliką viliojantis CTA |
-| `info` | neutrali sistemos informacija, sync ir papildomas kontekstas |
+| Semantika                      | Naudojimas                                                       |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `canvas`                       | beveik juodas aplikacijos fonas                                  |
+| `surface-1/2/3`                | pagrindas, pakelta kortelė, modalas/drawer                       |
+| `border-subtle/strong`         | struktūra ir aktyvus kontekstas                                  |
+| `text-primary/secondary/muted` | aiški tipografijos hierarchija                                   |
+| `focus` / `action-primary`     | gintarinis fokusas ir vienas pagrindinis CTA                     |
+| `danger`                       | atviras blokatorius, nepavykęs veiksmas, destruktyvus sprendimas |
+| `success`                      | užbaigta/patvirtinta, bet ne kliką viliojantis CTA               |
+| `info`                         | neutrali sistemos informacija, sync ir papildomas kontekstas     |
 
 Tikslios pradinės spalvos lieka `src/lib/admin-next/design-tokens.ts`, bet prieš
 Production turi būti patikrintos pagal WCAG 2.2 AA kiekvienoje teksto, border,
@@ -320,12 +320,12 @@ Kiekvienas darbo ekranas laikosi penkių lygių:
 
 ### Modalai, drawer ir pilnas puslapis
 
-| Modelis | Kada naudoti | Kada nenaudoti |
-|---|---|---|
-| Modalas | trumpai peržiūrai ir vienos atominės komandos patvirtinimui | ilgam redagavimui, kelioms proceso stadijoms, dideliems palyginimams |
-| Dešinysis drawer | greitam eilutės patikrinimui, mažam redagavimui, klaidos atkūrimui, neprarandant eilės | kritinei komandai be pilno pasekmės vaizdo |
-| Pilnas puslapis / workbench | RF, pasiūlymo redagavimui, sutarties ar SEO turinio darbui, kai reikia kelių įrodymų | vienam paprastam statuso pakeitimui |
-| Inline veiksmas | mažos rizikos, vienareikšmiam veiksmui Today ar lentelėje | kai reikia papildomų įvesčių arba teisinės/finansinės peržiūros |
+| Modelis                     | Kada naudoti                                                                           | Kada nenaudoti                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Modalas                     | trumpai peržiūrai ir vienos atominės komandos patvirtinimui                            | ilgam redagavimui, kelioms proceso stadijoms, dideliems palyginimams |
+| Dešinysis drawer            | greitam eilutės patikrinimui, mažam redagavimui, klaidos atkūrimui, neprarandant eilės | kritinei komandai be pilno pasekmės vaizdo                           |
+| Pilnas puslapis / workbench | RF, pasiūlymo redagavimui, sutarties ar SEO turinio darbui, kai reikia kelių įrodymų   | vienam paprastam statuso pakeitimui                                  |
+| Inline veiksmas             | mažos rizikos, vienareikšmiam veiksmui Today ar lentelėje                              | kai reikia papildomų įvesčių arba teisinės/finansinės peržiūros      |
 
 Visi overlay paviršiai turi focus trap, grąžinamą fokusą, `Esc` taisyklę,
 neišsaugotų pakeitimų apsaugą ir tiesioginį URL, jei darbą reikia tęsti ar
@@ -383,19 +383,19 @@ kelias negali rodyti seno aktyvaus CTA kartu su vykdoma ta pačia komanda.
 
 ### Puslapių šablonai
 
-| Šablonas | Paskirtis | Privaloma anatomija | Mobile transformacija |
-|---|---|---|---|
-| `AppShell` | visas custom admin | semantinė nav, globali paieška, aplinkos/rollout žyma, locale, vartotojas, sistemos pranešimai | apatinė 4–5 sričių nav, paieška per visą ekraną, administravimas per „Daugiau“ |
-| `WorkQueuePage` | Today, contract requests, reviews, failures | saved views, aiškiai interaktyvūs KPI filtrai, eilė, explainable rank, master–detail inspector, inline CTA | task cards; pasirinkimas atveria pilno ekrano inspector su lipniu CTA |
-| `EntityIndexPage` | bylos, klientai/objektai, dokumentai | paieška, filtrai URL, išsaugomi rodiniai, server-side pagination, stulpelių pasirinkimas, tuščia/klaidos būsena | svarbiausi laukai kortelėje; papildomi laukai po progressive disclosure |
-| `CaseWorkspace` | vienos bylos centras | header, proceso juosta, `NextActionCard`, blocker summary, kontekstiniai tabs, utility rail, audit stream | trumpa santrauka, dabartinis etapas, vienas veiksmas, blocker; sekcijos atskirais maršrutais/sheets |
-| `StageWorkbench` | RF, matavimas, pasiūlymas, sutartis, completion | darbo įvestys, vizualus įrodymas, validacija, versija, sticky action bar | vienas žingsnis vienu metu; ne suspaustas trijų kolonų desktop |
-| `ReviewAndCommit` | ekonominis, teisinis, išsiuntimo ar lifecycle sprendimas | veiksmo santrauka, šaltinių manifestas, gavėjai, versijos/hash, būsena po veiksmo, warnings, confirm CTA | pilno ekrano sheet; tas pats turinys ir ta pati komanda |
-| `VersionedArtifactPage` | pasiūlymai, sutartys, pakeitimai, sąskaitos, garantijos | current badge, immutable system version, human label, supersedes chain, compare, provenance, events | dabartinė versija pirma; senos versijos ir diff atskirai |
-| `DispatchWorkspace` | darbo priskyrimas ir grafikas | nepriskirtų eilė, kalendorius/timeline, darbuotojo pajėgumas, travel/context, conflict warnings, commit drawer | šiandienos grafikas ir konkretus perplanavimo veiksmas; pilnas planavimas – desktop |
-| `MobileTaskRunner` | darbuotojo vizitas/darbas | bylos kontekstas, vienas dabartinis žingsnis, required evidence, sync būsena, išimtys, lipnus CTA | tai yra pirminė forma; desktop naudoja tą pačią būsenų mašiną supervisoriaus režimu |
-| `ContentPipeline` | SEO studija | stulpelinė/list pipeline, temos, žmogaus peržiūra, kalendorius, performance signalai | eilė ir review; sudėtingas turinio redagavimas gali rekomenduoti desktop |
-| `OperationsConsole` | jobs, integrations, invariants, release health | severity, affected entity, attempts, last error summary, correlation ID, retry/cancel policy, runbook | incidentų triage ir acknowledgement; masinis valdymas – desktop |
+| Šablonas                | Paskirtis                                                | Privaloma anatomija                                                                                             | Mobile transformacija                                                                               |
+| ----------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `AppShell`              | visas custom admin                                       | semantinė nav, globali paieška, aplinkos/rollout žyma, locale, vartotojas, sistemos pranešimai                  | apatinė 4–5 sričių nav, paieška per visą ekraną, administravimas per „Daugiau“                      |
+| `WorkQueuePage`         | Today, contract requests, reviews, failures              | saved views, aiškiai interaktyvūs KPI filtrai, eilė, explainable rank, master–detail inspector, inline CTA      | task cards; pasirinkimas atveria pilno ekrano inspector su lipniu CTA                               |
+| `EntityIndexPage`       | bylos, klientai/objektai, dokumentai                     | paieška, filtrai URL, išsaugomi rodiniai, server-side pagination, stulpelių pasirinkimas, tuščia/klaidos būsena | svarbiausi laukai kortelėje; papildomi laukai po progressive disclosure                             |
+| `CaseWorkspace`         | vienos bylos centras                                     | header, proceso juosta, `NextActionCard`, blocker summary, kontekstiniai tabs, utility rail, audit stream       | trumpa santrauka, dabartinis etapas, vienas veiksmas, blocker; sekcijos atskirais maršrutais/sheets |
+| `StageWorkbench`        | RF, matavimas, pasiūlymas, sutartis, completion          | darbo įvestys, vizualus įrodymas, validacija, versija, sticky action bar                                        | vienas žingsnis vienu metu; ne suspaustas trijų kolonų desktop                                      |
+| `ReviewAndCommit`       | ekonominis, teisinis, išsiuntimo ar lifecycle sprendimas | veiksmo santrauka, šaltinių manifestas, gavėjai, versijos/hash, būsena po veiksmo, warnings, confirm CTA        | pilno ekrano sheet; tas pats turinys ir ta pati komanda                                             |
+| `VersionedArtifactPage` | pasiūlymai, sutartys, pakeitimai, sąskaitos, garantijos  | current badge, immutable system version, human label, supersedes chain, compare, provenance, events             | dabartinė versija pirma; senos versijos ir diff atskirai                                            |
+| `DispatchWorkspace`     | darbo priskyrimas ir grafikas                            | nepriskirtų eilė, kalendorius/timeline, darbuotojo pajėgumas, travel/context, conflict warnings, commit drawer  | šiandienos grafikas ir konkretus perplanavimo veiksmas; pilnas planavimas – desktop                 |
+| `MobileTaskRunner`      | darbuotojo vizitas/darbas                                | bylos kontekstas, vienas dabartinis žingsnis, required evidence, sync būsena, išimtys, lipnus CTA               | tai yra pirminė forma; desktop naudoja tą pačią būsenų mašiną supervisoriaus režimu                 |
+| `ContentPipeline`       | SEO studija                                              | stulpelinė/list pipeline, temos, žmogaus peržiūra, kalendorius, performance signalai                            | eilė ir review; sudėtingas turinio redagavimas gali rekomenduoti desktop                            |
+| `OperationsConsole`     | jobs, integrations, invariants, release health           | severity, affected entity, attempts, last error summary, correlation ID, retry/cancel policy, runbook           | incidentų triage ir acknowledgement; masinis valdymas – desktop                                     |
 
 ### Bendrų komponentų katalogas
 
@@ -455,17 +455,17 @@ versiją.
 
 ### Vienas žodynas skirtingoms sąvokoms
 
-| Sąvoka | Tikslinis modelis | Ko ji nereiškia |
-|---|---|---|
-| `processStage` | `inquiry → evidence → commercial → agreement → work → completion` | ne konkretaus dokumento statusas ir ne rizika |
-| `caseState` | išvedama `on_track | needs_action | waiting | blocked | completed` | ne laisvai pasirenkama pipeline etiketė |
-| `recordState` | `active | archived | trashed` | ne verslo proceso etapas |
-| `nextActionKind` | tipizuota komanda / klausimas / panelis / laukimas | ne laisvo teksto `Leads.nextAction` |
-| `priority` | apskaičiuotas eiliškumas su paaiškinimu | ne statuso spalva |
-| `risk` | SLA, finansinė, teisinė, saugos ar duomenų rizika | ne pats blocker |
-| `blocker` | pirmos klasės neišpildyta sąlyga ar struktūrinis ryšys | ne laisvas tekstas be savininko ir būsenos |
-| `artifactVersion` | nekintama sistemos versija su ID/hash ir `supersedes` | ne vien redaguojama „R4“ etiketė |
-| `visitState` | esama serverinė WorkOrder seka | ne bylos bendro proceso būsena |
+| Sąvoka            | Tikslinis modelis                                                 | Ko ji nereiškia                               |
+| ----------------- | ----------------------------------------------------------------- | --------------------------------------------- |
+| `processStage`    | `inquiry → evidence → commercial → agreement → work → completion` | ne konkretaus dokumento statusas ir ne rizika |
+| `caseState`       | išvedama `on_track                                                | needs_action                                  | waiting  | blocked                  | completed` | ne laisvai pasirenkama pipeline etiketė |
+| `recordState`     | `active                                                           | archived                                      | trashed` | ne verslo proceso etapas |
+| `nextActionKind`  | tipizuota komanda / klausimas / panelis / laukimas                | ne laisvo teksto `Leads.nextAction`           |
+| `priority`        | apskaičiuotas eiliškumas su paaiškinimu                           | ne statuso spalva                             |
+| `risk`            | SLA, finansinė, teisinė, saugos ar duomenų rizika                 | ne pats blocker                               |
+| `blocker`         | pirmos klasės neišpildyta sąlyga ar struktūrinis ryšys            | ne laisvas tekstas be savininko ir būsenos    |
+| `artifactVersion` | nekintama sistemos versija su ID/hash ir `supersedes`             | ne vien redaguojama „R4“ etiketė              |
+| `visitState`      | esama serverinė WorkOrder seka                                    | ne bylos bendro proceso būsena                |
 
 Esamas `case-read-model` ir `case-workspace-view-model` yra rekomenduojamas
 kanoninio **pateikimo resolverio** pagrindas. Jis turi absorbuoti siauresnį
@@ -475,14 +475,14 @@ leidžiamų perėjimų.
 
 ### Bylos proceso stadijos
 
-| Stadija | Įėjimo signalas | Pagrindinis rezultatas | Tipiniai blockeriai |
-|---|---|---|---|
-| `inquiry` | gauta užklausa | pakankamas klientas/objektas ir sutartas tolesnis žingsnis | trūksta kontakto, adreso, sutikimo ar atsakymo |
-| `evidence` | objektas tinkamas vertinti | patvirtintas, nekintamas matavimas su provenance | netinkamas pastatas, trūksta vaizdo/aukščio, per mažas confidence, reikia vizito |
-| `commercial` | patvirtintas matavimo pagrindas | peržiūrėtas ir klientui pateiktas versijuotas pasiūlymas | pasenęs matavimas, trūksta kainodaros, quote hash konfliktas |
-| `agreement` | pasirinktas pasiūlymas / sutarties prašymas | abiejų šalių patikimai pasirašyta sutartis | trūksta įrodymo, terminas, parašo ar counter-signature |
-| `work` | galiojanti sutartis | priskirtas, suplanuotas ir dokumentuotas darbas | nėra darbuotojo/laiko, saugos ar scope problema, nepatvirtintas pakeitimas |
-| `completion` | darbas užbaigtas | peržiūrėta dokumentacija, sąskaita, garantija ir bylos uždarymas | trūksta before/after, completion approval, invoice ar delivery įrodymo |
+| Stadija      | Įėjimo signalas                             | Pagrindinis rezultatas                                           | Tipiniai blockeriai                                                              |
+| ------------ | ------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `inquiry`    | gauta užklausa                              | pakankamas klientas/objektas ir sutartas tolesnis žingsnis       | trūksta kontakto, adreso, sutikimo ar atsakymo                                   |
+| `evidence`   | objektas tinkamas vertinti                  | patvirtintas, nekintamas matavimas su provenance                 | netinkamas pastatas, trūksta vaizdo/aukščio, per mažas confidence, reikia vizito |
+| `commercial` | patvirtintas matavimo pagrindas             | peržiūrėtas ir klientui pateiktas versijuotas pasiūlymas         | pasenęs matavimas, trūksta kainodaros, quote hash konfliktas                     |
+| `agreement`  | pasirinktas pasiūlymas / sutarties prašymas | abiejų šalių patikimai pasirašyta sutartis                       | trūksta įrodymo, terminas, parašo ar counter-signature                           |
+| `work`       | galiojanti sutartis                         | priskirtas, suplanuotas ir dokumentuotas darbas                  | nėra darbuotojo/laiko, saugos ar scope problema, nepatvirtintas pakeitimas       |
+| `completion` | darbas užbaigtas                            | peržiūrėta dokumentacija, sąskaita, garantija ir bylos uždarymas | trūksta before/after, completion approval, invoice ar delivery įrodymo           |
 
 Blocker nepakeičia proceso stadijos. Pvz., pasiūlymo stadijoje trūkstant
 matavimo įrodymo, byla lieka `commercial`, jos `caseState` tampa `blocked`, o
@@ -495,18 +495,18 @@ Kiekvienas svarbus perėjimas turi vieną konfigūruotą aprašą:
 
 ```ts
 type TransitionDefinition = {
-  command: string
-  from: string[]
-  to: string
-  allowedCapabilities: string[]
-  requiredInputs: string[]
-  requiredEvidence: string[]
-  blockingRules: string[]
-  reviewMode: 'inline' | 'review_and_commit' | 'danger'
-  produces: Array<'audit_event' | 'document' | 'message' | 'job'>
-  automationEffects: string[]
-  nextActionResolverKey: string
-}
+  command: string;
+  from: string[];
+  to: string;
+  allowedCapabilities: string[];
+  requiredInputs: string[];
+  requiredEvidence: string[];
+  blockingRules: string[];
+  reviewMode: "inline" | "review_and_commit" | "danger";
+  produces: Array<"audit_event" | "document" | "message" | "job">;
+  automationEffects: string[];
+  nextActionResolverKey: string;
+};
 ```
 
 Tai loginė specifikacija, ne siūlymas dabar pridėti TypeScript tipą. Vienas
@@ -596,8 +596,37 @@ rekonstruoti veiklą tik iš esybių timestampų ar rodyti hardcodintą aktorių
 
 ### Saugus nekintamas RF → pasiūlymo tiltas
 
-Ši dalis priklauso RF One Card v2 **Phase E** ir negali būti įgyvendinta šio
-plano vardu. Tikslas – vienas sąmoningas operatoriaus veiksmas
+RF gyvame sraute adreso šaltinis yra tik autoritetingas bylos adresas. Viešos
+užklausos Kartverket/Entur pasirinkimas arba aiškiai pažymėta rankinė įvestis
+išsaugoma byloje; administratorius RF lange mato nekeičiamą `Bylos adresas: …`
+su bylos ir matavimo revizija, o ne pakartotinį laisvą lauką.
+
+`Taisyti bylos adresą` yra atskiras bylos `ReviewAndCommit`. Prieš patvirtinimą
+jis išvardija, kad ankstesnis licencijuotas ortofoto capture, DOM/DTM, pasirinktas
+pastatas, geometrija, anotacijos ir nepatvirtintas rezultatas taps pasenę.
+Patvirtinus sena istorija neištrinama: sukuriama nauja bylos/matavimo revizija,
+šaltiniai gaunami iš naujo, o senas draft negali patekti į kainodarą ar pasiūlymą.
+Atkurtas draft visada siūlo `Tęsti ankstesnį` arba `Pradėti naują` ir rodo exact
+adreso/šaltinių/revizijos binding. RF UAT laisvas adreso laukas lieka tik
+diagnostinis; galimas `Matavimas be bylos` privalo būti sandbox ir fail-closed
+iki priskyrimo bylai.
+
+RF geometrijos overlay turi išlikti profesionaliai plonas nepriklausomai nuo
+žemėlapio mastelio: source `1 px` muted dashed, approved `1.75 px`,
+kraigas/sąlaja `1.5 px`, vertex `7–8 px` su atskiru `26 px` nematomu hit-area.
+Sutampant source ir approved negali atsirasti dvigubas sunkus kontūras:
+approved yra dominuojantis, o source atskiriamas dashed/opacity arba rodomas per
+`Advanced`. Juodas casing ir storas baltas halo nenaudojami. Priėmimas apima
+100 %, 300 %, Windows 150 % Full HD ir 375 px mobile.
+
+R4 rezultato pagrindiniai rodikliai naudoja vieną Lucide linijinių ikonų kalbą:
+grid/plan horizontalumui, layers tikram stogo plotui, angle vidutiniam nuolydžiui
+ir dashed outline perimetrui. Ikona yra tik pagalbinė: tekstinė etiketė visada
+išlieka, dydis/stroke/kontrastas vienodi, o kiekviena šlaito eilutė neapkraunama
+dekoratyviais pasikartojimais.
+
+RF→pasiūlymo komandos dalis priklauso RF One Card v2 **Phase E** ir negali būti
+įgyvendinta šio plano vardu. Tikslas – vienas sąmoningas operatoriaus veiksmas
 `Įkelti matavimą į pasiūlymą`, bet ne vienas neaudituojamas shortcutas.
 
 **Privalomos įvestys**
@@ -646,21 +675,21 @@ nuotraukos pasirinkimas ar būtinas įrodymo gestas. „Dabar“ yra statinio ko
 audito intervalas, ne instrumentuota Production telemetrija. P0 turi užfiksuoti
 realų baseline ir pakoreguoti šias reikšmes prieš nustatant KPI.
 
-| Kritinė kelionė | Dabar | Tikslas | Kas pašalinama / kodėl dalis paspaudimų lieka |
-|---|---:|---:|---|
-| Konkreti byla → RF matavimas | 4 techniniai pasirinkimai: Apsaugota peržiūra → Modulių būsena → Stogo matavimas ir R4 → RF UAT | 1 | Bylos `Kitas veiksmas` tiesiogiai atveria `Atverti/Tęsti matavimą`, išlaiko bylos ID/būseną ir turi vieno veiksmo grįžimą. |
-| Today eilė → atlikti aiškų bylos veiksmą | 3–5 | 1–2 | Pašalinamas tarpinis „atidaryti modulį / rasti panelį“; eilutė + inline arba review veiksmas. |
-| Nauja užklausa → paprašyti trūkstamos informacijos | 4–6 | 2–3 | Eilėje iš karto rodoma trūkstama sąlyga, parengtas tekstas ir recipient review. |
-| Bylos klausimas → parengti ir išsiųsti atsakymą | 4–6 | 2–3 | Unified conversation inspector; tekstą vis tiek privaloma peržiūrėti prieš siuntimą. |
-| Adresas → patvirtintas RF rezultatas | daug atskirų legacy/preview veiksmų; One Card tikslas 4 | 4 sąmoningi veiksmai | Išsaugomas RF plano kelias: rasti, pasirinkti pastatą, apskaičiuoti, įkelti į pasiūlymą; anotavimo gestai neskaičiuojami. |
-| Patvirtintas RF snapshot → pasiūlymo juodraštis | **N/A:** exact-hash Production tilto nėra | 1 | Viena idempotentiška komanda sukuria measurement ir quote draft; nesiunčia klientui. |
-| Pasiūlymo juodraštis → patvirtintas ir išsiųstas paketas | 2–4 | 1–2 | Vienas review/commit su gavėju, turiniu, manifestu ir būsena; siuntimo sauga nemažinama iki aklo quick action. |
-| Priimtas pasiūlymas → counter-sign → work order | 4–6 | 2–3 | Guided lifecycle pasiūlo sekantį veiksmą; teisinis parašas ir darbo sukūrimas lieka atskiri audit events. |
-| Nepriskirtas darbas → darbuotojas + laikas | 3–5 | 1–2 | Dispatch drawer vienu commit patvirtina žmogų ir slotą, bet rodo konfliktus/pajėgumą. |
-| Darbuotojas: priskirta → vykstu → atvykau → pradėjau → baigiau → dokumentuota | 5 perėjimai + įrodymai | 5 perėjimai + įrodymai | Tai vertingi, laiką ir atsakomybę fiksuojantys paspaudimai; tikslas yra aiškumas ir offline patikimumas, ne dirbtinis mažinimas. |
-| Completion → sąskaita + garantija + uždarymas | 4–7 | 2–4 | Readiness gate ir guided next action; atskiri finansiniai/teisiniai artefaktai neišnyksta. |
-| SEO tema → juodraštis → review → schedule/publish | 5–7 | 3–4 | Viena pipeline darbo erdvė; žmogaus review ir publish/schedule lieka atskiri vartai. |
-| Bylą archyvuoti | 3–4 | 2–3 | Centralizuota lifecycle zona; blocker/reason/confirm lieka, nes tai ne „frikcija be vertės“. |
+| Kritinė kelionė                                                               |                                                                                           Dabar |                Tikslas | Kas pašalinama / kodėl dalis paspaudimų lieka                                                                                    |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------: | ---------------------: | -------------------------------------------------------------------------------------------------------------------------------- |
+| Konkreti byla → RF matavimas                                                  | 4 techniniai pasirinkimai: Apsaugota peržiūra → Modulių būsena → Stogo matavimas ir R4 → RF UAT |                      1 | Bylos `Kitas veiksmas` tiesiogiai atveria `Atverti/Tęsti matavimą`, išlaiko bylos ID/būseną ir turi vieno veiksmo grįžimą.       |
+| Today eilė → atlikti aiškų bylos veiksmą                                      |                                                                                             3–5 |                    1–2 | Pašalinamas tarpinis „atidaryti modulį / rasti panelį“; eilutė + inline arba review veiksmas.                                    |
+| Nauja užklausa → paprašyti trūkstamos informacijos                            |                                                                                             4–6 |                    2–3 | Eilėje iš karto rodoma trūkstama sąlyga, parengtas tekstas ir recipient review.                                                  |
+| Bylos klausimas → parengti ir išsiųsti atsakymą                               |                                                                                             4–6 |                    2–3 | Unified conversation inspector; tekstą vis tiek privaloma peržiūrėti prieš siuntimą.                                             |
+| Adresas → patvirtintas RF rezultatas                                          |                                         daug atskirų legacy/preview veiksmų; One Card tikslas 4 |   4 sąmoningi veiksmai | Išsaugomas RF plano kelias: rasti, pasirinkti pastatą, apskaičiuoti, įkelti į pasiūlymą; anotavimo gestai neskaičiuojami.        |
+| Patvirtintas RF snapshot → pasiūlymo juodraštis                               |                                                       **N/A:** exact-hash Production tilto nėra |                      1 | Viena idempotentiška komanda sukuria measurement ir quote draft; nesiunčia klientui.                                             |
+| Pasiūlymo juodraštis → patvirtintas ir išsiųstas paketas                      |                                                                                             2–4 |                    1–2 | Vienas review/commit su gavėju, turiniu, manifestu ir būsena; siuntimo sauga nemažinama iki aklo quick action.                   |
+| Priimtas pasiūlymas → counter-sign → work order                               |                                                                                             4–6 |                    2–3 | Guided lifecycle pasiūlo sekantį veiksmą; teisinis parašas ir darbo sukūrimas lieka atskiri audit events.                        |
+| Nepriskirtas darbas → darbuotojas + laikas                                    |                                                                                             3–5 |                    1–2 | Dispatch drawer vienu commit patvirtina žmogų ir slotą, bet rodo konfliktus/pajėgumą.                                            |
+| Darbuotojas: priskirta → vykstu → atvykau → pradėjau → baigiau → dokumentuota |                                                                          5 perėjimai + įrodymai | 5 perėjimai + įrodymai | Tai vertingi, laiką ir atsakomybę fiksuojantys paspaudimai; tikslas yra aiškumas ir offline patikimumas, ne dirbtinis mažinimas. |
+| Completion → sąskaita + garantija + uždarymas                                 |                                                                                             4–7 |                    2–4 | Readiness gate ir guided next action; atskiri finansiniai/teisiniai artefaktai neišnyksta.                                       |
+| SEO tema → juodraštis → review → schedule/publish                             |                                                                                             5–7 |                    3–4 | Viena pipeline darbo erdvė; žmogaus review ir publish/schedule lieka atskiri vartai.                                             |
+| Bylą archyvuoti                                                               |                                                                                             3–4 |                    2–3 | Centralizuota lifecycle zona; blocker/reason/confirm lieka, nes tai ne „frikcija be vertės“.                                     |
 
 Sėkmės metrikos po rollout:
 
@@ -680,17 +709,17 @@ Sėkmės metrikos po rollout:
 mygtukus. Kol serverio autorizacija nepatvirtinta, naujas profilis negali gauti
 Production veiksmo.
 
-| Profilis | Numatytas startas | Desktop prioritetas | Mobile prioritetas | Pagrindinės capability |
-|---|---|---|---|---|
-| Savininkas / administratorius | Today + platform alerts | visos eilės, verslo stop, release/terms, komanda | kritinių išimčių peržiūra ir patvirtinimas | policy override tik audituojamai, users, release, configuration |
-| Bylos vadybininkas | Mano Today | bylos sprendimai, klientas, komunikacija, komercinė eiga | triage, skambutis/žinutė, mažos rizikos veiksmai | case edit, communication draft/send pagal vartus, workflow commands |
-| Komercijos peržiūrėtojas | Pasiūlymai peržiūrai | RF provenance, kainodara, quote/contract review and commit | approve/reject komentaras; sudėtingas redagavimas desktop | measurement review, pricing/quote approval, contract review |
-| Dispečeris | Nepriskirti ir šiandienos darbai | grafikas, priskyrimas, pajėgumas, konfliktai | perplanavimas ir incidentų triage | assign, schedule, reschedule, handoff |
-| Lauko darbuotojas | Mano šiandienos darbai | supervisor read-only arba įrodymų peržiūra | vienas vizitas, vienas žingsnis, nuotraukos, checklist, offline/sync | tik priskirto darbo leidžiami perėjimai ir evidence upload |
-| Finansai | Sąskaitos ir completion queue | amount basis, official export, payment, warranty | peržiūra/acknowledgement; ne pilna apskaita | invoice approve/export/status, warranty issue pagal vartus |
-| SEO redaktorius / peržiūrėtojas | Turinio eilė | temos, redaktorius + preview, QA, kalendorius, performance | triage, approve/reject, schedule | generate, edit, review, schedule/publish pagal atskirtas teises |
-| Operacijų administratorius | Incidentai | jobs, invariants, integrations, audit/correlation, runbooks | incident acknowledgement ir saugus retry | job inspect/retry/cancel, invariant scan, health |
-| Auditorius | Išsaugomas read-only rodinys | versijos, istorija, export | tik skaitymas | read-only audit/document provenance |
+| Profilis                        | Numatytas startas                | Desktop prioritetas                                         | Mobile prioritetas                                                   | Pagrindinės capability                                              |
+| ------------------------------- | -------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Savininkas / administratorius   | Today + platform alerts          | visos eilės, verslo stop, release/terms, komanda            | kritinių išimčių peržiūra ir patvirtinimas                           | policy override tik audituojamai, users, release, configuration     |
+| Bylos vadybininkas              | Mano Today                       | bylos sprendimai, klientas, komunikacija, komercinė eiga    | triage, skambutis/žinutė, mažos rizikos veiksmai                     | case edit, communication draft/send pagal vartus, workflow commands |
+| Komercijos peržiūrėtojas        | Pasiūlymai peržiūrai             | RF provenance, kainodara, quote/contract review and commit  | approve/reject komentaras; sudėtingas redagavimas desktop            | measurement review, pricing/quote approval, contract review         |
+| Dispečeris                      | Nepriskirti ir šiandienos darbai | grafikas, priskyrimas, pajėgumas, konfliktai                | perplanavimas ir incidentų triage                                    | assign, schedule, reschedule, handoff                               |
+| Lauko darbuotojas               | Mano šiandienos darbai           | supervisor read-only arba įrodymų peržiūra                  | vienas vizitas, vienas žingsnis, nuotraukos, checklist, offline/sync | tik priskirto darbo leidžiami perėjimai ir evidence upload          |
+| Finansai                        | Sąskaitos ir completion queue    | amount basis, official export, payment, warranty            | peržiūra/acknowledgement; ne pilna apskaita                          | invoice approve/export/status, warranty issue pagal vartus          |
+| SEO redaktorius / peržiūrėtojas | Turinio eilė                     | temos, redaktorius + preview, QA, kalendorius, performance  | triage, approve/reject, schedule                                     | generate, edit, review, schedule/publish pagal atskirtas teises     |
+| Operacijų administratorius      | Incidentai                       | jobs, invariants, integrations, audit/correlation, runbooks | incident acknowledgement ir saugus retry                             | job inspect/retry/cancel, invariant scan, health                    |
+| Auditorius                      | Išsaugomas read-only rodinys     | versijos, istorija, export                                  | tik skaitymas                                                        | read-only audit/document provenance                                 |
 
 ### Veiksmų rodymo taisyklė
 
@@ -906,16 +935,16 @@ Production mutacijų ar redirect.
 
 ### Testų strategija pagal sluoksnį
 
-| Sluoksnis | Būtini testai |
-|---|---|
-| Būsenų/taisyklių branduolys | transition lentelės, exhaustive action mapping, prioritetų property testai, blocker derivation, timezone/SLA ribos |
-| Komandos | authorization, CAS/stale revision, idempotency, hash mismatch, duplicate webhook, partial failure, audit/correlation |
-| Read model/adapteriai | canonical vs fixture/legacy parity, missing/null/old data, locale, PII redaction |
-| Komponentai | visos loading/empty/error/blocked/disabled/success būsenos, focus, dialog semantics, keyboard, mobile |
-| Integracija | snapshot→measurement→quote; quote→package→delivery; contract→work; completion→invoice/warranty; audit projection |
-| E2E | inquiry→measurement→offer; offer→contract→work; worker→documentation→completion; question/recovery; SEO; archive; operational retry |
-| Visual/a11y | keturi viewportai, dark contrast, 200/400 % zoom, no overflow, axe + manual screen-reader critical paths |
-| Atsparumas | offline/reconnect/conflict, double click, stale tab, failed upload/email/webhook, retry po proceso restart |
+| Sluoksnis                   | Būtini testai                                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Būsenų/taisyklių branduolys | transition lentelės, exhaustive action mapping, prioritetų property testai, blocker derivation, timezone/SLA ribos                  |
+| Komandos                    | authorization, CAS/stale revision, idempotency, hash mismatch, duplicate webhook, partial failure, audit/correlation                |
+| Read model/adapteriai       | canonical vs fixture/legacy parity, missing/null/old data, locale, PII redaction                                                    |
+| Komponentai                 | visos loading/empty/error/blocked/disabled/success būsenos, focus, dialog semantics, keyboard, mobile                               |
+| Integracija                 | snapshot→measurement→quote; quote→package→delivery; contract→work; completion→invoice/warranty; audit projection                    |
+| E2E                         | inquiry→measurement→offer; offer→contract→work; worker→documentation→completion; question/recovery; SEO; archive; operational retry |
+| Visual/a11y                 | keturi viewportai, dark contrast, 200/400 % zoom, no overflow, axe + manual screen-reader critical paths                            |
+| Atsparumas                  | offline/reconnect/conflict, double click, stale tab, failed upload/email/webhook, retry po proceso restart                          |
 
 Repo jau turi daug unit/integration testų, bet rasti tik du Playwright scenarijų
 failai ir nėra pilnų kritinių verslo grandinių. Todėl vien esamo testų skaičiaus
@@ -923,20 +952,20 @@ nepakanka rollout sprendimui.
 
 ### Fazavimo rizikos ir mažinimas
 
-| Rizika | Poveikis | Mažinimas / vartas |
-|---|---|---|
-| Trečias UI shell vietoje konsolidacijos | nuolatinis drift ir dviguba priežiūra | vienas bendras shell; adapter-first; jokio `admin-v3` klono |
-| Preview fixtures slepia duomenų spragas | demo veikia, Production ne | canonical parity, fixtures tik aiškiai pažymėtam demo, fail-closed gate |
-| State taisyklės lieka išbarstytos | UI ir API leidžia skirtingus veiksmus | viena transition matrica ir serveriniai command handleriai |
-| Stored ir derived nextAction išsiskiria | klaidinga eilė/CTA | typed resolver – truth; tekstas tik pastaba; migraciniai invariantai |
-| Audit diff atskleidžia PII | privatumo incidentas | allowlist/redaction history projection, hashes lieka vientisumui |
-| Role UI imituoja saugumą | neautorizuota mutacija | backend capability prieš UI rollout; deny testai kiekvienai komandai |
-| Customer/Property big-bang migracija | dedup ir istorijos sugadinimas | pradžioje read projections, atskiras ADR/backfill/rollback |
-| RF ir komercijos kontraktai išsiskiria | pasenęs ar neteisingas pasiūlymas | exact ID/version/hash, owner-owned Phase E, contract tests |
-| Kelių įrašų dalinė RF komanda | measurement be quote arba dublikatai | DB transaction arba command ledger + resumable/compensating job |
-| Mobile offline saugo jautrius duomenis | saugos ir sync konfliktai | threat model, minimali šifruota apimtis, expiry, remote revoke, explicit conflict |
-| Dokumentų registras neplečiamas | lėti/neišsamūs rezultatai | server-side query/pagination, bendras artifact index arba patikrinta projekcija |
-| Didelis case refactor | regresijos ir užsitęsęs rollout | vertical slices, contract tests, per-module fallback, legacy parity |
+| Rizika                                  | Poveikis                              | Mažinimas / vartas                                                                |
+| --------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------- |
+| Trečias UI shell vietoje konsolidacijos | nuolatinis drift ir dviguba priežiūra | vienas bendras shell; adapter-first; jokio `admin-v3` klono                       |
+| Preview fixtures slepia duomenų spragas | demo veikia, Production ne            | canonical parity, fixtures tik aiškiai pažymėtam demo, fail-closed gate           |
+| State taisyklės lieka išbarstytos       | UI ir API leidžia skirtingus veiksmus | viena transition matrica ir serveriniai command handleriai                        |
+| Stored ir derived nextAction išsiskiria | klaidinga eilė/CTA                    | typed resolver – truth; tekstas tik pastaba; migraciniai invariantai              |
+| Audit diff atskleidžia PII              | privatumo incidentas                  | allowlist/redaction history projection, hashes lieka vientisumui                  |
+| Role UI imituoja saugumą                | neautorizuota mutacija                | backend capability prieš UI rollout; deny testai kiekvienai komandai              |
+| Customer/Property big-bang migracija    | dedup ir istorijos sugadinimas        | pradžioje read projections, atskiras ADR/backfill/rollback                        |
+| RF ir komercijos kontraktai išsiskiria  | pasenęs ar neteisingas pasiūlymas     | exact ID/version/hash, owner-owned Phase E, contract tests                        |
+| Kelių įrašų dalinė RF komanda           | measurement be quote arba dublikatai  | DB transaction arba command ledger + resumable/compensating job                   |
+| Mobile offline saugo jautrius duomenis  | saugos ir sync konfliktai             | threat model, minimali šifruota apimtis, expiry, remote revoke, explicit conflict |
+| Dokumentų registras neplečiamas         | lėti/neišsamūs rezultatai             | server-side query/pagination, bendras artifact index arba patikrinta projekcija   |
+| Didelis case refactor                   | regresijos ir užsitęsęs rollout       | vertical slices, contract tests, per-module fallback, legacy parity               |
 
 ### Galutiniai priėmimo kriterijai
 
@@ -953,7 +982,7 @@ Planą galima laikyti įgyvendintu tik kai:
 5. kiekviena svarbi mutacija tikrinama serveryje, yra autorizuota,
    idempotentiška, CAS saugi ir sukuria koreliuojamą audit event;
 6. istorija rodo privatumą saugantį `kas / ką / nuo → į / kada / kodėl /
-   rezultatas`, o ne vien entity timestampą;
+rezultatas`, o ne vien entity timestampą;
 7. visi patvirtinti/išsiųsti/pasirašyti artefaktai yra nekintami ir turi aiškų
    current/old bei compare modelį;
 8. patvirtintas RF snapshot vienu veiksmu sukuria atsekamą measurement ir quote
@@ -1028,17 +1057,17 @@ naujos schemos pasiūlymas.
 
 Pagal `src/payload.config.ts:162` registruota ši administruojama duomenų apimtis:
 
-| Grupė | Kolekcijos | Tikslinis UI savininkas |
-|---|---|---|
-| Tapatybė ir organizacija | `Users`, `Projects` | Komanda ir teisės / techninis admin |
-| Įėjimas ir bylos | `Leads`, `Messages`, `CustomerContractRequests` | Today, Bylos, Komunikacija |
-| Matavimas ir kainodara | `RoofMeasurements`, `PriceCalculations`, `Quotes` | Bylos → RF/Matavimas/Komercija |
-| Susitarimai | `Contracts`, `ChangeAgreements` | Bylos → Sutartys/Pakeitimai; Dokumentai |
-| Darbų vykdymas | `WorkOrders` | Darbai, Mobile, Bylos |
-| Užbaigimas | `InvoiceRecords`, `OfficialInvoices`, `Warranties` | Bylos → Completion; Dokumentai; Finansų eilė |
-| Turinys | `Posts`, `SeoTopics`, `SeoRuns` | SEO studija |
-| Valdymas | `AuditEvents`, `OperationalJobs` | Istorija, Operacijos |
-| Roof Fusion Preview | `RoofFusionSnapshots`, `RoofFusionCommands`, `RoofFusionWorkbenchDrafts` | RF One Card Preview; vėliau tik patvirtinta F3 riba |
+| Grupė                    | Kolekcijos                                                               | Tikslinis UI savininkas                             |
+| ------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| Tapatybė ir organizacija | `Users`, `Projects`                                                      | Komanda ir teisės / techninis admin                 |
+| Įėjimas ir bylos         | `Leads`, `Messages`, `CustomerContractRequests`                          | Today, Bylos, Komunikacija                          |
+| Matavimas ir kainodara   | `RoofMeasurements`, `PriceCalculations`, `Quotes`                        | Bylos → RF/Matavimas/Komercija                      |
+| Susitarimai              | `Contracts`, `ChangeAgreements`                                          | Bylos → Sutartys/Pakeitimai; Dokumentai             |
+| Darbų vykdymas           | `WorkOrders`                                                             | Darbai, Mobile, Bylos                               |
+| Užbaigimas               | `InvoiceRecords`, `OfficialInvoices`, `Warranties`                       | Bylos → Completion; Dokumentai; Finansų eilė        |
+| Turinys                  | `Posts`, `SeoTopics`, `SeoRuns`                                          | SEO studija                                         |
+| Valdymas                 | `AuditEvents`, `OperationalJobs`                                         | Istorija, Operacijos                                |
+| Roof Fusion Preview      | `RoofFusionSnapshots`, `RoofFusionCommands`, `RoofFusionWorkbenchDrafts` | RF One Card Preview; vėliau tik patvirtinta F3 riba |
 
 Svarbi riba: nėra atskiros `Customer` ar `Property` kolekcijos. Kliento kontaktas
 ir objekto adresas laikomi `Leads`; Admin Next capability registry taip pat juos
@@ -1048,13 +1077,13 @@ identiteto negali laikyti patikimu be atskiros duomenų migracijos.
 
 ### Admin ir išoriniai paviršiai
 
-| Paviršius | Maršrutai | Pastaba |
-|---|---|---|
-| Custom Admin V2 | `/admin-v2`, `/cases`, `/cases/[id]`, `/contract-requests`, `/offers`, `/contracts`, `/work`, `/documents`, `/archive`, `/blog`, `/blog/[id]`, `/employees`, `/settings`, `/next-preview` po `/admin-v2` | Pagrindinė realaus darbo patirtis ir mutacijos |
-| Admin Next Preview | `/admin-next-preview/today`, `/cases/[caseId]`, `/cases/[caseId]/measurements/[measurementId]`, `/cases/[caseId]/documents/preflight`, `/roof-fusion/uat` | Feature-gated; registruoti moduliai `adapter_ready`, mutacijos `legacy_only` |
-| Payload techninis admin | `/admin/[[...segments]]` | Techninis backoffice ir dalis funkcijų, kurių nėra V2; ne tikslinė operatoriaus patirtis |
-| Darbuotojas | `/user`, `/user/arbeid/[id]`, `/user/login` | Priskirtų darbų mobile-first eiga |
-| Klientas | `/tilbud/[token]`, `/endring/[token]`, `/kontakt/[token]`, `/henvendelse/[id]` | Išorinės pasiūlymo, pakeitimo, kontakto ir užklausos grandys; admin būsenos turi sutapti su jų įvykiais |
+| Paviršius               | Maršrutai                                                                                                                                                                                                | Pastaba                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Custom Admin V2         | `/admin-v2`, `/cases`, `/cases/[id]`, `/contract-requests`, `/offers`, `/contracts`, `/work`, `/documents`, `/archive`, `/blog`, `/blog/[id]`, `/employees`, `/settings`, `/next-preview` po `/admin-v2` | Pagrindinė realaus darbo patirtis ir mutacijos                                                          |
+| Admin Next Preview      | `/admin-next-preview/today`, `/cases/[caseId]`, `/cases/[caseId]/measurements/[measurementId]`, `/cases/[caseId]/documents/preflight`, `/roof-fusion/uat`                                                | Feature-gated; registruoti moduliai `adapter_ready`, mutacijos `legacy_only`                            |
+| Payload techninis admin | `/admin/[[...segments]]`                                                                                                                                                                                 | Techninis backoffice ir dalis funkcijų, kurių nėra V2; ne tikslinė operatoriaus patirtis                |
+| Darbuotojas             | `/user`, `/user/arbeid/[id]`, `/user/login`                                                                                                                                                              | Priskirtų darbų mobile-first eiga                                                                       |
+| Klientas                | `/tilbud/[token]`, `/endring/[token]`, `/kontakt/[token]`, `/henvendelse/[id]`                                                                                                                           | Išorinės pasiūlymo, pakeitimo, kontakto ir užklausos grandys; admin būsenos turi sutapti su jų įvykiais |
 
 ### Serverinių veiksmų apimtis
 
@@ -1138,19 +1167,19 @@ performance darbo vietos.
 
 Statinis failų inventorius rado maždaug 320 test/spec failų. Apytiksliai:
 
-| Sritis | Failai |
-|---|---:|
-| Admin V2 komponentai | 17 |
-| Admin Next komponentai | 14 |
-| `lib/admin-v2` | 22 |
-| `lib/admin-next` | 12 |
-| Roof Fusion | 26 |
-| Work orders | 8 |
-| Blog/SEO | 17 |
-| Admin API | 18 |
-| Worker API | 3 |
-| Migracijos | 22 |
-| Playwright E2E | 2 |
+| Sritis                 | Failai |
+| ---------------------- | -----: |
+| Admin V2 komponentai   |     17 |
+| Admin Next komponentai |     14 |
+| `lib/admin-v2`         |     22 |
+| `lib/admin-next`       |     12 |
+| Roof Fusion            |     26 |
+| Work orders            |      8 |
+| Blog/SEO               |     17 |
+| Admin API              |     18 |
+| Worker API             |      3 |
+| Migracijos             |     22 |
+| Playwright E2E         |      2 |
 
 Tai failų, ne scenarijų ar coverage skaičius. Esami E2E daugiausia tikrina smoke,
 autentikaciją, bazinę admin/worker prieigą ir responsive higieną. Nerasta pilnų
@@ -1171,16 +1200,16 @@ izoliuotoje, atkuriamoje aplinkoje.
 
 ### Aiškiai nerastos galimybės
 
-| Galimybė | Audito rezultatas |
-|---|---|
-| Kanoninės Customer ir Property esybės | nerasta |
-| Production approved RF snapshot → offer komanda | nerasta; sąmoningai gated |
-| Pilna audit-event paremta `from/to` bylos istorija | nerasta |
-| Atskiras communication inbox | nerasta |
-| Admin Next Production mutacijos | nerasta; registry nurodo `legacy_only` |
-| Patikimas worker offline/PWA/background sync | nerasta |
-| Custom Admin operational-job detail/retry/cancel | nerasta |
-| Pilnos kritinės verslo grandinės E2E | nerasta |
+| Galimybė                                           | Audito rezultatas                      |
+| -------------------------------------------------- | -------------------------------------- |
+| Kanoninės Customer ir Property esybės              | nerasta                                |
+| Production approved RF snapshot → offer komanda    | nerasta; sąmoningai gated              |
+| Pilna audit-event paremta `from/to` bylos istorija | nerasta                                |
+| Atskiras communication inbox                       | nerasta                                |
+| Admin Next Production mutacijos                    | nerasta; registry nurodo `legacy_only` |
+| Patikimas worker offline/PWA/background sync       | nerasta                                |
+| Custom Admin operational-job detail/retry/cancel   | nerasta                                |
+| Pilnos kritinės verslo grandinės E2E               | nerasta                                |
 
 ## Sprendimai, kuriems reikia savininko patvirtinimo
 

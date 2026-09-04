@@ -7,18 +7,25 @@ import {
   DEFAULT_ROOF_FUSION_LAYERS,
   MAX_ROOF_FUSION_ZOOM,
   MIN_ROOF_FUSION_ZOOM,
-  ROOF_FUSION_PENDING_LINE_STROKE,
+  ROOF_FUSION_APPROVED_OUTLINE_STROKE_PX,
+  ROOF_FUSION_PENDING_LINE_STROKE_PX,
   ROOF_FUSION_ONE_CARD_STEPS,
-  ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
-  ROOF_FUSION_SKELETON_LINE_STROKE,
+  ROOF_FUSION_SELECTED_VERTEX_RADIUS_PX,
+  ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+  ROOF_FUSION_SKELETON_LINE_STROKE_PX,
+  ROOF_FUSION_SOURCE_OUTLINE_STROKE_PX,
   ROOF_FUSION_STAGES,
+  ROOF_FUSION_VERTEX_HIT_RADIUS_PX,
+  ROOF_FUSION_VERTEX_RADIUS_PX,
   clampRoofFusionPoint,
   clampRoofFusionViewport,
   hasRoofFusionPanGestureMoved,
   panRoofFusionViewport,
   roofFusionEndpointConstraintMetric,
   roofFusionImagePointFromViewportPoint,
-  roofFusionScreenStableMarkerRadii,
+  roofFusionScreenStableDashArrayPx,
+  roofFusionScreenStableMarkerRadiiPx,
+  roofFusionScreenStableStrokeWidthPx,
   shouldHandleRoofFusionZoomWheel,
   shouldSuppressRoofFusionCanvasClick,
   zoomRoofFusionViewportAt,
@@ -152,6 +159,9 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-workbench="unified"');
+    expect(html).toContain(
+      'data-roof-fusion-geometry-markers="screen-stable-v2"',
+    );
     expect(html).toContain("data-roof-fusion-canvas");
     expect(html).toContain("data-roof-fusion-viewport-controls");
     expect(html).toContain('data-roof-fusion-viewport-scale="1"');
@@ -165,15 +175,24 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('preserveAspectRatio="none"');
     expect(html).toContain("©norgeibilder.no");
     expect(html).toContain('data-roof-fusion-layer="sourceOutline"');
+    expect(html).toContain('stroke-dasharray="5px 4px"');
+    expect(html).toContain('stroke-width="1px"');
+    expect(html).toContain('stroke-width="1.75px"');
     expect(html).toContain("data-roof-fusion-approved-outline-opacity-control");
     expect(html).toContain("Patvirtinto ploto spalvos ryškumas");
     expect(html).toContain("touch-pan-y");
     expect(html).toContain('data-roof-fusion-vertex-marker="0"');
-    expect(html).toContain('rx="0.006"');
+    expect(html).toContain('stroke-opacity=".82"');
     expect(html).toContain("Šaltinio kontūras nekintamas");
     expect(html).toContain("142 m²");
     expect(html).toContain("159,4 m²");
     expect(html).toContain("27°");
+    expect(html).toContain('data-roof-fusion-metric-icon="horizontal-grid"');
+    expect(html).toContain('data-roof-fusion-metric-icon="surface-layers"');
+    expect(html).toContain(
+      'data-roof-fusion-metric-icon="average-pitch-angle"',
+    );
+    expect(html).toContain('data-roof-fusion-metric-icon="perimeter-outline"');
     expect(html).not.toContain('data-roof-fusion-layer="hoydedata"');
     expect(html).not.toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).not.toContain('data-roof-fusion-layer="skeleton"');
@@ -215,10 +234,13 @@ describe("Admin Next unified Roof Fusion workbench", () => {
   });
 
   it("renders Høydedata samples as small aspect-corrected points", () => {
-    const atOneX = roofFusionScreenStableMarkerRadii(0.006, 4 / 3, 1);
-    const atFourX = roofFusionScreenStableMarkerRadii(0.006, 4 / 3, 4);
-    expect(atFourX.rx * 4).toBeCloseTo(atOneX.rx);
-    expect(atFourX.ry * 4).toBeCloseTo(atOneX.ry);
+    const canvas = { width: 1_000, height: 750 };
+    const atOneX = roofFusionScreenStableMarkerRadiiPx(3, canvas, 1);
+    const atFourX = roofFusionScreenStableMarkerRadiiPx(3, canvas, 4);
+    expect(atOneX.rx * canvas.width).toBeCloseTo(3);
+    expect(atOneX.ry * canvas.height).toBeCloseTo(3);
+    expect(atFourX.rx * canvas.width * 4).toBeCloseTo(3);
+    expect(atFourX.ry * canvas.height * 4).toBeCloseTo(3);
 
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
@@ -232,34 +254,45 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-height-point="0"');
-    expect(html).toContain('rx="0.0035"');
-    expect(html).toContain('ry="0.004666666666666666"');
+    expect(html).toContain('rx="0.003"');
+    expect(html).toContain('ry="0.004"');
   });
 
-  it("keeps saved skeleton strokes and endpoint markers compact at 100%, 300%, and max zoom", () => {
-    const atOneX = roofFusionScreenStableMarkerRadii(
-      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
-      16 / 9,
+  it("keeps saved skeleton strokes and all marker hit areas screen-stable at 100%, 300%, and max zoom", () => {
+    const canvas = { width: 1_000, height: 562.5 };
+    const atOneX = roofFusionScreenStableMarkerRadiiPx(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+      canvas,
       1,
     );
-    const atThreeX = roofFusionScreenStableMarkerRadii(
-      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
-      16 / 9,
+    const atThreeX = roofFusionScreenStableMarkerRadiiPx(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+      canvas,
       3,
     );
-    const atMaxZoom = roofFusionScreenStableMarkerRadii(
-      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
-      16 / 9,
+    const atMaxZoom = roofFusionScreenStableMarkerRadiiPx(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+      canvas,
       MAX_ROOF_FUSION_ZOOM,
     );
 
-    expect(atOneX.rx).toBe(0.0025);
-    expect(atThreeX.rx * 3).toBeCloseTo(atOneX.rx);
-    expect(atThreeX.ry * 3).toBeCloseTo(atOneX.ry);
-    expect(atMaxZoom.rx * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.rx);
-    expect(atMaxZoom.ry * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.ry);
-    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("1.5px");
-    expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("1.5px");
+    expect(atOneX.rx * canvas.width).toBe(3);
+    expect(atOneX.ry * canvas.height).toBe(3);
+    expect(atThreeX.rx * canvas.width * 3).toBeCloseTo(3);
+    expect(atThreeX.ry * canvas.height * 3).toBeCloseTo(3);
+    expect(atMaxZoom.rx * canvas.width * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(3);
+    expect(atMaxZoom.ry * canvas.height * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(3);
+    expect(ROOF_FUSION_SOURCE_OUTLINE_STROKE_PX).toBe(1);
+    expect(ROOF_FUSION_APPROVED_OUTLINE_STROKE_PX).toBe(1.75);
+    expect(ROOF_FUSION_SKELETON_LINE_STROKE_PX).toBe(1.5);
+    expect(ROOF_FUSION_PENDING_LINE_STROKE_PX).toBe(1.5);
+    expect(roofFusionScreenStableStrokeWidthPx(1.5, 1)).toBe("1.5px");
+    expect(roofFusionScreenStableStrokeWidthPx(1.5, 3)).toBe("0.5px");
+    expect(roofFusionScreenStableDashArrayPx([5, 4], 1)).toBe("5px 4px");
+    expect(roofFusionScreenStableDashArrayPx([5, 4], 4)).toBe("1.25px 1px");
+    expect(ROOF_FUSION_VERTEX_RADIUS_PX * 2).toBe(7);
+    expect(ROOF_FUSION_SELECTED_VERTEX_RADIUS_PX * 2).toBe(8);
+    expect(ROOF_FUSION_VERTEX_HIT_RADIUS_PX * 2).toBe(26);
   });
 
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {
@@ -267,6 +300,11 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
         orthoImageSrc: "/preview/house-ortho.jpg",
         sourceOutline,
+        caseAddressContext: createElement(
+          "div",
+          { "data-test-case-address": true },
+          "Bylos adresas: Tordenskiolds gate 12",
+        ),
         roofPlanes: [
           {
             id: "plane-a",
@@ -296,14 +334,16 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-layer="roofPlanes"');
+    expect(html).toContain("data-roof-fusion-case-address-slot");
+    expect(html).toContain("Bylos adresas: Tordenskiolds gate 12");
     expect(html).toContain('data-roof-fusion-layer="skeleton"');
     expect(html).toContain('data-roof-fusion-line-kind="ridge"');
     expect(html).toContain('stroke-width="1.5px"');
     expect(html).toContain('data-roof-fusion-line-endpoint="ridge-a:0"');
-    expect(html).toContain('rx="0.0025"');
-    expect(html).toContain('stroke-width="1px"');
+    expect(html).toContain('rx="0.003"');
+    expect(html).toContain('stroke-width="0.75px"');
     expect(html).toContain('data-roof-fusion-vertex-hit-target="0"');
-    expect(html).toContain('rx="0.022"');
+    expect(html).toContain('rx="0.013"');
     expect(html).toContain('data-roof-fusion-obstacle="chimney"');
     expect(html).toContain("Trūksta patvirtinto nuolydžio");
     expect(html).toContain(

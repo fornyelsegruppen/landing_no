@@ -65,7 +65,11 @@ describe("Admin Next Roof Fusion UAT control", () => {
     expect(html).toContain("TF-13");
     expect(html).toContain("Production duomenys neliečiami");
     expect(html).toContain('data-roof-fusion-address="lookup-only"');
+    expect(html).toContain('data-rf-free-address-input="diagnostic-only"');
     expect(html).toContain('name="addressQuery"');
+    expect(html).toContain("Diagnostinis RF UAT");
+    expect(html).toContain("ne gyvas bylos procesas");
+    expect(html).toContain("nepatenka į kainodarą ar pasiūlymą");
     expect(html).toContain("Rasti adresą ir atverti ortofoto");
     expect(html).toContain("vieną licencijuotą Norge i bilder ortofoto");
     expect(html).toContain("Matavimas dar nesukuriamas");

@@ -251,6 +251,8 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
   measurementReview: {
     reference: "R4-2026-1042",
     state: "review_required",
+    horizontalAreaSquareMeters: 170.2,
+    surfaceAreaSquareMeters: 190.8,
     areaSquareMeters: 186.4,
     overallPitchDegrees: 22,
     perimeterMeters: 61.2,

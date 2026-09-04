@@ -52,10 +52,13 @@ describe("Admin Next R4 measurement review", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextR4MeasurementReview, {
         address: adminNextCaseWorkspaceFixture.address,
+        addressEditHref: "/admin-v2/cases/1042#measurement-section",
+        caseRevision: 12,
         locale: "lt",
         caseReference: adminNextCaseWorkspaceFixture.reference,
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
+        measurementRevision: 7,
         owner: adminNextCaseWorkspaceFixture.owner.name,
         returnTo,
       }),
@@ -67,6 +70,16 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).toContain("E-04");
     expect(html).toContain("E-11");
     expect(html).toContain("EVD-R4-1042-01");
+    expect(html).toContain('data-rf-address-context="case_authoritative"');
+    expect(html).toContain("Užrakintas matavimo kontekstas");
+    expect(html).toContain("case r12 · RF r7");
+    expect(html).toContain("Taisyti bylos adresą");
+    expect(html).toContain('data-r4-scroll-region="drawer"');
+    expect(html).toContain('data-r4-metric-icon="horizontal-grid"');
+    expect(html).toContain('data-r4-metric-icon="surface-layers"');
+    expect(html).toContain('data-r4-metric-icon="average-pitch-angle"');
+    expect(html).toContain('data-r4-metric-icon="perimeter-outline"');
+    expect(html).toContain('stroke-width="1.75"');
   });
 
   it("keeps approval disabled and uses one return target for close and fallback", () => {

@@ -164,10 +164,13 @@ describe("Admin Next R4 Preview page route", () => {
     expect(mocks.adminReader.readLatestSnapshot).not.toHaveBeenCalled();
     expect(element.props).toMatchObject({
       address: "Testgata 13, 0013, Oslo",
+      addressEditHref: "/admin-v2/cases/13#measurement-section",
+      caseRevision: 1,
       caseReference: "TF-13",
       customer: "Canonical UAT Customer",
       locale: "lt",
       measurement: { reference: snapshot.snapshotId },
+      measurementRevision: snapshot.revision,
       owner: "Aistė",
       returnTo: "/admin-v2/cases/13?tab=measurement#measurement-section",
     });
@@ -175,6 +178,9 @@ describe("Admin Next R4 Preview page route", () => {
       expect.objectContaining({ collection: "leads", depth: 1, id: 13 }),
     );
     const html = renderToStaticMarkup(element);
+    expect(html).toContain('data-rf-address-context="case_authoritative"');
+    expect(html).toContain("Užrakintas matavimo kontekstas");
+    expect(html).toContain('href="/admin-v2/cases/13#measurement-section"');
     expect(
       html.match(
         /href="\/admin-v2\/cases\/13\?tab=measurement#measurement-section"/gu,

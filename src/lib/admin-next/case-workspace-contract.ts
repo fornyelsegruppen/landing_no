@@ -226,6 +226,8 @@ export type AdminNextCaseWorkspaceView = {
   measurementReview?: {
     reference: string;
     state: "review_required" | "verified";
+    horizontalAreaSquareMeters?: number;
+    surfaceAreaSquareMeters?: number;
     areaSquareMeters: number;
     overallPitchDegrees?: number;
     perimeterMeters?: number;

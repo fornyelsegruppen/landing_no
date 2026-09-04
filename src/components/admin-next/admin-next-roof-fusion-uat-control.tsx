@@ -242,7 +242,8 @@ const copy = {
       ROOF_PITCH_REQUIRED: "Takvinkel må måles eller bekreftes",
       LICENSED_IMAGERY_REQUIRED: "Lisensiert ortofoto må kobles til",
     },
-    addressGuard: "Kun Preview · lagres ikke · ingen kundehandlinger",
+    addressGuard:
+      "Diagnostisk RF UAT · ikke aktiv saksflyt · inngår ikke i pris eller tilbud",
     addressErrors: {
       INVALID_ADDRESS: "Skriv inn en fullstendig adresse på 4–180 tegn.",
       ADDRESS_NOT_FOUND:
@@ -356,7 +357,8 @@ const copy = {
       ROOF_PITCH_REQUIRED: "Reikia išmatuoti arba patvirtinti nuolydį",
       LICENSED_IMAGERY_REQUIRED: "Reikia prijungti licencijuotą ortofoto",
     },
-    addressGuard: "Tik Preview · neišsaugoma · be kliento veiksmų",
+    addressGuard:
+      "Diagnostinis RF UAT · ne gyvas bylos procesas · nepatenka į kainodarą ar pasiūlymą",
     addressErrors: {
       INVALID_ADDRESS: "Įveskite pilną 4–180 ženklų adresą.",
       ADDRESS_NOT_FOUND:
@@ -469,7 +471,8 @@ const copy = {
       ROOF_PITCH_REQUIRED: "Roof pitch must be measured or confirmed",
       LICENSED_IMAGERY_REQUIRED: "Licensed orthophoto must be connected",
     },
-    addressGuard: "Preview only · not stored · no customer actions",
+    addressGuard:
+      "Diagnostic RF UAT · not the live case workflow · excluded from pricing and offers",
     addressErrors: {
       INVALID_ADDRESS: "Enter a complete address between 4 and 180 characters.",
       ADDRESS_NOT_FOUND:
@@ -2031,6 +2034,7 @@ export function AdminNextRoofFusionUatControl({
         aria-labelledby="roof-fusion-address-title"
         className="rounded-3xl border border-[var(--an-border)] bg-[var(--an-surface)] p-5 shadow-2xl sm:p-8"
         data-roof-fusion-address="lookup-only"
+        data-rf-free-address-input="diagnostic-only"
       >
         <div className="flex items-start gap-4">
           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--an-amber-soft)] text-[var(--an-amber)]">
