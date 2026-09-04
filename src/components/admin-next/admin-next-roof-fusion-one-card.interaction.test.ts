@@ -23,6 +23,13 @@ const polygon = [
   { latitude: 59.9115, longitude: 10.7493 },
 ];
 
+const garagePolygon = [
+  { latitude: 59.91122, longitude: 10.74952 },
+  { latitude: 59.91122, longitude: 10.74962 },
+  { latitude: 59.9113, longitude: 10.74962 },
+  { latitude: 59.9113, longitude: 10.74952 },
+];
+
 describe("Roof Fusion one-card Preview flow", () => {
   let root: Root;
   let container: HTMLDivElement;
@@ -56,7 +63,7 @@ describe("Roof Fusion one-card Preview flow", () => {
     vi.unstubAllGlobals();
   });
 
-  it("replaces legacy results with one unified card while retaining capture and source actions", async () => {
+  it("automatically captures the address image, exposes every building polygon, and binds the chosen building to one workbench", async () => {
     const capturedResult: NorgeIBilderCaptureResult = {
       address,
       addressLabel: address.label,
@@ -78,11 +85,26 @@ describe("Roof Fusion one-card Preview flow", () => {
       rawContentHash: "a".repeat(64),
       sourceId: "norge-i-bilder:91",
     };
-    const captureApi = vi.fn(async () => capturedResult);
-    const heightAnalysisAction = vi.fn(async () => ({
-      kind: "error" as const,
-      code: "HEIGHT_DATA_UNAVAILABLE" as const,
-    }));
+    let resolveCapture: (result: NorgeIBilderCaptureResult) => void = () => {};
+    const captureApi = vi.fn(
+      () =>
+        new Promise<NorgeIBilderCaptureResult>((resolve) => {
+          resolveCapture = resolve;
+        }),
+    );
+    let resolveHeight: (result: {
+      kind: "error";
+      code: "HEIGHT_DATA_UNAVAILABLE";
+    }) => void = () => {};
+    const heightAnalysisAction = vi.fn(
+      () =>
+        new Promise<{
+          kind: "error";
+          code: "HEIGHT_DATA_UNAVAILABLE";
+        }>((resolve) => {
+          resolveHeight = resolve;
+        }),
+    );
     await act(async () => {
       root.render(
         createElement(RealAddressResult, {
@@ -107,6 +129,20 @@ describe("Roof Fusion one-card Preview flow", () => {
                 confidenceReasoning: "Address point is inside",
                 source: "OpenStreetMap building footprint via Overpass API",
                 sourceUrl: "https://www.openstreetmap.org/way/123",
+                license: "Open Database License (ODbL) 1.0",
+                credits: "© OpenStreetMap contributors",
+              },
+              {
+                id: "way/456",
+                label: "garage · 42 m²",
+                polygon: garagePolygon,
+                horizontalAreaSquareMeters: 42,
+                distanceToAddressMeters: 12,
+                containsAddress: false,
+                confidence: "medium" as const,
+                confidenceReasoning: "Near the address point",
+                source: "OpenStreetMap building footprint via Overpass API",
+                sourceUrl: "https://www.openstreetmap.org/way/456",
                 license: "Open Database License (ODbL) 1.0",
                 credits: "© OpenStreetMap contributors",
               },
@@ -139,16 +175,64 @@ describe("Roof Fusion one-card Preview flow", () => {
       );
     });
 
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(1);
+    expect(captureApi.mock.calls[0]?.[0]).toMatchObject({ leadId: 13 });
+    expect(captureApi.mock.calls[0]?.[0].clickId).toEqual(expect.any(String));
+    await act(async () => {
+      resolveCapture(capturedResult);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const buildingSelection = await vi.waitFor(() => {
+      const selection = container.querySelector(
+        "[data-roof-fusion-building-selection]",
+      );
+      expect(selection, container.textContent ?? "").not.toBeNull();
+      return selection!;
+    });
+    expect(buildingSelection.textContent).toContain("©norgeibilder.no");
+
+    const candidateTargets = Array.from(
+      buildingSelection.querySelectorAll<SVGGElement>(
+        "[data-roof-fusion-building-candidate]",
+      ),
+    );
     expect(
-      container.querySelector("[data-roof-fusion-engine-contract]"),
-    ).not.toBeNull();
+      candidateTargets.map((target) =>
+        target.getAttribute("data-roof-fusion-building-candidate"),
+      ),
+    ).toEqual(["way/123", "way/456"]);
+    for (const target of candidateTargets) {
+      expect(target.getAttribute("role")).toBe("button");
+      expect(target.getAttribute("tabindex")).toBe("0");
+      expect(target.getAttribute("aria-label")).toMatch(/^Pasirinkti pastatą:/);
+      expect(target.querySelector("polygon")).not.toBeNull();
+    }
+
     const captureButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>("button"),
     ).find((button) => button.textContent?.includes("Gauti vaizdą iš Norge"));
     expect(captureButton).toBeDefined();
+    const standaloneCapture = captureButton!.closest<HTMLElement>(
+      "[data-norgeibilder-capture='single-case']",
+    );
+    expect(standaloneCapture?.dataset.norgeibilderCaptureMode).toBe(
+      "unified-hidden",
+    );
+    expect(standaloneCapture?.classList.contains("hidden")).toBe(true);
+    expect(heightAnalysisAction).not.toHaveBeenCalled();
+
+    const selectedPolygonPoints = candidateTargets[1]
+      ?.querySelector("polygon")
+      ?.getAttribute("points");
 
     await act(async () => {
-      captureButton!.click();
+      candidateTargets[1]!.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     await vi.waitFor(() =>
@@ -160,86 +244,32 @@ describe("Roof Fusion one-card Preview flow", () => {
     await vi.waitFor(() =>
       expect(heightAnalysisAction).toHaveBeenCalledTimes(1),
     );
+    const heightRequest = heightAnalysisAction.mock.calls[0]?.[1];
+    expect(heightRequest).toBeInstanceOf(FormData);
+    expect(heightRequest!.get("candidateId")).toBe("way/456");
+    expect(
+      container.querySelector("[data-roof-fusion-automatic-height='loading']"),
+    ).not.toBeNull();
+    expect(
+      container
+        .querySelector("[data-roof-fusion-layer='sourceOutline']")
+        ?.getAttribute("points"),
+    ).toBe(selectedPolygonPoints);
+
+    expect(standaloneCapture?.classList.contains("hidden")).toBe(true);
+
+    await act(async () => {
+      resolveHeight({
+        kind: "error",
+        code: "HEIGHT_DATA_UNAVAILABLE",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(
       container.querySelector("[data-roof-fusion-automatic-height='error']"),
     ).not.toBeNull();
-
-    expect(
-      container.querySelector("[data-roof-fusion-engine-contract]"),
-    ).toBeNull();
-    expect(
-      container.querySelector("[data-roof-fusion-height-contract]"),
-    ).toBeNull();
-    expect(
-      container
-        .querySelector("[data-norgeibilder-capture='single-case']")
-        ?.classList.contains("hidden"),
-    ).toBe(true);
-    expect(
-      container.querySelector("[data-norgeibilder-capture-viewport-controls]"),
-    ).toBeNull();
-    const advanced = container.querySelector<HTMLDetailsElement>(
-      "[data-roof-fusion-advanced]",
-    );
-    expect(advanced).not.toBeNull();
-    expect(advanced!.open).toBe(false);
-    expect(
-      advanced!.querySelector("[data-roof-fusion-unified-source-actions]"),
-    ).not.toBeNull();
-    expect(advanced!.textContent).toContain("Gauti tikrą stogo paviršių");
-    expect(advanced!.textContent).toContain(
-      "Atnaujinti vaizdą iš Norge i bilder",
-    );
-    expect(advanced!.textContent).toContain("Senas rankinis skaičiavimas");
-    expect(advanced!.textContent).toContain(
-      "Naudoti rankinį rezultatą peržiūrai",
-    );
+    expect(standaloneCapture?.classList.contains("hidden")).toBe(true);
     expect(captureButton!.isConnected).toBe(true);
-
-    const retryHeightButton = container.querySelector<HTMLButtonElement>(
-      "[data-roof-fusion-automatic-height-retry]",
-    );
-    expect(retryHeightButton).not.toBeNull();
-    await act(async () => {
-      retryHeightButton!.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    expect(heightAnalysisAction).toHaveBeenCalledTimes(2);
-
-    const refreshButton = advanced!.querySelector<HTMLButtonElement>(
-      "[data-roof-fusion-refresh-norge-capture]",
-    );
-    expect(refreshButton).not.toBeNull();
-    let resolveRefresh: (result: NorgeIBilderCaptureResult) => void = () => {};
-    captureApi.mockImplementationOnce(
-      () =>
-        new Promise<NorgeIBilderCaptureResult>((resolve) => {
-          resolveRefresh = resolve;
-        }),
-    );
-    await act(async () => {
-      refreshButton!.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    expect(
-      container.querySelector("[data-roof-fusion-workbench='unified']"),
-    ).toBeNull();
-    expect(heightAnalysisAction).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      resolveRefresh(capturedResult);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    await vi.waitFor(() =>
-      expect(
-        container.querySelector("[data-roof-fusion-workbench='unified']"),
-      ).not.toBeNull(),
-    );
-    expect(captureApi).toHaveBeenCalledTimes(2);
-    expect(heightAnalysisAction).toHaveBeenCalledTimes(3);
-    expect(
-      container.querySelector("[data-roof-fusion-workbench='unified']"),
-    ).not.toBeNull();
   });
 
   it("ignores a late capture when the operator selected another building", async () => {
@@ -297,18 +327,11 @@ describe("Roof Fusion one-card Preview flow", () => {
       );
     });
 
-    const captureButton = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((button) => button.textContent?.includes("Gauti vaizdą iš Norge"));
     const candidateSelect =
       container.querySelector<HTMLSelectElement>("select");
-    expect(captureButton).toBeDefined();
     expect(candidateSelect).not.toBeNull();
 
-    await act(async () => {
-      captureButton!.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    await vi.waitFor(() => expect(captureApi).toHaveBeenCalledTimes(1));
     await act(async () => {
       candidateSelect!.value = "way/456";
       candidateSelect!.dispatchEvent(new Event("change", { bubbles: true }));
