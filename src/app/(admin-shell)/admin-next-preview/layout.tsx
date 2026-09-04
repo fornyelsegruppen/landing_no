@@ -14,6 +14,7 @@ export default async function AdminNextLayout({ children }: { children: React.Re
     <AdminNextShell
       displayName={user.displayName || user.email}
       locale={user.interfaceLanguage}
+      mode="preview"
     >
       {children}
     </AdminNextShell>

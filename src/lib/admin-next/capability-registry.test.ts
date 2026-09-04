@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adminNextCanonicalCapabilityIds,
   adminNextCanonicalCapabilityRegistry,
+  adminNextModuleCanServeCanonical,
   adminNextModuleDefinitions,
   adminNextRoofFusionActionCapabilityIds,
   adminNextRoofFusionI1TargetContract,
@@ -29,6 +30,7 @@ describe("Admin Next capability registry", () => {
         definition.previewAdapter,
       );
       expect(definition.mutationPolicy).toBe("legacy_only");
+      expect(["legacy_only", "shadow_read", "preview", "canonical"]).toContain(definition.rolloutStage);
       expect(definition.legacyHref).toMatch(/^\/(admin-v2|user)\b/);
       for (const capability of definition.capabilities) {
         expect(adminNextCanonicalCapabilityRegistry[capability]).toBeDefined();
@@ -43,6 +45,11 @@ describe("Admin Next capability registry", () => {
       adminNextModuleDefinitions.find(({ id }) => id === "documentPreflight")
         ?.previewAdapter,
     ).toBe("fixture_only");
+  });
+
+  it("keeps every F1 module out of canonical rollout until its domain gate passes", () => {
+    expect(adminNextModuleDefinitions.every(({ rolloutStage }) => rolloutStage === "preview")).toBe(true);
+    expect(adminNextModuleCanServeCanonical("today")).toBe(false);
   });
 
   it("does not claim release readiness for an adapter-only slice", () => {

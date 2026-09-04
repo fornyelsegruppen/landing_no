@@ -8,5 +8,9 @@ describe("Admin Next dark design lock", () => {
     expect(adminNextDarkThemeCss).toContain("--an-amber: #f4b63f");
     expect(adminNextDarkThemeCss).toContain("--an-text: #f5f7fa");
     expect(adminNextDarkThemeCss).toContain(":focus-visible");
+    expect(adminNextDarkThemeCss).toContain("--an-action: var(--an-amber)");
+    expect(adminNextDarkThemeCss).toContain("--an-danger:");
+    expect(adminNextDarkThemeCss).toContain("forced-colors: active");
+    expect(adminNextDarkThemeCss).toContain("prefers-reduced-motion: reduce");
   });
 });

@@ -139,11 +139,17 @@ test("anonymous and cross-site requests cannot cross internal API boundaries", a
   const health = await request.get("/api/admin/platform-health");
   expect(health.status()).toBe(401);
 
+  const search = await request.get("/api/admin/search?q=customer");
+  expect(search.status()).toBe(401);
+
   const adminMedia = await request.get("/api/admin/media/999999");
   expect(adminMedia.status()).toBe(401);
 
   const workerMedia = await request.get("/api/worker/work-orders/999999/media/999999");
   expect(workerMedia.status()).toBe(401);
+
+  const visualFixture = await request.get("/admin-next-system-fixture");
+  expect(visualFixture.status()).toBe(404);
 
   const crossSite = await request.post("/api/lead", {
     data: {},

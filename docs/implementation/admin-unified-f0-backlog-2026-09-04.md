@@ -2,11 +2,11 @@
 
 **Artefaktas:** F0 planavimo rezultatas
 **Data:** 2026-09-04
-**Statusas:** `PLANNED / F0 CI GREEN / PREVIEW UAT PENDING / F1 NO-GO`
+**Statusas:** `AUTHORIZED / F0 CI GREEN / F1 FUNCTIONAL GREEN / VISUAL REMEDIATION ACTIVE / CI PENDING / PRODUCTION NO-GO`
 **Owner:** PLATFORM
 **Pagrindinis planas:** [Takfornyelse vientisos administravimo UI/UX sistemos planas](../product/takfornyelse-unified-admin-ui-ux-system-plan-2026-09-04.md)
 **Bazinis commit:** `4d03b94` (`feat(rf): implement one-card preview workflow`)
-**Production:** `NO-GO`; šis backlogas neleidžia pradėti F1–F7, diegti, keisti Production, schemų, kainodaros, laiškų ar klientų duomenų
+**Production:** `NO-GO`; savininkas autorizavo F1–F7 implementaciją ir izoliuotus vartus, bet ne Production diegimą, duomenų mutacijas, kainodarą ar siuntimus
 
 ## 1. Paskirtis ir naudojimo taisyklės
 
@@ -300,10 +300,10 @@ laimingas E2E kelias nėra pakankamas užbaigimo įrodymas.
 ## 14. Dabartinis vartų rezultatas
 
 - F0 planavimo artefaktas: **sukurtas**.
-- F1–F7 implementacija: **neautorizuota / nepradėta**.
+- F1–F7 implementacija: **autorizuota**; F1 vietinis vartas žalias, branch CI laukia.
 - RF Phase E/F ir RF→pasiūlymas: **neautorizuota šiame darbe**.
 - Duomenų ar Payload schemos migracija: **neautorizuota**.
 - Production konfigūracija, duomenys, laiškai, kainodara, routes ir deploy:
   **nepakeisti / NO-GO**.
-- Kitas sprendimo taškas: uždaryti likusius F0 inventoriaus, ADR, testų baseline
-  ir parity įrodymus, tada gauti atskirą savininko `GO` F1.
+- Kitas vartas: gauti žalią F1 branch CI, tada vykdyti F2. Savininko veiksmo
+  reikės prieš bendros Preview DB mutaciją, RF Phase E/F ir Production.

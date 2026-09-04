@@ -54,6 +54,13 @@ test.describe("authenticated internal portals", () => {
     await expect(page.getByText("New enquiries", { exact: true })).toBeVisible();
     await expect(page.getByText("The panel language does not change customer copy", { exact: false })).toBeVisible();
 
+    await page.keyboard.press("Control+K");
+    const searchDialog = page.getByRole("dialog", { name: "Global search" });
+    await expect(searchDialog).toBeVisible();
+    await expect(searchDialog.getByPlaceholder(/Customer, address, phone/)).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(searchDialog).toBeHidden();
+
     await language.selectOption("lt");
     await expect(page.getByRole("heading", { level: 1, name: "Apžvalga" })).toBeVisible();
     await expect(page.getByText("Naujos užklausos", { exact: true })).toBeVisible();

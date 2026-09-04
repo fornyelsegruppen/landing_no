@@ -8,7 +8,7 @@
     "build": "npm run build:migrate && next build",
     "build:migrate": "node scripts/run-migrate.mjs",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "node scripts/check-admin-semantic-tokens.mjs && eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ci:unit": "vitest run --exclude \"**/payload/migration-tests/**\" --maxWorkers=2",

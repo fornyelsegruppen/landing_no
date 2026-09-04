@@ -1,8 +1,13 @@
 import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AdminNextShell } from "./admin-next-shell";
 import { AdminNextToday } from "./admin-next-today";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/admin-next-preview/today",
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+}));
 
 describe("Admin Next Today preview", () => {
   it("renders one clear next action for every synthetic case", () => {
@@ -31,9 +36,9 @@ describe("Admin Next Today preview", () => {
     );
 
     expect(html).toContain("min-w-0");
-    expect(html).toContain("grid-cols-4");
+    expect(html).toContain("grid-cols-5");
     expect(html).toContain("Apsaugota Preview");
     expect(html).toContain("Mano");
-    expect(html.match(/data-admin-next-nav="cases" href="\/admin-next-preview\/today"/g)).toHaveLength(2);
+    expect(html).toContain('href="/admin-v2/cases"');
   });
 });

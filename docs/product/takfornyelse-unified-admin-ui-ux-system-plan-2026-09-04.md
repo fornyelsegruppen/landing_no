@@ -2,7 +2,7 @@
 
 **Owner:** PLATFORM
 **Technologijos partneris:** RF
-**Statusas:** PATVIRTINTA · F0 CI GREEN · PREVIEW UAT PENDING · F1 NO-GO
+**Statusas:** PATVIRTINTA · F0 CI GREEN · F1 FUNCTIONAL GREEN / VISUAL REMEDIATION ACTIVE / CI PENDING · PRODUCTION NO-GO
 **Data:** 2026-09-04
 **Bazinis commit:** `4d03b94` (`feat(rf): implement one-card preview workflow`)
 **Apimtis:** visa administravimo kelionė, darbuotojo mobili eiga ir susiję
@@ -1202,17 +1202,18 @@ Rekomenduojami defaultai po šio plano peržiūros:
 
 ## Įgyvendinimo autorizacijos būsena
 
-2026-09-04 savininkas davė aiškų `GO` pradėti. Pagal patvirtintą fazavimą tai
-autorizuoja tik **F0 baseline, ADR, testų atkūrimą izoliuotoje aplinkoje ir
-įgyvendinimo backlogą**. Vis dar neleidžiama:
+2026-09-04 savininkas po žalio F0 CI davė aiškų nurodymą tęsti pagal šį planą
+iki pilno rezultato ir kreiptis tik tada, kai reikės savininko veiksmo. Tai yra
+F1–F7 implementacijos, izoliuotų testų, branch CI ir Preview kandidato paruošimo
+`GO`. Tai nėra Production `GO`.
 
-- pradėti F1–F7 aplikacijos implementacijos;
-- vykdyti duomenų ar Payload schemos migracijų;
-- keisti Production konfigūracijos, duomenų, el. laiškų, kainodaros ar routes;
-- įjungti Admin Next mutacijas;
-- užbaigti RF Phase E/F ar sujungti RF su pasiūlymais;
-- deployinti ar keisti release vartus.
+Vis dar neleidžiama be atskiro savininko veiksmo:
 
-F0 darbo rezultatai registruojami atskiruose `docs/implementation/admin-unified-f0-*`
-artefaktuose. Perėjimui į F1 reikės aiškaus F0 vartų rezultato ir savininko
-sprendimo; šis `GO` nėra Production `GO`.
+- jungti ar deployinti į Production;
+- keisti Production konfigūraciją, duomenis, kainodarą, siuntimus ar automatizacijas;
+- kurti realias arba sintetines paskyras bendroje Preview DB;
+- atlikti negrįžtamą Payload schemos ar klientų duomenų migraciją;
+- apeiti RF Phase E owner ir exact-hash vartus.
+
+Kiekviena fazė įgyvendinama atskirais checkpointais, išlaikant legacy fallback
+iki F7 owner UAT ir atskiro Production `GO`.

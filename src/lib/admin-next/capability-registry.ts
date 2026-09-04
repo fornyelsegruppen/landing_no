@@ -115,11 +115,13 @@ export type AdminNextModuleId =
   | "fieldVisit";
 
 export type AdminNextModuleStage = "adapter_ready" | "release_ready" | "planned";
+export type AdminNextRolloutStage = "legacy_only" | "shadow_read" | "preview" | "canonical";
 export type AdminNextFoundationTarget = "FP0" | "FP1" | "FP2";
 
 export type AdminNextModuleDefinition = {
   id: AdminNextModuleId;
   stage: AdminNextModuleStage;
+  rolloutStage: AdminNextRolloutStage;
   foundationTarget: AdminNextFoundationTarget;
   capabilities: readonly AdminNextCanonicalCapabilityId[];
   dependencies: readonly FeatureFlagName[];
@@ -133,6 +135,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   {
     id: "today",
     stage: "adapter_ready",
+    rolloutStage: "preview",
     foundationTarget: "FP1",
     capabilities: ["Case", "Customer", "Property", "Visit"],
     dependencies: ["caseStateEngineV2", "adminExceptionFlowsV2"],
@@ -143,6 +146,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   {
     id: "caseWorkspace",
     stage: "adapter_ready",
+    rolloutStage: "preview",
     foundationTarget: "FP1",
     capabilities: ["Case", "Customer", "Property", "Roof", "Visit"],
     dependencies: ["caseStateEngineV2"],
@@ -153,6 +157,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   {
     id: "roofWorkbench",
     stage: "adapter_ready",
+    rolloutStage: "preview",
     foundationTarget: "FP2",
     capabilities: ["Case", "Property", "Roof"],
     dependencies: ["roofFusionV1"],
@@ -163,6 +168,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   {
     id: "documentPreflight",
     stage: "adapter_ready",
+    rolloutStage: "preview",
     foundationTarget: "FP2",
     capabilities: ["Case", "Customer", "Roof"],
     dependencies: [
@@ -177,6 +183,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = 
   {
     id: "fieldVisit",
     stage: "adapter_ready",
+    rolloutStage: "preview",
     foundationTarget: "FP2",
     capabilities: ["Case", "Customer", "Property", "Visit"],
     dependencies: ["workerPortal"],
@@ -191,4 +198,12 @@ export function adminNextModuleDefinition(id: AdminNextModuleId) {
   const definition = adminNextModuleDefinitions.find((item) => item.id === id);
   if (!definition) throw new Error(`Unknown Admin Next module: ${id}`);
   return definition;
+}
+
+export function adminNextModuleCanServeCanonical(id: AdminNextModuleId) {
+  return adminNextModuleDefinition(id).rolloutStage === "canonical";
+}
+
+export function adminNextModuleUsesShadowRead(id: AdminNextModuleId) {
+  return adminNextModuleDefinition(id).rolloutStage === "shadow_read";
 }
