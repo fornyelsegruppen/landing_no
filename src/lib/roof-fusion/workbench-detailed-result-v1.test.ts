@@ -27,6 +27,21 @@ describe("Roof Fusion workbench detailed result v1", () => {
     expect(result.surfaces.map((surface) => surface.surfaceId)).toEqual(
       snapshot.geometry.surfaces.map((surface) => surface.surfaceId),
     );
+    expect(result.vertices).toEqual(snapshot.geometry.vertices);
+    expect(result.vertices[0]).not.toBe(snapshot.geometry.vertices[0]);
+    expect(result.contours).toEqual(snapshot.geometry.contours);
+    expect(result.contours[0]).not.toBe(snapshot.geometry.contours[0]);
+    for (const surface of result.surfaces) {
+      const contour = result.contours.find(
+        (item) => item.contourId === surface.outerContourId,
+      );
+      expect(contour).toBeDefined();
+      expect(
+        contour?.vertexIds.map((vertexId) =>
+          result.vertices.find((vertex) => vertex.vertexId === vertexId),
+        ),
+      ).not.toContain(undefined);
+    }
     expect(result.surfaces[0]).toMatchObject({
       surfaceId: snapshot.geometry.surfaces[0].surfaceId,
       edgeIds: snapshot.geometry.surfaces[0].edgeIds,

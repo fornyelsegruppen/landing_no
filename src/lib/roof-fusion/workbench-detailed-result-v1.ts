@@ -43,6 +43,20 @@ export function projectRoofFusionWorkbenchDetailedResultV1(
       netSurfaceArea: measurement(snapshot.totals.netSurfaceArea),
       footprintPerimeter: measurement(snapshot.totals.footprintPerimeter),
     },
+    vertices: snapshot.geometry.vertices.map((vertex) => ({
+      vertexId: vertex.vertexId,
+      xM: vertex.xM,
+      yM: vertex.yM,
+      zM: vertex.zM,
+      uncertaintyM: vertex.uncertaintyM,
+      sourceRefs: [...vertex.sourceRefs],
+    })),
+    contours: snapshot.geometry.contours.map((contour) => ({
+      contourId: contour.contourId,
+      kind: contour.kind,
+      vertexIds: [...contour.vertexIds],
+      sourceRefs: [...contour.sourceRefs],
+    })),
     surfaces: snapshot.geometry.surfaces.map((surface) => ({
       surfaceId: surface.surfaceId,
       outerContourId: surface.outerContourId,

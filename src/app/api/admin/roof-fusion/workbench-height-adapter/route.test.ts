@@ -125,6 +125,40 @@ describe("POST /api/admin/roof-fusion/workbench-height-adapter", () => {
           footprintPerimeter: measurement("m", 42),
         },
         geometry: {
+          vertices: [
+            {
+              vertexId: "vertex-1",
+              xM: 0,
+              yM: 0,
+              zM: 10,
+              uncertaintyM: 0.25,
+              sourceRefs: ["source-1"],
+            },
+            {
+              vertexId: "vertex-2",
+              xM: 10,
+              yM: 0,
+              zM: 10,
+              uncertaintyM: 0.25,
+              sourceRefs: ["source-1"],
+            },
+            {
+              vertexId: "vertex-3",
+              xM: 0,
+              yM: 10,
+              zM: 14,
+              uncertaintyM: 0.25,
+              sourceRefs: ["source-1"],
+            },
+          ],
+          contours: [
+            {
+              contourId: "contour-1",
+              kind: "surface_boundary",
+              vertexIds: ["vertex-1", "vertex-2", "vertex-3"],
+              sourceRefs: ["source-1"],
+            },
+          ],
           surfaces: [
             {
               surfaceId: "surface-1",
@@ -213,6 +247,40 @@ describe("POST /api/admin/roof-fusion/workbench-height-adapter", () => {
           snapshotHash: "b".repeat(64),
           revision: 2,
         },
+        vertices: [
+          {
+            vertexId: "vertex-1",
+            xM: 0,
+            yM: 0,
+            zM: 10,
+            uncertaintyM: 0.25,
+            sourceRefs: ["source-1"],
+          },
+          {
+            vertexId: "vertex-2",
+            xM: 10,
+            yM: 0,
+            zM: 10,
+            uncertaintyM: 0.25,
+            sourceRefs: ["source-1"],
+          },
+          {
+            vertexId: "vertex-3",
+            xM: 0,
+            yM: 10,
+            zM: 14,
+            uncertaintyM: 0.25,
+            sourceRefs: ["source-1"],
+          },
+        ],
+        contours: [
+          {
+            contourId: "contour-1",
+            kind: "surface_boundary",
+            vertexIds: ["vertex-1", "vertex-2", "vertex-3"],
+            sourceRefs: ["source-1"],
+          },
+        ],
         surfaces: [
           {
             surfaceId: "surface-1",
