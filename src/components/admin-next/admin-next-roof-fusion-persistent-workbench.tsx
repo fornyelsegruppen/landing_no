@@ -19,6 +19,7 @@ import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoyde
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import {
   AdminNextRoofFusionUnifiedWorkbench,
+  roofFusionPlaneDisplayId,
   type RoofFusionLine,
   type RoofFusionPoint,
   type RoofFusionRoofPlane,
@@ -42,6 +43,7 @@ import {
 } from "./admin-next-roof-fusion-legacy-fallback-panel";
 
 type HeightResult = {
+  draftHash: string;
   status: "ready" | "review_required" | "blocked";
   pricingReady: false;
   summary: { blockers: string[] };
@@ -121,47 +123,50 @@ export function roofFusionDetailedResultPlanes(
     detailedResult.contours.map((contour) => [contour.contourId, contour]),
   );
 
-  return detailedResult.surfaces.flatMap((surface, index) => {
-    const contour = contours.get(surface.outerContourId);
-    if (!contour || contour.vertexIds.length < 3) return [];
-    const points = contour.vertexIds.flatMap((vertexId) => {
-      const vertex = vertices.get(vertexId);
-      if (!vertex) return [];
-      const point = {
-        x: (vertex.xM - reference.bounds.minEastingM) / spanX,
-        y: (reference.bounds.maxNorthingM - vertex.yM) / spanY,
-      };
-      if (
-        !Number.isFinite(point.x) ||
-        !Number.isFinite(point.y) ||
-        point.x < 0 ||
-        point.x > 1 ||
-        point.y < 0 ||
-        point.y > 1
-      ) {
-        return [];
-      }
-      return [point];
+  return [...detailedResult.surfaces]
+    .sort((first, second) => first.surfaceId.localeCompare(second.surfaceId))
+    .flatMap((surface, index) => {
+      const contour = contours.get(surface.outerContourId);
+      if (!contour || contour.vertexIds.length < 3) return [];
+      const points = contour.vertexIds.flatMap((vertexId) => {
+        const vertex = vertices.get(vertexId);
+        if (!vertex) return [];
+        const point = {
+          x: (vertex.xM - reference.bounds.minEastingM) / spanX,
+          y: (reference.bounds.maxNorthingM - vertex.yM) / spanY,
+        };
+        if (
+          !Number.isFinite(point.x) ||
+          !Number.isFinite(point.y) ||
+          point.x < 0 ||
+          point.x > 1 ||
+          point.y < 0 ||
+          point.y > 1
+        ) {
+          return [];
+        }
+        return [point];
+      });
+      if (points.length !== contour.vertexIds.length) return [];
+      const direction = roofPlaneDirection(surface.azimuthDegrees);
+      return [
+        {
+          id: surface.surfaceId,
+          displayId: roofFusionPlaneDisplayId(index),
+          label: direction ? `${direction} šlaitas` : `Šlaitas ${index + 1}`,
+          points,
+          horizontalAreaSquareMeters: measurementMidpoint(
+            surface.grossHorizontalArea,
+          ),
+          areaSquareMeters: measurementMidpoint(surface.grossSurfaceArea),
+          netAreaSquareMeters: measurementMidpoint(surface.netSurfaceArea),
+          slopeDegrees: measurementMidpoint(surface.pitch),
+          azimuthDegrees: surface.azimuthDegrees ?? undefined,
+          confidence: roofPlaneConfidence(surface),
+          confidenceReason: surface.pitch.confidence.rationale,
+        },
+      ];
     });
-    if (points.length !== contour.vertexIds.length) return [];
-    const direction = roofPlaneDirection(surface.azimuthDegrees);
-    return [
-      {
-        id: surface.surfaceId,
-        label: direction ? `${direction} šlaitas` : `Šlaitas ${index + 1}`,
-        points,
-        horizontalAreaSquareMeters: measurementMidpoint(
-          surface.grossHorizontalArea,
-        ),
-        areaSquareMeters: measurementMidpoint(surface.grossSurfaceArea),
-        netAreaSquareMeters: measurementMidpoint(surface.netSurfaceArea),
-        slopeDegrees: measurementMidpoint(surface.pitch),
-        azimuthDegrees: surface.azimuthDegrees ?? undefined,
-        confidence: roofPlaneConfidence(surface),
-        confidenceReason: surface.pitch.confidence.rationale,
-      },
-    ];
-  });
 }
 
 const heightStatusCopy: Record<HeightResult["status"], string> = {
@@ -232,6 +237,8 @@ function localizedWorkbenchProblem(error: unknown, fallback: string) {
       "Veiksmą turi atlikti prie bylos prisijungęs administratorius.",
     STALE_DRAFT:
       "Juodraštis paseno arba nebebuvo rastas. Perkraukite reviziją.",
+    STALE_RESULT:
+      "Skaičiavimo rezultatas neatitinka dabartinės juodraščio revizijos. Perskaičiuokite rezultatą.",
     TRUSTED_INPUT_REQUIRED:
       "Trūksta patikimos ortofoto registracijos arba pilno aukščio paviršiaus.",
     SOURCE_INTEGRITY_INVALID:
@@ -716,6 +723,13 @@ export function AdminNextRoofFusionPersistentWorkbench({
             response.status,
             body?.error ?? "Skaičiavimas nepavyko",
           );
+        if (body.draftHash !== calculationDraft.draftHash) {
+          throw new WorkbenchUiApiErrorV1(
+            "STALE_RESULT",
+            409,
+            "Skaičiavimo rezultatas neatitinka dabartinės juodraščio revizijos.",
+          );
+        }
         setHeightResult(body);
         setLegacyFallback(null);
         setHeightState("idle");
@@ -762,14 +776,22 @@ export function AdminNextRoofFusionPersistentWorkbench({
   const calculationBlockers = calculationBlockerCodes.map(
     (code) => calculationBlockerCopy[code],
   );
-  const roofFusionMetrics = heightResult?.metrics;
+  const heightResultMatchesDraft = Boolean(
+    heightResult &&
+    confirmed &&
+    !dirty &&
+    heightResult.draftHash === confirmed.draftHash &&
+    sourceFootprintIdentityMatches(confirmed, sourceFootprintId),
+  );
+  const currentHeightResult = heightResultMatchesDraft ? heightResult : null;
+  const roofFusionMetrics = currentHeightResult?.metrics;
   const calculatedRoofPlanes = useMemo(
     () =>
       roofFusionDetailedResultPlanes(
-        heightResult?.detailedResult,
+        currentHeightResult?.detailedResult,
         capture.geoReference,
       ),
-    [capture.geoReference, heightResult?.detailedResult],
+    [capture.geoReference, currentHeightResult?.detailedResult],
   );
   const metrics = legacyFallback
     ? {
@@ -780,7 +802,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       }
     : roofFusionMetrics;
   const protectedResultId =
-    heightResult && heightResult.status !== "blocked"
+    currentHeightResult && currentHeightResult.status !== "blocked"
       ? (confirmed?.draftHash ?? `${caseId}:height-result`)
       : undefined;
   const confirmSourceReset = useCallback(() => {
@@ -924,21 +946,24 @@ export function AdminNextRoofFusionPersistentWorkbench({
       blockers={blockers}
       confidence={
         legacyFallback ||
-        heightResult?.status === "blocked" ||
-        heightResult?.detailedResult?.snapshot.confidence.level === "low" ||
-        heightResult?.detailedResult?.snapshot.confidence.level === "unknown"
+        currentHeightResult?.status === "blocked" ||
+        currentHeightResult?.detailedResult?.snapshot.confidence.level ===
+          "low" ||
+        currentHeightResult?.detailedResult?.snapshot.confidence.level ===
+          "unknown"
           ? "low"
-          : heightResult?.detailedResult?.snapshot.confidence.level === "high"
+          : currentHeightResult?.detailedResult?.snapshot.confidence.level ===
+              "high"
             ? "high"
             : "medium"
       }
       confidenceReason={
         legacyFallback
           ? "Naudojamas operatoriaus pasirinktas senas rankinis nuolydžio metodas; rezultatas yra preliminarus ir lieka Preview peržiūrai."
-          : heightResult?.detailedResult
-            ? heightResult.detailedResult.snapshot.confidence.rationale
-            : heightResult
-              ? `${heightStatusCopy[heightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
+          : currentHeightResult?.detailedResult
+            ? currentHeightResult.detailedResult.snapshot.confidence.rationale
+            : currentHeightResult
+              ? `${heightStatusCopy[currentHeightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
               : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
       }
       footprintPerimeterMeters={metrics?.footprintPerimeterMeters}
@@ -953,6 +978,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       horizontalAreaSquareMeters={
         metrics?.horizontalAreaSquareMeters ?? horizontalAreaSquareMeters
       }
+      preliminaryHorizontalAreaSquareMeters={horizontalAreaSquareMeters}
       initialLayers={{ approvedOutline: true, sourceOutline: true }}
       key={sourceFootprintId ?? `${caseId}:source-footprint`}
       lines={lines}
@@ -971,7 +997,6 @@ export function AdminNextRoofFusionPersistentWorkbench({
         setLines((current) => [...current, line]);
         setDirty(true);
         setConfirmed(null);
-        setHeightResult(null);
         setLegacyFallback(null);
       }}
       onLineChange={(changedLine) => {
@@ -982,28 +1007,24 @@ export function AdminNextRoofFusionPersistentWorkbench({
         );
         setDirty(true);
         setConfirmed(null);
-        setHeightResult(null);
         setLegacyFallback(null);
       }}
       onLastLineUndo={() => {
         setLines((current) => current.slice(0, -1));
         setDirty(true);
         setConfirmed(null);
-        setHeightResult(null);
         setLegacyFallback(null);
       }}
       onLinesClear={() => {
         setLines([]);
         setDirty(true);
         setConfirmed(null);
-        setHeightResult(null);
         setLegacyFallback(null);
       }}
       onOutlineChange={(points) => {
         setOutline(points);
         setDirty(true);
         setConfirmed(null);
-        setHeightResult(null);
         setLegacyFallback(null);
       }}
       onPrimaryAction={primaryAction}
@@ -1017,16 +1038,29 @@ export function AdminNextRoofFusionPersistentWorkbench({
       sourceStatusPanel={sourceStatusPanel}
       persistencePanel={persistencePanel}
       resultIdentity={
-        heightResult?.detailedResult
+        currentHeightResult?.detailedResult
           ? {
-              snapshotId: heightResult.detailedResult.snapshot.snapshotId,
-              revision: heightResult.detailedResult.snapshot.revision,
-              snapshotHash: heightResult.detailedResult.snapshot.snapshotHash,
+              draftHash: currentHeightResult.draftHash,
+              snapshotId:
+                currentHeightResult.detailedResult.snapshot.snapshotId,
+              revision: currentHeightResult.detailedResult.snapshot.revision,
+              snapshotHash:
+                currentHeightResult.detailedResult.snapshot.snapshotHash,
               measurementMethod:
-                heightResult.detailedResult.snapshot.measurementMethod,
+                currentHeightResult.detailedResult.snapshot.measurementMethod,
             }
           : undefined
       }
+      resultState={
+        heightState === "running"
+          ? "updating"
+          : legacyFallback || heightResultMatchesDraft
+            ? "current"
+            : heightResult
+              ? "stale"
+              : "idle"
+      }
+      reviewStatus={currentHeightResult?.status}
       roofPlanes={calculatedRoofPlanes}
       sourceOutline={sourceOutline}
       stageBlockers={{

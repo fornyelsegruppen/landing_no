@@ -168,6 +168,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(
       {
+        draftHash: draft.draftHash,
         status: result.summary.status,
         pricingReady: false,
         summary: result.summary,

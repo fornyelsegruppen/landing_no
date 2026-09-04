@@ -19,10 +19,13 @@ import {
   clampRoofFusionViewport,
   constrainRoofFusionDraggedEndpoint,
   hasRoofFusionPanGestureMoved,
+  localizedRoofFusionTechnicalText,
   panRoofFusionViewport,
   roofFusionEndpointConstraintMetric,
   roofFusionImagePointFromViewportPoint,
   roofFusionLineJunctionTargets,
+  roofFusionPlaneDisplayId,
+  roofFusionPlaneLabelPlacements,
   roofFusionScreenStableMarkerRadii,
   shouldHandleRoofFusionZoomWheel,
   shouldSuppressRoofFusionCanvasClick,
@@ -290,7 +293,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       'data-roof-fusion-one-card-step="object" data-roof-fusion-one-card-step-state="reachable"',
     );
     expect(html).toContain(
-      'data-roof-fusion-one-card-step="refine" data-roof-fusion-one-card-step-state="active" disabled=""',
+      'data-roof-fusion-one-card-step="refine" data-roof-fusion-one-card-step-state="active"',
     );
     expect(html).toContain(
       'data-roof-fusion-one-card-step="result" data-roof-fusion-one-card-step-state="future" disabled=""',
@@ -315,7 +318,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       'data-roof-fusion-one-card-step="refine" data-roof-fusion-one-card-step-state="reachable"',
     );
     expect(reviewHtml).toContain(
-      'data-roof-fusion-one-card-step="result" data-roof-fusion-one-card-step-state="active" disabled=""',
+      'data-roof-fusion-one-card-step="result" data-roof-fusion-one-card-step-state="active"',
     );
   });
 
@@ -388,6 +391,39 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(ROOF_FUSION_SKELETON_HIT_STROKE).toBe("22px");
   });
 
+  it("keeps essential skeleton actions inside a compact canvas toolbar at a 1280x720 CSS viewport", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        initialStage: "skeleton",
+        lines: [
+          {
+            id: "ridge-a",
+            kind: "ridge",
+            start: { x: 0.3, y: 0.5 },
+            end: { x: 0.7, y: 0.5 },
+          },
+        ],
+        orthoImageHeight: 720,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        orthoImageWidth: 1280,
+        sourceOutline,
+      }),
+    );
+
+    const canvasIndex = html.indexOf("data-roof-fusion-canvas-shell");
+    const toolbarIndex = html.indexOf(
+      'data-roof-fusion-skeleton-toolbar="canvas-overlay"',
+    );
+    expect(canvasIndex).toBeGreaterThan(-1);
+    expect(toolbarIndex).toBeGreaterThan(canvasIndex);
+    expect(html).toContain("absolute top-2 right-2 left-2");
+    expect(html).toContain("overflow-x-auto");
+    expect(html).toContain("min-h-11 shrink-0");
+    expect(html).toContain("Atšaukti paskutinę liniją");
+    expect(html).toContain("Perbraižyti visas linijas");
+    expect(html.match(/data-roof-fusion-undo-last-line/g)).toHaveLength(1);
+  });
+
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
@@ -451,6 +487,97 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('data-roof-fusion-primary-action="calculate"');
   });
 
+  it("renders a compact responsive result with stable accessible plane keys and localized details", () => {
+    const planes = [
+      {
+        id: "surface-a",
+        displayId: "A",
+        label: "Šiaurės rytų šlaitas",
+        points: [
+          { x: 0.2, y: 0.2 },
+          { x: 0.55, y: 0.2 },
+          { x: 0.5, y: 0.7 },
+        ],
+        areaSquareMeters: 51.3,
+        slopeDegrees: 27,
+      },
+      {
+        id: "surface-b",
+        displayId: "B",
+        label: "Pietvakarių šlaitas",
+        points: [
+          { x: 0.45, y: 0.2 },
+          { x: 0.8, y: 0.2 },
+          { x: 0.5, y: 0.7 },
+        ],
+        areaSquareMeters: 49.8,
+        slopeDegrees: 31,
+      },
+    ];
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        averageSlopeDegrees: 29,
+        confidenceReason:
+          "Areas and pitches are preliminary because the shared topology requires human review.",
+        footprintPerimeterMeters: 42.1,
+        initialLayers: { roofPlanes: true },
+        initialStage: "review",
+        orthoImageHeight: 500,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        orthoImageWidth: 1000,
+        resultIdentity: {
+          draftHash: "a".repeat(64),
+          measurementMethod: "manual_workbench",
+          revision: 4,
+          snapshotHash: "b".repeat(64),
+          snapshotId: "snapshot-4",
+        },
+        resultState: "current",
+        reviewStatus: "review_required",
+        roofPlanes: planes,
+        sourceOutline,
+        horizontalAreaSquareMeters: 87.1,
+        preliminaryHorizontalAreaSquareMeters: 86.7,
+        totalSurfaceAreaSquareMeters: 101.1,
+      }),
+    );
+
+    expect(html).toContain("xl:sticky");
+    expect(html).toContain("grid-cols-2");
+    expect(html).toContain('data-roof-fusion-horizontal-result="true"');
+    expect(html).toContain("Horizontalus plotas");
+    expect(html).toContain("87,1 m²");
+    expect(html).toContain("nuo OSM preliminaraus +0,4 m²");
+    expect(html).toContain("data-roof-fusion-area-provenance");
+    expect(html).toContain("kanoninės EPSG:25833");
+    expect(html).toContain("OSM preliminarus kontūras buvo 86,7 m²");
+    expect(html).toContain('data-roof-fusion-plane-label="surface-a"');
+    expect(html).toContain("A · 51,3 m²");
+    expect(html).toContain("A · Šiaurės rytų šlaitas");
+    expect(html).toContain('aria-label="A · Šiaurės rytų šlaitas"');
+    expect(html).toContain('stroke-width="22px"');
+    expect(html).toContain('data-roof-fusion-roof-plane-outer="surface-a"');
+    expect(html).toContain('data-roof-fusion-roof-plane-inner="surface-a"');
+    expect(html).toContain("Matavimo informacija");
+    expect(html).toContain("Rankinis RF žymėjimas");
+    expect(html).toContain("Plotai ir nuolydžiai yra preliminarūs");
+    expect(html).not.toContain("Areas and pitches are preliminary");
+    expect(html).toContain("Perkėlimas į pasiūlymą dar neįjungtas");
+    expect(html).toContain("data-roof-fusion-offer-transfer-boundary");
+    expect(roofFusionPlaneDisplayId(0)).toBe("A");
+    expect(roofFusionPlaneDisplayId(25)).toBe("Z");
+    expect(roofFusionPlaneDisplayId(26)).toBe("AA");
+    const placements = roofFusionPlaneLabelPlacements(planes, 1);
+    expect(placements.get("surface-a")).not.toEqual(
+      placements.get("surface-b"),
+    );
+    expect(
+      localizedRoofFusionTechnicalText(
+        "Areas and pitches are preliminary because they derive from fitted planes.",
+      ),
+    ).not.toMatch(/Areas|pitches/u);
+  });
+
   it("applies only the blockers for the active guided stage", () => {
     const outlineHtml = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
@@ -463,6 +590,8 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
         initialStage: "review",
         orthoImageSrc: "/preview/house-ortho.jpg",
+        resultState: "current",
+        reviewStatus: "review_required",
         sourceOutline,
         stageBlockers: { review: ["Preview išsaugojimas dar neįjungtas"] },
       }),
@@ -471,8 +600,8 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(outlineHtml).not.toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("data-roof-fusion-preview-complete");
-    expect(reviewHtml).toContain("Matavimo rezultatas parengtas peržiūrai");
-    expect(reviewHtml).toContain("dar nenaudojamas kainodarai");
+    expect(reviewHtml).toContain("Parengta rankinei peržiūrai");
+    expect(reviewHtml).toContain("Rezultatas nėra perduotas kainodarai");
     expect(reviewHtml).not.toContain("Patvirtinti R4 matavimą");
     expect(reviewHtml).not.toContain("Pirmiausia išspręskite blokatorius");
     expect(reviewHtml).not.toContain(

@@ -5,7 +5,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoofFusionWorkbenchDraftV1 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 import { buildWorkbenchDraftFromUiV1 } from "@/lib/roof-fusion/workbench-ui-client-v1";
-import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
+import {
+  AdminNextRoofFusionPersistentWorkbench,
+  roofFusionDetailedResultPlanes,
+} from "./admin-next-roof-fusion-persistent-workbench";
 import type { RoofFusionPoint } from "./admin-next-roof-fusion-unified-workbench";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
@@ -119,18 +122,22 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
   let container: HTMLDivElement;
   let latest: RoofFusionWorkbenchDraftV1 | null;
   let heightResponse: "error" | "blocked" | "review";
+  let deferHeightResponse: boolean;
+  let releaseHeightResponse: (() => void) | null;
+  let scrollIntoViewMock: ReturnType<typeof vi.fn>;
 
   const renderWorkbench = (
     activeCapture = capture,
     activeHeightSurface?: KartverketHeightSurfaceV1,
     activeSourceFootprintId?: string,
     activeSourceOutline: readonly RoofFusionPoint[] = sourceOutline,
+    preliminaryHorizontalAreaSquareMeters = 142,
   ) =>
     createElement(AdminNextRoofFusionPersistentWorkbench, {
       actorId: "7",
       capture: activeCapture,
       caseId: "lead:13",
-      horizontalAreaSquareMeters: 142,
+      horizontalAreaSquareMeters: preliminaryHorizontalAreaSquareMeters,
       orthoImageAlt: "Test roof",
       sourceOutline: activeSourceOutline,
       sourceFootprintId: activeSourceFootprintId,
@@ -314,6 +321,27 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       sourceOutline,
     });
     heightResponse = "error";
+    deferHeightResponse = false;
+    releaseHeightResponse = null;
+    scrollIntoViewMock = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -343,6 +371,11 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
               });
         }
         if (url === "/api/admin/roof-fusion/workbench-height-adapter") {
+          if (deferHeightResponse) {
+            await new Promise<void>((resolve) => {
+              releaseHeightResponse = resolve;
+            });
+          }
           return heightResponse === "error"
             ? new Response(
                 JSON.stringify({
@@ -356,6 +389,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
               )
             : new Response(
                 JSON.stringify({
+                  draftHash: latest?.draftHash,
                   status:
                     heightResponse === "blocked"
                       ? "blocked"
@@ -373,7 +407,12 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
                   },
                   metrics:
                     heightResponse === "review"
-                      ? { averageSlopeDegrees: 27 }
+                      ? {
+                          averageSlopeDegrees: 27,
+                          footprintPerimeterMeters: 41,
+                          horizontalAreaSquareMeters: 87.1,
+                          totalSurfaceAreaSquareMeters: 95.6,
+                        }
                       : {},
                   detailedResult:
                     heightResponse === "review"
@@ -395,6 +434,190 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as { scrollIntoView?: unknown })
+      .scrollIntoView;
+  });
+
+  it("keeps A/B plane labels stable when the adapter surface order changes", () => {
+    const detailed = detailedResultFixture();
+    const ordered = roofFusionDetailedResultPlanes(detailed, geoReference);
+    const reversed = roofFusionDetailedResultPlanes(
+      { ...detailed, surfaces: [...detailed.surfaces].reverse() },
+      geoReference,
+    );
+    expect(
+      Object.fromEntries(ordered.map((plane) => [plane.id, plane.displayId])),
+    ).toEqual(
+      Object.fromEntries(reversed.map((plane) => [plane.id, plane.displayId])),
+    );
+    expect(ordered.map((plane) => plane.displayId)).toEqual(["A", "B"]);
+  });
+
+  it("shows the canonical 87.1 m² result with compact OSM provenance and sends bound calculation evidence", async () => {
+    heightResponse = "review";
+    latest = await buildWorkbenchDraftFromUiV1({
+      actorId: "7",
+      approvedOutline: persistedOutline,
+      caseId: "lead:13",
+      createdAt: "2026-09-03T08:00:00.000Z",
+      draftId: "uat-lead-13-r1-area-provenance",
+      evidence: {
+        attribution: capture.attribution!,
+        georeference: geoReference,
+        imageId: capture.mediaId,
+        sourceContentHash: capture.rawContentHash!,
+        sourceId: capture.sourceId!,
+      },
+      idempotencyKey: "workbench:lead:13:r1:area-provenance",
+      lines: persistedLines,
+      revision: 1,
+      sourceFootprintId: "osm:way/123",
+      sourceOutline,
+    });
+    await act(async () => {
+      root.render(
+        renderWorkbench(
+          capture,
+          heightSurface,
+          "osm:way/123",
+          sourceOutline,
+          86.7,
+        ),
+      );
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await act(async () => {
+      buttonWithText("Apskaičiuoti")!.click();
+      await flushAsyncWork();
+    });
+
+    expect(stage()).toBe("review");
+    expect(container.textContent).toContain("Horizontalus plotas");
+    expect(container.textContent).toContain("87,1 m²");
+    expect(container.textContent).toContain("nuo OSM preliminaraus +0,4 m²");
+    expect(container.textContent).not.toContain("86,7 m²87,1 m²");
+    const heightCall = vi
+      .mocked(fetch)
+      .mock.calls.find(
+        ([url]) =>
+          String(url) === "/api/admin/roof-fusion/workbench-height-adapter",
+      );
+    const heightBody = JSON.parse(String(heightCall?.[1]?.body)) as {
+      draftHash: string;
+      orthophoto: { rawContentHash: string; sourceId: string };
+    };
+    expect(latest?.geometry.sourceFootprint.sourceId).toBe("osm:way/123");
+    expect(heightBody.draftHash).toBe(latest?.draftHash);
+    expect(heightBody.orthophoto).toMatchObject({
+      rawContentHash: capture.rawContentHash,
+      sourceId: capture.sourceId,
+    });
+  });
+
+  it("hides the previous candidate's canonical result as soon as another footprint is selected", async () => {
+    heightResponse = "review";
+    latest = await buildWorkbenchDraftFromUiV1({
+      actorId: "7",
+      approvedOutline: persistedOutline,
+      caseId: "lead:13",
+      createdAt: "2026-09-03T08:00:00.000Z",
+      draftId: "uat-lead-13-r1-building-a-result",
+      evidence: {
+        attribution: capture.attribution!,
+        georeference: geoReference,
+        imageId: capture.mediaId,
+        sourceContentHash: capture.rawContentHash!,
+        sourceId: capture.sourceId!,
+      },
+      idempotencyKey: "workbench:lead:13:r1:building-a-result",
+      lines: persistedLines,
+      revision: 1,
+      sourceFootprintId: "osm:A",
+      sourceOutline,
+    });
+    await act(async () => {
+      root.render(
+        renderWorkbench(capture, heightSurface, "osm:A", sourceOutline, 86.7),
+      );
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await act(async () => {
+      buttonWithText("Apskaičiuoti")!.click();
+      await flushAsyncWork();
+    });
+    expect(stage()).toBe("review");
+    expect(container.textContent).toContain("87,1 m²");
+
+    const buildingBOutline = [
+      { x: 0.15, y: 0.15 },
+      { x: 0.85, y: 0.15 },
+      { x: 0.85, y: 0.85 },
+      { x: 0.15, y: 0.85 },
+    ] as const;
+    await act(async () => {
+      root.render(
+        renderWorkbench(capture, heightSurface, "osm:B", buildingBOutline, 42),
+      );
+      await flushAsyncWork();
+    });
+
+    expect(stage()).toBe("outline");
+    expect(container.textContent).not.toContain("87,1 m²");
+    expect(
+      container.querySelectorAll("[data-roof-fusion-plane-label]"),
+    ).toHaveLength(0);
+    await openAdvanced();
+    expect(container.textContent).toContain("stogo kontūro tapatybė nesutampa");
+  });
+
+  it("focuses and scrolls only after explicit result-step navigation while preserving zoom and marking", async () => {
+    heightResponse = "review";
+    await act(async () => {
+      root.render(renderWorkbench(capture, heightSurface));
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    expect(container.textContent).toContain("300%");
+    scrollIntoViewMock.mockClear();
+
+    await act(async () => {
+      buttonWithText("Apskaičiuoti")!.click();
+      await flushAsyncWork();
+    });
+    expect(stage()).toBe("review");
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+    await click('[data-roof-fusion-one-card-step="result"]');
+    expect(document.activeElement).toBe(
+      container.querySelector("[data-roof-fusion-active-heading]"),
+    );
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "start",
+    });
+    scrollIntoViewMock.mockClear();
+
+    await click("[data-roof-fusion-edit-result]");
+    expect(stage()).toBe("skeleton");
+    expect(container.textContent).toContain("300%");
+    expect(renderedLines()).toHaveLength(1);
+    expect(document.activeElement).toBe(
+      container.querySelector("[data-roof-fusion-active-heading]"),
+    );
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "start",
+    });
+
+    scrollIntoViewMock.mockClear();
+    await click('[data-roof-fusion-one-card-step="refine"]');
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
   });
 
   it("hydrates approved geometry and a saved line after the latest draft loads asynchronously", async () => {
@@ -808,9 +1031,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
 
     expect(stage()).toBe("review");
     expect(container.textContent).toContain("27°");
-    expect(container.textContent).toContain(
-      "Matavimo rezultatas parengtas peržiūrai",
-    );
+    expect(container.textContent).toContain("Parengta rankinei peržiūrai");
     expect(container.textContent).not.toContain("review_required");
     expect(container.textContent).not.toContain("Manual ridge");
     const surfaceRows = container.querySelectorAll(
@@ -826,6 +1047,11 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(surfaceRows.item(1).getAttribute("aria-pressed")).toBe("true");
     expect(container.textContent).toContain("Pietinis šlaitas");
     expect(container.textContent).toContain("Šiaurinis šlaitas");
+    expect(container.textContent).toContain("A · Šiaurinis šlaitas");
+    expect(container.textContent).toContain("B · Pietinis šlaitas");
+    expect(
+      container.querySelectorAll("[data-roof-fusion-plane-label]"),
+    ).toHaveLength(2);
     await openAdvanced();
 
     const fallback = container.querySelector<HTMLElement>(
@@ -867,6 +1093,129 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       container.querySelector("[data-roof-fusion-legacy-fallback-active]"),
     ).toBeNull();
+  });
+
+  it("hides stale plane values after geometry changes and gates them until the matching draft recalculates", async () => {
+    heightResponse = "review";
+    await act(async () => {
+      root.render(renderWorkbench(capture, heightSurface));
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await act(async () => {
+      buttonWithText("Apskaičiuoti")!.click();
+      await flushAsyncWork();
+    });
+    expect(stage()).toBe("review");
+    expect(
+      container.querySelectorAll("[data-roof-fusion-plane-label]"),
+    ).toHaveLength(2);
+    const previousDraftHash = latest?.draftHash;
+
+    const canvasShell = container.querySelector<HTMLDivElement>(
+      "[data-roof-fusion-canvas-shell]",
+    );
+    canvasShell!.getBoundingClientRect = () =>
+      ({
+        bottom: 500,
+        height: 500,
+        left: 0,
+        right: 1_000,
+        top: 0,
+        width: 1_000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+    const endpoint = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    expect(endpoint).not.toBeNull();
+    await act(async () => {
+      endpoint!.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 450,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 73,
+        }),
+      );
+      endpoint!.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          button: 0,
+          clientX: 460,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 73,
+        }),
+      );
+    });
+    const movedEndpoint = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    await act(async () => {
+      movedEndpoint!.dispatchEvent(
+        new PointerEvent("pointerup", {
+          bubbles: true,
+          button: 0,
+          clientX: 460,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 73,
+        }),
+      );
+    });
+
+    expect(
+      container
+        .querySelector("[data-roof-fusion-workbench]")
+        ?.getAttribute("data-roof-fusion-result-state"),
+    ).toBe("stale");
+    expect(container.textContent).toContain("Rezultatą reikia atnaujinti");
+    expect(container.textContent).toContain("ankstesni plotai paslėpti");
+    expect(container.textContent).not.toContain("142 m²");
+    expect(
+      container.querySelectorAll("[data-roof-fusion-plane-label]"),
+    ).toHaveLength(0);
+    expect(container.textContent).not.toContain("46,2 m²");
+
+    deferHeightResponse = true;
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>("[data-roof-fusion-refresh-result]")!
+        .click();
+    });
+    await vi.waitFor(() =>
+      expect(
+        container
+          .querySelector("[data-roof-fusion-review-gate]")
+          ?.getAttribute("data-roof-fusion-review-gate"),
+      ).toBe("updating"),
+    );
+    expect(container.textContent).toContain("Atnaujinama…");
+    expect(
+      container.querySelectorAll("[data-roof-fusion-plane-label]"),
+    ).toHaveLength(0);
+
+    deferHeightResponse = false;
+    await act(async () => {
+      releaseHeightResponse?.();
+      await flushAsyncWork();
+    });
+    await vi.waitFor(() =>
+      expect(
+        container
+          .querySelector("[data-roof-fusion-workbench]")
+          ?.getAttribute("data-roof-fusion-result-state"),
+      ).toBe("current"),
+    );
+    expect(latest?.draftHash).not.toBe(previousDraftHash);
+    expect(
+      container.querySelectorAll("[data-roof-fusion-plane-label]"),
+    ).toHaveLength(2);
   });
 
   it("keeps Advanced modal keyboard focus contained and restores it on Escape", async () => {
@@ -1271,9 +1620,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       container.querySelector("[data-roof-fusion-preview-complete]"),
     ).not.toBeNull();
-    expect(container.textContent).toContain(
-      "Matavimo rezultatas parengtas peržiūrai",
-    );
+    expect(container.textContent).toContain("Parengta peržiūrai");
     expect(
       container.querySelector('[data-roof-fusion-primary-action="calculate"]'),
     ).toBeNull();

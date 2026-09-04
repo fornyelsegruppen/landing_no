@@ -230,6 +230,7 @@ describe("POST /api/admin/roof-fusion/workbench-height-adapter", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
+      draftHash: "a".repeat(64),
       status: "review_required",
       pricingReady: false,
       metrics: {

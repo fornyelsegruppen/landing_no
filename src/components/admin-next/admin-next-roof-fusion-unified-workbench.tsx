@@ -48,6 +48,7 @@ export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
 
 export type RoofFusionStage = "outline" | "skeleton" | "slopes" | "review";
 export type RoofFusionOneCardStep = "object" | "refine" | "result";
+export type RoofFusionResultState = "idle" | "updating" | "current" | "stale";
 export type RoofFusionLineKind = "ridge" | "valley";
 export type RoofFusionConfidence = "high" | "medium" | "low";
 export type RoofFusionLayer =
@@ -62,6 +63,7 @@ export type RoofFusionLine = Readonly<{
 
 export type RoofFusionRoofPlane = Readonly<{
   id: string;
+  displayId?: string;
   label?: string;
   points: readonly RoofFusionPoint[];
   horizontalAreaSquareMeters?: number;
@@ -74,6 +76,7 @@ export type RoofFusionRoofPlane = Readonly<{
 }>;
 
 export type RoofFusionResultIdentity = Readonly<{
+  draftHash?: string;
   snapshotId: string;
   revision: number;
   snapshotHash: string;
@@ -121,11 +124,15 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   obstacles?: readonly RoofFusionObstacle[];
   totalSurfaceAreaSquareMeters?: number;
   horizontalAreaSquareMeters?: number;
+  /** Address-selection OSM area, shown only as provenance context. */
+  preliminaryHorizontalAreaSquareMeters?: number;
   averageSlopeDegrees?: number;
   footprintPerimeterMeters?: number;
   confidence?: RoofFusionConfidence;
   confidenceReason?: string;
   resultIdentity?: RoofFusionResultIdentity;
+  resultState?: RoofFusionResultState;
+  reviewStatus?: "ready" | "review_required" | "blocked";
   blockers?: readonly string[];
   stageBlockers?: Partial<Record<RoofFusionStage, readonly string[]>>;
   guardNotice?: string;
@@ -492,6 +499,54 @@ export function constrainRoofFusionDraggedEndpoint(
   return constrained;
 }
 
+function polygonLabelAnchor(points: readonly RoofFusionPoint[]) {
+  if (points.length === 0) return { x: 0.5, y: 0.5 };
+  const total = points.reduce(
+    (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }),
+    { x: 0, y: 0 },
+  );
+  return { x: total.x / points.length, y: total.y / points.length };
+}
+
+export function roofFusionPlaneLabelPlacements(
+  planes: readonly RoofFusionRoofPlane[],
+  scale = 1,
+) {
+  const safeScale = Math.max(1, scale);
+  const occupied: RoofFusionPoint[] = [];
+  const placements = new Map<string, RoofFusionPoint>();
+  const offsets = [
+    { x: 0, y: 0 },
+    { x: 0.1 / safeScale, y: 0 },
+    { x: -0.1 / safeScale, y: 0 },
+    { x: 0, y: 0.08 / safeScale },
+    { x: 0, y: -0.08 / safeScale },
+    { x: 0.08 / safeScale, y: 0.06 / safeScale },
+    { x: -0.08 / safeScale, y: -0.06 / safeScale },
+  ];
+  planes.forEach((plane) => {
+    const anchor = polygonLabelAnchor(plane.points);
+    const placement =
+      offsets
+        .map((offset) =>
+          clampRoofFusionPoint({
+            x: anchor.x + offset.x,
+            y: anchor.y + offset.y,
+          }),
+        )
+        .find((candidate) =>
+          occupied.every(
+            (current) =>
+              Math.abs(candidate.x - current.x) * safeScale >= 0.09 ||
+              Math.abs(candidate.y - current.y) * safeScale >= 0.055,
+          ),
+        ) ?? anchor;
+    occupied.push(placement);
+    placements.set(plane.id, placement);
+  });
+  return placements;
+}
+
 function formatNumber(value: number | undefined, suffix = "") {
   if (value === undefined || !Number.isFinite(value)) return "—";
   return `${new Intl.NumberFormat("lt-LT", { maximumFractionDigits: 1 }).format(value)}${suffix}`;
@@ -516,6 +571,53 @@ const confidenceLabels: Record<RoofFusionConfidence, string> = {
   medium: "Vidutinis",
   low: "Žemas",
 };
+
+const planePalette = [
+  "#78a9ff",
+  "#c69cff",
+  "#61c4d8",
+  "#f29bc6",
+  "#9eb4d8",
+  "#d39ce8",
+] as const;
+
+export function roofFusionPlaneDisplayId(index: number) {
+  let value = Math.max(0, Math.floor(index));
+  let result = "";
+  do {
+    result = String.fromCharCode(65 + (value % 26)) + result;
+    value = Math.floor(value / 26) - 1;
+  } while (value >= 0);
+  return result;
+}
+
+function planeColor(displayId: string) {
+  const hash = [...displayId].reduce(
+    (value, character) => value * 31 + character.charCodeAt(0),
+    0,
+  );
+  return planePalette[Math.abs(hash) % planePalette.length];
+}
+
+export function localizedRoofFusionTechnicalText(value?: string) {
+  if (!value) return "Techninė informacija nepateikta.";
+  if (/areas and pitches are preliminary/iu.test(value)) {
+    return "Plotai ir nuolydžiai yra preliminarūs; prieš naudojimą juos būtina peržiūrėti.";
+  }
+  if (/approved roof masses|trusted h.yde|calculable planes/iu.test(value)) {
+    return "Patvirtintas stogo kontūras ir aukščio duomenys panaudoti preliminarioms plokštumoms apskaičiuoti.";
+  }
+  if (/[A-Za-z]{4,}/u.test(value) && !/[ĄČĘĖĮŠŲŪŽąčęėįšųūž]/u.test(value)) {
+    return "Techninis patikimumo paaiškinimas prieinamas tik sistemos žurnale.";
+  }
+  return value;
+}
+
+function measurementMethodLabel(value: string) {
+  if (value === "manual_workbench") return "Rankinis RF žymėjimas";
+  if (value === "legacy_manual_pitch") return "Senas rankinis nuolydis";
+  return "Roof Fusion skaičiavimas";
+}
 
 function restoredMarkingSummary(lines: readonly RoofFusionLine[]) {
   if (lines.length === 0) return null;
@@ -577,11 +679,14 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   obstacles = [],
   totalSurfaceAreaSquareMeters,
   horizontalAreaSquareMeters,
+  preliminaryHorizontalAreaSquareMeters,
   averageSlopeDegrees,
   footprintPerimeterMeters,
   confidence = "medium",
   confidenceReason,
   resultIdentity,
+  resultState = resultIdentity ? "current" : "idle",
+  reviewStatus,
   blockers = [],
   stageBlockers,
   guardNotice = "Nieko neišsaugo, kol nepatvirtinta",
@@ -602,6 +707,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onEditResult,
 }: RoofFusionUnifiedWorkbenchProps) {
   const canvasShellRef = useRef<HTMLDivElement>(null);
+  const workspaceHeadingRef = useRef<HTMLHeadingElement>(null);
   const [stage, setStage] = useState<RoofFusionStage>(initialStage);
   const [layerVisibility, setLayerVisibility] = useState(() => ({
     ...DEFAULT_ROOF_FUSION_LAYERS,
@@ -1206,28 +1312,132 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     stage,
   ]);
 
+  const refreshStaleResult = useCallback(async () => {
+    if (primaryActionPending) return;
+    setPrimaryActionPending(true);
+    try {
+      const refreshed = await onPrimaryAction?.("review");
+      if (refreshed === false) setAdvancedOpen(true);
+    } finally {
+      setPrimaryActionPending(false);
+    }
+  }, [onPrimaryAction, primaryActionPending]);
+
+  const reviewGate =
+    resultState === "updating"
+      ? {
+          label: "Atnaujinama…",
+          detail: "Tikrinama aktuali juodraščio revizija.",
+          tone: "border-[#78a9ff]/35 bg-[#78a9ff]/10 text-[#cfe0ff]",
+        }
+      : resultState === "stale"
+        ? {
+            label: "Rezultatą reikia atnaujinti",
+            detail: "Geometrija pasikeitė — ankstesni plotai paslėpti.",
+            tone: "border-[#f3c66b]/35 bg-[#e8a317]/10 text-[#ffe2a3]",
+          }
+        : reviewStatus === "blocked"
+          ? {
+              label: "Skaičiavimas užblokuotas",
+              detail: "Patikslinkite pažymėtą geometriją.",
+              tone: "border-red-400/35 bg-red-400/10 text-red-100",
+            }
+          : reviewStatus === "review_required"
+            ? {
+                label: "Parengta rankinei peržiūrai",
+                detail: "Rezultatas nėra perduotas kainodarai.",
+                tone: "border-[#f3c66b]/35 bg-[#e8a317]/10 text-[#ffe2a3]",
+              }
+            : {
+                label: "Parengta peržiūrai",
+                detail: "Rezultatas nėra perduotas kainodarai.",
+                tone: "border-[#78a9ff]/35 bg-[#78a9ff]/10 text-[#dce9ff]",
+              };
+
   const activeOneCardStep: RoofFusionOneCardStep =
     stage === "review" ? "result" : "refine";
   const activeOneCardStepIndex =
     ROOF_FUSION_ONE_CARD_STEPS.indexOf(activeOneCardStep);
+  const focusExplicitWorkflowTarget = useCallback(
+    (target: "workspace" | "building-selection" = "workspace") => {
+      requestAnimationFrame(() => {
+        const element =
+          target === "building-selection"
+            ? document.querySelector<HTMLElement>(
+                "[data-roof-fusion-building-selection]",
+              )
+            : workspaceHeadingRef.current;
+        if (!element) return;
+        const reducedMotion = window.matchMedia?.(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        element.scrollIntoView?.({
+          behavior: reducedMotion ? "auto" : "smooth",
+          block: "start",
+        });
+        element.focus({ preventScroll: true });
+      });
+    },
+    [],
+  );
   const navigateToOneCardStep = useCallback(
     (step: RoofFusionOneCardStep) => {
       if (step === "object") {
         onChangeBuilding?.();
+        focusExplicitWorkflowTarget("building-selection");
         return;
       }
-      if (step === "refine" && stage === "review") {
-        goToStage(draftLines.length > 0 ? "skeleton" : "outline");
-        onEditResult?.();
+      if (step === "refine") {
+        if (stage === "review") {
+          goToStage(draftLines.length > 0 ? "skeleton" : "outline");
+          onEditResult?.();
+        }
+        focusExplicitWorkflowTarget();
+        return;
+      }
+      if (step === "result" && stage === "review") {
+        focusExplicitWorkflowTarget();
       }
     },
-    [draftLines.length, goToStage, onChangeBuilding, onEditResult, stage],
+    [
+      draftLines.length,
+      focusExplicitWorkflowTarget,
+      goToStage,
+      onChangeBuilding,
+      onEditResult,
+      stage,
+    ],
   );
-  const activeSelectedRoofPlaneId = roofPlanes.some(
+  const horizontalAreaDeltaSquareMeters =
+    stage === "review" &&
+    resultState === "current" &&
+    horizontalAreaSquareMeters !== undefined &&
+    preliminaryHorizontalAreaSquareMeters !== undefined
+      ? horizontalAreaSquareMeters - preliminaryHorizontalAreaSquareMeters
+      : undefined;
+  const displayRoofPlanes = useMemo(
+    () =>
+      [...roofPlanes]
+        .sort((first, second) =>
+          (first.displayId ?? first.id).localeCompare(
+            second.displayId ?? second.id,
+          ),
+        )
+        .map((plane, index) => ({
+          ...plane,
+          displayId: plane.displayId ?? roofFusionPlaneDisplayId(index),
+        })),
+    [roofPlanes],
+  );
+  const activeSelectedRoofPlaneId = displayRoofPlanes.some(
     (plane) => plane.id === selectedRoofPlaneId,
   )
     ? selectedRoofPlaneId
-    : (roofPlanes[0]?.id ?? null);
+    : (displayRoofPlanes[0]?.id ?? null);
+  const planeLabelPlacements = useMemo(
+    () => roofFusionPlaneLabelPlacements(displayRoofPlanes, viewport.scale),
+    [displayRoofPlanes, viewport.scale],
+  );
 
   const displayLines = [
     ...draftLines,
@@ -1291,30 +1501,44 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     <section
       aria-label="Roof Fusion vieno lango matavimo darbo vieta"
       className="overflow-hidden rounded-3xl border border-white/10 bg-[#111722] text-[#f4f1ea] shadow-2xl shadow-black/30"
+      data-roof-fusion-result-state={
+        stage === "review" ? resultState : undefined
+      }
       data-roof-fusion-workbench="unified"
       data-roof-fusion-stage={stage}
     >
       <div className="flex flex-col gap-0 xl:flex-row">
-        <div className="min-w-0 flex-1 bg-[#0c111a] p-3 sm:p-5">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div
+          className={`min-w-0 flex-1 bg-[#0c111a] p-3 ${stage === "review" ? "sm:p-3" : "sm:p-5"}`}
+        >
+          <div
+            className={`${stage === "review" ? "mb-2" : "mb-4"} flex flex-wrap items-start justify-between gap-3`}
+          >
             <div>
               <p className="text-[11px] font-semibold tracking-[0.2em] text-[#e8a317] uppercase">
                 Roof Fusion · Preview
               </p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+              <h2
+                className="mt-1 scroll-mt-4 text-xl font-semibold tracking-tight outline-none sm:text-2xl"
+                data-roof-fusion-active-heading
+                ref={workspaceHeadingRef}
+                tabIndex={-1}
+              >
                 Sudėtingo stogo matavimas
               </h2>
-              <p className="mt-1 max-w-2xl text-sm text-[#c4c0b8]">
-                Viename ortofoto lange pažymėkite tik tai, ko sistema negali
-                patikimai nustatyti pati.
-              </p>
+              {stage !== "review" ? (
+                <p className="mt-1 max-w-2xl text-sm text-[#c4c0b8]">
+                  Viename ortofoto lange pažymėkite tik tai, ko sistema negali
+                  patikimai nustatyti pati.
+                </p>
+              ) : null}
             </div>
             <span className="rounded-full border border-[#e8a317]/30 bg-[#e8a317]/10 px-3 py-1.5 text-xs font-medium text-[#f3c66b]">
               {guardNotice}
             </span>
           </div>
 
-          {sourceStatusPanel}
+          {stage !== "review" ? sourceStatusPanel : null}
 
           {restoredMarkingNotice ? (
             <div
@@ -1375,7 +1599,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     data-roof-fusion-one-card-step-state={
                       active ? "active" : reachable ? "reachable" : "future"
                     }
-                    disabled={!reachable}
+                    disabled={!reachable && !active}
                     key={item}
                     onClick={() => navigateToOneCardStep(item)}
                     type="button"
@@ -1522,69 +1746,113 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               )}
               {layerVisibility.roofPlanes && (
                 <g data-roof-fusion-layer="roofPlanes">
-                  {roofPlanes.map((plane, index) => (
-                    <polygon
-                      aria-label={plane.label ?? `Stogo plokštuma ${index + 1}`}
-                      className={
-                        stage === "review" ? "cursor-pointer" : undefined
-                      }
-                      data-roof-fusion-roof-plane={plane.id}
-                      fill={index % 2 ? "#ef9b4f" : "#55c7a3"}
-                      fillOpacity={
-                        activeSelectedRoofPlaneId === plane.id ? ".42" : ".2"
-                      }
-                      key={plane.id}
-                      onClick={(event) => {
-                        if (stage !== "review") return;
-                        event.stopPropagation();
-                        setSelectedRoofPlaneId(plane.id);
-                      }}
-                      onKeyDown={(event) => {
-                        if (
-                          stage === "review" &&
-                          (event.key === "Enter" || event.key === " ")
-                        ) {
-                          event.preventDefault();
-                          setSelectedRoofPlaneId(plane.id);
+                  {displayRoofPlanes.map((plane, index) => (
+                    <g key={plane.id}>
+                      <polygon
+                        aria-label={`${plane.displayId} · ${plane.label ?? `Stogo plokštuma ${index + 1}`}`}
+                        aria-pressed={activeSelectedRoofPlaneId === plane.id}
+                        className={
+                          stage === "review" ? "cursor-pointer" : undefined
                         }
-                      }}
-                      points={pointsAttribute(plane.points)}
-                      role={stage === "review" ? "button" : undefined}
-                      stroke={index % 2 ? "#ef9b4f" : "#55c7a3"}
-                      strokeWidth={
-                        activeSelectedRoofPlaneId === plane.id ? "3px" : "2px"
-                      }
-                      tabIndex={stage === "review" ? 0 : undefined}
-                      vectorEffect="non-scaling-stroke"
-                    >
-                      <title>
-                        {plane.label ?? `Stogo plokštuma ${index + 1}`}
-                      </title>
-                    </polygon>
+                        data-roof-fusion-roof-plane={plane.id}
+                        fill="transparent"
+                        onClick={(event) => {
+                          if (stage !== "review") return;
+                          event.stopPropagation();
+                          setSelectedRoofPlaneId(plane.id);
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            stage === "review" &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            setSelectedRoofPlaneId(plane.id);
+                          }
+                        }}
+                        pointerEvents={stage === "review" ? "all" : "none"}
+                        points={pointsAttribute(plane.points)}
+                        role={stage === "review" ? "button" : undefined}
+                        stroke="transparent"
+                        strokeWidth="22px"
+                        tabIndex={stage === "review" ? 0 : undefined}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <polygon
+                        aria-hidden="true"
+                        data-roof-fusion-roof-plane-outer={plane.id}
+                        fill={planeColor(plane.displayId)}
+                        fillOpacity={
+                          activeSelectedRoofPlaneId === plane.id ? ".2" : ".1"
+                        }
+                        pointerEvents="none"
+                        points={pointsAttribute(plane.points)}
+                        stroke="#07101d"
+                        strokeLinejoin="round"
+                        strokeWidth="3px"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <polygon
+                        aria-hidden="true"
+                        data-roof-fusion-roof-plane-inner={plane.id}
+                        fill="none"
+                        pointerEvents="none"
+                        points={pointsAttribute(plane.points)}
+                        stroke={planeColor(plane.displayId)}
+                        strokeLinejoin="round"
+                        strokeWidth="1px"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    </g>
                   ))}
                 </g>
               )}
               {layerVisibility.sourceOutline && sourceOutline.length >= 3 && (
-                <polygon
-                  data-roof-fusion-layer="sourceOutline"
-                  fill="none"
-                  points={pointsAttribute(sourceOutline)}
-                  stroke="#f3c66b"
-                  strokeDasharray=".012 .009"
-                  strokeWidth=".006"
-                  vectorEffect="non-scaling-stroke"
-                />
+                <g data-roof-fusion-layer-group="sourceOutline">
+                  <polygon
+                    aria-hidden="true"
+                    data-roof-fusion-layer="sourceOutline"
+                    fill="none"
+                    points={pointsAttribute(sourceOutline)}
+                    stroke="#07101d"
+                    strokeDasharray="6 5"
+                    strokeWidth="3px"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polygon
+                    aria-hidden="true"
+                    fill="none"
+                    points={pointsAttribute(sourceOutline)}
+                    stroke="#f3c66b"
+                    strokeDasharray="6 5"
+                    strokeWidth="1px"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
               )}
               {layerVisibility.approvedOutline && draftOutline.length >= 3 && (
-                <polygon
-                  data-roof-fusion-layer="approvedOutline"
-                  fill="#46d69a"
-                  fillOpacity={approvedOutlineFillOpacity / 100}
-                  points={pointsAttribute(draftOutline)}
-                  stroke="#46d69a"
-                  strokeWidth=".007"
-                  vectorEffect="non-scaling-stroke"
-                />
+                <g data-roof-fusion-layer-group="approvedOutline">
+                  <polygon
+                    aria-hidden="true"
+                    data-roof-fusion-layer="approvedOutline"
+                    fill="#46d69a"
+                    fillOpacity={approvedOutlineFillOpacity / 100}
+                    points={pointsAttribute(draftOutline)}
+                    stroke="#07101d"
+                    strokeLinejoin="round"
+                    strokeWidth="3px"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polygon
+                    aria-hidden="true"
+                    fill="none"
+                    points={pointsAttribute(draftOutline)}
+                    stroke="#46d69a"
+                    strokeLinejoin="round"
+                    strokeWidth="1px"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
               )}
               {layerVisibility.skeleton && (
                 <g data-roof-fusion-layer="skeleton">
@@ -1599,6 +1867,24 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       stroke="transparent"
                       strokeLinecap="round"
                       strokeWidth={ROOF_FUSION_SKELETON_HIT_STROKE}
+                      vectorEffect="non-scaling-stroke"
+                      x1={line.start.x}
+                      x2={line.end.x}
+                      y1={line.start.y}
+                      y2={line.end.y}
+                    />
+                  ))}
+                  {displayLines.map((line) => (
+                    <line
+                      aria-hidden="true"
+                      key={`${line.id}:outer`}
+                      pointerEvents="none"
+                      stroke="#07101d"
+                      strokeDasharray={
+                        line.id === "pending-line" ? ".012 .009" : undefined
+                      }
+                      strokeLinecap="round"
+                      strokeWidth="3px"
                       vectorEffect="non-scaling-stroke"
                       x1={line.start.x}
                       x2={line.end.x}
@@ -1775,6 +2061,29 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 />
               )}
             </svg>
+            {stage === "review" &&
+              resultState === "current" &&
+              layerVisibility.roofPlanes &&
+              displayRoofPlanes.map((plane) => {
+                const position = planeLabelPlacements.get(plane.id);
+                if (!position) return null;
+                return (
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-md border bg-[#09111d]/90 px-1.5 py-0.5 text-[10px] font-bold whitespace-nowrap text-white shadow-sm ${activeSelectedRoofPlaneId === plane.id ? "ring-1 ring-white/70" : ""}`}
+                    data-roof-fusion-plane-label={plane.id}
+                    key={`${plane.id}:label`}
+                    style={{
+                      borderColor: planeColor(plane.displayId),
+                      left: `${(viewport.offsetX + position.x * viewport.scale) * 100}%`,
+                      top: `${(viewport.offsetY + position.y * viewport.scale) * 100}%`,
+                    }}
+                  >
+                    {plane.displayId} ·{" "}
+                    {formatNumber(plane.areaSquareMeters, " m²")}
+                  </span>
+                );
+              })}
             <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2 text-[11px] font-medium">
               <span className="rounded-full border border-[#f3c66b]/50 bg-[#111722]/85 px-2.5 py-1 text-[#f3c66b]">
                 — Šaltinis (nekintamas)
@@ -1791,30 +2100,84 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 Spustelėkite vietą naujam taškui
               </div>
             )}
+            {stage === "skeleton" ? (
+              <div
+                aria-label="Kraigų ir slėnių žymėjimo įrankiai"
+                className="absolute top-2 right-2 left-2 z-30 flex min-h-12 [scrollbar-width:thin] items-center gap-1.5 overflow-x-auto rounded-xl border border-white/20 bg-[#09111d]/95 p-1.5 shadow-xl backdrop-blur-sm"
+                data-roof-fusion-skeleton-toolbar="canvas-overlay"
+                role="group"
+              >
+                {(["ridge", "valley"] as const).map((kind) => (
+                  <button
+                    aria-pressed={lineMode === kind}
+                    className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-semibold ${lineMode === kind ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
+                    data-roof-fusion-line-mode={kind}
+                    key={kind}
+                    onClick={() => {
+                      setLineMode((current) =>
+                        current === kind ? null : kind,
+                      );
+                      setPendingLinePoint(null);
+                      setLineCaptureProblem(null);
+                      setLineCaptureNotice(null);
+                    }}
+                    type="button"
+                  >
+                    {kind === "ridge"
+                      ? draftLines.some((line) => line.kind === "ridge")
+                        ? "＋ Dar vienas kraigas"
+                        : "＋ Kraigas"
+                      : draftLines.some((line) => line.kind === "valley")
+                        ? "⌄ Dar vienas slėnis"
+                        : "⌄ Slėnis"}
+                  </button>
+                ))}
+                <button
+                  className="min-h-11 shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  data-roof-fusion-undo-last-line
+                  disabled={draftLines.length === 0}
+                  onClick={undoLastLine}
+                  type="button"
+                >
+                  Atšaukti paskutinę liniją
+                </button>
+                <button
+                  className="min-h-11 shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  data-roof-fusion-clear-lines
+                  disabled={draftLines.length === 0}
+                  onClick={() => setClearLinesArmed(true)}
+                  type="button"
+                >
+                  Perbraižyti visas linijas
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <label
-              className="flex min-w-[220px] flex-1 items-center gap-3 text-xs font-medium text-[#ddd8cd]"
-              data-roof-fusion-approved-outline-opacity-control
-            >
-              <span className="shrink-0">Kontūro ryškumas</span>
-              <input
-                aria-label="Patvirtinto ploto spalvos ryškumas"
-                className="w-full accent-[#46d69a] disabled:opacity-40"
-                disabled={!layerVisibility.approvedOutline}
-                max="100"
-                min="0"
-                onChange={(event) =>
-                  setApprovedOutlineFillOpacity(Number(event.target.value))
-                }
-                type="range"
-                value={approvedOutlineFillOpacity}
-              />
-              <output aria-live="polite" className="w-9 text-right">
-                {approvedOutlineFillOpacity}%
-              </output>
-            </label>
+            {stage !== "review" ? (
+              <label
+                className="flex min-w-[220px] flex-1 items-center gap-3 text-xs font-medium text-[#ddd8cd]"
+                data-roof-fusion-approved-outline-opacity-control
+              >
+                <span className="shrink-0">Kontūro ryškumas</span>
+                <input
+                  aria-label="Patvirtinto ploto spalvos ryškumas"
+                  className="w-full accent-[#46d69a] disabled:opacity-40"
+                  disabled={!layerVisibility.approvedOutline}
+                  max="100"
+                  min="0"
+                  onChange={(event) =>
+                    setApprovedOutlineFillOpacity(Number(event.target.value))
+                  }
+                  type="range"
+                  value={approvedOutlineFillOpacity}
+                />
+                <output aria-live="polite" className="w-9 text-right">
+                  {approvedOutlineFillOpacity}%
+                </output>
+              </label>
+            ) : null}
             {stage !== "review" ? (
               <div
                 aria-label="Žymėjimo įrankiai"
@@ -1877,53 +2240,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
           {stage === "skeleton" && (
             <div
-              className="mt-3 flex flex-wrap items-center gap-2"
+              aria-live="polite"
+              className="mt-2 flex flex-wrap items-center gap-2"
               data-roof-fusion-skeleton-tools
             >
-              <span className="mr-1 text-xs text-[#aaa69d]">
-                Nubrėžti dviem paspaudimais:
-              </span>
-              {(["ridge", "valley"] as const).map((kind) => (
-                <button
-                  aria-pressed={lineMode === kind}
-                  className={`min-h-10 rounded-xl border px-3 text-sm font-medium ${lineMode === kind ? "border-[#e8a317] bg-[#e8a317]/15 text-[#f3c66b]" : "border-white/15 bg-white/5 text-[#ddd8cd] hover:bg-white/10"}`}
-                  data-roof-fusion-line-mode={kind}
-                  key={kind}
-                  onClick={() => {
-                    setLineMode((current) => (current === kind ? null : kind));
-                    setPendingLinePoint(null);
-                    setLineCaptureProblem(null);
-                    setLineCaptureNotice(null);
-                  }}
-                  type="button"
-                >
-                  {kind === "ridge"
-                    ? draftLines.some((line) => line.kind === "ridge")
-                      ? "＋ Dar vienas kraigas"
-                      : "＋ Kraigas"
-                    : draftLines.some((line) => line.kind === "valley")
-                      ? "⌄ Dar vienas slėnis"
-                      : "⌄ Slėnis"}
-                </button>
-              ))}
-              <button
-                className="min-h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                data-roof-fusion-undo-last-line
-                disabled={draftLines.length === 0}
-                onClick={undoLastLine}
-                type="button"
-              >
-                Atšaukti paskutinę liniją
-              </button>
-              <button
-                className="min-h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                data-roof-fusion-clear-lines
-                disabled={draftLines.length === 0}
-                onClick={() => setClearLinesArmed(true)}
-                type="button"
-              >
-                Perbraižyti visas linijas
-              </button>
               <span className="text-xs text-[#aaa69d]">
                 {lineMode
                   ? pendingLinePoint
@@ -1983,104 +2303,168 @@ export function AdminNextRoofFusionUnifiedWorkbench({
           )}
         </div>
 
-        <aside className="w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 sm:p-5 xl:w-[360px] xl:border-t-0 xl:border-l">
-          <div className="space-y-4">
-            <div
-              aria-live="polite"
-              className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
-              data-roof-fusion-status
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
-                  Patikimumas
+        <aside
+          className={`w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 xl:border-t-0 xl:border-l ${stage === "review" ? "xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:w-[390px] xl:overflow-hidden" : "sm:p-5 xl:w-[360px]"}`}
+        >
+          <div
+            className={
+              stage === "review"
+                ? "flex h-full min-h-0 flex-col gap-3"
+                : "space-y-4"
+            }
+          >
+            {stage === "review" ? (
+              <div
+                aria-live="polite"
+                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs ${reviewGate.tone}`}
+                data-roof-fusion-preview-complete={
+                  resultState === "current" ? true : undefined
+                }
+                data-roof-fusion-review-gate={resultState}
+                role="status"
+              >
+                <span>
+                  <strong className="block">{reviewGate.label}</strong>
+                  <span className="mt-0.5 block opacity-80">
+                    {reviewGate.detail}
+                  </span>
                 </span>
-                <span
-                  className={`rounded-full px-2 py-1 text-xs font-semibold ${confidence === "high" ? "bg-[#46d69a]/15 text-[#71e6b4]" : confidence === "medium" ? "bg-[#e8a317]/15 text-[#f3c66b]" : "bg-[#ef7676]/15 text-[#ff9d9d]"}`}
-                >
-                  {confidenceLabels[confidence]}
+                <span className="shrink-0 rounded-full border border-current/25 px-2 py-1 font-semibold">
+                  Preview
                 </span>
               </div>
-              <p className="mt-2 text-sm text-[#ddd8cd]">
-                {confidenceReason ??
-                  "Patikimumas bus patikslintas po nuolydžio skaičiavimo."}
-              </p>
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
-                  Blokatoriai
-                </span>
-                {activeBlockers.length ? (
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#ffadad]">
-                    {activeBlockers.map((blocker) => (
-                      <li key={blocker}>{blocker}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-1 text-xs text-[#71e6b4]">
-                    Nėra — galima tęsti.
-                  </p>
-                )}
+            ) : null}
+            {stage !== "review" ? (
+              <div
+                aria-live="polite"
+                className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
+                data-roof-fusion-status
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
+                    Patikimumas
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-1 text-xs font-semibold ${confidence === "high" ? "bg-[#46d69a]/15 text-[#71e6b4]" : confidence === "medium" ? "bg-[#e8a317]/15 text-[#f3c66b]" : "bg-[#ef7676]/15 text-[#ff9d9d]"}`}
+                  >
+                    {confidenceLabels[confidence]}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-[#ddd8cd]">
+                  {confidenceReason ??
+                    "Patikimumas bus patikslintas po nuolydžio skaičiavimo."}
+                </p>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
+                    Blokatoriai
+                  </span>
+                  {activeBlockers.length ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#ffadad]">
+                      {activeBlockers.map((blocker) => (
+                        <li key={blocker}>{blocker}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-[#71e6b4]">
+                      Nėra — galima tęsti.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <dl className="grid grid-cols-2 gap-2" data-roof-fusion-metrics>
-              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">Horizontalus</dt>
-                <dd className="mt-1 text-lg font-semibold">
-                  {formatNumber(horizontalAreaSquareMeters, " m²")}
-                </dd>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">Tikras paviršius</dt>
-                <dd className="mt-1 text-lg font-semibold text-[#f3c66b]">
+              {stage !== "review" ? (
+                <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
+                  <dt className="text-[11px] text-[#aaa69d]">Horizontalus</dt>
+                  <dd className="mt-1 text-lg font-semibold">
+                    {formatNumber(horizontalAreaSquareMeters, " m²")}
+                  </dd>
+                </div>
+              ) : (
+                <div
+                  className="col-span-2 rounded-xl border border-white/10 bg-[#0f151f] p-2.5"
+                  data-roof-fusion-horizontal-result
+                >
+                  <dt className="text-[10px] text-[#aaa69d]">
+                    Horizontalus plotas
+                  </dt>
+                  <dd className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <strong className="text-base text-white">
+                      {formatNumber(
+                        resultState === "current"
+                          ? horizontalAreaSquareMeters
+                          : undefined,
+                        " m²",
+                      )}
+                    </strong>
+                    {horizontalAreaDeltaSquareMeters !== undefined &&
+                    Math.abs(horizontalAreaDeltaSquareMeters) >= 0.05 ? (
+                      <span
+                        className="text-[10px] text-[#aaa69d]"
+                        data-roof-fusion-preliminary-area-delta
+                      >
+                        nuo OSM preliminaraus{" "}
+                        {horizontalAreaDeltaSquareMeters > 0 ? "+" : ""}
+                        {formatNumber(horizontalAreaDeltaSquareMeters, " m²")}
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+              )}
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-2.5">
+                <dt className="text-[10px] text-[#aaa69d]">Tikras plotas</dt>
+                <dd className="mt-1 text-base font-semibold text-white">
                   {formatNumber(totalSurfaceAreaSquareMeters, " m²")}
                 </dd>
               </div>
-              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">
-                  Vidutinis nuolydis
-                </dt>
-                <dd className="mt-1 text-lg font-semibold">
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-2.5">
+                <dt className="text-[10px] text-[#aaa69d]">Vid. nuolydis</dt>
+                <dd className="mt-1 text-base font-semibold">
                   {formatNumber(averageSlopeDegrees, "°")}
                 </dd>
               </div>
-              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-3">
-                <dt className="text-[11px] text-[#aaa69d]">Perimetras</dt>
-                <dd className="mt-1 text-lg font-semibold">
+              <div className="rounded-xl border border-white/10 bg-[#0f151f] p-2.5">
+                <dt className="text-[10px] text-[#aaa69d]">Perimetras</dt>
+                <dd className="mt-1 text-base font-semibold">
                   {formatNumber(footprintPerimeterMeters, " m")}
                 </dd>
               </div>
             </dl>
 
-            {stage === "review" && roofPlanes.length ? (
+            {stage === "review" && displayRoofPlanes.length ? (
               <div
-                className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
+                className="min-h-0 flex-1 rounded-2xl border border-white/10 bg-[#0f151f] p-3"
                 data-roof-fusion-surface-results
               >
                 <div className="flex items-center justify-between gap-2">
                   <strong className="text-sm">Stogo šlaitai</strong>
                   <span className="text-xs text-[#aaa69d]">
-                    {roofPlanes.length}
+                    {displayRoofPlanes.length}
                   </span>
                 </div>
-                <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto">
-                  {roofPlanes.map((plane, index) => (
+                <div className="mt-2 grid max-h-[min(32dvh,16rem)] gap-1.5 overflow-y-auto pr-1">
+                  {displayRoofPlanes.map((plane, index) => (
                     <button
                       aria-pressed={activeSelectedRoofPlaneId === plane.id}
-                      className={`grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2 text-left ${activeSelectedRoofPlaneId === plane.id ? "border-[#e8a317]/60 bg-[#e8a317]/10" : "border-white/10 bg-[#151c28] hover:border-white/20"}`}
+                      className={`grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left ${activeSelectedRoofPlaneId === plane.id ? "border-white/35 bg-white/10" : "border-white/10 bg-[#151c28] hover:border-white/20"}`}
                       data-roof-fusion-surface-result={plane.id}
                       key={plane.id}
                       onClick={() => setSelectedRoofPlaneId(plane.id)}
                       type="button"
                     >
-                      <span>
-                        <strong className="block text-xs">
+                      <span
+                        aria-hidden="true"
+                        className="size-3 shrink-0 rounded-sm"
+                        style={{ backgroundColor: planeColor(plane.displayId) }}
+                      />
+                      <span className="min-w-0">
+                        <strong className="block truncate text-xs">
+                          {plane.displayId} ·{" "}
                           {plane.label ?? `Šlaitas ${index + 1}`}
                         </strong>
                         <span className="mt-0.5 block text-[10px] text-[#aaa69d]">
-                          Nuolydis {formatNumber(plane.slopeDegrees, "°")}
-                          {plane.confidence
-                            ? ` · ${confidenceLabels[plane.confidence]}`
-                            : ""}
+                          {formatNumber(plane.slopeDegrees, "°")} nuolydis
                         </span>
                         {plane.netAreaSquareMeters !== undefined &&
                         plane.netAreaSquareMeters !== plane.areaSquareMeters ? (
@@ -2091,7 +2475,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                         ) : null}
                       </span>
                       <span className="text-right">
-                        <strong className="block text-sm text-[#f3c66b]">
+                        <strong className="block text-sm text-white">
                           {formatNumber(plane.areaSquareMeters, " m²")}
                         </strong>
                         <span className="block text-[9px] text-[#aaa69d]">
@@ -2104,52 +2488,121 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               </div>
             ) : null}
 
-            <div className="rounded-2xl border border-[#e8a317]/25 bg-[#e8a317]/10 p-3 text-xs leading-relaxed text-[#ddd8cd]">
-              <strong className="text-[#f3c66b]">
-                Šaltinio kontūras nekintamas.
-              </strong>{" "}
-              Jis lieka matomas brūkšniuota linija, o pataisymai kuriami kaip
-              atskiras patvirtintas kontūras.
-            </div>
-
             {stage === "review" ? (
-              <div className="grid gap-2">
-                <div
-                  className="rounded-2xl border border-[#46d69a]/30 bg-[#46d69a]/10 p-4 text-sm text-[#ddd8cd]"
-                  data-roof-fusion-preview-complete
-                  role="status"
-                >
-                  <strong className="block text-[#71e6b4]">
-                    Matavimo rezultatas parengtas peržiūrai
-                  </strong>
-                  <span className="mt-1 block text-xs leading-relaxed">
-                    Rezultatas neišsiųstas klientui ir dar nenaudojamas
-                    kainodarai.
+              <details
+                className="rounded-xl border border-white/10 bg-[#0f151f] text-xs text-[#c4c0b8]"
+                data-roof-fusion-measurement-info
+              >
+                <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 font-semibold text-[#ddd8cd]">
+                  <span>Matavimo informacija</span>
+                  <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-[#aaa69d]">
+                    {confidenceLabels[confidence]}
                   </span>
+                </summary>
+                <div className="space-y-2 border-t border-white/10 px-3 py-3 leading-relaxed">
+                  <p>
+                    <strong className="text-[#ddd8cd]">Patikimumas:</strong>{" "}
+                    {localizedRoofFusionTechnicalText(confidenceReason)}
+                  </p>
+                  <p>
+                    <strong className="text-[#ddd8cd]">
+                      Šaltinio kontūras nekintamas.
+                    </strong>{" "}
+                    Pataisymai saugomi atskirame patvirtintame kontūre.
+                  </p>
+                  {resultState === "current" &&
+                  horizontalAreaSquareMeters !== undefined ? (
+                    <p data-roof-fusion-area-provenance>
+                      <strong className="text-[#ddd8cd]">
+                        Horizontalus plotas:
+                      </strong>{" "}
+                      {formatNumber(horizontalAreaSquareMeters, " m²")} gauta iš
+                      kanoninės EPSG:25833 patvirtintos ir apskaičiuotos
+                      geometrijos.
+                      {preliminaryHorizontalAreaSquareMeters !== undefined ? (
+                        <>
+                          {" "}
+                          OSM preliminarus kontūras buvo{" "}
+                          {formatNumber(
+                            preliminaryHorizontalAreaSquareMeters,
+                            " m²",
+                          )}
+                          ; nedidelis projekcijos ir patvirtinto kontūro
+                          skirtumas yra tikėtinas.
+                        </>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  {activeBlockers.length ? (
+                    <ul className="list-disc space-y-1 pl-4 text-[#ffd3a6]">
+                      {activeBlockers.map((blocker) => (
+                        <li key={blocker}>{blocker}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                   {resultIdentity ? (
-                    <span
-                      className="mt-2 block truncate font-mono text-[10px] text-[#aaa69d]"
+                    <p
+                      className="font-mono text-[10px] break-all text-[#8e98a8]"
                       data-roof-fusion-result-identity={
                         resultIdentity.snapshotId
                       }
-                      title={`${resultIdentity.snapshotId} · ${resultIdentity.snapshotHash}`}
                     >
-                      {resultIdentity.measurementMethod} · r
-                      {resultIdentity.revision} · {resultIdentity.snapshotId}
-                    </span>
+                      {measurementMethodLabel(resultIdentity.measurementMethod)}{" "}
+                      · r{resultIdentity.revision} · draft{" "}
+                      {resultIdentity.draftHash?.slice(0, 12) ?? "—"}… · result{" "}
+                      {resultIdentity.snapshotHash.slice(0, 12)}…
+                    </p>
                   ) : null}
+                  {sourceStatusPanel}
                 </div>
-                <button
-                  className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#ddd8cd] hover:bg-white/10"
-                  data-roof-fusion-edit-result
-                  onClick={() => {
-                    goToStage("outline");
-                    onEditResult?.();
-                  }}
-                  type="button"
-                >
-                  Keisti žymėjimą
-                </button>
+              </details>
+            ) : (
+              <div className="rounded-2xl border border-[#e8a317]/25 bg-[#e8a317]/10 p-3 text-xs leading-relaxed text-[#ddd8cd]">
+                <strong className="text-[#f3c66b]">
+                  Šaltinio kontūras nekintamas.
+                </strong>{" "}
+                Jis lieka matomas brūkšniuota linija, o pataisymai kuriami kaip
+                atskiras patvirtintas kontūras.
+              </div>
+            )}
+
+            {stage === "review" ? (
+              <div className="sticky bottom-0 mt-auto grid gap-2 border-t border-white/10 bg-[#151c28] pt-3">
+                {resultState === "current" ? (
+                  <div
+                    className="flex items-center justify-between gap-2 text-[11px] text-[#aaa69d]"
+                    data-roof-fusion-offer-transfer-boundary
+                  >
+                    <span>Perkėlimas į pasiūlymą dar neįjungtas</span>
+                    <span className="rounded-full border border-white/15 px-2 py-0.5">
+                      tik Preview
+                    </span>
+                  </div>
+                ) : null}
+                {resultState === "stale" || resultState === "updating" ? (
+                  <button
+                    className="min-h-11 rounded-xl bg-[#78a9ff] px-4 text-sm font-bold text-[#07101d] hover:bg-[#91b9ff] disabled:cursor-wait disabled:opacity-60"
+                    data-roof-fusion-refresh-result
+                    disabled={
+                      primaryActionPending || resultState === "updating"
+                    }
+                    onClick={() => void refreshStaleResult()}
+                    type="button"
+                  >
+                    {primaryActionPending || resultState === "updating"
+                      ? "Atnaujinama…"
+                      : "Atnaujinti skaičiavimą"}
+                  </button>
+                ) : (
+                  <button
+                    className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#ddd8cd] hover:bg-white/10"
+                    data-roof-fusion-edit-result
+                    onClick={() => navigateToOneCardStep("refine")}
+                    type="button"
+                  >
+                    Keisti žymėjimą
+                  </button>
+                )}
               </div>
             ) : (
               <button

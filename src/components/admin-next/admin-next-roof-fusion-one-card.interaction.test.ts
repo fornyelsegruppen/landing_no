@@ -39,6 +39,7 @@ const garagePolygon = [
 describe("Roof Fusion one-card Preview flow", () => {
   let root: Root;
   let container: HTMLDivElement;
+  let scrollIntoViewMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     (
@@ -47,6 +48,14 @@ describe("Roof Fusion one-card Preview flow", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
+    scrollIntoViewMock = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+      window.setTimeout(() => callback(0), 0),
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -67,6 +76,8 @@ describe("Roof Fusion one-card Preview flow", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as { scrollIntoView?: unknown })
+      .scrollIntoView;
   });
 
   it("automatically captures the address image, exposes every building polygon, and binds the chosen building to one workbench", async () => {
@@ -432,12 +443,20 @@ describe("Roof Fusion one-card Preview flow", () => {
     ).toBe(true);
     await act(async () => {
       changeBuilding!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(captureApi).toHaveBeenCalledTimes(2);
     expect(heightAnalysisAction).toHaveBeenCalledTimes(2);
     expect(
       container.querySelector("[data-roof-fusion-pending-line-point]"),
     ).not.toBeNull();
+    expect(document.activeElement).toBe(
+      container.querySelector("[data-roof-fusion-building-selection]"),
+    );
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start",
+    });
 
     await act(async () => {
       captureButton!.click();

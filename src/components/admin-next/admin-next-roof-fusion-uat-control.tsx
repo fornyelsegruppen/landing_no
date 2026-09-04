@@ -1367,9 +1367,11 @@ export function RealAddressResult({
           ) : buildingSelectionActive && captureResult ? (
             <div
               aria-busy="false"
+              aria-label="Pastato pasirinkimas"
               className="relative overflow-hidden bg-[#080d12]"
               data-roof-fusion-building-selection
               data-roof-fusion-ortho-canvas
+              tabIndex={-1}
               style={{
                 aspectRatio: captureResult.geoReference
                   ? `${captureResult.geoReference.imageWidth} / ${captureResult.geoReference.imageHeight}`
