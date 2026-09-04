@@ -109,4 +109,31 @@ describe("Roof Fusion One Card v2 workflow", () => {
       offerId: "offer-9",
     });
   });
+
+  it("opens an offered measurement correction as a new revision context", () => {
+    const offered = {
+      status: "offer_added" as const,
+      requestId: "search-1",
+      sourceId: "norge-1",
+      candidateId: "way/123",
+      resultId: "result-r7",
+      measurementId: "RF-42-r7",
+      offerId: "offer-9",
+    };
+    const correction = reduceRoofFusionOneCardStateV2(offered, {
+      type: "EDIT_MEASUREMENT",
+    });
+    const calculating = reduceRoofFusionOneCardStateV2(correction, {
+      type: "CALCULATE",
+    });
+
+    expect(correction).toMatchObject({
+      status: "annotate",
+      revisesMeasurementId: "RF-42-r7",
+    });
+    expect(calculating).toMatchObject({
+      status: "calculating",
+      revisesMeasurementId: "RF-42-r7",
+    });
+  });
 });

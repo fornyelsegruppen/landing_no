@@ -34,12 +34,19 @@ export type RoofFusionViewport = Readonly<{
 export const MIN_ROOF_FUSION_ZOOM = 1;
 export const MAX_ROOF_FUSION_ZOOM = 4;
 export const ROOF_FUSION_PAN_THRESHOLD_PX = 5;
-export const ROOF_FUSION_SKELETON_LINE_STROKE = "1px";
-export const ROOF_FUSION_PENDING_LINE_STROKE = "1px";
+export const ROOF_FUSION_SKELETON_LINE_STROKE = "2px";
+export const ROOF_FUSION_PENDING_LINE_STROKE = "2px";
 export const ROOF_FUSION_SKELETON_ENDPOINT_RADIUS = 0.003;
 export const ROOF_FUSION_SKELETON_ENDPOINT_CENTER_RADIUS = 0.0015;
 export const ROOF_FUSION_SKELETON_HIT_RADIUS = 0.022;
 export const ROOF_FUSION_SKELETON_HIT_STROKE = "22px";
+export const ROOF_FUSION_GEOMETRY_TOKENS = {
+  approved: "#35c7b2",
+  source: "#91a0b3",
+  ridge: "#f4b63f",
+  valley: "#55bfe8",
+  contrastHalo: "rgba(255,255,255,.68)",
+} as const;
 export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
   scale: MIN_ROOF_FUSION_ZOOM,
   offsetX: 0,
@@ -141,6 +148,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   geometryHydrationSignal?: string | number;
   /** Changes only when that hydration restores an earlier measurement session. */
   restoredGeometrySignal?: string | number;
+  /** The persistent wrapper can replace this legacy notice with its decision gate. */
+  showRestoredMarkingNotice?: boolean;
   initialStage?: RoofFusionStage;
   initialLayers?: Partial<Record<RoofFusionLayer, boolean>>;
   onStageChange?: (stage: RoofFusionStage) => void;
@@ -739,6 +748,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   guardNotice = "Nieko neišsaugo, kol nepatvirtinta",
   geometryHydrationSignal,
   restoredGeometrySignal,
+  showRestoredMarkingNotice = true,
   initialStage = "outline",
   initialLayers,
   onStageChange,
@@ -782,7 +792,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     () => lines,
   );
   const [restoredMarkingNotice, setRestoredMarkingNotice] = useState(() =>
-    restoredMarkingSummary(lines),
+    showRestoredMarkingNotice ? restoredMarkingSummary(lines) : null,
   );
   const [clearLinesArmed, setClearLinesArmed] = useState(false);
   const [redrawRestoredGeometryArmed, setRedrawRestoredGeometryArmed] =
@@ -805,7 +815,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const panGestureMovedRef = useRef(false);
   const suppressCanvasClickRef = useRef(false);
   const [approvedOutlineFillOpacity, setApprovedOutlineFillOpacity] =
-    useState(8);
+    useState(14);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const advancedDialogRef = useRef<HTMLElement>(null);
   const advancedTriggerRef = useRef<HTMLButtonElement>(null);
@@ -879,7 +889,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       ),
     );
     setDraftLines(lines);
-    if (restoredFromEarlierSession) {
+    if (restoredFromEarlierSession && showRestoredMarkingNotice) {
       setRestoredMarkingNotice(
         restoredMarkingSummary(lines) ?? "atkurtas patvirtintas kontūras",
       );
@@ -891,6 +901,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     geometryHydrationSignal,
     lines,
     restoredGeometrySignal,
+    showRestoredMarkingNotice,
     sourceOutline,
   ]);
 
@@ -1934,11 +1945,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                         data-roof-fusion-roof-plane-outer={plane.id}
                         fill={planeColor(plane.displayId)}
                         fillOpacity={
-                          activeSelectedRoofPlaneId === plane.id ? ".2" : ".1"
+                          activeSelectedRoofPlaneId === plane.id ? ".24" : ".14"
                         }
                         pointerEvents="none"
                         points={pointsAttribute(plane.points)}
-                        stroke="#07101d"
+                        stroke={ROOF_FUSION_GEOMETRY_TOKENS.contrastHalo}
                         strokeLinejoin="round"
                         strokeWidth="3px"
                         vectorEffect="non-scaling-stroke"
@@ -1951,7 +1962,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                         points={pointsAttribute(plane.points)}
                         stroke={planeColor(plane.displayId)}
                         strokeLinejoin="round"
-                        strokeWidth="1px"
+                        strokeWidth="1.5px"
                         vectorEffect="non-scaling-stroke"
                       />
                     </g>
@@ -1965,8 +1976,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     data-roof-fusion-layer="sourceOutline"
                     fill="none"
                     points={pointsAttribute(sourceOutline)}
-                    stroke="#07101d"
-                    strokeDasharray="6 5"
+                    stroke={ROOF_FUSION_GEOMETRY_TOKENS.contrastHalo}
+                    strokeDasharray="6px 5px"
                     strokeWidth="3px"
                     vectorEffect="non-scaling-stroke"
                   />
@@ -1974,9 +1985,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     aria-hidden="true"
                     fill="none"
                     points={pointsAttribute(sourceOutline)}
-                    stroke="#f3c66b"
-                    strokeDasharray="6 5"
-                    strokeWidth="1px"
+                    stroke={ROOF_FUSION_GEOMETRY_TOKENS.source}
+                    strokeDasharray="6px 5px"
+                    strokeWidth="1.5px"
                     vectorEffect="non-scaling-stroke"
                   />
                 </g>
@@ -1986,21 +1997,21 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   <polygon
                     aria-hidden="true"
                     data-roof-fusion-layer="approvedOutline"
-                    fill="#46d69a"
+                    fill={ROOF_FUSION_GEOMETRY_TOKENS.approved}
                     fillOpacity={approvedOutlineFillOpacity / 100}
                     points={pointsAttribute(draftOutline)}
-                    stroke="#07101d"
+                    stroke={ROOF_FUSION_GEOMETRY_TOKENS.contrastHalo}
                     strokeLinejoin="round"
-                    strokeWidth="3px"
+                    strokeWidth="3.5px"
                     vectorEffect="non-scaling-stroke"
                   />
                   <polygon
                     aria-hidden="true"
                     fill="none"
                     points={pointsAttribute(draftOutline)}
-                    stroke="#46d69a"
+                    stroke={ROOF_FUSION_GEOMETRY_TOKENS.approved}
                     strokeLinejoin="round"
-                    strokeWidth="1px"
+                    strokeWidth="2px"
                     vectorEffect="non-scaling-stroke"
                   />
                 </g>
@@ -2030,12 +2041,14 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       aria-hidden="true"
                       key={`${line.id}:outer`}
                       pointerEvents="none"
-                      stroke="#07101d"
+                      stroke={ROOF_FUSION_GEOMETRY_TOKENS.contrastHalo}
                       strokeDasharray={
-                        line.id === "pending-line" ? ".012 .009" : undefined
+                        line.id === "pending-line" || line.kind === "valley"
+                          ? "6px 5px"
+                          : undefined
                       }
                       strokeLinecap="round"
-                      strokeWidth="3px"
+                      strokeWidth="3.5px"
                       vectorEffect="non-scaling-stroke"
                       x1={line.start.x}
                       x2={line.end.x}
@@ -2047,9 +2060,15 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     <line
                       data-roof-fusion-line-kind={line.kind}
                       key={line.id}
-                      stroke={line.kind === "ridge" ? "#f8d164" : "#8cb8ff"}
+                      stroke={
+                        line.kind === "ridge"
+                          ? ROOF_FUSION_GEOMETRY_TOKENS.ridge
+                          : ROOF_FUSION_GEOMETRY_TOKENS.valley
+                      }
                       strokeDasharray={
-                        line.id === "pending-line" ? ".012 .009" : undefined
+                        line.id === "pending-line" || line.kind === "valley"
+                          ? "6px 5px"
+                          : undefined
                       }
                       strokeLinecap="round"
                       strokeWidth={
@@ -2112,7 +2131,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                             cx={point.x}
                             cy={point.y}
                             data-roof-fusion-line-endpoint-outline={`${line.id}:${index}`}
-                            fill="#fffdf7"
+                            fill={
+                              line.kind === "ridge"
+                                ? ROOF_FUSION_GEOMETRY_TOKENS.ridge
+                                : ROOF_FUSION_GEOMETRY_TOKENS.valley
+                            }
                             pointerEvents="none"
                             rx={lineEndpointRadii.rx}
                             ry={lineEndpointRadii.ry}
@@ -2122,7 +2145,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                             cx={point.x}
                             cy={point.y}
                             data-roof-fusion-line-endpoint-center={`${line.id}:${index}`}
-                            fill={line.kind === "ridge" ? "#e8a317" : "#629dff"}
+                            fill="#fffdf7"
                             pointerEvents="none"
                             rx={lineEndpointCenterRadii.rx}
                             ry={lineEndpointCenterRadii.ry}
@@ -2180,7 +2203,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       cx={point.x}
                       cy={point.y}
                       data-roof-fusion-vertex-marker={index}
-                      fill={selectedVertex === index ? "#fff" : "#46d69a"}
+                      fill={
+                        selectedVertex === index
+                          ? ROOF_FUSION_GEOMETRY_TOKENS.approved
+                          : "#fffdf7"
+                      }
                       pointerEvents="none"
                       rx={
                         selectedVertex === index
@@ -2192,8 +2219,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                           ? selectedVertexRadii.ry
                           : vertexRadii.ry
                       }
-                      stroke="#0b111a"
-                      strokeWidth=".003"
+                      stroke={ROOF_FUSION_GEOMETRY_TOKENS.approved}
+                      strokeWidth="2px"
                       vectorEffect="non-scaling-stroke"
                     />
                   </g>
@@ -2207,8 +2234,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   pointerEvents="none"
                   rx={pendingLinePointRadii.rx}
                   ry={pendingLinePointRadii.ry}
-                  stroke="#e8a317"
-                  strokeWidth=".003"
+                  stroke={
+                    lineMode === "valley"
+                      ? ROOF_FUSION_GEOMETRY_TOKENS.valley
+                      : ROOF_FUSION_GEOMETRY_TOKENS.ridge
+                  }
+                  strokeWidth="2px"
                   vectorEffect="non-scaling-stroke"
                 />
               )}
@@ -2237,10 +2268,22 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 );
               })}
             <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2 text-[11px] font-medium">
-              <span className="rounded-full border border-[#f3c66b]/50 bg-[#111722]/85 px-2.5 py-1 text-[#f3c66b]">
-                — Šaltinis (nekintamas)
+              <span
+                className="rounded-full border bg-[#111722]/85 px-2.5 py-1"
+                style={{
+                  borderColor: ROOF_FUSION_GEOMETRY_TOKENS.source,
+                  color: ROOF_FUSION_GEOMETRY_TOKENS.source,
+                }}
+              >
+                ╌ Šaltinis (nekintamas)
               </span>
-              <span className="rounded-full border border-[#46d69a]/50 bg-[#111722]/85 px-2.5 py-1 text-[#71e6b4]">
+              <span
+                className="rounded-full border bg-[#111722]/85 px-2.5 py-1"
+                style={{
+                  borderColor: ROOF_FUSION_GEOMETRY_TOKENS.approved,
+                  color: ROOF_FUSION_GEOMETRY_TOKENS.approved,
+                }}
+              >
                 — Patvirtinta
               </span>
             </div>
@@ -2322,6 +2365,34 @@ export function AdminNextRoofFusionUnifiedWorkbench({
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
+            {stage !== "review" ? (
+              <div
+                aria-label="Geometrijos linijų legenda"
+                className="flex flex-wrap items-center gap-3 text-[11px] text-[#c4c0b8]"
+                data-roof-fusion-geometry-legend
+              >
+                {(
+                  [
+                    ["source", "Šaltinis"],
+                    ["approved", "Kontūras"],
+                    ["ridge", "Kraigas"],
+                    ["valley", "Sąlaja"],
+                  ] as const
+                ).map(([kind, label]) => (
+                  <span className="inline-flex items-center gap-1.5" key={kind}>
+                    <span
+                      aria-hidden="true"
+                      className={`inline-block w-6 border-t-2 ${kind === "valley" || kind === "source" ? "border-dashed" : ""}`}
+                      data-roof-fusion-geometry-legend-token={kind}
+                      style={{
+                        borderColor: ROOF_FUSION_GEOMETRY_TOKENS[kind],
+                      }}
+                    />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {stage !== "review" ? (
               <label
                 className="flex min-w-[220px] flex-1 items-center gap-3 text-xs font-medium text-[#ddd8cd]"

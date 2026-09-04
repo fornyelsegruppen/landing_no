@@ -7,6 +7,7 @@ import {
   DEFAULT_ROOF_FUSION_LAYERS,
   MAX_ROOF_FUSION_ZOOM,
   MIN_ROOF_FUSION_ZOOM,
+  ROOF_FUSION_GEOMETRY_TOKENS,
   ROOF_FUSION_PENDING_LINE_STROKE,
   ROOF_FUSION_ONE_CARD_STEPS,
   ROOF_FUSION_SKELETON_ENDPOINT_CENTER_RADIUS,
@@ -417,8 +418,8 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(atThreeX.ry * 3).toBeCloseTo(atOneX.ry);
     expect(atMaxZoom.rx * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.rx);
     expect(atMaxZoom.ry * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.ry);
-    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("1px");
-    expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("1px");
+    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("2px");
+    expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("2px");
     expect(ROOF_FUSION_SKELETON_ENDPOINT_CENTER_RADIUS).toBe(0.0015);
     expect(ROOF_FUSION_SKELETON_HIT_RADIUS).toBe(0.022);
     expect(ROOF_FUSION_SKELETON_HIT_STROKE).toBe("22px");
@@ -516,6 +517,12 @@ describe("Admin Next unified Roof Fusion workbench", () => {
             start: { x: 0.5, y: 0.3 },
             end: { x: 0.5, y: 0.7 },
           },
+          {
+            id: "valley-a",
+            kind: "valley",
+            start: { x: 0.3, y: 0.4 },
+            end: { x: 0.7, y: 0.6 },
+          },
         ],
         obstacles: [
           { id: "chimney", point: { x: 0.65, y: 0.52 }, label: "Kaminas" },
@@ -529,7 +536,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).toContain('data-roof-fusion-layer="skeleton"');
     expect(html).toContain('data-roof-fusion-line-kind="ridge"');
-    expect(html).toContain('stroke-width="1px"');
+    expect(html).toContain('stroke-width="2px"');
     expect(html).toContain('data-roof-fusion-line-hit-target="ridge-a"');
     expect(html).toContain('stroke="transparent"');
     expect(html).toContain('stroke-width="22px"');
@@ -538,11 +545,16 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       'data-roof-fusion-line-endpoint-hit-target="ridge-a:0"',
     );
     expect(html).toContain(
-      'data-roof-fusion-line-endpoint-outline="ridge-a:0" fill="#fffdf7"',
+      `data-roof-fusion-line-endpoint-outline="ridge-a:0" fill="${ROOF_FUSION_GEOMETRY_TOKENS.ridge}"`,
     );
     expect(html).toContain(
-      'data-roof-fusion-line-endpoint-center="ridge-a:0" fill="#e8a317"',
+      'data-roof-fusion-line-endpoint-center="ridge-a:0" fill="#fffdf7"',
     );
+    expect(html).toContain('data-roof-fusion-line-kind="valley"');
+    expect(html).toContain('stroke-dasharray="6px 5px"');
+    expect(html).toContain("data-roof-fusion-geometry-legend");
+    expect(html).not.toContain('stroke="#07101d"');
+    expect(html).not.toContain('stroke="#0b111a"');
     expect(html).toContain('rx="0.003"');
     expect(html).toContain('rx="0.0015"');
     expect(html).toContain('rx="0.022"');
@@ -709,8 +721,8 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       }),
     );
 
-    expect(html).toContain('data-roof-fusion-workbench="unified"');
-    expect(html).toContain("data-roof-fusion-advanced-trigger");
+    expect(html).toContain('data-roof-fusion-restored-draft-gate="loading"');
+    expect(html).not.toContain('data-roof-fusion-workbench="unified"');
     expect(html).not.toContain('data-roof-fusion-persistence="true"');
     expect(html).not.toContain("Išsaugoti ir patvirtinti reviziją");
     expect(html).not.toContain(">Perkrauti<");

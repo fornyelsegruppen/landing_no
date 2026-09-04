@@ -12,6 +12,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -37,6 +38,10 @@ import type {
   RoofFusionWorkbenchDraftV1,
 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 import type { RoofFusionWorkbenchDetailedResultV1 } from "@/lib/roof-fusion/workbench-detailed-result-v1";
+import {
+  ROOF_FUSION_DRAFT_SESSION_INITIAL_STATE_V1,
+  reduceRoofFusionDraftSessionV1,
+} from "@/lib/roof-fusion/restored-draft-session-v1";
 import {
   AdminNextRoofFusionLegacyFallbackPanel,
   type RoofFusionLegacyFallbackSelection,
@@ -420,7 +425,16 @@ export function AdminNextRoofFusionPersistentWorkbench({
   const [sourceResetRequired, setSourceResetRequired] = useState(false);
   const [geometryHydrationSignal, setGeometryHydrationSignal] = useState(0);
   const [restoredGeometrySignal, setRestoredGeometrySignal] = useState(0);
+  const [draftSession, dispatchDraftSession] = useReducer(
+    reduceRoofFusionDraftSessionV1,
+    ROOF_FUSION_DRAFT_SESSION_INITIAL_STATE_V1,
+  );
+  const [restoredCandidate, setRestoredCandidate] =
+    useState<RoofFusionWorkbenchDraftV1 | null>(null);
   const pendingDraft = useRef<RoofFusionWorkbenchDraftV1 | null>(null);
+  const loadRequestSequence = useRef(0);
+  const operationGeneration = useRef(0);
+  const nextDraftNonce = useRef<string | null>(null);
   const sourceOutlineIdentity = sourceOutline
     .map((point) => `${point.x}:${point.y}`)
     .join("|");
@@ -498,10 +512,6 @@ export function AdminNextRoofFusionPersistentWorkbench({
     },
     [capture, registeredSourceOutline, sourceFootprintId],
   );
-  const applyLoadedDraftRef = useRef(applyLoadedDraft);
-  useEffect(() => {
-    applyLoadedDraftRef.current = applyLoadedDraft;
-  }, [applyLoadedDraft]);
   const captureEvidenceIdentity = [
     capture.sourceId ?? "missing-source",
     capture.rawContentHash ?? "missing-content-hash",
@@ -510,41 +520,123 @@ export function AdminNextRoofFusionPersistentWorkbench({
   const previousCaptureEvidenceIdentity = useRef(captureEvidenceIdentity);
 
   const loadLatest = useCallback(async () => {
+    const requestId = loadRequestSequence.current + 1;
+    loadRequestSequence.current = requestId;
+    operationGeneration.current += 1;
+    const decisionAlreadyMade = draftSession.status === "active";
+    if (!decisionAlreadyMade) {
+      dispatchDraftSession({ type: "LOAD_STARTED", requestId });
+    }
     setLoadState("loading");
     setProblem(null);
     try {
       const draft = await loadWorkbenchDraftV1(caseId);
+      if (loadRequestSequence.current !== requestId) return;
       setLatest(draft);
       setLoadState(draft ? "loaded" : "none");
-      if (draft) applyLoadedDraft(draft);
+      if (decisionAlreadyMade) {
+        if (draft) applyLoadedDraft(draft);
+        return;
+      }
+      const newSessionId = `session-${safeNonce()}`;
+      if (draft) {
+        setRestoredCandidate(draft);
+      } else {
+        setRestoredCandidate(null);
+        nextDraftNonce.current = newSessionId.slice("session-".length);
+      }
+      dispatchDraftSession({
+        type: "LOAD_COMPLETED",
+        requestId,
+        restoredDraft: draft ? reference(draft) : null,
+        newSessionId,
+      });
     } catch (error) {
+      if (loadRequestSequence.current !== requestId) return;
       setLoadState("error");
+      dispatchDraftSession({ type: "LOAD_FAILED", requestId });
       setProblem(
         localizedWorkbenchProblem(error, "Juodraščio įkelti nepavyko."),
       );
     }
-  }, [applyLoadedDraft, caseId]);
+  }, [applyLoadedDraft, caseId, draftSession.status]);
 
   useEffect(() => {
+    const requestId = loadRequestSequence.current + 1;
+    loadRequestSequence.current = requestId;
     let cancelled = false;
+    dispatchDraftSession({ type: "LOAD_STARTED", requestId });
     loadWorkbenchDraftV1(caseId)
       .then((draft) => {
-        if (cancelled) return;
+        if (cancelled || loadRequestSequence.current !== requestId) return;
         setLatest(draft);
         setLoadState(draft ? "loaded" : "none");
-        if (draft) applyLoadedDraftRef.current(draft);
+        const newSessionId = `session-${safeNonce()}`;
+        if (draft) {
+          setRestoredCandidate(draft);
+        } else {
+          setRestoredCandidate(null);
+          nextDraftNonce.current = newSessionId.slice("session-".length);
+        }
+        dispatchDraftSession({
+          type: "LOAD_COMPLETED",
+          requestId,
+          restoredDraft: draft ? reference(draft) : null,
+          newSessionId,
+        });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (cancelled || loadRequestSequence.current !== requestId) return;
         setLoadState("error");
+        dispatchDraftSession({ type: "LOAD_FAILED", requestId });
         setProblem(
           localizedWorkbenchProblem(error, "Juodraščio įkelti nepavyko."),
         );
       });
     return () => {
       cancelled = true;
+      if (loadRequestSequence.current === requestId) {
+        loadRequestSequence.current += 1;
+      }
     };
   }, [caseId, sourceFootprintId]);
+
+  const resumeRestoredDraft = useCallback(() => {
+    if (draftSession.status !== "choice_required" || !restoredCandidate) {
+      return;
+    }
+    operationGeneration.current += 1;
+    nextDraftNonce.current = null;
+    applyLoadedDraft(restoredCandidate);
+    setRestoredCandidate(null);
+    dispatchDraftSession({ type: "RESUME" });
+  }, [applyLoadedDraft, draftSession.status, restoredCandidate]);
+
+  const startNewDraft = useCallback(() => {
+    if (draftSession.status !== "choice_required") return;
+    const nonce = safeNonce();
+    operationGeneration.current += 1;
+    nextDraftNonce.current = nonce;
+    pendingDraft.current = null;
+    setRestoredCandidate(null);
+    setOutline(sourceOutline);
+    setLines([]);
+    setConfirmed(null);
+    setDirty(true);
+    setUnsupportedLatest(false);
+    setSourceResetRequired(false);
+    setHeightResult(null);
+    setLegacyFallback(null);
+    setSaveState("idle");
+    setGeometryHydrationSignal((current) => current + 1);
+    setProblem(
+      `Pradėtas naujas matavimas. Ankstesnė r${draftSession.restoredDraft.revision} revizija išsaugota istorijoje.`,
+    );
+    dispatchDraftSession({
+      type: "START_NEW",
+      sessionId: `session-${nonce}`,
+    });
+  }, [draftSession, sourceOutline]);
 
   useEffect(() => {
     if (previousCaptureEvidenceIdentity.current === captureEvidenceIdentity) {
@@ -604,6 +696,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     useCallback(async (): Promise<RoofFusionWorkbenchDraftV1 | null> => {
       if (confirmed && !dirty) return confirmed;
       if (
+        draftSession.status !== "active" ||
         !evidenceReady ||
         unsupportedLatest ||
         (loadState !== "loaded" && loadState !== "none") ||
@@ -615,6 +708,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         return null;
       setSaveState("saving");
       setProblem(null);
+      const generation = operationGeneration.current;
       try {
         let draft = pendingDraft.current;
         if (
@@ -623,7 +717,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
           !dirty
         ) {
           const revision = (latest?.revision ?? 0) + 1;
-          const nonce = safeNonce();
+          const nonce = nextDraftNonce.current ?? safeNonce();
+          nextDraftNonce.current = nonce;
           draft = await buildWorkbenchDraftFromUiV1({
             caseId,
             actorId,
@@ -650,14 +745,21 @@ export function AdminNextRoofFusionPersistentWorkbench({
           draft,
           latest ? reference(latest) : null,
         );
+        if (operationGeneration.current !== generation) return null;
         setLatest(saved.draft);
         setConfirmed(saved.draft);
         setDirty(false);
         setSaveState(saved.status);
         setGeometryHydrationSignal((current) => current + 1);
         pendingDraft.current = null;
+        nextDraftNonce.current = null;
+        dispatchDraftSession({
+          type: "SAVE_CONFIRMED",
+          draft: reference(saved.draft),
+        });
         return saved.draft;
       } catch (error) {
+        if (operationGeneration.current !== generation) return null;
         setSaveState("error");
         setProblem(localizedWorkbenchProblem(error, "Išsaugoti nepavyko."));
         return null;
@@ -668,6 +770,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       caseId,
       confirmed,
       dirty,
+      draftSession.status,
       evidenceReady,
       latest,
       lines,
@@ -692,6 +795,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         return false;
       setHeightState("running");
       setProblem(null);
+      const generation = operationGeneration.current;
       try {
         const response = await fetch(
           "/api/admin/roof-fusion/workbench-height-adapter",
@@ -719,6 +823,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         );
         const body = (await response.json().catch(() => null)) as
           (HeightResult & { code?: string; error?: string }) | null;
+        if (operationGeneration.current !== generation) return false;
         if (!response.ok || !body)
           throw new WorkbenchUiApiErrorV1(
             body?.code ?? "HEIGHT_FAILED",
@@ -737,6 +842,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         setHeightState("idle");
         return body.status !== "blocked";
       } catch (error) {
+        if (operationGeneration.current !== generation) return false;
         setHeightState("error");
         setProblem(localizedWorkbenchProblem(error, "Skaičiavimas nepavyko."));
         return false;
@@ -809,6 +915,9 @@ export function AdminNextRoofFusionPersistentWorkbench({
       : undefined;
   const confirmSourceReset = useCallback(() => {
     if (!sourceResetRequired) return;
+    const nonce = safeNonce();
+    operationGeneration.current += 1;
+    nextDraftNonce.current = nonce;
     setOutline(sourceOutline);
     setLines([]);
     setConfirmed(null);
@@ -819,6 +928,10 @@ export function AdminNextRoofFusionPersistentWorkbench({
     setLegacyFallback(null);
     pendingDraft.current = null;
     setGeometryHydrationSignal((current) => current + 1);
+    dispatchDraftSession({
+      type: "START_NEW",
+      sessionId: `session-${nonce}`,
+    });
     setProblem(
       "Patvirtinta: ankstesnės rankinės anotacijos pašalintos tik iš naujos neišsaugotos geometrijos.",
     );
@@ -940,6 +1053,104 @@ export function AdminNextRoofFusionPersistentWorkbench({
     return calculated;
   }
 
+  if (draftSession.status !== "active") {
+    const restored =
+      draftSession.status === "choice_required" ? restoredCandidate : null;
+    const ridgeCount =
+      restored?.geometry.skeletonEdges.filter((edge) => edge.type === "ridge")
+        .length ?? 0;
+    const valleyCount =
+      restored?.geometry.skeletonEdges.filter((edge) => edge.type === "valley")
+        .length ?? 0;
+    return (
+      <section
+        aria-busy={draftSession.status === "loading"}
+        aria-label={
+          draftSession.status === "loading"
+            ? "Tikrinamas ankstesnis matavimas"
+            : undefined
+        }
+        aria-labelledby={
+          draftSession.status === "loading"
+            ? undefined
+            : "roof-fusion-restored-draft-title"
+        }
+        className="rounded-3xl border border-white/10 bg-[#0c111a] p-5 text-[#f7f4ee] shadow-2xl sm:p-6"
+        data-roof-fusion-restored-draft-gate={draftSession.status}
+      >
+        {draftSession.status === "loading" ? (
+          <p className="flex items-center gap-3 text-sm" role="status">
+            <LoaderCircle aria-hidden className="size-5 animate-spin" />
+            Tikrinamas ankstesnis matavimas…
+          </p>
+        ) : draftSession.status === "error" ? (
+          <div className="grid gap-3">
+            <h2
+              className="text-lg font-semibold"
+              id="roof-fusion-restored-draft-title"
+            >
+              Ankstesnio matavimo patikrinti nepavyko
+            </h2>
+            <p className="text-sm text-[#c4c0b8]" role="alert">
+              {problem ?? "Juodraščio įkelti nepavyko."} Redagavimas lieka
+              užblokuotas, kol revizija nepatikrinta.
+            </p>
+            <button
+              className="min-h-11 justify-self-start rounded-xl border border-[#e8a317]/45 bg-[#e8a317]/10 px-4 text-sm font-bold text-[#f3c66b]"
+              onClick={() => void loadLatest()}
+              type="button"
+            >
+              Bandyti dar kartą
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-4" data-roof-fusion-restored-draft-prompt>
+            <div>
+              <p className="text-[11px] font-semibold tracking-[.18em] text-[#e8a317] uppercase">
+                Roof Fusion · Preview
+              </p>
+              <h2
+                className="mt-1 text-xl font-semibold"
+                id="roof-fusion-restored-draft-title"
+              >
+                Rastas ankstesnis nebaigtas matavimas
+              </h2>
+              <p className="mt-2 text-sm text-[#c4c0b8]">
+                r{restored?.revision ?? draftSession.restoredDraft.revision} ·
+                kraigų: {ridgeCount} · sąlajų: {valleyCount}. Pasirinkite, kaip
+                tęsti; iki tol geometrija neredaguojama.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                className="min-h-12 rounded-xl bg-[#e8a317] px-4 text-sm font-black text-[#17130a] disabled:opacity-40"
+                data-roof-fusion-resume-restored-draft
+                disabled={!restored}
+                onClick={resumeRestoredDraft}
+                type="button"
+              >
+                Tęsti ankstesnį matavimą
+              </button>
+              <button
+                className="min-h-12 rounded-xl border border-white/20 bg-white/5 px-4 text-sm font-bold text-white disabled:opacity-40"
+                data-roof-fusion-start-new-draft
+                disabled={!restored}
+                onClick={startNewDraft}
+                type="button"
+              >
+                Pradėti naują matavimą
+              </button>
+            </div>
+            <p className="text-xs text-[#aaa69d]">
+              Naujas matavimas išlaikys ankstesnę reviziją istorijoje ir
+              nenaudos naujos ortofoto užklausos.
+            </p>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
     <AdminNextRoofFusionUnifiedWorkbench
       approvedOutline={outline}
@@ -972,12 +1183,15 @@ export function AdminNextRoofFusionPersistentWorkbench({
       guardNotice={
         legacyFallback
           ? "Preview · aktyvus senas rankinis fallback · kainodarai nenaudojama"
-          : confirmed && !dirty
-            ? "Preview · revizija išsaugota ir pakartotinai patvirtinta"
-            : "Preview · neišsaugoti pakeitimai"
+          : draftSession.mode === "new" && draftSession.baseDraft
+            ? `Preview · naujas matavimas · ankstesnė r${draftSession.baseDraft.revision} išsaugota istorijoje`
+            : confirmed && !dirty
+              ? "Preview · revizija išsaugota ir pakartotinai patvirtinta"
+              : "Preview · neišsaugoti pakeitimai"
       }
       geometryHydrationSignal={geometryHydrationSignal}
       restoredGeometrySignal={restoredGeometrySignal}
+      showRestoredMarkingNotice={false}
       horizontalAreaSquareMeters={
         metrics?.horizontalAreaSquareMeters ?? horizontalAreaSquareMeters
       }

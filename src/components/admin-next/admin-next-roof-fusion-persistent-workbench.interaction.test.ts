@@ -112,9 +112,18 @@ function detailedResultFixture() {
   };
 }
 
+let autoResumeRestoredDraft = true;
+
 async function flushAsyncWork() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
+  const resume = document.querySelector<HTMLButtonElement>(
+    "[data-roof-fusion-resume-restored-draft]",
+  );
+  if (autoResumeRestoredDraft && resume) {
+    resume.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }
 
 describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
@@ -175,7 +184,14 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     container.querySelectorAll("[data-roof-fusion-line-kind]");
 
   const click = async (selector: string) => {
-    const button = container.querySelector<HTMLButtonElement>(selector);
+    let button = container.querySelector<HTMLButtonElement>(selector);
+    const resume = container.querySelector<HTMLButtonElement>(
+      "[data-roof-fusion-resume-restored-draft]",
+    );
+    if (!button && autoResumeRestoredDraft && resume) {
+      await act(async () => resume.click());
+      button = container.querySelector<HTMLButtonElement>(selector);
+    }
     expect(button).not.toBeNull();
     await act(async () => button!.click());
   };
@@ -302,6 +318,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
+    autoResumeRestoredDraft = true;
     latest = await buildWorkbenchDraftFromUiV1({
       actorId: "7",
       approvedOutline: persistedOutline,
@@ -562,6 +579,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       );
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
 
     expect(stage()).toBe("outline");
     expect(container.textContent).not.toContain("87,1 m²");
@@ -620,12 +638,25 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
   });
 
-  it("hydrates approved geometry and a saved line after the latest draft loads asynchronously", async () => {
+  it("blocks editing until the operator resumes the exact restored draft identity", async () => {
+    autoResumeRestoredDraft = false;
+    const restoredIdentity = latest
+      ? { draftId: latest.draftId, draftHash: latest.draftHash }
+      : null;
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
 
+    expect(
+      container.querySelector("[data-roof-fusion-restored-draft-prompt]"),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("Tęsti ankstesnį matavimą");
+    expect(container.textContent).toContain("Pradėti naują matavimą");
+    expect(container.textContent).toContain("kraigų: 1 · sąlajų: 0");
+    expect(container.querySelector("[data-roof-fusion-canvas]")).toBeNull();
+
+    await click("[data-roof-fusion-resume-restored-draft]");
     expect(
       container
         .querySelector('[data-roof-fusion-layer="approvedOutline"]')
@@ -637,41 +668,99 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       renderedLines().item(0).getAttribute("data-roof-fusion-line-kind"),
     ).toBe("ridge");
-    expect(container.textContent).toContain(
-      "Atkurti ankstesni nebaigto matavimo pakeitimai",
-    );
-    expect(container.textContent).toContain("kraigų: 1 · sąlajų: 0");
     expect(
-      container.querySelector("[data-roof-fusion-continue-restored]"),
-    ).not.toBeNull();
-    expect(
-      container.querySelector("[data-roof-fusion-redraw-lines]"),
-    ).not.toBeNull();
-
-    await click("[data-roof-fusion-continue-restored]");
-    expect(
-      container.querySelector("[data-roof-fusion-restored-marking]"),
+      container.querySelector("[data-roof-fusion-restored-draft-prompt]"),
     ).toBeNull();
     expect(renderedLines()).toHaveLength(1);
+    expect(latest).toMatchObject(restoredIdentity!);
     expect(container.textContent).toContain(
       "Preview · revizija išsaugota ir pakartotinai patvirtinta",
     );
   });
 
-  it("redraws restored geometry only in the dirty draft and reloads the confirmed revision", async () => {
+  it("ignores a late draft response after the active footprint load changes", async () => {
+    autoResumeRestoredDraft = false;
+    const olderDraft = latest!;
+    const newerDraft = await buildWorkbenchDraftFromUiV1({
+      actorId: "7",
+      approvedOutline: sourceOutline,
+      caseId: "lead:13",
+      createdAt: "2026-09-04T09:00:00.000Z",
+      draftId: "uat-lead-13-r2-building-b",
+      evidence: {
+        attribution: capture.attribution!,
+        georeference: geoReference,
+        imageId: capture.mediaId,
+        sourceContentHash: capture.rawContentHash!,
+        sourceId: capture.sourceId!,
+      },
+      idempotencyKey: "workbench:lead:13:r2:building-b",
+      lines: [],
+      revision: 2,
+      sourceFootprintId: "osm:B",
+      sourceOutline,
+      supersedes: {
+        draftId: olderDraft.draftId,
+        revision: olderDraft.revision,
+        draftHash: olderDraft.draftHash,
+        state: olderDraft.state,
+      },
+    });
+    let resolveOlder: ((response: Response) => void) | undefined;
+    let loadCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (
+          !String(input).startsWith("/api/admin/roof-fusion/workbench-draft?")
+        ) {
+          throw new Error(`Unexpected request: ${String(input)}`);
+        }
+        loadCount += 1;
+        if (loadCount === 1) {
+          return await new Promise<Response>((resolve) => {
+            resolveOlder = resolve;
+          });
+        }
+        return new Response(JSON.stringify({ draft: newerDraft }), {
+          headers: { "content-type": "application/json" },
+          status: 200,
+        });
+      }),
+    );
+
+    await act(async () => {
+      root.render(renderWorkbench(capture, undefined, "osm:A"));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      root.render(renderWorkbench(capture, undefined, "osm:B"));
+      await flushAsyncWork();
+    });
+    expect(container.textContent).toContain("r2 · kraigų: 0");
+
+    await act(async () => {
+      resolveOlder?.(
+        new Response(JSON.stringify({ draft: olderDraft }), {
+          headers: { "content-type": "application/json" },
+          status: 200,
+        }),
+      );
+      await flushAsyncWork();
+    });
+    expect(container.textContent).toContain("r2 · kraigų: 0");
+    expect(container.textContent).not.toContain("r1 · kraigų: 1");
+  });
+
+  it("starts a new identity without old lines or another capture and reloads deterministically", async () => {
+    autoResumeRestoredDraft = false;
+    const previousDraft = latest!;
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
 
-    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
-    await click("[data-roof-fusion-redraw-lines]");
-    expect(stage()).toBe("skeleton");
-    expect(
-      container.querySelector("[data-roof-fusion-clear-lines-confirmation]"),
-    ).not.toBeNull();
-    await click("[data-roof-fusion-confirm-clear-lines]");
-
+    await click("[data-roof-fusion-start-new-draft]");
     expect(renderedLines()).toHaveLength(0);
     expect(
       container
@@ -680,25 +769,42 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe("0.1,0.1 0.9,0.1 0.9,0.9 0.1,0.9");
     expect(latest?.geometry.skeletonEdges).toHaveLength(1);
     expect(container.textContent).toContain(
-      "Kontūras ir linijos pakeisti tik neišsaugotame juodraštyje",
+      "ankstesnė r1 išsaugota istorijoje",
     );
-    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+    expect(container.textContent).toContain("Preview · naujas matavimas");
 
     await openAdvanced();
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      false,
+    );
+    await act(async () => {
+      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
+      await flushAsyncWork();
+    });
+    await vi.waitFor(() => expect(latest?.revision).toBe(2));
+    expect(latest).toMatchObject({
+      revision: 2,
+      supersedesDraftId: previousDraft.draftId,
+      geometry: { skeletonEdges: [] },
+    });
+    expect(latest?.draftId).not.toBe(previousDraft.draftId);
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([url]) => String(url).includes("norgeibilder")),
+    ).toBe(false);
+
     await act(async () => {
       buttonWithText("Perkrauti")!.click();
       await flushAsyncWork();
     });
-    expect(renderedLines()).toHaveLength(1);
     expect(
-      container
-        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
-        ?.getAttribute("points"),
-    ).toBe("0.4,0.3 0.6,0.3 0.6,0.7 0.4,0.7");
+      container.querySelector("[data-roof-fusion-restored-draft-prompt]"),
+    ).toBeNull();
+    expect(renderedLines()).toHaveLength(0);
     expect(container.textContent).toContain(
-      "Atkurti ankstesni nebaigto matavimo pakeitimai",
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
     );
-    expect(stage()).toBe("skeleton");
   });
 
   it("auto-fits the selected roof once and preserves manual zoom across draft hydration", async () => {
@@ -732,6 +838,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         );
         await flushAsyncWork();
       });
+      await click('[data-roof-fusion-stage-tab="outline"]');
       const zoomPercent = () =>
         Number.parseInt(
           container
@@ -951,6 +1058,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
     const fetchMock = vi.mocked(fetch);
     const draftLoadCount = () =>
       fetchMock.mock.calls.filter(([input]) =>
@@ -1077,6 +1185,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(capture, heightSurface, "osm:B"));
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
 
     expect(
       container
@@ -1131,6 +1240,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       );
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
 
     expect(
       container
@@ -1155,6 +1265,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(capture, heightSurface, "osm:B"));
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
 
     expect(
       container
@@ -1181,6 +1292,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(capture, heightSurface));
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
     await act(async () => {
       buttonWithText("Apskaičiuoti")!.click();
       await flushAsyncWork();
@@ -1407,6 +1519,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+    await click('[data-roof-fusion-stage-tab="outline"]');
 
     const trigger = container.querySelector<HTMLButtonElement>(
       "[data-roof-fusion-advanced-trigger]",
@@ -1640,7 +1753,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(pendingMarker).not.toBeNull();
     expect(pendingMarker!.getAttribute("cx")).toBe("0.4");
     expect(Number(pendingMarker!.getAttribute("rx"))).toBeLessThan(0.002);
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
     expect(container.textContent).toContain(
       "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
     );
@@ -1652,7 +1765,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(renderedLines().item(1).getAttribute("x1")).not.toBe(
       renderedLines().item(1).getAttribute("x2"),
     );
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
     expect(
       container.querySelectorAll("[data-roof-fusion-line-endpoint]"),
     ).toHaveLength(4);
@@ -1666,9 +1779,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       "[data-roof-fusion-line-endpoint-hit-target]",
     );
     expect(Number(endpointOutline?.getAttribute("rx")) * 3).toBeCloseTo(0.003);
-    expect(endpointOutline?.getAttribute("fill")).toBe("#fffdf7");
+    expect(endpointOutline?.getAttribute("fill")).toBe("#f4b63f");
     expect(Number(endpointCenter?.getAttribute("rx")) * 3).toBeCloseTo(0.0015);
-    expect(endpointCenter?.getAttribute("fill")).toBe("#e8a317");
+    expect(endpointCenter?.getAttribute("fill")).toBe("#fffdf7");
     expect(Number(endpointHitTarget?.getAttribute("rx")) * 3).toBeCloseTo(
       0.022,
     );

@@ -11,12 +11,14 @@ export type RoofFusionOneCardStateV2 =
       requestId: string;
       sourceId: string;
       candidateId: string;
+      revisesMeasurementId?: string;
     }>
   | Readonly<{
       status: "calculating";
       requestId: string;
       sourceId: string;
       candidateId: string;
+      revisesMeasurementId?: string;
     }>
   | Readonly<{
       status: "result";
@@ -24,6 +26,7 @@ export type RoofFusionOneCardStateV2 =
       sourceId: string;
       candidateId: string;
       resultId: string;
+      revisesMeasurementId?: string;
     }>
   | Readonly<{
       status: "blocked";
@@ -31,6 +34,7 @@ export type RoofFusionOneCardStateV2 =
       sourceId: string;
       candidateId: string;
       reason: string;
+      revisesMeasurementId?: string;
     }>
   | Readonly<{
       status: "adding_to_offer";
@@ -38,6 +42,7 @@ export type RoofFusionOneCardStateV2 =
       sourceId: string;
       candidateId: string;
       resultId: string;
+      revisesMeasurementId?: string;
     }>
   | Readonly<{
       status: "offer_added";
@@ -147,12 +152,19 @@ export function reduceRoofFusionOneCardStateV2(
     return { ...state, status: "blocked", reason: event.reason };
   }
   if (event.type === "EDIT_MEASUREMENT") {
-    if (state.status !== "result") return state;
+    if (state.status !== "result" && state.status !== "offer_added") {
+      return state;
+    }
     return {
       status: "annotate",
       requestId: state.requestId,
       sourceId: state.sourceId,
       candidateId: state.candidateId,
+      ...(state.status === "offer_added"
+        ? { revisesMeasurementId: state.measurementId }
+        : state.revisesMeasurementId
+          ? { revisesMeasurementId: state.revisesMeasurementId }
+          : {}),
     };
   }
   if (event.type === "ADD_TO_OFFER") {
