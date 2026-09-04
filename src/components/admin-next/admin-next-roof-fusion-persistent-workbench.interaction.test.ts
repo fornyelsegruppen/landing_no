@@ -449,7 +449,103 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
   });
 
-  it("drags a saved endpoint live with touch at 300% and fences it to the approved outline", async () => {
+  it("rolls a touch endpoint drag back on pointercancel without dirtying the confirmed revision", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    const canvasShell = container.querySelector<HTMLDivElement>(
+      "[data-roof-fusion-canvas-shell]",
+    );
+    expect(canvasShell).not.toBeNull();
+    canvasShell!.getBoundingClientRect = () =>
+      ({
+        bottom: 500,
+        height: 500,
+        left: 0,
+        right: 1_000,
+        top: 0,
+        width: 1_000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+    await click('[aria-label="Didinti vaizdą"]');
+
+    const ridge = () =>
+      container.querySelector<SVGLineElement>(
+        '[data-roof-fusion-line-kind="ridge"]',
+      );
+    const endpoint = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    expect(endpoint).not.toBeNull();
+    expect(ridge()?.getAttribute("x1")).toBe("0.45");
+    expect(container.textContent).toContain(
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
+    );
+
+    await act(async () => {
+      endpoint!.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 350,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 40,
+          pointerType: "touch",
+        }),
+      );
+      endpoint!.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          button: 0,
+          clientX: 0,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 40,
+          pointerType: "touch",
+        }),
+      );
+    });
+
+    expect(ridge()?.getAttribute("x1")).toBe("0.4");
+    expect(container.textContent).toContain(
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
+    );
+    const movedEndpoint = container.querySelector<SVGEllipseElement>(
+      "[data-roof-fusion-line-endpoint-hit-target]",
+    );
+    await act(async () => {
+      movedEndpoint!.dispatchEvent(
+        new PointerEvent("pointercancel", {
+          bubbles: true,
+          button: 0,
+          clientX: 0,
+          clientY: 250,
+          isPrimary: true,
+          pointerId: 40,
+          pointerType: "touch",
+        }),
+      );
+    });
+
+    expect(ridge()?.getAttribute("x1")).toBe("0.45");
+    expect(container.textContent).toContain(
+      "Linijos galinio taško keitimas atšauktas",
+    );
+    expect(container.textContent).toContain(
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
+    );
+    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+  });
+
+  it("commits a fenced touch endpoint drag only on pointerup", async () => {
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
@@ -513,6 +609,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
 
     expect(ridge()?.getAttribute("x1")).toBe("0.4");
     expect(latest?.geometry.skeletonEdges).toHaveLength(1);
+    expect(container.textContent).toContain(
+      "Preview · revizija išsaugota ir pakartotinai patvirtinta",
+    );
     const movedEndpoint = container.querySelector<SVGEllipseElement>(
       "[data-roof-fusion-line-endpoint-hit-target]",
     );
