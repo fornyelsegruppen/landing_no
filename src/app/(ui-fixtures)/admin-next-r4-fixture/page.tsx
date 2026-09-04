@@ -22,6 +22,7 @@ export default function AdminNextR4VisualFixture() {
         locale="lt"
         measurement={measurement}
         owner={adminNextCaseWorkspaceFixture.owner.name}
+        returnTo="/admin-next-preview/cases/TF-1042?tab=measurement#case-evidence-title"
         source="fixture"
       />
     </AdminNextShell>

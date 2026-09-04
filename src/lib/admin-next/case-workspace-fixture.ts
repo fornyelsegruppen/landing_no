@@ -2,6 +2,26 @@ import type {
   AdminNextCaseWorkspaceAdapter,
   AdminNextCaseWorkspaceView,
 } from "@/lib/admin-next/case-workspace-contract";
+import {
+  ADMIN_NEXT_RF_ROUTE_VERSION,
+  buildAdminNextRfRoute,
+} from "@/lib/admin-next/rf-route-contract";
+
+const fixtureRfRoute = buildAdminNextRfRoute({
+  version: ADMIN_NEXT_RF_ROUTE_VERSION,
+  mode: "review",
+  case: { id: 1042, reference: "TF-1042", revision: 12 },
+  measurement: { id: "R4-2026-1042", revision: 7 },
+  snapshot: {
+    id: "R4-2026-1042",
+    revision: 7,
+    hash: "a".repeat(64),
+  },
+  blocker: "measurement.review_required",
+  evidence: ["EVD-R4-1042-01"],
+  returnTo:
+    "/admin-next-preview/cases/TF-1042?tab=evidence#case-evidence-title",
+});
 
 export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
   reference: "TF-1042",
@@ -19,16 +39,24 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
     state: "overdue",
   },
   nextAction: {
+    kind: "approve_measurement",
     title: "Patikrinti R4 matavimą",
     reason:
       "Matavimo patikimumas yra 82 %. Prieš pasiūlymą reikia patvirtinti du stogo kraštus.",
+    label: "Peržiūrėti R4",
+    href: fixtureRfRoute,
+    processStage: "evidence",
+    requiredCapability: "measurement.review_approve",
+    reviewMode: "review_and_commit",
+    interaction: { mode: "executable", activation: "open_workbench" },
   },
   stages: [
     { id: "inquiry", state: "complete" },
-    { id: "measurement", state: "current" },
-    { id: "offer", state: "blocked" },
-    { id: "contract", state: "upcoming" },
+    { id: "evidence", state: "current" },
+    { id: "commercial", state: "blocked" },
+    { id: "agreement", state: "upcoming" },
     { id: "work", state: "upcoming" },
+    { id: "completion", state: "upcoming" },
   ],
   evidence: [
     {
@@ -40,8 +68,7 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       metric: "186,4 m² · 82 %",
       recordedAt: "08:41",
       fallbackHref: "/admin-v2/cases",
-      previewHref:
-        "/admin-next-preview/cases/TF-1042/measurements/R4-2026-1042",
+      previewHref: fixtureRfRoute,
       previewAction: "review_measurement",
     },
     {
@@ -116,15 +143,50 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       },
     ],
     primarySlopes: [
-      { id: "S1", areaSquareMeters: 54.2, pitchDegrees: 22, perimeterMeters: 31.8 },
-      { id: "S2", areaSquareMeters: 49.8, pitchDegrees: 24, perimeterMeters: 29.6 },
-      { id: "S3", areaSquareMeters: 43.6, pitchDegrees: 22, perimeterMeters: 27.4 },
-      { id: "S4", areaSquareMeters: 38.8, pitchDegrees: 17, perimeterMeters: 25.9 },
+      {
+        id: "S1",
+        areaSquareMeters: 54.2,
+        pitchDegrees: 22,
+        perimeterMeters: 31.8,
+      },
+      {
+        id: "S2",
+        areaSquareMeters: 49.8,
+        pitchDegrees: 24,
+        perimeterMeters: 29.6,
+      },
+      {
+        id: "S3",
+        areaSquareMeters: 43.6,
+        pitchDegrees: 22,
+        perimeterMeters: 27.4,
+      },
+      {
+        id: "S4",
+        areaSquareMeters: 38.8,
+        pitchDegrees: 17,
+        perimeterMeters: 25.9,
+      },
     ],
     photos: [
-      { id: "IMG-1042-N", label: "Šiaurinė stogo pusė", source: "Aerial source A", capturedAt: "2026-09-01 08:35" },
-      { id: "IMG-1042-S", label: "Pietinė stogo pusė", source: "Aerial source B", capturedAt: "2026-09-01 08:36" },
-      { id: "IMG-1042-C", label: "Kamino ir kraigo zona", source: "Field photo 07", capturedAt: "2026-09-01 08:37" },
+      {
+        id: "IMG-1042-N",
+        label: "Šiaurinė stogo pusė",
+        source: "Aerial source A",
+        capturedAt: "2026-09-01 08:35",
+      },
+      {
+        id: "IMG-1042-S",
+        label: "Pietinė stogo pusė",
+        source: "Aerial source B",
+        capturedAt: "2026-09-01 08:36",
+      },
+      {
+        id: "IMG-1042-C",
+        label: "Kamino ir kraigo zona",
+        source: "Field photo 07",
+        capturedAt: "2026-09-01 08:37",
+      },
     ],
     deltaFromR3: {
       areaSquareMeters: 3.8,
@@ -132,10 +194,22 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       planeCount: 1,
     },
     verificationGates: [
-      { id: "source_identity", state: "verified", detail: "Evidence ID ir checksum sutampa" },
+      {
+        id: "source_identity",
+        state: "verified",
+        detail: "Evidence ID ir checksum sutampa",
+      },
       { id: "plane_sum", state: "verified", detail: "S1–S4 suma yra 186,4 m²" },
-      { id: "review_edges", state: "review_required", detail: "E-04 ir E-11 dar nepatvirtinti" },
-      { id: "approval", state: "locked", detail: "Confirm laukia exact edge review" },
+      {
+        id: "review_edges",
+        state: "review_required",
+        detail: "E-04 ir E-11 dar nepatvirtinti",
+      },
+      {
+        id: "approval",
+        state: "locked",
+        detail: "Confirm laukia exact edge review",
+      },
     ],
     nextAction:
       "Palyginti E-04 ir E-11 kraštus su objekto nuotraukomis, tada patvirtinti arba pataisyti geometriją veikiančiame matavimo sraute.",
@@ -246,6 +320,7 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       actor: "Takfornyelse CRM",
     },
   ],
+  timelineState: { status: "ready", source: "fixture" },
   fallback: {
     caseHref: "/admin-v2/cases",
     documentsHref: "/admin-v2/documents",
@@ -253,15 +328,16 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
   },
 };
 
-export const adminNextFixtureCaseWorkspaceAdapter: AdminNextCaseWorkspaceAdapter = {
-  async load(reference) {
-    if (reference !== adminNextCaseWorkspaceFixture.reference) {
-      return { status: "not_found" };
-    }
-    return {
-      status: "ready",
-      source: "fixture",
-      value: adminNextCaseWorkspaceFixture,
-    };
-  },
-};
+export const adminNextFixtureCaseWorkspaceAdapter: AdminNextCaseWorkspaceAdapter =
+  {
+    async load(reference) {
+      if (reference !== adminNextCaseWorkspaceFixture.reference) {
+        return { status: "not_found" };
+      }
+      return {
+        status: "ready",
+        source: "fixture",
+        value: adminNextCaseWorkspaceFixture,
+      };
+    },
+  };

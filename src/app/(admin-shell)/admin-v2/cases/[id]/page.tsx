@@ -12,7 +12,7 @@ import { CaseActionPanel } from "@/components/admin-v2/case-action-panel";
 import { AdminLeadPhotoGallery } from "@/components/admin-v2/admin-lead-photo-gallery";
 import { MeasurementReviewPanel } from "@/components/admin-v2/measurement-review-panel";
 import { WorkOrderPlanningPanel } from "@/components/admin-v2/work-order-planning-panel";
-import { CommercialQuoteEditor } from "@/components/admin-v2/commercial-quote-editor";
+import { CaseCommercialPackageWorkbench } from "@/components/admin-v2/case-commercial-package-workbench";
 import { CompletionReviewPanel } from "@/components/admin-v2/completion-review-panel";
 import { InvoiceRecordPanel } from "@/components/admin-v2/invoice-record-panel";
 import { OfficialInvoiceManager } from "@/components/admin-v2/official-invoice-manager";
@@ -79,6 +79,7 @@ import {
   type CasePriceCalculation,
   type CaseTimelineItem,
 } from "@/lib/admin-v2/case-read-model";
+import { projectCaseCommercialPackageWorkbench } from "@/lib/admin-v2/case-commercial-package-workbench-model";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale, type PanelLocale } from "@/lib/panel-i18n";
 import {
@@ -2392,26 +2393,14 @@ export default async function AdminCasePage({
                         ))}
                       </div>
                     ) : null}
-                    {secondaryMutationsAllowed &&
-                    caseData.quote &&
-                    ["draft", "declined"].includes(
-                      caseData.quote.status || "",
-                    ) &&
-                    caseData.price ? (
-                      <CommercialQuoteEditor
-                        currentService={caseData.lead.inquiryType}
-                        expectedRevision={caseData.lead.revision}
-                        leadId={caseData.lead.id}
-                        locale={user.interfaceLanguage}
-                        rules={rules}
-                        sourceQuoteId={caseData.quote.id}
-                        unitPriceExVatOre={
-                          caseData.quote.optionKind === "recommended"
-                            ? undefined
-                            : caseData.price.unitPriceExVatOre
-                        }
-                      />
-                    ) : null}
+                    <CaseCommercialPackageWorkbench
+                      value={projectCaseCommercialPackageWorkbench({
+                        caseData,
+                        locale: user.interfaceLanguage,
+                        mutationsAllowed: secondaryMutationsAllowed,
+                        rules,
+                      })}
+                    />
                   </Section>
 
                   <Section

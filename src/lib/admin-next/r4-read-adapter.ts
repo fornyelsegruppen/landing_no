@@ -16,7 +16,20 @@ export type AdminNextR4MeasurementView = NonNullable<
   surfaceAreaSquareMeters?: number;
 };
 export type AdminNextR4LoadResult =
-  | { status: "ready"; source: "fixture" | "canonical"; value: AdminNextR4MeasurementView }
+  | {
+      status: "ready";
+      source: "fixture";
+      value: AdminNextR4MeasurementView;
+    }
+  | {
+      status: "ready";
+      source: "canonical";
+      value: AdminNextR4MeasurementView;
+      binding: {
+        measurement: { id: string; revision: number };
+        snapshot: { id: string; revision: number; hash: string };
+      };
+    }
   | {
       status: "not_found";
       reason:
@@ -26,7 +39,11 @@ export type AdminNextR4LoadResult =
         | "measurement_mismatch";
     };
 export interface AdminNextR4Adapter {
-  load(caseReference: string, measurementReference: string): Promise<AdminNextR4LoadResult>;
+  load(
+    caseReference: string,
+    measurementReference: string,
+    snapshotReference?: string,
+  ): Promise<AdminNextR4LoadResult>;
 }
 
 export const adminNextFixtureR4Adapter: AdminNextR4Adapter = {
@@ -36,13 +53,16 @@ export const adminNextFixtureR4Adapter: AdminNextR4Adapter = {
       caseReference !== adminNextCaseWorkspaceFixture.reference ||
       !measurement ||
       measurement.reference !== measurementReference
-    ) return { status: "not_found", reason: "fixture_missing" };
+    )
+      return { status: "not_found", reason: "fixture_missing" };
     return { status: "ready", source: "fixture", value: measurement };
   },
 };
 
 function midpoint(value: RoofMeasurementValueV1): number | undefined {
-  return value.min === null || value.max === null ? undefined : (value.min + value.max) / 2;
+  return value.min === null || value.max === null
+    ? undefined
+    : (value.min + value.max) / 2;
 }
 function confidence(snapshot: RoofSnapshotV1) {
   return Math.round((snapshot.measurement.confidence.score || 0) * 100);
@@ -54,7 +74,10 @@ function overallPitch(snapshot: RoofSnapshotV1) {
       const pitch = midpoint(surface.pitch);
       return area === undefined || pitch === undefined
         ? result
-        : { area: result.area + area, pitchArea: result.pitchArea + pitch * area };
+        : {
+            area: result.area + area,
+            pitchArea: result.pitchArea + pitch * area,
+          };
     },
     { area: 0, pitchArea: 0 },
   );
@@ -70,7 +93,9 @@ export function projectRoofSnapshotToR4(
   snapshot: RoofSnapshotV1,
   previous: RoofSnapshotV1 | null,
 ): AdminNextR4MeasurementView {
-  const reviewedEdges = snapshot.geometry.edges.filter((edge) => edge.quality === "conflicted");
+  const reviewedEdges = snapshot.geometry.edges.filter(
+    (edge) => edge.quality === "conflicted",
+  );
   const sources = snapshot.provenance.sources;
   const rendererContours = new Map(
     snapshot.rendererPayload.contours.map((contour) => [
@@ -78,16 +103,21 @@ export function projectRoofSnapshotToR4(
       contour,
     ]),
   );
-  const primarySlopes = snapshot.geometry.surfaces.slice(0, 4).map((surface, index) => ({
-    id: (["S1", "S2", "S3", "S4"] as const)[index],
-    areaSquareMeters: midpoint(surface.netSurfaceArea) ?? 0,
-    pitchDegrees: midpoint(surface.pitch),
-    perimeterMeters: perimeter(snapshot, surface.surfaceId),
-  }));
+  const primarySlopes = snapshot.geometry.surfaces
+    .slice(0, 4)
+    .map((surface, index) => ({
+      id: (["S1", "S2", "S3", "S4"] as const)[index],
+      areaSquareMeters: midpoint(surface.netSurfaceArea) ?? 0,
+      pitchDegrees: midpoint(surface.pitch),
+      perimeterMeters: perimeter(snapshot, surface.surfaceId),
+    }));
   const area = midpoint(snapshot.totals.netSurfaceArea) ?? 0;
   return {
     reference: snapshot.snapshotId,
-    state: snapshot.state === "approved" && snapshot.quality.status === "pass" ? "verified" : "review_required",
+    state:
+      snapshot.state === "approved" && snapshot.quality.status === "pass"
+        ? "verified"
+        : "review_required",
     areaSquareMeters: area,
     horizontalAreaSquareMeters: midpoint(snapshot.totals.grossHorizontalArea),
     surfaceAreaSquareMeters: midpoint(snapshot.totals.grossSurfaceArea),
@@ -98,7 +128,8 @@ export function projectRoofSnapshotToR4(
     comparedToReference: previous?.snapshotId,
     provenance: {
       evidenceId: sources[0]?.sourceId || snapshot.snapshotId,
-      source: sources.map((source) => source.provider).join(" + ") || "Roof Fusion",
+      source:
+        sources.map((source) => source.provider).join(" + ") || "Roof Fusion",
       capturedAt: snapshot.generatedAt,
       modelVersion: snapshot.engineVersion,
       checksum: snapshot.snapshotHash,
@@ -115,7 +146,11 @@ export function projectRoofSnapshotToR4(
       reason: "Roof Fusion geometry conflict",
       varianceMeters: Math.max(
         ...snapshot.geometry.vertices
-          .filter((vertex) => vertex.vertexId === edge.fromVertexId || vertex.vertexId === edge.toVertexId)
+          .filter(
+            (vertex) =>
+              vertex.vertexId === edge.fromVertexId ||
+              vertex.vertexId === edge.toVertexId,
+          )
           .map((vertex) => vertex.uncertaintyM),
         0,
       ),
@@ -139,12 +174,14 @@ export function projectRoofSnapshotToR4(
       })),
     },
     primarySlopes,
-    photos: sources.filter((source) => source.kind === "photo").map((source) => ({
-      id: source.sourceId,
-      label: source.provider,
-      source: source.license.attribution,
-      capturedAt: source.capturedAt || source.retrievedAt,
-    })),
+    photos: sources
+      .filter((source) => source.kind === "photo")
+      .map((source) => ({
+        id: source.sourceId,
+        label: source.provider,
+        source: source.license.attribution,
+        capturedAt: source.capturedAt || source.retrievedAt,
+      })),
     sources: sources.map((source) => ({
       id: source.sourceId,
       kind: source.kind,
@@ -155,17 +192,44 @@ export function projectRoofSnapshotToR4(
       qualityState: source.quality.status,
     })),
     deltaFromR3: {
-      areaSquareMeters: area - (previous ? (midpoint(previous.totals.netSurfaceArea) ?? area) : area),
-      confidencePoints: confidence(snapshot) - (previous ? confidence(previous) : confidence(snapshot)),
-      planeCount: snapshot.geometry.surfaces.length - (previous?.geometry.surfaces.length || snapshot.geometry.surfaces.length),
+      areaSquareMeters:
+        area -
+        (previous ? (midpoint(previous.totals.netSurfaceArea) ?? area) : area),
+      confidencePoints:
+        confidence(snapshot) -
+        (previous ? confidence(previous) : confidence(snapshot)),
+      planeCount:
+        snapshot.geometry.surfaces.length -
+        (previous?.geometry.surfaces.length ||
+          snapshot.geometry.surfaces.length),
     },
     verificationGates: [
-      { id: "source_identity", state: sources.length ? "verified" : "review_required", detail: `${sources.length} bound source(s)` },
-      { id: "plane_sum", state: snapshot.quality.status === "pass" ? "verified" : "review_required", detail: snapshot.quality.status },
-      { id: "review_edges", state: reviewedEdges.length ? "review_required" : "verified", detail: `${reviewedEdges.length} conflict edge(s)` },
-      { id: "approval", state: snapshot.approval.status === "approved" ? "verified" : "locked", detail: snapshot.approval.status },
+      {
+        id: "source_identity",
+        state: sources.length ? "verified" : "review_required",
+        detail: `${sources.length} bound source(s)`,
+      },
+      {
+        id: "plane_sum",
+        state:
+          snapshot.quality.status === "pass" ? "verified" : "review_required",
+        detail: snapshot.quality.status,
+      },
+      {
+        id: "review_edges",
+        state: reviewedEdges.length ? "review_required" : "verified",
+        detail: `${reviewedEdges.length} conflict edge(s)`,
+      },
+      {
+        id: "approval",
+        state: snapshot.approval.status === "approved" ? "verified" : "locked",
+        detail: snapshot.approval.status,
+      },
     ],
-    nextAction: snapshot.approval.status === "approved" ? "Ready for approved rendering" : "Complete Roof Fusion review and approval",
+    nextAction:
+      snapshot.approval.status === "approved"
+        ? "Ready for approved rendering"
+        : "Complete Roof Fusion review and approval",
     fallbackHref: "/admin-v2/cases",
   };
 }
@@ -198,50 +262,51 @@ export function createAdminNextRoofFusionR4Adapter(
   user: PayloadRequest["user"],
 ): AdminNextR4Adapter {
   return {
-    async load(caseReference, measurementReference) {
+    async load(caseReference, measurementReference, snapshotReference) {
       const identity = parseAdminNextR4CaseIdentityV1(caseReference);
       if (!identity)
         return { status: "not_found", reason: "case_identity_invalid" };
-      const latestRaw = await reader.readLatestSnapshot(
-        identity.roofFusionCaseId,
-        user,
-      );
-      if (!latestRaw)
-        return { status: "not_found", reason: "canonical_snapshot_missing" };
-      const latest = parseRoofSnapshotV1(latestRaw);
-      if (latest.snapshotId !== measurementReference)
-        return { status: "not_found", reason: "measurement_mismatch" };
-      const previous = latest.supersedesSnapshotId
+      const selectedRaw = snapshotReference
         ? await reader.readSnapshot(
             identity.roofFusionCaseId,
-            latest.supersedesSnapshotId,
+            snapshotReference,
+            user,
+          )
+        : await reader.readLatestSnapshot(identity.roofFusionCaseId, user);
+      if (!selectedRaw)
+        return { status: "not_found", reason: "canonical_snapshot_missing" };
+      const selected = parseRoofSnapshotV1(selectedRaw);
+      if (selected.snapshotId !== measurementReference)
+        return { status: "not_found", reason: "measurement_mismatch" };
+      const previous = selected.supersedesSnapshotId
+        ? await reader.readSnapshot(
+            identity.roofFusionCaseId,
+            selected.supersedesSnapshotId,
             user,
           )
         : null;
+      // RoofSnapshotV1 is the canonical versioned measurement aggregate. The
+      // RF route path identity therefore repeats this snapshot id/revision;
+      // snapshot binding adds the hash pin rather than naming another record.
+      const measurementIdentity = {
+        id: selected.snapshotId,
+        revision: selected.revision,
+      };
       return {
         status: "ready",
         source: "canonical",
-        value: projectRoofSnapshotToR4(latest, previous ? parseRoofSnapshotV1(previous) : null),
+        value: projectRoofSnapshotToR4(
+          selected,
+          previous ? parseRoofSnapshotV1(previous) : null,
+        ),
+        binding: {
+          measurement: measurementIdentity,
+          snapshot: {
+            ...measurementIdentity,
+            hash: selected.snapshotHash,
+          },
+        },
       };
     },
   };
-}
-
-export async function loadAdminNextR4WithMissingCanonicalFallback(input: {
-  canonical: AdminNextR4Adapter;
-  fixture: AdminNextR4Adapter;
-  caseReference: string;
-  measurementReference: string;
-}) {
-  const canonical = await input.canonical.load(
-    input.caseReference,
-    input.measurementReference,
-  );
-  if (
-    canonical.status !== "not_found" ||
-    canonical.reason !== "canonical_snapshot_missing"
-  ) {
-    return canonical;
-  }
-  return input.fixture.load(input.caseReference, input.measurementReference);
 }

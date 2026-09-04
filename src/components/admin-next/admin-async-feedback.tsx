@@ -1,11 +1,18 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, CloudOff, LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 export const ADMIN_ASYNC_FEEDBACK_THRESHOLD_MS = 150;
 
 export type AdminAsyncState = "idle" | "pending" | "success" | "error" | "offline";
+export type AdminRecoveryAction = {
+  kind: "back" | "correct" | "retry";
+  label?: string;
+  onAction: () => void;
+  safe?: boolean;
+};
 
 export function shouldShowAdminPendingFeedback(elapsedMs: number) {
   return elapsedMs >= ADMIN_ASYNC_FEEDBACK_THRESHOLD_MS;
@@ -18,6 +25,7 @@ export function AdminAsyncFeedback({
   locale = "lt",
   message,
   onRetry,
+  recoveryActions = [],
   retryIsSafe = false,
   state,
 }: {
@@ -27,13 +35,31 @@ export function AdminAsyncFeedback({
   locale?: PanelLocale;
   message?: string;
   onRetry?: () => void;
+  recoveryActions?: readonly AdminRecoveryAction[];
   retryIsSafe?: boolean;
   state: Exclude<AdminAsyncState, "idle">;
 }) {
+  if (delayMs > 0) {
+    return (
+      <DelayedAdminFeedback delayMs={delayMs}>
+        <AdminAsyncFeedback
+          action={action}
+          correlationId={correlationId}
+          locale={locale}
+          message={message}
+          onRetry={onRetry}
+          recoveryActions={recoveryActions}
+          retryIsSafe={retryIsSafe}
+          state={state}
+        />
+      </DelayedAdminFeedback>
+    );
+  }
+
   const copy = {
-    nb: { success: "fullført", error: "mislyktes", offline: "venter på nettverk", correlation: "Korrelasjon", retry: "Prøv igjen" },
-    lt: { success: "baigta", error: "nepavyko", offline: "laukia ryšio", correlation: "Koreliacija", retry: "Bandyti dar kartą" },
-    en: { success: "completed", error: "failed", offline: "waiting for a connection", correlation: "Correlation", retry: "Try again" },
+    nb: { success: "fullført", error: "mislyktes", offline: "venter på nettverk", correlation: "Korrelasjon", retry: "Prøv igjen", back: "Gå tilbake", correct: "Rett opp" },
+    lt: { success: "baigta", error: "nepavyko", offline: "laukia ryšio", correlation: "Koreliacija", retry: "Bandyti dar kartą", back: "Grįžti", correct: "Koreguoti" },
+    en: { success: "completed", error: "failed", offline: "waiting for a connection", correlation: "Correlation", retry: "Try again", back: "Go back", correct: "Correct" },
   }[locale];
   const details = {
     pending: { icon: LoaderCircle, label: action, className: "border-[var(--an-info)] bg-[var(--an-info-soft)] text-[var(--an-info)]", spin: true },
@@ -44,17 +70,31 @@ export function AdminAsyncFeedback({
   const Icon = details.icon;
 
   return (
-    <div aria-live={state === "error" ? "assertive" : "polite"} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${delayMs ? "opacity-0 [animation:admin-feedback-reveal_1ms_linear_forwards]" : ""} ${details.className}`} role={state === "error" ? "alert" : "status"} style={delayMs ? { animationDelay: `${delayMs}ms` } : undefined}>
+    <div aria-live={state === "error" ? "assertive" : "polite"} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${details.className}`} role={state === "error" ? "alert" : "status"}>
       <Icon aria-hidden="true" className={`mt-0.5 size-5 shrink-0 ${details.spin ? "animate-spin motion-reduce:animate-none" : ""}`} />
       <div className="min-w-0 flex-1">
         <strong className="block">{details.label}</strong>
         {correlationId ? <small className="mt-1 block opacity-80">{copy.correlation}: {correlationId}</small> : null}
       </div>
-      {state === "error" && onRetry && retryIsSafe ? (
-        <button className="min-h-11 rounded-lg border border-current px-3 font-bold" onClick={onRetry} type="button">
-          {copy.retry}
-        </button>
+      {state === "error" ? (
+        <div className="flex flex-wrap gap-2">
+          {recoveryActions.filter((item) => item.kind !== "retry" || item.safe).map((item) => (
+            <button className="min-h-11 rounded-lg border border-current px-3 font-bold" key={`${item.kind}-${item.label || "default"}`} onClick={item.onAction} type="button">
+              {item.label || copy[item.kind]}
+            </button>
+          ))}
+          {onRetry && retryIsSafe ? <button className="min-h-11 rounded-lg border border-current px-3 font-bold" onClick={onRetry} type="button">{copy.retry}</button> : null}
+        </div>
       ) : null}
     </div>
   );
+}
+
+function DelayedAdminFeedback({ children, delayMs }: { children: React.ReactNode; delayMs: number }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [delayMs]);
+  return visible ? children : null;
 }

@@ -1,29 +1,61 @@
 export type AdminNextCaseStageId =
-  | "inquiry"
-  | "measurement"
-  | "offer"
-  | "contract"
-  | "work";
+  "inquiry" | "evidence" | "commercial" | "agreement" | "work" | "completion";
 
 export type AdminNextCaseStageState =
-  | "complete"
-  | "current"
-  | "blocked"
-  | "upcoming";
+  "complete" | "current" | "blocked" | "upcoming";
+
+export type AdminNextCaseStage = {
+  id: AdminNextCaseStageId;
+  state: AdminNextCaseStageState;
+};
 
 export type AdminNextEvidenceKind =
-  | "measurement"
-  | "photo"
-  | "document"
-  | "communication";
+  "measurement" | "photo" | "document" | "communication";
 
 export type AdminNextEvidenceState = "verified" | "review" | "missing";
 
 export type AdminNextTimelineKind =
-  | "automation"
-  | "measurement"
-  | "message"
-  | "assignment";
+  "automation" | "measurement" | "message" | "assignment";
+
+export type AdminNextCaseInteraction =
+  | { mode: "executable"; activation: "open_workbench" }
+  | { mode: "waiting"; waitingParty: "customer" | "system" | "worker" }
+  | {
+      mode: "read_only";
+      reason:
+        | "capability_denied"
+        | "diagnostic_blocker"
+        | "no_action"
+        | "target_unavailable";
+    };
+
+export type AdminNextAuditTimelineDetails = {
+  action: string;
+  actor: {
+    kind: AuditHistoryActorKind;
+    display: string | null;
+  };
+  atUtc: string;
+  changedFields: readonly string[];
+  changedFieldsStatus: "absent" | "projected" | "rejected";
+  result: AuditHistoryResult | null;
+  reason: string | null;
+  version: string | number | null;
+  source: string | null;
+  correlationId: string;
+  integrity: {
+    hashStatus: AuditHistoryHashStatus;
+    tamperStatus: "not_assessable";
+  };
+};
+
+export type AdminNextTimelineState =
+  | { status: "ready"; source: "canonical" | "fixture" }
+  | {
+      status: "unavailable" | "denied";
+      source: "canonical";
+      reason: "audit_unavailable" | "audit_read_denied";
+    };
 
 export type AdminNextCaseWorkspaceView = {
   reference: string;
@@ -37,17 +69,25 @@ export type AdminNextCaseWorkspaceView = {
   };
   sla: {
     deadline: string;
-    remainingMinutes: number;
-    state: "overdue" | "due_soon" | "on_track";
+    remainingMinutes: number | null;
+    state: "overdue" | "due_soon" | "on_track" | "unknown";
   };
   nextAction: {
+    kind: CaseNextActionKind;
     title: string;
     reason: string;
+    label: string | null;
+    href: string | null;
+    processStage: CaseNextActionProcessStage;
+    requiredCapability: CaseNextActionCapability;
+    reviewMode: CaseNextActionReviewMode;
+    interaction: AdminNextCaseInteraction;
+    diagnosticBlocker?: {
+      code: string;
+      recovery: string;
+    };
   };
-  stages: readonly {
-    id: AdminNextCaseStageId;
-    state: AdminNextCaseStageState;
-  }[];
+  stages: readonly AdminNextCaseStage[];
   evidence: readonly {
     id: string;
     kind: AdminNextEvidenceKind;
@@ -56,7 +96,7 @@ export type AdminNextCaseWorkspaceView = {
     summary: string;
     metric?: string;
     recordedAt: string;
-    fallbackHref: string;
+    fallbackHref: string | null;
     previewHref?: string;
     previewAction?: "review_measurement" | "document_preflight";
   }[];
@@ -157,7 +197,12 @@ export type AdminNextCaseWorkspaceView = {
       summary: string;
     }[];
     sequence: readonly {
-      id: "measurement_review" | "reload" | "verify_artifacts" | "owner_gate" | "send";
+      id:
+        | "measurement_review"
+        | "reload"
+        | "verify_artifacts"
+        | "owner_gate"
+        | "send";
       state: "current" | "locked" | "ready";
     }[];
     blocker: string;
@@ -171,7 +216,9 @@ export type AdminNextCaseWorkspaceView = {
     summary: string;
     at: string;
     actor: string;
+    audit?: AdminNextAuditTimelineDetails;
   }[];
+  timelineState: AdminNextTimelineState;
   fallback: {
     caseHref: string;
     documentsHref: string;
@@ -197,3 +244,14 @@ export function loadAdminNextCaseWorkspace(
 ) {
   return adapter.load(reference.trim().toUpperCase());
 }
+import type { CaseNextActionKind } from "@/lib/admin-v2/case-read-model";
+import type {
+  CaseNextActionCapability,
+  CaseNextActionProcessStage,
+  CaseNextActionReviewMode,
+} from "@/lib/admin-v2/case-next-action-presentation";
+import type {
+  AuditHistoryActorKind,
+  AuditHistoryHashStatus,
+  AuditHistoryResult,
+} from "@/lib/audit/audit-history-projection";

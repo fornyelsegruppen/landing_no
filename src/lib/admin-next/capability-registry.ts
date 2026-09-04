@@ -1,4 +1,34 @@
 import type { FeatureFlagName } from "@/lib/platform/features";
+import type { UserRole } from "@/payload/access/roles";
+
+export const adminNextReadCapabilityIds = ["case.read", "audit.read"] as const;
+export type AdminNextReadCapabilityId =
+  (typeof adminNextReadCapabilityIds)[number];
+
+export const adminNextReadCapabilityRegistry: Readonly<
+  Record<
+    AdminNextReadCapabilityId,
+    {
+      roles: readonly UserRole[];
+      source: "leads" | "audit-events";
+      mode: "read_only";
+    }
+  >
+> = {
+  "case.read": { roles: ["admin"], source: "leads", mode: "read_only" },
+  "audit.read": {
+    roles: ["admin"],
+    source: "audit-events",
+    mode: "read_only",
+  },
+};
+
+export function adminNextRoleHasReadCapability(
+  role: UserRole,
+  capability: AdminNextReadCapabilityId,
+) {
+  return adminNextReadCapabilityRegistry[capability].roles.includes(role);
+}
 
 export const adminNextCanonicalCapabilityIds = [
   "Case",
@@ -20,6 +50,7 @@ export type AdminNextCanonicalCapabilityContract = {
   targetReadContracts?: readonly string[];
   mutationOwner: string;
   previewMutationPolicy: "forbidden";
+  readCapabilities?: readonly AdminNextReadCapabilityId[];
 };
 
 export const adminNextCanonicalCapabilityRegistry: Readonly<
@@ -32,6 +63,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
     readContract: "src/lib/admin-v2/case-read-model.ts",
     mutationOwner: "Admin V2 lead APIs and case commands",
     previewMutationPolicy: "forbidden",
+    readCapabilities: ["case.read", "audit.read"],
   },
   Property: {
     id: "Property",
@@ -114,8 +146,10 @@ export type AdminNextModuleId =
   | "documentPreflight"
   | "fieldVisit";
 
-export type AdminNextModuleStage = "adapter_ready" | "release_ready" | "planned";
-export type AdminNextRolloutStage = "legacy_only" | "shadow_read" | "preview" | "canonical";
+export type AdminNextModuleStage =
+  "adapter_ready" | "release_ready" | "planned";
+export type AdminNextRolloutStage =
+  "legacy_only" | "shadow_read" | "preview" | "canonical";
 export type AdminNextFoundationTarget = "FP0" | "FP1" | "FP2";
 
 export type AdminNextModuleDefinition = {
@@ -131,68 +165,69 @@ export type AdminNextModuleDefinition = {
   mutationPolicy: "legacy_only";
 };
 
-export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] = [
-  {
-    id: "today",
-    stage: "adapter_ready",
-    rolloutStage: "preview",
-    foundationTarget: "FP1",
-    capabilities: ["Case", "Customer", "Property", "Visit"],
-    dependencies: ["caseStateEngineV2", "adminExceptionFlowsV2"],
-    legacyHref: "/admin-v2",
-    previewAdapter: "canonical_read_with_fixture_fallback",
-    mutationPolicy: "legacy_only",
-  },
-  {
-    id: "caseWorkspace",
-    stage: "adapter_ready",
-    rolloutStage: "preview",
-    foundationTarget: "FP1",
-    capabilities: ["Case", "Customer", "Property", "Roof", "Visit"],
-    dependencies: ["caseStateEngineV2"],
-    legacyHref: "/admin-v2/cases",
-    previewAdapter: "canonical_read_with_fixture_fallback",
-    mutationPolicy: "legacy_only",
-  },
-  {
-    id: "roofWorkbench",
-    stage: "adapter_ready",
-    rolloutStage: "preview",
-    foundationTarget: "FP2",
-    capabilities: ["Case", "Property", "Roof"],
-    dependencies: ["roofFusionV1"],
-    legacyHref: "/admin-v2/cases",
-    previewAdapter: "canonical_read_with_fixture_fallback",
-    mutationPolicy: "legacy_only",
-  },
-  {
-    id: "documentPreflight",
-    stage: "adapter_ready",
-    rolloutStage: "preview",
-    foundationTarget: "FP2",
-    capabilities: ["Case", "Customer", "Roof"],
-    dependencies: [
-      "customerQuotes",
-      "contractSigning",
-      "communicationRoutingV2",
-    ],
-    legacyHref: "/admin-v2/documents",
-    previewAdapter: "fixture_only",
-    mutationPolicy: "legacy_only",
-  },
-  {
-    id: "fieldVisit",
-    stage: "adapter_ready",
-    rolloutStage: "preview",
-    foundationTarget: "FP2",
-    capabilities: ["Case", "Customer", "Property", "Visit"],
-    dependencies: ["workerPortal"],
-    legacyHref: "/admin-v2/work",
-    workerLegacyHref: "/user",
-    previewAdapter: "canonical_read_with_fixture_fallback",
-    mutationPolicy: "legacy_only",
-  },
-] as const;
+export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] =
+  [
+    {
+      id: "today",
+      stage: "adapter_ready",
+      rolloutStage: "preview",
+      foundationTarget: "FP1",
+      capabilities: ["Case", "Customer", "Property", "Visit"],
+      dependencies: ["caseStateEngineV2", "adminExceptionFlowsV2"],
+      legacyHref: "/admin-v2",
+      previewAdapter: "canonical_read_with_fixture_fallback",
+      mutationPolicy: "legacy_only",
+    },
+    {
+      id: "caseWorkspace",
+      stage: "adapter_ready",
+      rolloutStage: "preview",
+      foundationTarget: "FP1",
+      capabilities: ["Case", "Customer", "Property", "Roof", "Visit"],
+      dependencies: ["caseStateEngineV2"],
+      legacyHref: "/admin-v2/cases",
+      previewAdapter: "canonical_read_with_fixture_fallback",
+      mutationPolicy: "legacy_only",
+    },
+    {
+      id: "roofWorkbench",
+      stage: "adapter_ready",
+      rolloutStage: "preview",
+      foundationTarget: "FP2",
+      capabilities: ["Case", "Property", "Roof"],
+      dependencies: ["roofFusionV1"],
+      legacyHref: "/admin-v2/cases",
+      previewAdapter: "canonical_read_with_fixture_fallback",
+      mutationPolicy: "legacy_only",
+    },
+    {
+      id: "documentPreflight",
+      stage: "adapter_ready",
+      rolloutStage: "preview",
+      foundationTarget: "FP2",
+      capabilities: ["Case", "Customer", "Roof"],
+      dependencies: [
+        "customerQuotes",
+        "contractSigning",
+        "communicationRoutingV2",
+      ],
+      legacyHref: "/admin-v2/documents",
+      previewAdapter: "fixture_only",
+      mutationPolicy: "legacy_only",
+    },
+    {
+      id: "fieldVisit",
+      stage: "adapter_ready",
+      rolloutStage: "preview",
+      foundationTarget: "FP2",
+      capabilities: ["Case", "Customer", "Property", "Visit"],
+      dependencies: ["workerPortal"],
+      legacyHref: "/admin-v2/work",
+      workerLegacyHref: "/user",
+      previewAdapter: "canonical_read_with_fixture_fallback",
+      mutationPolicy: "legacy_only",
+    },
+  ] as const;
 
 export function adminNextModuleDefinition(id: AdminNextModuleId) {
   const definition = adminNextModuleDefinitions.find((item) => item.id === id);

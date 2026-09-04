@@ -14,7 +14,7 @@ export const adminNextDarkThemeCss = `
     --an-border-strong: #394b5f;
     --an-text: #f5f7fa;
     --an-muted: #9aa8b8;
-    --an-subtle: #69798b;
+    --an-subtle: #8293a6;
     --an-amber: #f4b63f;
     --an-amber-strong: #ffc44d;
     --an-amber-ink: #171108;

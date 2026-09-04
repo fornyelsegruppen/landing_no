@@ -4,6 +4,9 @@ import {
   adminNextCanonicalCapabilityRegistry,
   adminNextModuleCanServeCanonical,
   adminNextModuleDefinitions,
+  adminNextReadCapabilityIds,
+  adminNextReadCapabilityRegistry,
+  adminNextRoleHasReadCapability,
   adminNextRoofFusionActionCapabilityIds,
   adminNextRoofFusionI1TargetContract,
 } from "@/lib/admin-next/capability-registry";
@@ -13,11 +16,28 @@ describe("Admin Next capability registry", () => {
     expect(Object.keys(adminNextCanonicalCapabilityRegistry).sort()).toEqual(
       [...adminNextCanonicalCapabilityIds].sort(),
     );
-    for (const contract of Object.values(adminNextCanonicalCapabilityRegistry)) {
+    for (const contract of Object.values(
+      adminNextCanonicalCapabilityRegistry,
+    )) {
       expect(contract.previewMutationPolicy).toBe("forbidden");
       expect(contract.readContract).toBeTruthy();
       expect(contract.mutationOwner).toBeTruthy();
     }
+  });
+
+  it("gates case audit reads to the existing admin role", () => {
+    expect(Object.keys(adminNextReadCapabilityRegistry).sort()).toEqual(
+      [...adminNextReadCapabilityIds].sort(),
+    );
+    expect(
+      adminNextCanonicalCapabilityRegistry.Case.readCapabilities,
+    ).toContain("audit.read");
+    expect(adminNextRoleHasReadCapability("admin", "audit.read")).toBe(true);
+    expect(adminNextRoleHasReadCapability("worker", "audit.read")).toBe(false);
+    expect(adminNextReadCapabilityRegistry["audit.read"]).toMatchObject({
+      mode: "read_only",
+      source: "audit-events",
+    });
   });
 
   it("records read adapters while keeping every mutation on the legacy owner", () => {
@@ -26,11 +46,14 @@ describe("Admin Next capability registry", () => {
     );
     for (const definition of adminNextModuleDefinitions) {
       expect(definition.capabilities.length).toBeGreaterThan(0);
-      expect(["fixture_only", "canonical_read_with_fixture_fallback"]).toContain(
-        definition.previewAdapter,
-      );
+      expect([
+        "fixture_only",
+        "canonical_read_with_fixture_fallback",
+      ]).toContain(definition.previewAdapter);
       expect(definition.mutationPolicy).toBe("legacy_only");
-      expect(["legacy_only", "shadow_read", "preview", "canonical"]).toContain(definition.rolloutStage);
+      expect(["legacy_only", "shadow_read", "preview", "canonical"]).toContain(
+        definition.rolloutStage,
+      );
       expect(definition.legacyHref).toMatch(/^\/(admin-v2|user)\b/);
       for (const capability of definition.capabilities) {
         expect(adminNextCanonicalCapabilityRegistry[capability]).toBeDefined();
@@ -39,7 +62,10 @@ describe("Admin Next capability registry", () => {
     expect(
       adminNextModuleDefinitions
         .filter(({ id }) => id !== "documentPreflight")
-        .every(({ previewAdapter }) => previewAdapter === "canonical_read_with_fixture_fallback"),
+        .every(
+          ({ previewAdapter }) =>
+            previewAdapter === "canonical_read_with_fixture_fallback",
+        ),
     ).toBe(true);
     expect(
       adminNextModuleDefinitions.find(({ id }) => id === "documentPreflight")
@@ -48,7 +74,11 @@ describe("Admin Next capability registry", () => {
   });
 
   it("keeps every F1 module out of canonical rollout until its domain gate passes", () => {
-    expect(adminNextModuleDefinitions.every(({ rolloutStage }) => rolloutStage === "preview")).toBe(true);
+    expect(
+      adminNextModuleDefinitions.every(
+        ({ rolloutStage }) => rolloutStage === "preview",
+      ),
+    ).toBe(true);
     expect(adminNextModuleCanServeCanonical("today")).toBe(false);
   });
 

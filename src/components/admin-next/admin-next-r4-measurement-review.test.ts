@@ -9,6 +9,8 @@ import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-f
 import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 
 const measurement = adminNextCaseWorkspaceFixture.measurementReview;
+const returnTo =
+  "/admin-next-preview/cases/TF-1042?tab=evidence#case-evidence-title";
 const transientVisualization = {
   schemaVersion: "height-surface-visualization.v1" as const,
   mimeType: "image/png" as const,
@@ -40,8 +42,7 @@ const transientVisualization = {
   },
   minHeightAboveTerrainM: 3,
   maxHeightAboveTerrainM: 9,
-  attribution:
-    "Kartverket · NLOD 2.0 + OpenStreetMap contributors · ODbL 1.0",
+  attribution: "Kartverket · NLOD 2.0 + OpenStreetMap contributors · ODbL 1.0",
 } satisfies HeightSurfaceVisualizationV1;
 
 describe("Admin Next R4 measurement review", () => {
@@ -56,6 +57,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
         owner: adminNextCaseWorkspaceFixture.owner.name,
+        returnTo,
       }),
     );
 
@@ -67,7 +69,7 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).toContain("EVD-R4-1042-01");
   });
 
-  it("keeps approval disabled and exposes only the working mutation fallback", () => {
+  it("keeps approval disabled and uses one return target for close and fallback", () => {
     expect(measurement).toBeDefined();
     if (!measurement) return;
     const html = renderToStaticMarkup(
@@ -78,12 +80,14 @@ describe("Admin Next R4 measurement review", () => {
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
         owner: adminNextCaseWorkspaceFixture.owner.name,
+        returnTo,
       }),
     );
 
-    expect(html).toContain("disabled=\"\"");
+    expect(html).toContain('disabled=""');
     expect(html).toContain("Confirm užrakintas");
-    expect(html).toContain(`href="${measurement.fallbackHref}"`);
+    expect(html.split(`href="${returnTo}"`)).toHaveLength(3);
+    expect(html).not.toContain(`href="${measurement.fallbackHref}"`);
   });
 
   it("renders four primary slopes, photos, R3 delta and verification gates", () => {
@@ -97,6 +101,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
         owner: adminNextCaseWorkspaceFixture.owner.name,
+        returnTo,
       }),
     );
 
@@ -134,7 +139,12 @@ describe("Admin Next R4 measurement review", () => {
           { id: "S2", vertexIds: ["v1", "v3", "v4"] },
         ],
         edges: [
-          { id: "ridge-1", fromVertexId: "v1", toVertexId: "v3", state: "verified" as const },
+          {
+            id: "ridge-1",
+            fromVertexId: "v1",
+            toVertexId: "v3",
+            state: "verified" as const,
+          },
         ],
       },
     };
@@ -146,6 +156,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: "UAT-01 Testkunde",
         measurement: approved,
         owner: "Aistė",
+        returnTo: "/admin-v2/cases/13?tab=measurement#measurement-section",
         source: "canonical",
       }),
     );
@@ -184,6 +195,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: "UAT-01 Testkunde",
         measurement: withEvidence,
         owner: "Aistė",
+        returnTo: "/admin-v2/cases/13?tab=evidence#measurement-section",
         source: "canonical",
       }),
     );

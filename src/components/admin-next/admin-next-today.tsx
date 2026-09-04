@@ -45,6 +45,7 @@ const copy = {
     paused: "Eksterne utsendelser er satt på pause",
     fallback: "Dagens Admin V2 er tilgjengelig som fallback",
     allWork: "Åpne arbeidsplan",
+    priorities: { critical: "Kritisk", today: "I dag", waiting: "Venter", scheduled: "Planlagt" },
     stages: { measurement: "Måling", offer: "Tilbud", documents: "Dokumenter", visit: "Besøk" },
     actions: { reviewMeasurement: "Kontroller R4-målingen", approveOffer: "Godkjenn prisendringen", sendDocuments: "Fullfør dokumentpakken", confirmVisit: "Bekreft morgendagens besøk" },
     reasons: { lowConfidence: "Målingens confidence er 82 %", priceChanged: "Prisen er endret med 6,4 %", missingSignature: "Kundens signatur mangler", visitTomorrow: "Kunden venter på tidsbekreftelse" },
@@ -74,6 +75,7 @@ const copy = {
     paused: "Išoriniai automatiniai siuntimai pristabdyti",
     fallback: "Dabartinis Admin V2 veikia kaip atsarginis kelias",
     allWork: "Atidaryti darbų planą",
+    priorities: { critical: "Kritinė", today: "Šiandien", waiting: "Laukia", scheduled: "Suplanuota" },
     stages: { measurement: "Matavimas", offer: "Pasiūlymas", documents: "Dokumentai", visit: "Vizitas" },
     actions: { reviewMeasurement: "Patikrinti R4 matavimą", approveOffer: "Patvirtinti kainos pakeitimą", sendDocuments: "Užbaigti dokumentų paketą", confirmVisit: "Patvirtinti rytojaus vizitą" },
     reasons: { lowConfidence: "Matavimo confidence yra 82 %", priceChanged: "Kaina pasikeitė 6,4 %", missingSignature: "Trūksta kliento parašo", visitTomorrow: "Klientas laukia laiko patvirtinimo" },
@@ -98,17 +100,18 @@ const copy = {
     paused: "External automated sends are paused",
     fallback: "Current Admin V2 remains available as fallback",
     allWork: "Open work schedule",
+    priorities: { critical: "Critical", today: "Today", waiting: "Waiting", scheduled: "Scheduled" },
     stages: { measurement: "Measurement", offer: "Offer", documents: "Documents", visit: "Visit" },
     actions: { reviewMeasurement: "Review the R4 measurement", approveOffer: "Approve the price change", sendDocuments: "Complete the document package", confirmVisit: "Confirm tomorrow's visit" },
     reasons: { lowConfidence: "Measurement confidence is 82%", priceChanged: "Price changed by 6.4%", missingSignature: "Customer signature is missing", visitTomorrow: "Customer is waiting for time confirmation" },
   },
 } as const;
 
-const priorityStyle: Record<AdminNextTaskPriority, { dot: string; label: string }> = {
-  critical: { dot: "bg-[var(--an-danger)]", label: "border-[color:rgba(255,113,113,.35)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" },
-  today: { dot: "bg-[var(--an-amber)]", label: "border-[color:rgba(244,182,63,.35)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]" },
-  waiting: { dot: "bg-[#9f91ff]", label: "border-[#4d4677] bg-[#211f35] text-[#c0b8ff]" },
-  scheduled: { dot: "bg-[var(--an-success)]", label: "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]" },
+const priorityStyle: Record<AdminNextTaskPriority, { dot: string; indicator: string }> = {
+  critical: { dot: "bg-[var(--an-danger)]", indicator: "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" },
+  today: { dot: "bg-[var(--an-action)]", indicator: "border-[var(--an-action)] bg-[var(--an-action-soft)] text-[var(--an-action)]" },
+  waiting: { dot: "bg-[var(--an-info)]", indicator: "border-[var(--an-info)] bg-[var(--an-info-soft)] text-[var(--an-info)]" },
+  scheduled: { dot: "bg-[var(--an-success)]", indicator: "border-[var(--an-success)] bg-[var(--an-success-soft)] text-[var(--an-success)]" },
 };
 
 export function AdminNextToday({ locale, source = "fixture", tasks: inputTasks = adminNextTodayTasks, view }: { locale: PanelLocale; source?: "fixture" | "canonical"; tasks?: readonly AdminNextTodayTask[]; view: AdminNextTodayView }) {
@@ -167,9 +170,13 @@ export function AdminNextToday({ locale, source = "fixture", tasks: inputTasks =
                   <div className="grid min-w-0 gap-4 pl-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${priorityStyle[task.priority].label}`}>
-                          <span className={`size-1.5 rounded-full ${priorityStyle[task.priority].dot}`} />
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--an-border-strong)] bg-[var(--an-surface-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--an-text-muted)]">
+                          <CircleDot aria-hidden="true" className="size-3.5" />
                           {t.stages[task.stage]}
+                        </span>
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${priorityStyle[task.priority].indicator}`}>
+                          <span aria-hidden="true" className={`size-1.5 rounded-full ${priorityStyle[task.priority].dot}`} />
+                          {t.priorities[task.priority]}
                         </span>
                         <span className="text-xs font-bold text-[var(--an-subtle)]">{task.id}</span>
                       </div>
@@ -186,7 +193,7 @@ export function AdminNextToday({ locale, source = "fixture", tasks: inputTasks =
                         <span className="flex items-center gap-1.5 lg:justify-end"><Clock3 aria-hidden="true" className="size-3.5" />{t.due} {task.due}</span>
                         <span className="mt-0 lg:mt-1.5 flex items-center gap-1.5 lg:justify-end"><UserRound aria-hidden="true" className="size-3.5" />{task.owner}</span>
                       </div>
-                      <Link className="an-cta inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none" href={task.href}>
+                      <Link aria-label={`${t.open} ${task.id}: ${t.actions[task.action]}, ${task.customer}`} className="an-cta inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none" href={task.href}>
                         {t.open}
                         <ChevronRight aria-hidden="true" className="size-4" />
                       </Link>

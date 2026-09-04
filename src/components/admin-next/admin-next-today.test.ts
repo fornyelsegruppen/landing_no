@@ -16,9 +16,12 @@ describe("Admin Next Today preview", () => {
     );
 
     expect(html).toContain("Mano darbo eilė");
-    expect(html.match(/Atidaryti bylą/g)).toHaveLength(4);
+    expect(html.match(/>Atidaryti bylą</g)).toHaveLength(4);
     expect(html.match(/Demo · /g)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain("Patikrinti R4 matavimą");
+    expect(html).toContain("Kritinė");
+    expect(html).toContain("Suplanuota");
+    expect(html).toContain('aria-label="Atidaryti bylą TF-1042: Patikrinti R4 matavimą, Demo · Kari Nilsen"');
     expect(html).toContain("Dabartinis Admin V2 veikia kaip atsarginis kelias");
   });
 
