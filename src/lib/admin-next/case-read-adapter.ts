@@ -557,6 +557,17 @@ export function projectAdminCaseWorkspace(
       ...(message.replyToMessageId
         ? { replyToMessageId: message.replyToMessageId }
         : {}),
+      attachments: (message.attachmentIds || []).map((attachmentId) => {
+        const document = value.documents.find(
+          (candidate) => candidate.id === attachmentId,
+        );
+        return {
+          id: `document-${attachmentId}`,
+          filename: document?.filename || `#${attachmentId}`,
+          href:
+            artifactHref(document?.href) || `/api/admin/media/${attachmentId}`,
+        };
+      }),
       fallbackHref: `${caseHref}#message-${message.id}`,
     }))
     .sort(newestFirst);

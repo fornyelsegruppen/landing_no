@@ -200,6 +200,7 @@ export type CaseChangeAgreement = CaseEntity & {
 };
 
 export type CaseMessage = CaseEntity & {
+  attachmentIds?: number[];
   aiAnalysis?: unknown;
   aiAssisted?: boolean;
   bodyText: string;
@@ -702,10 +703,7 @@ function makeTimeline(
   const record = asRecord(raw);
   const id = numericId(record.id);
   return {
-    id:
-      type === "invoice"
-        ? `${type}-${collection}-${id}`
-        : `${type}-${id}`,
+    id: type === "invoice" ? `${type}-${collection}-${id}` : `${type}-${id}`,
     sourceCollection: collection,
     sourceId: id,
     type,
@@ -1274,6 +1272,11 @@ export async function loadAdminCase(
 
   const mappedMessages: CaseMessage[] = visibleMessages.map((message) => ({
     ...entity("messages", message),
+    attachmentIds: Array.isArray(message.attachments)
+      ? message.attachments
+          .map(relationId)
+          .filter((id): id is number => typeof id === "number")
+      : [],
     reference: stringValue(message.subject) || `#${numericId(message.id)}`,
     subject: stringValue(message.subject) || "",
     bodyText: stringValue(message.bodyText) || "",

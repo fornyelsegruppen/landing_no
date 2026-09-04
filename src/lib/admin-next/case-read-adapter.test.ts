@@ -88,6 +88,7 @@ describe("Admin Next canonical customer record projection", () => {
           status: "received",
           subject: "Re: Quote",
           bodyText: "Is scaffolding included?",
+          attachmentIds: [501],
           createdAt: "2026-09-04T10:00:00.000Z",
           replyToMessageId: 40,
         },
@@ -164,6 +165,13 @@ describe("Admin Next canonical customer record projection", () => {
           subject: "Re: Quote",
           bodyText: "Is scaffolding included?",
           replyToMessageId: 40,
+          attachments: [
+            {
+              id: "document-501",
+              filename: "contract-v2.pdf",
+              href: "/api/admin/media/501",
+            },
+          ],
           fallbackHref: "/admin-v2/cases/13#message-41",
         },
       ],

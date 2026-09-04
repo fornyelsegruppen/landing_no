@@ -101,6 +101,7 @@ const copy = {
     sentAt: "Sendt",
     deliveredAt: "Levert",
     replyTo: "Svar på melding",
+    attachments: "Vedlegg",
     openThread: "Åpne i Admin V2",
     commercialVersions: "Tilbud og kontrakter",
     commercialVersionsEmpty: "Ingen tilbuds- eller kontraktsversjoner.",
@@ -230,6 +231,7 @@ const copy = {
     sentAt: "Išsiųsta",
     deliveredAt: "Pristatyta",
     replyTo: "Atsakymas į žinutę",
+    attachments: "Priedai",
     openThread: "Atidaryti Admin V2",
     commercialVersions: "Pasiūlymai ir sutartys",
     commercialVersionsEmpty: "Pasiūlymų ar sutarčių versijų nėra.",
@@ -359,6 +361,7 @@ const copy = {
     sentAt: "Sent",
     deliveredAt: "Delivered",
     replyTo: "Reply to message",
+    attachments: "Attachments",
     openThread: "Open in Admin V2",
     commercialVersions: "Quotes and contracts",
     commercialVersionsEmpty: "No quote or contract versions.",
@@ -850,6 +853,32 @@ export function AdminNextCaseWorkspace({
                           <p className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
                             {message.bodyText || "—"}
                           </p>
+                          {message.attachments.length ? (
+                            <div className="mt-3">
+                              <p className="text-[10px] font-bold tracking-wider text-[var(--an-subtle)] uppercase">
+                                {t.attachments} · {message.attachments.length}
+                              </p>
+                              <ul className="mt-2 flex flex-wrap gap-2">
+                                {message.attachments.map((attachment) => (
+                                  <li key={attachment.id}>
+                                    <Link
+                                      className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-[var(--an-border)] bg-[var(--an-surface)] px-2 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)] hover:text-[var(--an-amber)]"
+                                      href={attachment.href}
+                                      target="_blank"
+                                    >
+                                      <FileCheck2
+                                        aria-hidden="true"
+                                        className="size-3.5 shrink-0"
+                                      />
+                                      <span className="truncate">
+                                        {attachment.filename}
+                                      </span>
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
                           <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
                             <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
                               {message.sentAt ? (

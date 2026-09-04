@@ -72,6 +72,7 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
           "Takk. Kan dere sende tilbudet i dag, og bekrefte at stillas er inkludert?",
         at: "2026-09-03T15:06:00.000Z",
         replyToMessageId: 104202,
+        attachments: [],
         fallbackHref: "/admin-v2/cases/1042#message-104203",
       },
       {
@@ -86,6 +87,18 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
         at: "2026-09-03T14:58:00.000Z",
         sentAt: "2026-09-03T14:57:00.000Z",
         deliveredAt: "2026-09-03T14:58:00.000Z",
+        attachments: [
+          {
+            id: "document-104201",
+            filename: "tilbud-T-1042-V1.pdf",
+            href: "/api/admin/media/104201",
+          },
+          {
+            id: "document-104202",
+            filename: "kontrakt-K-1042-V1.pdf",
+            href: "/api/admin/media/104202",
+          },
+        ],
         fallbackHref: "/admin-v2/cases/1042#message-104202",
       },
     ],

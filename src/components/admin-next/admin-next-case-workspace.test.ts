@@ -62,6 +62,9 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain('data-customer-communications="true"');
     expect(html).toContain("Re: Tilbud på takfornyelse");
     expect(html).toContain("Takk. Kan dere sende tilbudet i dag");
+    expect(html).toContain("Priedai · 2");
+    expect(html).toContain("tilbud-T-1042-V1.pdf");
+    expect(html).toContain("kontrakt-K-1042-V1.pdf");
     expect(html).toContain('data-customer-question-state="resolved"');
     expect(html).toContain('data-commercial-versions="true"');
     expect(html).toContain("K-1042-V1");

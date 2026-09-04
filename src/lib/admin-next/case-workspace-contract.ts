@@ -34,6 +34,11 @@ export type AdminNextCustomerRecord = {
     sentAt?: string;
     deliveredAt?: string;
     replyToMessageId?: number;
+    attachments: readonly {
+      id: string;
+      filename: string;
+      href: string;
+    }[];
     fallbackHref: string;
   }[];
   commercialVersions: readonly {

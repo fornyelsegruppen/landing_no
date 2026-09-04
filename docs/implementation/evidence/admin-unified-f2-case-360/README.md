@@ -12,8 +12,8 @@ data.
 
 ## Visible read parity added
 
-- inbound and outbound message direction, exact body, category, channel and
-  delivery state;
+- inbound and outbound message direction, exact body, category, channel,
+  delivery state and the exact persistent attachments sent with that message;
 - customer-question total and unresolved state;
 - quote and contract versions, supersession reference, signature times and
   document hash;
