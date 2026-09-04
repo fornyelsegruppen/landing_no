@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoofFusionWorkbenchDraftV1 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 import { buildWorkbenchDraftFromUiV1 } from "@/lib/roof-fusion/workbench-ui-client-v1";
 import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
+import type { RoofFusionPoint } from "./admin-next-roof-fusion-unified-workbench";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
 import { buildApprovedGableRoofFixtureV1 } from "@/lib/roof-fusion/gable-roof-fixture-v1";
@@ -122,6 +123,8 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
   const renderWorkbench = (
     activeCapture = capture,
     activeHeightSurface?: KartverketHeightSurfaceV1,
+    activeSourceFootprintId?: string,
+    activeSourceOutline: readonly RoofFusionPoint[] = sourceOutline,
   ) =>
     createElement(AdminNextRoofFusionPersistentWorkbench, {
       actorId: "7",
@@ -129,9 +132,32 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       caseId: "lead:13",
       horizontalAreaSquareMeters: 142,
       orthoImageAlt: "Test roof",
-      sourceOutline,
+      sourceOutline: activeSourceOutline,
+      sourceFootprintId: activeSourceFootprintId,
       heightSurface: activeHeightSurface,
     });
+
+  const useLegacyCaptureAliasDraft = async () => {
+    latest = await buildWorkbenchDraftFromUiV1({
+      actorId: "7",
+      approvedOutline: persistedOutline,
+      caseId: "lead:13",
+      createdAt: "2026-09-03T08:00:00.000Z",
+      draftId: "uat-lead-13-r1-legacy-alias",
+      evidence: {
+        attribution: capture.attribution!,
+        georeference: geoReference,
+        imageId: capture.mediaId,
+        sourceContentHash: capture.rawContentHash!,
+        sourceId: capture.sourceId!,
+      },
+      idempotencyKey: "workbench:lead:13:r1:legacy-alias",
+      lines: persistedLines,
+      revision: 1,
+      sourceFootprintId: capture.sourceId!,
+      sourceOutline,
+    });
+  };
 
   const stage = () =>
     container
@@ -395,6 +421,28 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+    const fetchMock = vi.mocked(fetch);
+    const draftLoadCount = () =>
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).startsWith("/api/admin/roof-fusion/workbench-draft?"),
+      ).length;
+    expect(draftLoadCount()).toBe(1);
+    const approvedOutline = () =>
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points");
+    const persistedPoints = approvedOutline();
+    const firstVertex = container.querySelector<SVGGElement>(
+      '[data-roof-fusion-vertex="0"]',
+    );
+    expect(firstVertex).not.toBeNull();
+    await act(async () => {
+      firstVertex!.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }),
+      );
+    });
+    const dirtyPoints = approvedOutline();
+    expect(dirtyPoints).not.toBe(persistedPoints);
     const refreshedCapture = {
       ...capture,
       sourceId: "norge-capture-92",
@@ -406,6 +454,8 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(refreshedCapture, heightSurface));
       await flushAsyncWork();
     });
+    expect(draftLoadCount()).toBe(1);
+    expect(approvedOutline()).toBe(dirtyPoints);
     await click('[data-roof-fusion-stage-tab="skeleton"]');
     await openAdvanced();
 
@@ -470,6 +520,130 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       false,
     );
     expect(latest?.revision).toBe(1);
+  });
+
+  it("does not hydrate another building's explicitly identified geometry from the same address capture", async () => {
+    latest = await buildWorkbenchDraftFromUiV1({
+      actorId: "7",
+      approvedOutline: persistedOutline,
+      caseId: "lead:13",
+      createdAt: "2026-09-03T08:00:00.000Z",
+      draftId: "uat-lead-13-r1-building-a",
+      evidence: {
+        attribution: capture.attribution!,
+        georeference: geoReference,
+        imageId: capture.mediaId,
+        sourceContentHash: capture.rawContentHash!,
+        sourceId: capture.sourceId!,
+      },
+      idempotencyKey: "workbench:lead:13:r1:building-a",
+      lines: persistedLines,
+      revision: 1,
+      sourceFootprintId: "osm:A",
+      sourceOutline,
+    });
+
+    await act(async () => {
+      root.render(renderWorkbench(capture, heightSurface, "osm:B"));
+      await flushAsyncWork();
+    });
+
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.1,0.1 0.9,0.1 0.9,0.9 0.1,0.9");
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    expect(renderedLines()).toHaveLength(0);
+    await openAdvanced();
+
+    expect(container.textContent).toContain("stogo kontūro tapatybė nesutampa");
+    expect(container.textContent).toContain("Rankinės anotacijos neišvalytos");
+    expect(
+      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
+    ).not.toBeNull();
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      true,
+    );
+
+    const heightRequestCount = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(
+          ([input]) =>
+            String(input) === "/api/admin/roof-fusion/workbench-height-adapter",
+        ).length;
+    expect(heightRequestCount()).toBe(0);
+    await closeAdvanced();
+    await act(async () => {
+      buttonWithText("Apskaičiuoti")!.click();
+      await flushAsyncWork();
+    });
+    expect(heightRequestCount()).toBe(0);
+    expect(stage()).toBe("skeleton");
+    expect(
+      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
+    ).not.toBeNull();
+  });
+
+  it("does not let a legacy capture-ID alias transfer to a building with different footprint geometry", async () => {
+    await useLegacyCaptureAliasDraft();
+    const buildingBOutline = [
+      { x: 0.15, y: 0.15 },
+      { x: 0.85, y: 0.15 },
+      { x: 0.85, y: 0.85 },
+      { x: 0.15, y: 0.85 },
+    ] as const;
+
+    await act(async () => {
+      root.render(
+        renderWorkbench(capture, heightSurface, "osm:B", buildingBOutline),
+      );
+      await flushAsyncWork();
+    });
+
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.15,0.15 0.85,0.15 0.85,0.85 0.15,0.85");
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    expect(renderedLines()).toHaveLength(0);
+    await openAdvanced();
+    expect(container.textContent).toContain("stogo kontūro tapatybė nesutampa");
+    expect(
+      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
+    ).not.toBeNull();
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      true,
+    );
+  });
+
+  it("transfers a legacy capture-ID alias only after matching footprint geometry and requires re-save", async () => {
+    await useLegacyCaptureAliasDraft();
+    await act(async () => {
+      root.render(renderWorkbench(capture, heightSurface, "osm:B"));
+      await flushAsyncWork();
+    });
+
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.4,0.3 0.6,0.3 0.6,0.7 0.4,0.7");
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    expect(renderedLines()).toHaveLength(1);
+    await openAdvanced();
+    expect(container.textContent).toContain(
+      "Ankstesnės rankinės anotacijos perkeltos",
+    );
+    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+    expect(
+      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
+    ).toBeNull();
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      false,
+    );
   });
 
   it("runs save and calculation behind one action and advances only after success", async () => {
@@ -898,7 +1072,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       );
       await flushAsyncWork();
     });
-    expect(stage()).toBe("outline");
+    expect(stage()).toBe("skeleton");
+    expect(
+      container.querySelector('[data-roof-fusion-line-kind="valley"]'),
+    ).not.toBeNull();
   });
 
   it("lets the guarded old manual fallback reach review without a height surface", async () => {

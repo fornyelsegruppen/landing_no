@@ -161,6 +161,7 @@ const copy = {
     addressPlaceholder: "Eksempel: Storgata 1, Oslo",
     addressAction: "Finn adresse og åpne ortofoto",
     addressWorking: "Finner og åpner …",
+    orthoLoading: "Laster ortofoto …",
     candidateLabel: "Velg riktig bygning",
     footprint: "Horisontalt fotavtrykk",
     distance: "Avstand til adressepunkt",
@@ -179,6 +180,7 @@ const copy = {
     automaticHeightReady:
       "Kartverkets høydeoverflate er hentet og koblet til valgt bygning.",
     automaticHeightRetry: "Prøv igjen",
+    orthoRetry: "Hent ortofoto på nytt",
     ridgeInstruction:
       "Klikk to endepunkter på mønelinjen i høydeflaten for å korrigere Preview-modellen.",
     ridgeReady:
@@ -274,6 +276,7 @@ const copy = {
     addressPlaceholder: "Pavyzdžiui: Storgata 1, Oslo",
     addressAction: "Rasti adresą ir atverti ortofoto",
     addressWorking: "Ieškoma ir atveriama…",
+    orthoLoading: "Kraunamas ortofoto…",
     candidateLabel: "Pasirinkti teisingą pastatą",
     footprint: "Horizontalus kontūro plotas",
     distance: "Atstumas iki adreso taško",
@@ -293,6 +296,7 @@ const copy = {
     automaticHeightReady:
       "Kartverket aukščio paviršius gautas ir susietas su pasirinktu pastatu.",
     automaticHeightRetry: "Bandyti dar kartą",
+    orthoRetry: "Pakartoti ortofoto gavimą",
     ridgeInstruction:
       "Aukščio paviršiuje pažymėkite du kraigo galus, kad pakoreguotumėte Preview modelį.",
     ridgeReady:
@@ -388,6 +392,7 @@ const copy = {
     addressPlaceholder: "Example: Storgata 1, Oslo",
     addressAction: "Find address and open orthophoto",
     addressWorking: "Finding and opening…",
+    orthoLoading: "Loading orthophoto…",
     candidateLabel: "Choose the correct building",
     footprint: "Horizontal footprint",
     distance: "Distance to address point",
@@ -406,6 +411,7 @@ const copy = {
     automaticHeightReady:
       "The Kartverket height surface is ready and bound to the selected building.",
     automaticHeightRetry: "Try again",
+    orthoRetry: "Retry orthophoto capture",
     ridgeInstruction:
       "Click two ridge endpoints on the height surface to correct the Preview model.",
     ridgeReady:
@@ -772,6 +778,7 @@ export function HeightAnalysisPanel({
 }
 
 export function RealAddressResult({
+  addressPending = false,
   actorId,
   captureApi,
   caseReference,
@@ -780,6 +787,7 @@ export function RealAddressResult({
   locale,
   result,
 }: {
+  addressPending?: boolean;
   actorId: string;
   captureApi?: NorgeIBilderCaptureApi;
   caseReference: string;
@@ -801,6 +809,9 @@ export function RealAddressResult({
     },
   );
   const [selectedId, setSelectedId] = useState(result.candidates[0]?.id ?? "");
+  const [confirmedCandidateId, setConfirmedCandidateId] = useState<
+    string | null
+  >(null);
   const [opacity, setOpacity] = useState(38);
   const [showOverlay, setShowOverlay] = useState(true);
   const [ridgePoints, setRidgePoints] = useState<
@@ -810,6 +821,9 @@ export function RealAddressResult({
     candidateId: string;
     result: NorgeIBilderCaptureResult;
   } | null>(null);
+  const [capturePhase, setCapturePhase] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
   const automaticCaptureStarted = useRef(false);
   const captureResult = captureBinding?.result ?? null;
   const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<Extract<
@@ -939,19 +953,27 @@ export function RealAddressResult({
       nextCapture: NorgeIBilderCaptureResult | null,
       context: NorgeIBilderCaptureContext,
     ) => {
-      const candidateId = context.candidateId;
-      if (!nextCapture || !candidateId) {
+      if (context.phase === "loading") {
+        setCapturePhase("loading");
         automaticHeightGeneration.current += 1;
         automaticHeightRequestKey.current = null;
         latestAutomaticHeightBinding.current = null;
         setAutomaticHeightAttempt({ kind: "idle" });
-        setCaptureBinding(null);
         return;
       }
-      if (candidateId !== selectedCandidateIdRef.current) {
+      if (context.phase === "error") {
+        setCapturePhase("error");
+        automaticHeightGeneration.current += 1;
+        automaticHeightRequestKey.current = null;
+        latestAutomaticHeightBinding.current = null;
+        setAutomaticHeightAttempt({ kind: "idle" });
         return;
       }
-      setCaptureBinding({ candidateId, result: nextCapture });
+      const candidateId = selectedCandidateIdRef.current;
+      if (!nextCapture || !candidateId) {
+        setCapturePhase("error");
+        return;
+      }
       if (
         !captureMatchesSelectedAddress(nextCapture.address, result.address) ||
         !nextCapture.geoReference ||
@@ -959,6 +981,7 @@ export function RealAddressResult({
         !nextCapture.rawContentHash ||
         !nextCapture.capturedAt
       ) {
+        setCapturePhase("error");
         const binding = {
           candidateId,
           addressQuery: result.address.label,
@@ -974,6 +997,8 @@ export function RealAddressResult({
         });
         return;
       }
+      setCapturePhase("ready");
+      setCaptureBinding({ candidateId, result: nextCapture });
       dispatchOneCard({
         type: "CAPTURE_READY",
         requestId: workflowRequestId,
@@ -1006,11 +1031,16 @@ export function RealAddressResult({
         (item) => item.id === candidateId,
       );
       if (!candidate) return;
+      const candidateChanged = candidateId !== selected.id;
       selectedCandidateIdRef.current = candidateId;
       setSelectedId(candidateId);
+      setConfirmedCandidateId(candidateId);
+      if (candidateChanged) {
+        setRidgePoints([]);
+        setLastSuccessfulHeight(null);
+        setAutomaticHeightAttempt({ kind: "idle" });
+      }
       setCaptureBinding({ candidateId, result: captureResult });
-      setLastSuccessfulHeight(null);
-      setAutomaticHeightAttempt({ kind: "idle" });
       dispatchOneCard({ type: "SELECT_BUILDING", candidateId });
       const binding = {
         candidateId,
@@ -1029,6 +1059,7 @@ export function RealAddressResult({
       result.address.label,
       result.candidates,
       runAutomaticHeight,
+      selected.id,
     ],
   );
 
@@ -1113,11 +1144,15 @@ export function RealAddressResult({
           }))
           .filter((item) => item.points.length >= 3)
       : [];
+  const orthoCaptureLoading =
+    Boolean(leadId) && (addressPending || capturePhase === "loading");
   const buildingSelectionActive =
+    !orthoCaptureLoading &&
     oneCardState.status === "building_select" &&
     Boolean(captureResult?.imageUrl);
   const canRenderUnifiedWorkbench =
     Boolean(leadId) &&
+    !orthoCaptureLoading &&
     Boolean(captureResult?.imageUrl) &&
     normalizedSourceOutline.length >= 3 &&
     captureMatchesSelection &&
@@ -1125,6 +1160,15 @@ export function RealAddressResult({
       oneCardState.status === "calculating" ||
       oneCardState.status === "result" ||
       oneCardState.status === "blocked");
+  const hasConfirmedCachedWorkbench =
+    confirmedCandidateId === selected.id &&
+    Boolean(leadId) &&
+    Boolean(captureResult?.imageUrl) &&
+    normalizedSourceOutline.length >= 3 &&
+    captureMatchesSelection;
+  const keepWorkbenchMountedWhileHidden =
+    hasConfirmedCachedWorkbench &&
+    (buildingSelectionActive || orthoCaptureLoading);
   const anyHeightPending =
     heightPending || automaticHeightAttempt.kind === "loading";
   const canRetryAutomaticHeight =
@@ -1182,6 +1226,19 @@ export function RealAddressResult({
         </div>
       </div>
     );
+  const orthoLoadingOverlay = orthoCaptureLoading ? (
+    <div
+      aria-live="polite"
+      className="absolute inset-0 z-20 grid place-items-center bg-[#080d12]/80 backdrop-blur-[1px]"
+      data-roof-fusion-ortho-loading
+      role="status"
+    >
+      <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/75 px-4 py-3 text-sm font-bold text-white shadow-xl">
+        <LoaderCircle aria-hidden className="size-5 animate-spin" />
+        {t.orthoLoading}
+      </span>
+    </div>
+  ) : null;
   const unifiedSourceActions = (
     <div className="grid gap-3" data-roof-fusion-unified-source-actions>
       <strong className="text-xs tracking-[.12em] text-[var(--an-subtle)] uppercase">
@@ -1248,8 +1305,11 @@ export function RealAddressResult({
       className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]"
       data-roof-fusion-one-card-state={oneCardState.status}
     >
-      {canRenderUnifiedWorkbench ? (
-        <div className="xl:col-span-2">
+      {canRenderUnifiedWorkbench || keepWorkbenchMountedWhileHidden ? (
+        <div
+          aria-hidden={!canRenderUnifiedWorkbench}
+          className={canRenderUnifiedWorkbench ? "xl:col-span-2" : "hidden"}
+        >
           <AdminNextRoofFusionPersistentWorkbench
             advancedPanel={unifiedSourceActions}
             actorId={actorId}
@@ -1257,7 +1317,7 @@ export function RealAddressResult({
             caseId={`lead:${leadId}`}
             heightSurface={activeHeight?.surface}
             horizontalAreaSquareMeters={selected.horizontalAreaSquareMeters}
-            key={`${selected.id}:${captureResult?.capturedAt ?? "capture"}`}
+            key={`osm:${selected.id}`}
             orthoImageAlt={`Stogo vaizdas ${result.address.label}`}
             onChangeBuilding={changeBuilding}
             onWorkflowStateChange={handleWorkbenchStateChange}
@@ -1281,10 +1341,35 @@ export function RealAddressResult({
               {t.imageryPending}
             </span>
           </div>
-          {buildingSelectionActive && captureResult ? (
+          {orthoCaptureLoading && captureResult ? (
             <div
+              aria-busy="true"
+              className="relative overflow-hidden bg-[#080d12]"
+              data-roof-fusion-ortho-canvas
+              style={{
+                aspectRatio: captureResult.geoReference
+                  ? `${captureResult.geoReference.imageWidth} / ${captureResult.geoReference.imageHeight}`
+                  : "4 / 3",
+              }}
+            >
+              {/* Authenticated media URLs cannot use the public image optimizer. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt={`Anksčiau gautas stogo vaizdas · ${result.address.label}`}
+                className="absolute inset-0 size-full object-contain"
+                src={captureResult.imageUrl}
+              />
+              <span className="pointer-events-none absolute right-3 bottom-3 rounded-lg bg-black/75 px-2 py-1 text-[10px] font-semibold text-white">
+                {captureResult.attribution ?? "©norgeibilder.no"}
+              </span>
+              {orthoLoadingOverlay}
+            </div>
+          ) : buildingSelectionActive && captureResult ? (
+            <div
+              aria-busy="false"
               className="relative overflow-hidden bg-[#080d12]"
               data-roof-fusion-building-selection
+              data-roof-fusion-ortho-canvas
               style={{
                 aspectRatio: captureResult.geoReference
                   ? `${captureResult.geoReference.imageWidth} / ${captureResult.geoReference.imageHeight}`
@@ -1306,11 +1391,13 @@ export function RealAddressResult({
                 viewBox="0 0 1 1"
               >
                 {normalizedCandidateOutlines.map(({ candidate, points }) => {
+                  const active = candidate.id === selected.id;
                   const recommended = candidate.containsAddress;
                   const activate = () => confirmBuilding(candidate.id);
                   return (
                     <g
                       aria-label={`Pasirinkti pastatą: ${candidate.label}`}
+                      aria-pressed={active}
                       className="cursor-pointer outline-none"
                       data-roof-fusion-building-candidate={candidate.id}
                       key={candidate.id}
@@ -1326,14 +1413,16 @@ export function RealAddressResult({
                     >
                       <polygon
                         fill={
-                          recommended
+                          active
                             ? "rgba(244,182,63,.26)"
-                            : "rgba(70,214,154,.16)"
+                            : recommended
+                              ? "rgba(70,214,154,.20)"
+                              : "rgba(70,214,154,.10)"
                         }
                         points={points
                           .map((point) => `${point.x},${point.y}`)
                           .join(" ")}
-                        stroke={recommended ? "#f4b63f" : "#46d69a"}
+                        stroke={active ? "#f4b63f" : "#46d69a"}
                         strokeWidth="2px"
                         vectorEffect="non-scaling-stroke"
                       />
@@ -1497,7 +1586,11 @@ export function RealAddressResult({
               </span>
             </div>
           ) : (
-            <div className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3">
+            <div
+              aria-busy={orthoCaptureLoading}
+              className="relative bg-[linear-gradient(rgba(111,132,151,.10)_1px,transparent_1px),linear-gradient(90deg,rgba(111,132,151,.10)_1px,transparent_1px),radial-gradient(circle_at_50%_45%,#182532,#0b1118_72%)] bg-[size:24px_24px,24px_24px,auto] p-3"
+              data-roof-fusion-ortho-canvas
+            >
               <svg
                 aria-label={t.candidateLabel}
                 className="h-auto w-full"
@@ -1534,6 +1627,7 @@ export function RealAddressResult({
               <span className="pointer-events-none absolute right-4 bottom-4 rounded-lg border border-[var(--an-border)] bg-black/65 px-2 py-1 text-[9px] text-[var(--an-muted)]">
                 © OpenStreetMap contributors · ODbL 1.0
               </span>
+              {orthoLoadingOverlay}
             </div>
           )}
           <div className="grid gap-3 border-t border-[var(--an-border)] p-4 sm:grid-cols-2">
@@ -1563,16 +1657,16 @@ export function RealAddressResult({
 
       {!canRenderUnifiedWorkbench ? (
         <div className="grid content-start gap-3">
-          {buildingSelectionActive ? (
+          {buildingSelectionActive && !orthoCaptureLoading ? (
             <div className="grid gap-2" data-roof-fusion-building-list>
               <strong className="text-xs">{t.candidateLabel}</strong>
               {result.candidates.map((candidate) => (
                 <button
                   className="min-h-11 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 text-left text-sm font-bold hover:border-[var(--an-amber)]"
                   data-roof-fusion-building-list-option={candidate.id}
+                  aria-pressed={candidate.id === selected.id}
                   key={candidate.id}
                   onClick={() => confirmBuilding(candidate.id)}
-                  onFocus={() => setSelectedId(candidate.id)}
                   type="button"
                 >
                   {candidate.label}
@@ -1729,18 +1823,33 @@ export function RealAddressResult({
           {t.preliminary}
         </p>
       ) : null}
-      {!canRenderUnifiedWorkbench && heightState.kind === "error" ? (
-        <p
+      {!canRenderUnifiedWorkbench && currentHeightState.kind === "error" ? (
+        <div
           className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200 xl:col-span-2"
           role="alert"
         >
-          {t.heightErrors[heightState.code]}
-          {heightState.correlationId ? (
+          <p>{t.heightErrors[currentHeightState.code]}</p>
+          {currentHeightState.correlationId ? (
             <span className="mt-1 block font-mono text-[10px] font-normal">
-              ID: {heightState.correlationId}
+              ID: {currentHeightState.correlationId}
             </span>
           ) : null}
-        </p>
+          {capturePhase === "error" &&
+          currentHeightState.code === "SOURCE_VALIDATION_UNAVAILABLE" ? (
+            <button
+              className="mt-3 min-h-10 rounded-lg border border-current px-3"
+              data-roof-fusion-ortho-retry
+              onClick={() =>
+                document
+                  .getElementById(`roof-fusion-norge-capture-${leadId}`)
+                  ?.click()
+              }
+              type="button"
+            >
+              {t.orthoRetry}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {!canRenderUnifiedWorkbench ? (
         activeHeight ? (
@@ -2093,6 +2202,7 @@ export function AdminNextRoofFusionUatControl({
         </p>
         {addressState.kind === "success" ? (
           <RealAddressResult
+            addressPending={addressPending}
             actorId={actorId}
             captureApi={captureApi}
             caseReference={caseReference}

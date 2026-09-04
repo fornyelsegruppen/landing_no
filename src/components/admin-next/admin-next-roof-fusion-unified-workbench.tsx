@@ -966,6 +966,16 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 );
               })}
             </nav>
+            {onChangeBuilding && activeOneCardStep === "refine" ? (
+              <button
+                className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#ddd8cd] hover:bg-white/10"
+                data-roof-fusion-change-building
+                onClick={onChangeBuilding}
+                type="button"
+              >
+                ← Keisti pastatą
+              </button>
+            ) : null}
             <button
               aria-expanded={advancedOpen}
               className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#ddd8cd] hover:bg-white/10"
@@ -1633,16 +1643,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               <p className="text-center text-xs text-[#ffadad]">
                 Paspaudus „Apskaičiuoti“ bus parodyti reikalingi sprendimai.
               </p>
-            ) : null}
-            {onChangeBuilding ? (
-              <button
-                className="min-h-10 w-full rounded-xl border border-white/10 px-3 text-xs font-semibold text-[#aaa69d] hover:border-white/20 hover:text-white"
-                data-roof-fusion-change-building
-                onClick={onChangeBuilding}
-                type="button"
-              >
-                Keisti pastatą
-              </button>
             ) : null}
           </div>
         </aside>

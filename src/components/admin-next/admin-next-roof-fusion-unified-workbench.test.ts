@@ -196,6 +196,23 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).not.toContain("data-roof-fusion-legacy-fallback-slot");
   });
 
+  it("places the change-building action beside progress without hiding it in Advanced", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        onChangeBuilding: () => undefined,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        sourceOutline,
+      }),
+    );
+
+    expect(html).toContain("data-roof-fusion-one-card-progress");
+    expect(html).toContain("data-roof-fusion-change-building");
+    expect(html).toContain("← Keisti pastatą");
+    expect(html.indexOf("data-roof-fusion-change-building")).toBeLessThan(
+      html.indexOf("data-roof-fusion-advanced-trigger"),
+    );
+  });
+
   it("localizes adapter blocker prose and never exposes unknown English reasons", () => {
     expect(
       localizedWorkbenchHeightBlocker(

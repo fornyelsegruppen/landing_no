@@ -308,6 +308,14 @@ function hydrateDraft(
 
 const FOOTPRINT_IDENTITY_TOLERANCE_METERS = 0.05;
 
+function sourceFootprintIdentityMatches(
+  draft: RoofFusionWorkbenchDraftV1,
+  sourceFootprintId?: string,
+) {
+  if (!sourceFootprintId) return true;
+  return draft.geometry.sourceFootprint.sourceId === sourceFootprintId;
+}
+
 function sourceFootprintMatchesCapture(
   draft: RoofFusionWorkbenchDraftV1,
   capture: NorgeIBilderCaptureResult,
@@ -317,12 +325,15 @@ function sourceFootprintMatchesCapture(
   const reference = capture.geoReference;
   if (!reference || sourceOutline.length < 3) return false;
   const footprint = draft.geometry.sourceFootprint;
+  const exactIdentity = sourceFootprintIdentityMatches(
+    draft,
+    sourceFootprintId,
+  );
+  // Drafts created before footprint identity was split from capture identity
+  // may use the orthophoto source ID here. They are transferable only after
+  // the complete registered footprint geometry matches, never by ID alone.
   const legacyAliasedIdentity = footprint.sourceId === draft.source.sourceId;
-  if (
-    sourceFootprintId &&
-    !legacyAliasedIdentity &&
-    footprint.sourceId !== sourceFootprintId
-  ) {
+  if (sourceFootprintId && !exactIdentity && !legacyAliasedIdentity) {
     return false;
   }
   const spanX = reference.bounds.maxEastingM - reference.bounds.minEastingM;
@@ -431,22 +442,27 @@ export function AdminNextRoofFusionPersistentWorkbench({
       const exactCapture =
         draft.source.sourceId === capture.sourceId &&
         draft.source.sourceContentHash === capture.rawContentHash;
+      const exactFootprintIdentity = sourceFootprintIdentityMatches(
+        draft,
+        sourceFootprintId,
+      );
+      const exactStoredSource = exactCapture && exactFootprintIdentity;
       const transferable = sourceFootprintMatchesCapture(
         draft,
         capture,
         registeredSourceOutline,
         sourceFootprintId,
       );
-      if (hydrated && (exactCapture || transferable)) {
+      if (hydrated && (exactStoredSource || transferable)) {
         setUnsupportedLatest(false);
         setSourceResetRequired(false);
         setSaveState("idle");
         pendingDraft.current = null;
         setOutline(hydrated.outline);
         setLines(hydrated.lines);
-        setConfirmed(exactCapture ? draft : null);
-        setDirty(!exactCapture);
-        if (!exactCapture) {
+        setConfirmed(exactStoredSource ? draft : null);
+        setDirty(!exactStoredSource);
+        if (!exactStoredSource) {
           setProblem(
             "Ankstesnės rankinės anotacijos perkeltos į tą patį registruotą stogo kontūrą. Išsaugokite naują reviziją, kad susietumėte jas su atnaujintu vaizdu.",
           );
@@ -459,7 +475,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       setUnsupportedLatest(true);
       setSaveState("idle");
       pendingDraft.current = null;
-      if (exactCapture) {
+      if (exactStoredSource) {
         setSourceResetRequired(false);
         setProblem(
           "Naujausioje revizijoje yra keli stogo masyvai, angos, kliūtys arba nepalaikomi kraštai. Ši UAT drobė jų saugiai nepriskiria paviršiams — reikalinga peržiūra.",
@@ -473,6 +489,16 @@ export function AdminNextRoofFusionPersistentWorkbench({
     },
     [capture, registeredSourceOutline, sourceFootprintId],
   );
+  const applyLoadedDraftRef = useRef(applyLoadedDraft);
+  useEffect(() => {
+    applyLoadedDraftRef.current = applyLoadedDraft;
+  }, [applyLoadedDraft]);
+  const captureEvidenceIdentity = [
+    capture.sourceId ?? "missing-source",
+    capture.rawContentHash ?? "missing-content-hash",
+    capture.capturedAt ?? "missing-captured-at",
+  ].join(":");
+  const previousCaptureEvidenceIdentity = useRef(captureEvidenceIdentity);
 
   const loadLatest = useCallback(async () => {
     setLoadState("loading");
@@ -497,7 +523,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         if (cancelled) return;
         setLatest(draft);
         setLoadState(draft ? "loaded" : "none");
-        if (draft) applyLoadedDraft(draft);
+        if (draft) applyLoadedDraftRef.current(draft);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -509,7 +535,61 @@ export function AdminNextRoofFusionPersistentWorkbench({
     return () => {
       cancelled = true;
     };
-  }, [applyLoadedDraft, caseId]);
+  }, [caseId, sourceFootprintId]);
+
+  useEffect(() => {
+    if (previousCaptureEvidenceIdentity.current === captureEvidenceIdentity) {
+      return;
+    }
+    previousCaptureEvidenceIdentity.current = captureEvidenceIdentity;
+    if (!latest) return;
+    const exactCapture =
+      latest.source.sourceId === capture.sourceId &&
+      latest.source.sourceContentHash === capture.rawContentHash;
+    const exactFootprintIdentity = sourceFootprintIdentityMatches(
+      latest,
+      sourceFootprintId,
+    );
+    if (exactCapture && exactFootprintIdentity) return;
+    const transferable = sourceFootprintMatchesCapture(
+      latest,
+      capture,
+      registeredSourceOutline,
+      sourceFootprintId,
+    );
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLegacyFallback(null);
+      setHeightResult(null);
+      setSaveState("idle");
+      pendingDraft.current = null;
+      if (transferable) {
+        setUnsupportedLatest(false);
+        setSourceResetRequired(false);
+        setConfirmed(null);
+        setDirty(true);
+        setProblem(
+          "Ankstesnės rankinės anotacijos perkeltos į tą patį registruotą stogo kontūrą. Išsaugokite naują reviziją, kad susietumėte jas su atnaujintu vaizdu.",
+        );
+        return;
+      }
+      setUnsupportedLatest(true);
+      setSourceResetRequired(true);
+      setProblem(
+        "Atnaujinto vaizdo stogo kontūro tapatybė nesutampa su išsaugota revizija. Rankinės anotacijos neišvalytos; patvirtinkite naujos geometrijos pradžią tik jei tikrai norite jų atsisakyti.",
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    capture,
+    captureEvidenceIdentity,
+    latest,
+    registeredSourceOutline,
+    sourceFootprintId,
+  ]);
 
   const save =
     useCallback(async (): Promise<RoofFusionWorkbenchDraftV1 | null> => {
@@ -874,7 +954,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         metrics?.horizontalAreaSquareMeters ?? horizontalAreaSquareMeters
       }
       initialLayers={{ approvedOutline: true, sourceOutline: true }}
-      key={`${capture.sourceId ?? "missing-source"}:${capture.rawContentHash ?? "missing-content-hash"}`}
+      key={sourceFootprintId ?? `${caseId}:source-footprint`}
       lines={lines}
       legacyFallbackPanel={
         <AdminNextRoofFusionLegacyFallbackPanel

@@ -64,6 +64,7 @@ export type NorgeIBilderCaptureApi = (
 
 export type NorgeIBilderCaptureContext = Readonly<{
   candidateId?: string;
+  phase: "loading" | "success" | "error";
 }>;
 
 /** Convert the georeferenced pixel overlay into the workbench's 0..1 space. */
@@ -408,7 +409,10 @@ export function NorgeIBilderCaptureControl({
     if (!leadId) return;
     const clickId = crypto.randomUUID();
     const requestedCandidateId = selectedCandidateId;
-    onCaptureResultChange?.(null, { candidateId: requestedCandidateId });
+    onCaptureResultChange?.(null, {
+      candidateId: requestedCandidateId,
+      phase: "loading",
+    });
     setState({ kind: "loading", attempt: 1 });
     try {
       const captureApi =
@@ -448,6 +452,7 @@ export function NorgeIBilderCaptureControl({
       });
       onCaptureResultChange?.(result, {
         candidateId: requestedCandidateId,
+        phase: "success",
       });
     } catch (error) {
       setState({
@@ -455,7 +460,10 @@ export function NorgeIBilderCaptureControl({
         message:
           error instanceof Error ? error.message : "Nepavyko gauti vaizdo.",
       });
-      onCaptureResultChange?.(null, { candidateId: requestedCandidateId });
+      onCaptureResultChange?.(null, {
+        candidateId: requestedCandidateId,
+        phase: "error",
+      });
     }
   }
 
