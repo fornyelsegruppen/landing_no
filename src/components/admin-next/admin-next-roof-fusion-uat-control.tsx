@@ -18,7 +18,9 @@ import {
   type MouseEvent,
   useActionState,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { AddressCandidate } from "@/lib/providers/contracts";
@@ -34,6 +36,7 @@ import {
   captureMatchesSelectedAddress,
   NorgeIBilderCaptureControl,
   type NorgeIBilderCaptureApi,
+  type NorgeIBilderCaptureContext,
   type NorgeIBilderCaptureResult,
   normalizeOrthoOverlayPoints,
 } from "@/components/admin-next/norgeibilder-capture-control";
@@ -100,6 +103,26 @@ const initialState: RoofFusionUatActionState = { kind: "idle" };
 const initialAddressState: RoofFusionAddressLookupState = { kind: "idle" };
 const initialHeightState: RoofFusionHeightAnalysisState = { kind: "idle" };
 
+type AutomaticHeightBinding = Readonly<{
+  candidateId: string;
+  addressQuery: string;
+  requestKey: string;
+}>;
+
+type AutomaticHeightAttempt =
+  | { kind: "idle" }
+  | { kind: "loading"; binding: AutomaticHeightBinding }
+  | {
+      kind: "success";
+      binding: AutomaticHeightBinding;
+      result: Extract<RoofFusionHeightAnalysisState, { kind: "success" }>;
+    }
+  | {
+      kind: "error";
+      binding: AutomaticHeightBinding;
+      result: Extract<RoofFusionHeightAnalysisState, { kind: "error" }>;
+    };
+
 export function selectActiveHeightState(
   current: RoofFusionHeightAnalysisState,
   lastSuccessful: Extract<
@@ -149,6 +172,11 @@ const copy = {
       "Dette er et gratis, foreløpig bygningsfotavtrykk – ikke ferdige takflater eller godkjent takareal.",
     heightAction: "Hent virkelig takflate",
     heightWorking: "Leser DOM og DTM …",
+    automaticHeightWorking:
+      "Kartverkets frie DOM- og DTM-høydedata leses automatisk …",
+    automaticHeightReady:
+      "Kartverkets høydeoverflate er hentet og koblet til valgt bygning.",
+    automaticHeightRetry: "Prøv igjen",
     ridgeInstruction:
       "Klikk to endepunkter på mønelinjen i høydeflaten for å korrigere Preview-modellen.",
     ridgeReady:
@@ -258,6 +286,11 @@ const copy = {
       "Tai nemokamas preliminarus pastato kontūras – dar ne galutiniai stogo šlaitai ar patvirtintas stogo plotas.",
     heightAction: "Gauti tikrą stogo paviršių",
     heightWorking: "Skaitomi DOM ir DTM…",
+    automaticHeightWorking:
+      "Automatiškai nuskaitomi nemokami Kartverket DOM ir DTM aukščio duomenys…",
+    automaticHeightReady:
+      "Kartverket aukščio paviršius gautas ir susietas su pasirinktu pastatu.",
+    automaticHeightRetry: "Bandyti dar kartą",
     ridgeInstruction:
       "Aukščio paviršiuje pažymėkite du kraigo galus, kad pakoreguotumėte Preview modelį.",
     ridgeReady:
@@ -366,6 +399,11 @@ const copy = {
       "This is a free preliminary building footprint, not final roof planes or an approved roof area.",
     heightAction: "Fetch real roof surface",
     heightWorking: "Reading DOM and DTM…",
+    automaticHeightWorking:
+      "Reading the free Kartverket DOM and DTM height data automatically…",
+    automaticHeightReady:
+      "The Kartverket height surface is ready and bound to the selected building.",
+    automaticHeightRetry: "Try again",
     ridgeInstruction:
       "Click two ridge endpoints on the height surface to correct the Preview model.",
     ridgeReady:
@@ -758,17 +796,30 @@ export function RealAddressResult({
   const [ridgePoints, setRidgePoints] = useState<
     Array<{ x: number; y: number }>
   >([]);
-  const [captureResult, setCaptureResult] =
-    useState<NorgeIBilderCaptureResult | null>(null);
+  const [captureBinding, setCaptureBinding] = useState<{
+    candidateId: string;
+    result: NorgeIBilderCaptureResult;
+  } | null>(null);
+  const captureResult = captureBinding?.result ?? null;
   const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<Extract<
     RoofFusionHeightAnalysisState,
     { kind: "success" }
   > | null>(null);
+  const [automaticHeightAttempt, setAutomaticHeightAttempt] =
+    useState<AutomaticHeightAttempt>({ kind: "idle" });
+  const automaticHeightGeneration = useRef(0);
+  const automaticHeightRequestKey = useRef<string | null>(null);
+  const latestAutomaticHeightBinding = useRef<AutomaticHeightBinding | null>(
+    null,
+  );
   const heightAnalysisActionWithHistory = useCallback(
     async (
       previousState: RoofFusionHeightAnalysisState,
       formData: FormData,
     ) => {
+      automaticHeightGeneration.current += 1;
+      automaticHeightRequestKey.current = null;
+      setAutomaticHeightAttempt({ kind: "idle" });
       const nextState = await heightAnalysisAction(previousState, formData);
       if (nextState.kind === "success") {
         setLastSuccessfulHeight(nextState);
@@ -784,6 +835,10 @@ export function RealAddressResult({
   const selected =
     result.candidates.find((candidate) => candidate.id === selectedId) ??
     result.candidates[0];
+  const selectedCandidateIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedCandidateIdRef.current = selected?.id ?? null;
+  }, [selected?.id]);
   const enginePreview = result.enginePreviews.find(
     (preview) => preview.candidateId === selected?.id,
   );
@@ -791,8 +846,15 @@ export function RealAddressResult({
     () => projectCandidates(result.address, result.candidates),
     [result.address, result.candidates],
   );
+  const automaticHeightState =
+    automaticHeightAttempt.kind === "success" ||
+    automaticHeightAttempt.kind === "error"
+      ? automaticHeightAttempt.result
+      : initialHeightState;
+  const currentHeightState =
+    automaticHeightAttempt.kind === "idle" ? heightState : automaticHeightState;
   const activeHeight = selectActiveHeightState(
-    heightState,
+    currentHeightState,
     lastSuccessfulHeight,
     selected?.id,
   );
@@ -800,9 +862,112 @@ export function RealAddressResult({
   const hasSegmentedPlanes = activePlanes.length > 0;
   const manualRidgeAvailable =
     activeHeight?.summary.manualRidgeCorrectionStatus === "available";
-  const captureMatchesSelection = captureMatchesSelectedAddress(
-    captureResult?.address,
-    result.address,
+  const captureMatchesSelection =
+    captureBinding?.candidateId === selected?.id &&
+    captureMatchesSelectedAddress(captureResult?.address, result.address);
+
+  const runAutomaticHeight = useCallback(
+    (binding: AutomaticHeightBinding, force = false) => {
+      if (!force && automaticHeightRequestKey.current === binding.requestKey) {
+        return;
+      }
+      automaticHeightRequestKey.current = binding.requestKey;
+      latestAutomaticHeightBinding.current = binding;
+      const generation = automaticHeightGeneration.current + 1;
+      automaticHeightGeneration.current = generation;
+      setAutomaticHeightAttempt({ kind: "loading", binding });
+      const formData = new FormData();
+      formData.set("addressQuery", binding.addressQuery);
+      formData.set("candidateId", binding.candidateId);
+      void heightAnalysisAction(initialHeightState, formData)
+        .then((nextState) => {
+          if (automaticHeightGeneration.current !== generation) return;
+          if (
+            nextState.kind === "success" &&
+            nextState.candidateId === binding.candidateId
+          ) {
+            setLastSuccessfulHeight(nextState);
+            setAutomaticHeightAttempt({
+              kind: "success",
+              binding,
+              result: nextState,
+            });
+            return;
+          }
+          setAutomaticHeightAttempt({
+            kind: "error",
+            binding,
+            result:
+              nextState.kind === "error"
+                ? nextState
+                : { kind: "error", code: "HEIGHT_PROCESSING_FAILED" },
+          });
+        })
+        .catch(() => {
+          if (automaticHeightGeneration.current !== generation) return;
+          setAutomaticHeightAttempt({
+            kind: "error",
+            binding,
+            result: { kind: "error", code: "HEIGHT_PROCESSING_FAILED" },
+          });
+        });
+    },
+    [heightAnalysisAction],
+  );
+
+  const handleCaptureResultChange = useCallback(
+    (
+      nextCapture: NorgeIBilderCaptureResult | null,
+      context: NorgeIBilderCaptureContext,
+    ) => {
+      const candidateId = context.candidateId;
+      if (!nextCapture || !candidateId) {
+        automaticHeightGeneration.current += 1;
+        automaticHeightRequestKey.current = null;
+        latestAutomaticHeightBinding.current = null;
+        setAutomaticHeightAttempt({ kind: "idle" });
+        setCaptureBinding(null);
+        return;
+      }
+      if (candidateId !== selectedCandidateIdRef.current) {
+        return;
+      }
+      setCaptureBinding({ candidateId, result: nextCapture });
+      if (
+        !captureMatchesSelectedAddress(nextCapture.address, result.address) ||
+        !nextCapture.geoReference ||
+        !nextCapture.sourceId ||
+        !nextCapture.rawContentHash ||
+        !nextCapture.capturedAt
+      ) {
+        const binding = {
+          candidateId,
+          addressQuery: result.address.label,
+          requestKey: `invalid:${candidateId}:${nextCapture.capturedAt ?? "missing"}`,
+        };
+        automaticHeightGeneration.current += 1;
+        automaticHeightRequestKey.current = null;
+        latestAutomaticHeightBinding.current = binding;
+        setAutomaticHeightAttempt({
+          kind: "error",
+          binding,
+          result: { kind: "error", code: "SOURCE_VALIDATION_UNAVAILABLE" },
+        });
+        return;
+      }
+      const binding = {
+        candidateId,
+        addressQuery: result.address.label,
+        requestKey: [
+          candidateId,
+          nextCapture.sourceId,
+          nextCapture.rawContentHash,
+          nextCapture.capturedAt,
+        ].join(":"),
+      };
+      runAutomaticHeight(binding);
+    },
+    [result.address, runAutomaticHeight],
   );
 
   function selectRidgePoint(event: MouseEvent<HTMLButtonElement>) {
@@ -846,6 +1011,63 @@ export function RealAddressResult({
     Boolean(captureResult?.imageUrl) &&
     normalizedSourceOutline.length >= 3 &&
     captureMatchesSelection;
+  const anyHeightPending =
+    heightPending || automaticHeightAttempt.kind === "loading";
+  const canRetryAutomaticHeight =
+    automaticHeightAttempt.kind === "error" &&
+    Boolean(captureResult?.geoReference) &&
+    Boolean(captureResult?.sourceId) &&
+    Boolean(captureResult?.rawContentHash) &&
+    Boolean(captureResult?.capturedAt) &&
+    automaticHeightAttempt.binding.candidateId === selected.id &&
+    captureBinding?.candidateId === selected.id;
+  const automaticHeightStatusPanel =
+    automaticHeightAttempt.kind === "idle" ? null : (
+      <div
+        className={`mb-4 rounded-2xl border p-3 text-xs font-bold ${
+          automaticHeightAttempt.kind === "error"
+            ? "border-red-400/35 bg-red-400/10 text-red-200"
+            : automaticHeightAttempt.kind === "success"
+              ? "border-emerald-400/35 bg-emerald-400/10 text-emerald-100"
+              : "border-amber-300/35 bg-amber-300/10 text-amber-100"
+        }`}
+        data-roof-fusion-automatic-height={automaticHeightAttempt.kind}
+        role={automaticHeightAttempt.kind === "error" ? "alert" : "status"}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          {automaticHeightAttempt.kind === "loading" ? (
+            <LoaderCircle aria-hidden className="size-4 animate-spin" />
+          ) : automaticHeightAttempt.kind === "success" ? (
+            <CheckCircle2 aria-hidden className="size-4" />
+          ) : (
+            <TriangleAlert aria-hidden className="size-4" />
+          )}
+          <span>
+            {automaticHeightAttempt.kind === "loading"
+              ? t.automaticHeightWorking
+              : automaticHeightAttempt.kind === "success"
+                ? t.automaticHeightReady
+                : t.heightErrors[automaticHeightAttempt.result.code]}
+          </span>
+          {automaticHeightAttempt.kind === "error" ? (
+            <button
+              className="ml-auto min-h-9 rounded-lg border border-current px-3"
+              data-roof-fusion-automatic-height-retry
+              disabled={!canRetryAutomaticHeight || anyHeightPending}
+              onClick={() => {
+                const binding = latestAutomaticHeightBinding.current;
+                if (binding && canRetryAutomaticHeight) {
+                  runAutomaticHeight(binding, true);
+                }
+              }}
+              type="button"
+            >
+              {t.automaticHeightRetry}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
   const unifiedSourceActions = (
     <div className="grid gap-3" data-roof-fusion-unified-source-actions>
       <strong className="text-xs tracking-[.12em] text-[var(--an-subtle)] uppercase">
@@ -892,26 +1114,26 @@ export function RealAddressResult({
         <input name="candidateId" type="hidden" value={selected.id} />
         <button
           className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
-          disabled={heightPending}
+          disabled={anyHeightPending}
           type="submit"
         >
-          {heightPending ? (
+          {anyHeightPending ? (
             <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
           ) : (
             <Mountain aria-hidden="true" className="size-4" />
           )}
-          {heightPending ? t.heightWorking : t.heightAction}
+          {anyHeightPending ? t.heightWorking : t.heightAction}
         </button>
       </form>
-      {heightState.kind === "error" ? (
+      {currentHeightState.kind === "error" ? (
         <p
           className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200"
           role="alert"
         >
-          {t.heightErrors[heightState.code]}
-          {heightState.correlationId ? (
+          {t.heightErrors[currentHeightState.code]}
+          {currentHeightState.correlationId ? (
             <span className="mt-1 block font-mono text-[10px] font-normal">
-              ID: {heightState.correlationId}
+              ID: {currentHeightState.correlationId}
             </span>
           ) : null}
         </p>
@@ -935,6 +1157,7 @@ export function RealAddressResult({
             horizontalAreaSquareMeters={selected.horizontalAreaSquareMeters}
             key={`${selected.id}:${captureResult?.capturedAt ?? "capture"}`}
             orthoImageAlt={`Stogo vaizdas ${result.address.label}`}
+            sourceStatusPanel={automaticHeightStatusPanel}
             sourceOutline={normalizedSourceOutline}
             sourceFootprintId={`osm:${selected.id}`}
           />
@@ -1464,8 +1687,9 @@ export function RealAddressResult({
         caseReference={caseReference}
         compactWhenWorkbenchActive={canRenderUnifiedWorkbench}
         leadId={leadId}
-        onCaptureResultChange={setCaptureResult}
+        onCaptureResultChange={handleCaptureResultChange}
         address={result.address}
+        selectedCandidateId={selected.id}
         selectedFootprint={selected.polygon}
       />
     </div>

@@ -7,6 +7,9 @@ import {
   DEFAULT_ROOF_FUSION_LAYERS,
   MAX_ROOF_FUSION_ZOOM,
   MIN_ROOF_FUSION_ZOOM,
+  ROOF_FUSION_PENDING_LINE_STROKE,
+  ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
+  ROOF_FUSION_SKELETON_LINE_STROKE,
   ROOF_FUSION_STAGES,
   clampRoofFusionPoint,
   clampRoofFusionViewport,
@@ -238,6 +241,32 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('ry="0.004666666666666666"');
   });
 
+  it("keeps saved skeleton strokes and endpoint markers compact at 100%, 300%, and max zoom", () => {
+    const atOneX = roofFusionScreenStableMarkerRadii(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
+      16 / 9,
+      1,
+    );
+    const atThreeX = roofFusionScreenStableMarkerRadii(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
+      16 / 9,
+      3,
+    );
+    const atMaxZoom = roofFusionScreenStableMarkerRadii(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
+      16 / 9,
+      MAX_ROOF_FUSION_ZOOM,
+    );
+
+    expect(atOneX.rx).toBe(0.0025);
+    expect(atThreeX.rx * 3).toBeCloseTo(atOneX.rx);
+    expect(atThreeX.ry * 3).toBeCloseTo(atOneX.ry);
+    expect(atMaxZoom.rx * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.rx);
+    expect(atMaxZoom.ry * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.ry);
+    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("2px");
+    expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("1.5px");
+  });
+
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
@@ -274,6 +303,12 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).toContain('data-roof-fusion-layer="skeleton"');
     expect(html).toContain('data-roof-fusion-line-kind="ridge"');
+    expect(html).toContain('stroke-width="2px"');
+    expect(html).toContain('data-roof-fusion-line-endpoint="ridge-a:0"');
+    expect(html).toContain('rx="0.0025"');
+    expect(html).toContain('stroke-width="1px"');
+    expect(html).toContain('data-roof-fusion-vertex-hit-target="0"');
+    expect(html).toContain('rx="0.022"');
     expect(html).toContain('data-roof-fusion-obstacle="chimney"');
     expect(html).toContain("Trūksta patvirtinto nuolydžio");
     expect(html).toContain("Pirmiausia išspręskite blokatorius");
@@ -299,7 +334,16 @@ describe("Admin Next unified Roof Fusion workbench", () => {
 
     expect(outlineHtml).not.toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("Preview išsaugojimas dar neįjungtas");
-    expect(reviewHtml).toContain('disabled=""');
+    expect(reviewHtml).toContain("data-roof-fusion-preview-complete");
+    expect(reviewHtml).toContain(
+      "Preview skaičiavimas parengtas rankinei peržiūrai",
+    );
+    expect(reviewHtml).toContain("nebus naudojamas kainodarai");
+    expect(reviewHtml).not.toContain("Patvirtinti R4 matavimą");
+    expect(reviewHtml).not.toContain("Pirmiausia išspręskite blokatorius");
+    expect(reviewHtml).not.toContain(
+      'data-roof-fusion-primary-action="review"',
+    );
   });
 
   it("keeps save, reload proof and height gating inside the approved one-window UI", () => {

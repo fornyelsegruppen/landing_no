@@ -100,6 +100,14 @@ function localizedWorkbenchProblem(error: unknown, fallback: string) {
   const messages: Record<string, string> = {
     LOAD_FAILED: "Juodraščio įkelti nepavyko.",
     SAVE_FAILED: "Juodraščio išsaugoti nepavyko.",
+    LOAD_CONNECTION_FAILED:
+      "Nepavyko prisijungti prie serverio įkeliant reviziją. Patikrinkite interneto ryšį ir spauskite „Perkrauti“.",
+    LOAD_TIMEOUT:
+      "Revizijos įkėlimas užtruko per ilgai. Patikrinkite ryšį ir spauskite „Perkrauti“.",
+    SAVE_CONNECTION_FAILED:
+      "Nepavyko prisijungti prie serverio išsaugant reviziją. Išsaugojimas nepatvirtintas; patikrinkite ryšį ir dar kartą spauskite „Išsaugoti ir patvirtinti reviziją“.",
+    SAVE_TIMEOUT:
+      "Revizijos išsaugojimas užtruko per ilgai. Išsaugojimas nepatvirtintas; patikrinkite ryšį ir dar kartą spauskite „Išsaugoti ir patvirtinti reviziją“.",
     INVALID_DRAFT:
       "Juodraščio geometrija netinkama. Patikrinkite kontūrą ir stogo linijas.",
     INVALID_GEOMETRY:
@@ -235,6 +243,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   heightSurface,
   horizontalAreaSquareMeters,
   orthoImageAlt,
+  sourceStatusPanel,
   sourceOutline,
   sourceFootprintId,
 }: {
@@ -245,6 +254,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
   heightSurface?: KartverketHeightSurfaceV1;
   horizontalAreaSquareMeters: number;
   orthoImageAlt: string;
+  sourceStatusPanel?: ReactNode;
   sourceOutline: readonly RoofFusionPoint[];
   sourceFootprintId?: string;
 }) {
@@ -740,6 +750,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       orthoImageHeight={capture.geoReference?.imageHeight}
       orthoImageSrc={capture.imageUrl}
       orthoImageWidth={capture.geoReference?.imageWidth}
+      sourceStatusPanel={sourceStatusPanel}
       persistencePanel={persistencePanel}
       sourceOutline={sourceOutline}
       stageBlockers={{

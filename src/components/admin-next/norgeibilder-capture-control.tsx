@@ -62,6 +62,10 @@ export type NorgeIBilderCaptureApi = (
   request: NorgeIBilderCaptureRequest,
 ) => Promise<NorgeIBilderCaptureResult>;
 
+export type NorgeIBilderCaptureContext = Readonly<{
+  candidateId?: string;
+}>;
+
 /** Convert the georeferenced pixel overlay into the workbench's 0..1 space. */
 export function normalizeOrthoOverlayPoints(
   overlay: string | null,
@@ -100,7 +104,11 @@ export function normalizeOrthoOverlayPoints(
 type CaptureState =
   | { kind: "idle" }
   | { kind: "loading"; attempt: number }
-  | { kind: "success"; result: NorgeIBilderCaptureResult }
+  | {
+      kind: "success";
+      result: NorgeIBilderCaptureResult;
+      candidateId?: string;
+    }
   | { kind: "error"; message: string };
 
 export function captureMatchesSelectedAddress(
@@ -378,13 +386,18 @@ export function NorgeIBilderCaptureControl({
   compactWhenWorkbenchActive = false,
   leadId,
   onCaptureResultChange,
+  selectedCandidateId,
   selectedFootprint,
 }: {
   api?: NorgeIBilderCaptureApi;
   caseReference: string;
   compactWhenWorkbenchActive?: boolean;
   leadId?: number;
-  onCaptureResultChange?: (result: NorgeIBilderCaptureResult | null) => void;
+  onCaptureResultChange?: (
+    result: NorgeIBilderCaptureResult | null,
+    context: NorgeIBilderCaptureContext,
+  ) => void;
+  selectedCandidateId?: string;
   selectedFootprint?: GeoPoint[];
   address?: AddressCandidate;
 }) {
@@ -394,7 +407,8 @@ export function NorgeIBilderCaptureControl({
   async function capture() {
     if (!leadId) return;
     const clickId = crypto.randomUUID();
-    if (!compactWhenWorkbenchActive) onCaptureResultChange?.(null);
+    const requestedCandidateId = selectedCandidateId;
+    onCaptureResultChange?.(null, { candidateId: requestedCandidateId });
     setState({ kind: "loading", attempt: 1 });
     try {
       const captureApi =
@@ -427,24 +441,30 @@ export function NorgeIBilderCaptureControl({
         });
       const result = await captureApi({ clickId, leadId });
       if (!result.imageUrl) throw new Error("Tuščias vaizdo rezultatas");
-      setState({ kind: "success", result });
-      onCaptureResultChange?.(result);
+      setState({
+        kind: "success",
+        result,
+        ...(requestedCandidateId ? { candidateId: requestedCandidateId } : {}),
+      });
+      onCaptureResultChange?.(result, {
+        candidateId: requestedCandidateId,
+      });
     } catch (error) {
       setState({
         kind: "error",
         message:
           error instanceof Error ? error.message : "Nepavyko gauti vaizdo.",
       });
-      if (!compactWhenWorkbenchActive) onCaptureResultChange?.(null);
+      onCaptureResultChange?.(null, { candidateId: requestedCandidateId });
     }
   }
 
   const busy = state.kind === "loading";
   const captureResult = state.kind === "success" ? state.result : undefined;
-  const selectionMatchesCapture = captureMatchesSelectedAddress(
-    captureResult?.address,
-    address,
-  );
+  const selectionMatchesCapture =
+    captureMatchesSelectedAddress(captureResult?.address, address) &&
+    (!selectedCandidateId ||
+      (state.kind === "success" && state.candidateId === selectedCandidateId));
   const overlayPoints =
     selectionMatchesCapture && selectedFootprint && captureResult?.geoReference
       ? projectWgs84ToOrthoPixels(selectedFootprint, captureResult.geoReference)

@@ -718,7 +718,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(pendingMarker).not.toBeNull();
     expect(pendingMarker!.getAttribute("cx")).toBe("0.4");
     expect(Number(pendingMarker!.getAttribute("rx"))).toBeLessThan(0.002);
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1.5px");
     expect(container.textContent).toContain(
       "Taškas magnetiškai pritrauktas prie patvirtinto kontūro (14 px)",
     );
@@ -730,7 +730,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(renderedLines().item(1).getAttribute("x1")).not.toBe(
       renderedLines().item(1).getAttribute("x2"),
     );
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("3px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
     expect(
       container.querySelectorAll("[data-roof-fusion-line-endpoint]"),
     ).toHaveLength(4);
@@ -852,9 +852,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       "Aktyvus senas rankinis nuolydžio fallback",
     );
     expect(
-      container.querySelector<HTMLButtonElement>(
-        '[data-roof-fusion-primary-action="review"]',
-      )?.disabled,
-    ).toBe(true);
+      container.querySelector("[data-roof-fusion-preview-complete]"),
+    ).not.toBeNull();
+    expect(container.textContent).toContain(
+      "Preview skaičiavimas parengtas rankinei peržiūrai",
+    );
+    expect(
+      container.querySelector('[data-roof-fusion-primary-action="review"]'),
+    ).toBeNull();
   });
 });

@@ -34,6 +34,9 @@ export type RoofFusionViewport = Readonly<{
 export const MIN_ROOF_FUSION_ZOOM = 1;
 export const MAX_ROOF_FUSION_ZOOM = 4;
 export const ROOF_FUSION_PAN_THRESHOLD_PX = 5;
+export const ROOF_FUSION_SKELETON_LINE_STROKE = "2px";
+export const ROOF_FUSION_PENDING_LINE_STROKE = "1.5px";
+export const ROOF_FUSION_SKELETON_ENDPOINT_RADIUS = 0.0025;
 export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
   scale: MIN_ROOF_FUSION_ZOOM,
   offsetX: 0,
@@ -117,6 +120,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   onLastLineUndo?: (line: RoofFusionLine) => void;
   onLayerVisibilityChange?: (layer: RoofFusionLayer, visible: boolean) => void;
   persistencePanel?: ReactNode;
+  /** Primary-flow source loading/success/retry status. */
+  sourceStatusPanel?: ReactNode;
   /** Secondary source actions supplied by the Preview UAT wrapper. */
   advancedPanel?: ReactNode;
   /** Reserved integration point for the legacy manual calculation fallback. */
@@ -325,6 +330,7 @@ function pointFromPointer(
 
 export function AdminNextRoofFusionUnifiedWorkbench({
   advancedPanel,
+  sourceStatusPanel,
   orthoImageSrc,
   orthoImageAlt = "Namo ortofoto",
   orthoImageWidth,
@@ -744,7 +750,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     if (stage === "outline") return "Patvirtinti kontūrą";
     if (stage === "skeleton") return "Patvirtinti kraigus ir slėnius";
     if (stage === "slopes") return "Apskaičiuoti nuolydžius";
-    return "Patvirtinti R4 matavimą";
+    return null;
   }, [stage]);
 
   const activeBlockers = useMemo(
@@ -810,12 +816,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     viewport.scale,
   );
   const lineEndpointRadii = roofFusionScreenStableMarkerRadii(
-    0.0035,
+    ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
     canvasAspectRatio,
     viewport.scale,
   );
   const pendingLinePointRadii = roofFusionScreenStableMarkerRadii(
-    0.0045,
+    0.0035,
     canvasAspectRatio,
     viewport.scale,
   );
@@ -846,6 +852,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               {guardNotice}
             </span>
           </div>
+
+          {sourceStatusPanel}
 
           <nav
             aria-label="Matavimo etapai"
@@ -1039,7 +1047,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       strokeDasharray={
                         line.id === "pending-line" ? ".012 .009" : undefined
                       }
-                      strokeWidth={line.id === "pending-line" ? "2px" : "3px"}
+                      strokeWidth={
+                        line.id === "pending-line"
+                          ? ROOF_FUSION_PENDING_LINE_STROKE
+                          : ROOF_FUSION_SKELETON_LINE_STROKE
+                      }
                       vectorEffect="non-scaling-stroke"
                       x1={line.start.x}
                       x2={line.end.x}
@@ -1059,7 +1071,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                         rx={lineEndpointRadii.rx}
                         ry={lineEndpointRadii.ry}
                         stroke="#0b111a"
-                        strokeWidth=".002"
+                        strokeWidth="1px"
                         vectorEffect="non-scaling-stroke"
                       />
                     )),
@@ -1419,16 +1431,32 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
             {persistencePanel}
 
-            <button
-              className="min-h-12 w-full rounded-xl bg-[#e8a317] px-4 py-3 text-sm font-bold text-[#101318] shadow-lg shadow-[#e8a317]/10 transition hover:bg-[#f0b12e] disabled:cursor-not-allowed disabled:opacity-45"
-              data-roof-fusion-primary-action={stage}
-              disabled={activeBlockers.length > 0 || primaryActionPending}
-              onClick={() => void handlePrimaryAction()}
-              type="button"
-            >
-              {primaryActionLabel}
-            </button>
-            {activeBlockers.length > 0 && (
+            {stage === "review" ? (
+              <div
+                className="rounded-2xl border border-[#46d69a]/30 bg-[#46d69a]/10 p-4 text-sm text-[#ddd8cd]"
+                data-roof-fusion-preview-complete
+                role="status"
+              >
+                <strong className="block text-[#71e6b4]">
+                  Preview skaičiavimas parengtas rankinei peržiūrai
+                </strong>
+                <span className="mt-1 block text-xs leading-relaxed">
+                  Tai nėra galutinis matavimo patvirtinimas. Rezultatas
+                  neišsiųstas ir nebus naudojamas kainodarai.
+                </span>
+              </div>
+            ) : (
+              <button
+                className="min-h-12 w-full rounded-xl bg-[#e8a317] px-4 py-3 text-sm font-bold text-[#101318] shadow-lg shadow-[#e8a317]/10 transition hover:bg-[#f0b12e] disabled:cursor-not-allowed disabled:opacity-45"
+                data-roof-fusion-primary-action={stage}
+                disabled={activeBlockers.length > 0 || primaryActionPending}
+                onClick={() => void handlePrimaryAction()}
+                type="button"
+              >
+                {primaryActionLabel}
+              </button>
+            )}
+            {stage !== "review" && activeBlockers.length > 0 && (
               <p className="text-center text-xs text-[#ffadad]">
                 Pirmiausia išspręskite blokatorius.
               </p>

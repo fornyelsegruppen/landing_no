@@ -204,17 +204,15 @@ describe("Roof Fusion workbench UI persistence contract", () => {
 
   it("surfaces revision conflict and preserves idempotent replay feedback", async () => {
     const value = await draft();
-    const conflictFetch = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            code: "EXPECTED_REVISION_MISMATCH",
-            error: "changed",
-          }),
-          { status: 409 },
-        ),
-      );
+    const conflictFetch = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: "EXPECTED_REVISION_MISMATCH",
+          error: "changed",
+        }),
+        { status: 409 },
+      ),
+    );
     await expect(
       persistAndReloadWorkbenchDraftV1(value, null, conflictFetch),
     ).rejects.toMatchObject({
@@ -233,6 +231,103 @@ describe("Roof Fusion workbench UI persistence contract", () => {
     await expect(
       persistAndReloadWorkbenchDraftV1(value, null, replayFetch),
     ).resolves.toMatchObject({ status: "replayed" });
+  });
+
+  it.each([
+    [
+      "connection failure",
+      new TypeError("secret internal endpoint"),
+      "LOAD_CONNECTION_FAILED",
+      "Nepavyko prisijungti prie serverio įkeliant reviziją",
+    ],
+    [
+      "timeout",
+      new DOMException("secret timeout detail", "TimeoutError"),
+      "LOAD_TIMEOUT",
+      "Revizijos įkėlimas užtruko per ilgai",
+    ],
+  ])(
+    "classifies a load %s without exposing the rejected fetch detail",
+    async (_label, failure, code, message) => {
+      const fetcher = vi.fn<typeof fetch>().mockRejectedValue(failure);
+
+      await expect(
+        loadWorkbenchDraftV1("lead:13", fetcher),
+      ).rejects.toMatchObject({
+        code,
+        status: 0,
+        message: expect.stringContaining(message),
+      });
+      await expect(
+        loadWorkbenchDraftV1("lead:13", fetcher),
+      ).rejects.not.toThrow(/secret/iu);
+    },
+  );
+
+  it.each([
+    [
+      "connection failure",
+      new TypeError("secret save endpoint"),
+      "SAVE_CONNECTION_FAILED",
+    ],
+    [
+      "timeout",
+      new DOMException("secret timeout detail", "AbortError"),
+      "SAVE_TIMEOUT",
+    ],
+  ])(
+    "classifies a save %s and keeps retry guidance explicit",
+    async (_label, failure, code) => {
+      const value = await draft();
+      const fetcher = vi.fn<typeof fetch>().mockRejectedValue(failure);
+
+      await expect(
+        persistAndReloadWorkbenchDraftV1(value, null, fetcher),
+      ).rejects.toMatchObject({
+        code,
+        status: 0,
+        message: expect.stringContaining(
+          "dar kartą spauskite „Išsaugoti ir patvirtinti reviziją“",
+        ),
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("fails closed when the save response succeeds but the hash-proof reload loses connection", async () => {
+    const value = await draft();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: "applied" }), { status: 201 }),
+      )
+      .mockRejectedValueOnce(new TypeError("secret reload endpoint"));
+
+    await expect(
+      persistAndReloadWorkbenchDraftV1(value, null, fetcher),
+    ).rejects.toMatchObject({
+      code: "LOAD_CONNECTION_FAILED",
+      status: 0,
+      message: expect.stringContaining("spauskite „Perkrauti“"),
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("still rejects a successful reload whose draft hash does not match", async () => {
+    const value = await draft();
+    const mismatched = { ...value, draftHash: "b".repeat(64) };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: "applied" }), { status: 201 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ draft: mismatched }), { status: 200 }),
+      );
+
+    await expect(
+      persistAndReloadWorkbenchDraftV1(value, null, fetcher),
+    ).rejects.toMatchObject({ code: "RELOAD_MISMATCH", status: 409 });
   });
 
   it("blocks calculation when georef, full height, or reloaded hash proof is missing", () => {
@@ -277,13 +372,11 @@ describe("Roof Fusion workbench UI persistence contract", () => {
     );
     expect(found.mock.calls[0]?.[0]).toContain("caseId=lead%3A13");
 
-    const missing = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ code: "DRAFT_NOT_FOUND" }), {
-          status: 404,
-        }),
-      );
+    const missing = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ code: "DRAFT_NOT_FOUND" }), {
+        status: 404,
+      }),
+    );
     await expect(loadWorkbenchDraftV1("lead:13", missing)).resolves.toBeNull();
   });
 });

@@ -437,6 +437,45 @@ async function responseJson(response: Response) {
   > | null;
 }
 
+type WorkbenchTransportOperationV1 = "load" | "save";
+
+function transportFailure(
+  operation: WorkbenchTransportOperationV1,
+  error: unknown,
+) {
+  if (error instanceof WorkbenchUiApiErrorV1) return error;
+  const errorName =
+    error instanceof Error
+      ? error.name
+      : typeof error === "object" && error !== null && "name" in error
+        ? String(error.name)
+        : "";
+  const timedOut = errorName === "AbortError" || errorName === "TimeoutError";
+  const code = `${operation.toUpperCase()}_${timedOut ? "TIMEOUT" : "CONNECTION_FAILED"}`;
+  const message =
+    operation === "save"
+      ? timedOut
+        ? "Revizijos išsaugojimas užtruko per ilgai. Išsaugojimas nepatvirtintas; patikrinkite ryšį ir dar kartą spauskite „Išsaugoti ir patvirtinti reviziją“."
+        : "Nepavyko prisijungti prie serverio išsaugant reviziją. Išsaugojimas nepatvirtintas; patikrinkite ryšį ir dar kartą spauskite „Išsaugoti ir patvirtinti reviziją“."
+      : timedOut
+        ? "Revizijos įkėlimas užtruko per ilgai. Patikrinkite ryšį ir spauskite „Perkrauti“."
+        : "Nepavyko prisijungti prie serverio įkeliant reviziją. Patikrinkite interneto ryšį ir spauskite „Perkrauti“.";
+  return new WorkbenchUiApiErrorV1(code, 0, message);
+}
+
+async function fetchWorkbenchV1(
+  fetcher: typeof fetch,
+  operation: WorkbenchTransportOperationV1,
+  input: string,
+  init?: RequestInit,
+) {
+  try {
+    return await fetcher(input, init);
+  } catch (error) {
+    throw transportFailure(operation, error);
+  }
+}
+
 export async function loadWorkbenchDraftV1(
   caseId: string,
   fetcher: typeof fetch = fetch,
@@ -444,7 +483,9 @@ export async function loadWorkbenchDraftV1(
 ): Promise<RoofFusionWorkbenchDraftV1 | null> {
   const query = new URLSearchParams({ caseId });
   if (draftId) query.set("draftId", draftId);
-  const response = await fetcher(
+  const response = await fetchWorkbenchV1(
+    fetcher,
+    "load",
     `/api/admin/roof-fusion/workbench-draft?${query}`,
   );
   const body = await responseJson(response);
@@ -464,11 +505,16 @@ export async function persistAndReloadWorkbenchDraftV1(
   expectedLatest: RoofFusionWorkbenchDraftReferenceV1 | null,
   fetcher: typeof fetch = fetch,
 ) {
-  const response = await fetcher("/api/admin/roof-fusion/workbench-draft", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ draft, expectedLatest }),
-  });
+  const response = await fetchWorkbenchV1(
+    fetcher,
+    "save",
+    "/api/admin/roof-fusion/workbench-draft",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ draft, expectedLatest }),
+    },
+  );
   const body = await responseJson(response);
   if (!response.ok) {
     throw new WorkbenchUiApiErrorV1(
