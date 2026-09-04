@@ -556,6 +556,11 @@ describe("Roof Fusion one-card Preview flow", () => {
     expect(document.activeElement).toBe(
       container.querySelector("[data-roof-fusion-building-selection]"),
     );
+    expect(
+      container
+        .querySelector("[data-roof-fusion-building-selection]")
+        ?.classList.contains("scroll-mt-36"),
+    ).toBe(true);
     expect(scrollIntoViewMock).toHaveBeenCalledWith({
       behavior: "smooth",
       block: "start",

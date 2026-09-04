@@ -590,7 +590,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain("stogo kontūro tapatybė nesutampa");
   });
 
-  it("focuses and scrolls only after explicit result-step navigation while preserving zoom and marking", async () => {
+  it("focuses and scrolls after explicit calculate and step navigation while preserving zoom and marking", async () => {
     heightResponse = "review";
     await act(async () => {
       root.render(renderWorkbench(capture, heightSurface));
@@ -609,8 +609,15 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     expect(stage()).toBe("review");
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    expect(
+      container.querySelector("[data-roof-fusion-active-anchor='result']"),
+    ).toBe(document.activeElement);
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "start",
+    });
 
+    scrollIntoViewMock.mockClear();
     await click('[data-roof-fusion-one-card-step="result"]');
     expect(document.activeElement).toBe(
       container.querySelector("[data-roof-fusion-active-heading]"),
@@ -623,6 +630,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
 
     await click("[data-roof-fusion-edit-result]");
     expect(stage()).toBe("skeleton");
+    expect(
+      container.querySelector("[data-roof-fusion-active-anchor='editor']"),
+    ).toBe(document.activeElement);
     expect(container.textContent).toContain("300%");
     expect(renderedLines()).toHaveLength(1);
     expect(document.activeElement).toBe(
@@ -636,6 +646,11 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     scrollIntoViewMock.mockClear();
     await click('[data-roof-fusion-one-card-step="refine"]');
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    expect(
+      container
+        .querySelector("[data-roof-fusion-active-heading]")
+        ?.classList.contains("scroll-mt-36"),
+    ).toBe(true);
   });
 
   it("blocks editing until the operator resumes the exact restored draft identity", async () => {
@@ -656,7 +671,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain("kraigų: 1 · sąlajų: 0");
     expect(container.querySelector("[data-roof-fusion-canvas]")).toBeNull();
 
+    scrollIntoViewMock.mockClear();
     await click("[data-roof-fusion-resume-restored-draft]");
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
     expect(
       container
         .querySelector('[data-roof-fusion-layer="approvedOutline"]')
@@ -1293,6 +1310,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     await click('[data-roof-fusion-stage-tab="outline"]');
+    scrollIntoViewMock.mockClear();
     await act(async () => {
       buttonWithText("Apskaičiuoti")!.click();
       await flushAsyncWork();
@@ -1303,8 +1321,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).not.toContain(
       "Workbench height calculation could not be prepared",
     );
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
     await closeAdvanced();
 
+    scrollIntoViewMock.mockClear();
     heightResponse = "blocked";
     await act(async () => {
       buttonWithText("Apskaičiuoti")!.click();
@@ -1317,8 +1337,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       "Kraigo arba sąlajos galas nesujungtas",
     );
     expect(container.textContent).not.toContain("Endpoint is not attached");
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
     await closeAdvanced();
 
+    scrollIntoViewMock.mockClear();
     heightResponse = "review";
     await act(async () => {
       buttonWithText("Apskaičiuoti")!.click();
@@ -1326,6 +1348,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     });
 
     expect(stage()).toBe("review");
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "start",
+    });
     expect(container.textContent).toContain("27°");
     expect(container.textContent).toContain("Parengta rankinei peržiūrai");
     expect(container.textContent).not.toContain("review_required");
@@ -1803,6 +1829,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
+    scrollIntoViewMock.mockClear();
     await openAdvanced();
     const saveButton = buttonWithText("Išsaugoti ir patvirtinti reviziją");
     expect(saveButton).toBeDefined();
@@ -1833,6 +1860,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe(true);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     await click('[data-roof-fusion-line-mode="ridge"]');
     await captureLine(350, 650);
@@ -1859,6 +1887,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain(
       "Preview · revizija išsaugota ir pakartotinai patvirtinta",
     );
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     await click('[data-roof-fusion-line-mode="valley"]');
     await captureLine(400, 600);

@@ -1404,6 +1404,29 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     [onLayerVisibilityChange],
   );
 
+  const focusExplicitWorkflowTarget = useCallback(
+    (target: "editor" | "result" | "building-selection" = "editor") => {
+      requestAnimationFrame(() => {
+        const element =
+          target === "building-selection"
+            ? document.querySelector<HTMLElement>(
+                "[data-roof-fusion-building-selection]",
+              )
+            : workspaceHeadingRef.current;
+        if (!element) return;
+        const reducedMotion = window.matchMedia?.(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        element.scrollIntoView?.({
+          behavior: reducedMotion ? "auto" : "smooth",
+          block: "start",
+        });
+        element.focus({ preventScroll: true });
+      });
+    },
+    [],
+  );
+
   const goToStage = useCallback(
     (nextStage: RoofFusionStage) => {
       setStage(nextStage);
@@ -1444,11 +1467,13 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         return;
       }
       goToStage("review");
+      focusExplicitWorkflowTarget("result");
     } finally {
       setPrimaryActionPending(false);
     }
   }, [
     activeBlockers.length,
+    focusExplicitWorkflowTarget,
     goToStage,
     onPrimaryAction,
     primaryActionPending,
@@ -1501,28 +1526,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     stage === "review" ? "result" : "refine";
   const activeOneCardStepIndex =
     ROOF_FUSION_ONE_CARD_STEPS.indexOf(activeOneCardStep);
-  const focusExplicitWorkflowTarget = useCallback(
-    (target: "workspace" | "building-selection" = "workspace") => {
-      requestAnimationFrame(() => {
-        const element =
-          target === "building-selection"
-            ? document.querySelector<HTMLElement>(
-                "[data-roof-fusion-building-selection]",
-              )
-            : workspaceHeadingRef.current;
-        if (!element) return;
-        const reducedMotion = window.matchMedia?.(
-          "(prefers-reduced-motion: reduce)",
-        ).matches;
-        element.scrollIntoView?.({
-          behavior: reducedMotion ? "auto" : "smooth",
-          block: "start",
-        });
-        element.focus({ preventScroll: true });
-      });
-    },
-    [],
-  );
   const navigateToOneCardStep = useCallback(
     (step: RoofFusionOneCardStep) => {
       if (step === "object") {
@@ -1535,11 +1538,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
           goToStage(draftLines.length > 0 ? "skeleton" : "outline");
           onEditResult?.();
         }
-        focusExplicitWorkflowTarget();
+        focusExplicitWorkflowTarget("editor");
         return;
       }
       if (step === "result" && stage === "review") {
-        focusExplicitWorkflowTarget();
+        focusExplicitWorkflowTarget("result");
       }
     },
     [
@@ -1667,7 +1670,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 Roof Fusion · Preview
               </p>
               <h2
-                className="mt-1 scroll-mt-4 text-xl font-semibold tracking-tight outline-none sm:text-2xl"
+                className="mt-1 scroll-mt-36 text-xl font-semibold tracking-tight outline-none sm:text-2xl"
+                data-roof-fusion-active-anchor={
+                  stage === "review" ? "result" : "editor"
+                }
                 data-roof-fusion-active-heading
                 ref={workspaceHeadingRef}
                 tabIndex={-1}

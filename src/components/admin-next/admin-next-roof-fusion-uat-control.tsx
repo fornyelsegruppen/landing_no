@@ -1361,7 +1361,7 @@ export function RealAddressResult({
             <div
               aria-busy="false"
               aria-label="Pastato pasirinkimas"
-              className="relative overflow-hidden bg-[#080d12]"
+              className="relative scroll-mt-36 overflow-hidden bg-[#080d12]"
               data-roof-fusion-building-selection
               data-roof-fusion-ortho-canvas
               tabIndex={-1}
