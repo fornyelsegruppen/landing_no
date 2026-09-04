@@ -11,6 +11,8 @@ data.
 - `case-360-375.png` — mobile, full page
 - `case-360-evidence-1440.png` — evidence workspace panel
 - `case-360-history-1440.png` — audit-history workspace panel
+- `case-360-pagination-1440.png` — exact desktop communication pagination UI
+- `case-360-pagination-375.png` — exact mobile communication pagination UI
 
 The case summary and next action stay visible above a sticky, keyboard-accessible
 three-panel switcher. Only one of customer dialogue, evidence, or history is
@@ -31,6 +33,17 @@ without removing any record data.
 - links back to the exact working Admin V2 case/message or whitelisted PDF/media
   endpoint.
 
+## Bounded communication history
+
+The customer dialogue initially reads the newest 25 canonical messages and
+shows the exact loaded/total count. When older records exist, the UI exposes an
+explicit localized `Show older messages (N)` control. Each activation reads the
+next 25 records through the authenticated, private, no-store Admin Next API.
+The continuation cursor combines `createdAt` and message ID, so a newly arrived
+message cannot shift or duplicate the older pages already being traversed.
+Cancelled AI drafts that were never customer communication are excluded; all
+other inbound, outbound, queued, failed and draft messages remain visible.
+
 ## Deliberate boundary
 
 Admin Next Preview remains read-only and fail-closed. Existing Admin V2 editors,
@@ -38,7 +51,8 @@ question workbench, resend/recovery controls, contract-request review, change
 agreement controls and signing actions remain the command surface. Production
 and shared Preview were not changed by this capture.
 
-The current Admin V2 general case read loads at most 100 messages. Customer
-question threads use their separate exact query. A claim of unlimited full
-communication history therefore still requires a paginated canonical read
-contract and acceptance approval.
+The legacy Admin V2 general case read still loads at most 100 messages, but the
+Admin Next customer dialogue no longer inherits that presentation cap. Its
+dedicated canonical cursor reader can traverse the complete communication
+history in bounded pages. Customer-question status continues to use its
+separate exact query.

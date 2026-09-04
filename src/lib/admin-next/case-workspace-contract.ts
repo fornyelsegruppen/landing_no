@@ -17,30 +17,43 @@ export type AdminNextEvidenceState = "verified" | "review" | "missing";
 export type AdminNextTimelineKind =
   "automation" | "measurement" | "message" | "assignment";
 
+export type AdminNextCaseCommunication = {
+  id: string;
+  direction: "inbound" | "outbound";
+  channel: string;
+  category: string;
+  status: string;
+  subject: string;
+  bodyText: string;
+  at: string;
+  sentAt?: string;
+  deliveredAt?: string;
+  replyToMessageId?: number;
+  attachments: readonly {
+    id: string;
+    filename: string;
+    href: string;
+  }[];
+  fallbackHref: string;
+};
+
+export type AdminNextCaseCommunicationPage = {
+  items: readonly AdminNextCaseCommunication[];
+  pageInfo: {
+    remainingCount: number;
+    totalCount: number;
+    nextCursor: string | null;
+    loadMoreHref: string | null;
+  };
+};
+
 export type AdminNextCustomerRecord = {
   questions: {
     total: number;
     unresolved: boolean;
   };
-  communications: readonly {
-    id: string;
-    direction: "inbound" | "outbound";
-    channel: string;
-    category: string;
-    status: string;
-    subject: string;
-    bodyText: string;
-    at: string;
-    sentAt?: string;
-    deliveredAt?: string;
-    replyToMessageId?: number;
-    attachments: readonly {
-      id: string;
-      filename: string;
-      href: string;
-    }[];
-    fallbackHref: string;
-  }[];
+  communications: readonly AdminNextCaseCommunication[];
+  communicationPage?: AdminNextCaseCommunicationPage["pageInfo"];
   commercialVersions: readonly {
     id: string;
     kind: "quote" | "contract";

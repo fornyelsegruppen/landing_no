@@ -14,12 +14,14 @@ import {
   type LocalizedCaseNextActionPresentation,
 } from "@/lib/admin-v2/case-next-action-presentation";
 import type {
+  AdminNextCaseCommunicationPage,
   AdminNextCaseStageId,
   AdminNextCaseStageState,
   AdminNextCaseWorkspaceAdapter,
   AdminNextCaseWorkspaceView,
   AdminNextTimelineKind,
 } from "@/lib/admin-next/case-workspace-contract";
+import { loadAdminNextCaseCommunicationPage } from "@/lib/admin-next/case-communication-read";
 import { adminNextRoleHasReadCapability } from "@/lib/admin-next/capability-registry";
 import {
   projectAdminNextRfCaseEntry,
@@ -429,6 +431,7 @@ export function projectAdminCaseWorkspace(
     reason: "canonical_audit_unavailable",
   },
   options: {
+    communicationPage?: AdminNextCaseCommunicationPage;
     grantedCapabilities?: readonly CaseNextActionCapability[];
     rfEntry?: AdminNextRfCaseEntryProjection;
     rfReviewHref?: string | null;
@@ -534,7 +537,7 @@ export function projectAdminCaseWorkspace(
     threads: [],
     unresolved: null,
   };
-  const communications = messages
+  const projectedCommunications = messages
     .map((message) => ({
       id: `message-${message.id}`,
       direction:
@@ -571,6 +574,8 @@ export function projectAdminCaseWorkspace(
       fallbackHref: `${caseHref}#message-${message.id}`,
     }))
     .sort(newestFirst);
+  const communications =
+    options.communicationPage?.items || projectedCommunications;
   const commercialVersions = [
     ...(commercial.quoteVersions || []),
     ...(commercial.contractVersions || []),
@@ -674,6 +679,12 @@ export function projectAdminCaseWorkspace(
         unresolved: Boolean(customerQuestionContext.unresolved),
       },
       communications,
+      communicationPage: options.communicationPage?.pageInfo || {
+        totalCount: communications.length,
+        remainingCount: 0,
+        nextCursor: null,
+        loadMoreHref: null,
+      },
       commercialVersions,
       documents: customerDocuments,
       history: businessHistory,
@@ -702,7 +713,11 @@ export function createAdminNextCanonicalCaseWorkspaceAdapter(
     async load(reference) {
       const match = reference.match(/^(?:TF-)?(\d+)$/u);
       if (!match) return { status: "not_found" };
-      const value = await loadAdminCaseWorkspace(payload, Number(match[1]));
+      const leadId = Number(match[1]);
+      const [value, communicationPage] = await Promise.all([
+        loadAdminCaseWorkspace(payload, leadId),
+        loadAdminNextCaseCommunicationPage(payload, leadId),
+      ]);
       if (!value) return { status: "not_found" };
       const [auditHistory, rfEntry] = await Promise.all([
         loadAdminNextCaseAuditHistory(payload, value, options.viewerRole),
@@ -717,6 +732,7 @@ export function createAdminNextCanonicalCaseWorkspaceAdapter(
           locale,
           auditHistory,
           {
+            communicationPage,
             rfEntry,
             grantedCapabilities: options.grantedCapabilities,
           },

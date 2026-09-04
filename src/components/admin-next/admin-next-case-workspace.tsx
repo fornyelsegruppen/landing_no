@@ -13,13 +13,11 @@ import {
   Files,
   FolderOpen,
   ImageIcon,
-  Inbox,
   Mail,
   MapPin,
   MessageCircleQuestion,
   MessageSquareText,
   Ruler,
-  Send,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -37,6 +35,7 @@ import {
   AdminNextCaseWorkspaceHistoryRail,
   AdminNextCaseWorkspacePanelSwitcher,
 } from "./admin-next-case-workspace-navigation";
+import { AdminNextCaseCommunications } from "./admin-next-case-communications";
 import {
   BlockerSummary,
   DueIndicator,
@@ -94,6 +93,10 @@ const copy = {
       "Meldinger, spørsmål, tilbud, kontrakter og dokumentversjoner i samme saksbilde.",
     communications: "Meldinger",
     communicationsEmpty: "Ingen kundemeldinger er registrert.",
+    communicationAllLoaded: "Hele meldingshistorikken vises",
+    communicationLoadFailed: "Eldre meldinger kunne ikke lastes. Prøv igjen.",
+    communicationLoadingOlder: "Laster eldre meldinger",
+    communicationShowOlder: "Vis eldre meldinger",
     questions: "Kundespørsmål",
     unresolvedQuestion: "Ett eller flere spørsmål venter på svar",
     questionsResolved: "Alle registrerte spørsmål er besvart",
@@ -224,6 +227,11 @@ const copy = {
       "Žinutės, klausimai, pasiūlymai, sutartys ir dokumentų versijos vienoje byloje.",
     communications: "Žinutės",
     communicationsEmpty: "Kliento žinučių neužregistruota.",
+    communicationAllLoaded: "Rodoma visa žinučių istorija",
+    communicationLoadFailed:
+      "Senesnių žinučių įkelti nepavyko. Bandykite dar kartą.",
+    communicationLoadingOlder: "Įkeliamos senesnės žinutės",
+    communicationShowOlder: "Rodyti ankstesnes žinutes",
     questions: "Kliento klausimai",
     unresolvedQuestion: "Vienas ar daugiau klausimų laukia atsakymo",
     questionsResolved: "Į visus užregistruotus klausimus atsakyta",
@@ -354,6 +362,10 @@ const copy = {
       "Messages, questions, quotes, contracts and document versions in one case record.",
     communications: "Messages",
     communicationsEmpty: "No customer messages are recorded.",
+    communicationAllLoaded: "The full message history is shown",
+    communicationLoadFailed: "Older messages could not be loaded. Try again.",
+    communicationLoadingOlder: "Loading older messages",
+    communicationShowOlder: "Show older messages",
     questions: "Customer questions",
     unresolvedQuestion: "One or more questions are awaiting a reply",
     questionsResolved: "All recorded questions have been answered",
@@ -803,143 +815,27 @@ export function AdminNextCaseWorkspace({
               </div>
 
               <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.85fr)]">
-                <section
-                  className="min-w-0"
-                  aria-labelledby="case-communications-title"
-                >
-                  <h3
-                    className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
-                    id="case-communications-title"
-                  >
-                    <MessageSquareText
-                      aria-hidden="true"
-                      className="size-4 text-[var(--an-amber)]"
-                    />
-                    {t.communications} ·{" "}
-                    {value.customerRecord.communications.length}
-                  </h3>
-                  {value.customerRecord.communications.length ? (
-                    <ol
-                      className="mt-3 max-h-[42rem] space-y-3 overflow-auto pr-1"
-                      data-customer-communications
-                    >
-                      {value.customerRecord.communications.map((message) => {
-                        const DirectionIcon =
-                          message.direction === "inbound" ? Inbox : Send;
-                        return (
-                          <li key={message.id}>
-                            <article className="an-elevated rounded-2xl border p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="flex items-center gap-2 text-xs font-bold text-[var(--an-amber)]">
-                                    <DirectionIcon
-                                      aria-hidden="true"
-                                      className="size-4 shrink-0"
-                                    />
-                                    {message.direction === "inbound"
-                                      ? t.inbound
-                                      : t.outbound}
-                                  </p>
-                                  <h4 className="mt-2 text-sm font-bold break-words text-[var(--an-text)]">
-                                    {message.subject}
-                                  </h4>
-                                </div>
-                                <span className="shrink-0 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
-                                  {message.status}
-                                </span>
-                              </div>
-                              <p className="mt-2 text-[11px] text-[var(--an-subtle)]">
-                                {message.channel} · {message.category} ·{" "}
-                                {auditTimestamp(locale, message.at)}
-                              </p>
-                              <p className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
-                                {message.bodyText || "—"}
-                              </p>
-                              {message.attachments.length ? (
-                                <div className="mt-3">
-                                  <p className="text-[10px] font-bold tracking-wider text-[var(--an-subtle)] uppercase">
-                                    {t.attachments} ·{" "}
-                                    {message.attachments.length}
-                                  </p>
-                                  <ul className="mt-2 flex flex-wrap gap-2">
-                                    {message.attachments.map((attachment) => (
-                                      <li key={attachment.id}>
-                                        <Link
-                                          className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-[var(--an-border)] bg-[var(--an-surface)] px-2 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)] hover:text-[var(--an-amber)]"
-                                          href={attachment.href}
-                                          target="_blank"
-                                        >
-                                          <FileCheck2
-                                            aria-hidden="true"
-                                            className="size-3.5 shrink-0"
-                                          />
-                                          <span className="truncate">
-                                            {attachment.filename}
-                                          </span>
-                                        </Link>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ) : null}
-                              <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-                                <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
-                                  {message.sentAt ? (
-                                    <div>
-                                      <dt className="inline font-bold">
-                                        {t.sentAt}:{" "}
-                                      </dt>
-                                      <dd className="inline">
-                                        {auditTimestamp(locale, message.sentAt)}
-                                      </dd>
-                                    </div>
-                                  ) : null}
-                                  {message.deliveredAt ? (
-                                    <div>
-                                      <dt className="inline font-bold">
-                                        {t.deliveredAt}:{" "}
-                                      </dt>
-                                      <dd className="inline">
-                                        {auditTimestamp(
-                                          locale,
-                                          message.deliveredAt,
-                                        )}
-                                      </dd>
-                                    </div>
-                                  ) : null}
-                                  {message.replyToMessageId ? (
-                                    <div>
-                                      <dt className="inline font-bold">
-                                        {t.replyTo}:{" "}
-                                      </dt>
-                                      <dd className="inline">
-                                        #{message.replyToMessageId}
-                                      </dd>
-                                    </div>
-                                  ) : null}
-                                </dl>
-                                <Link
-                                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
-                                  href={message.fallbackHref}
-                                >
-                                  {t.openThread}
-                                  <ArrowRight
-                                    aria-hidden="true"
-                                    className="size-3.5"
-                                  />
-                                </Link>
-                              </div>
-                            </article>
-                          </li>
-                        );
-                      })}
-                    </ol>
-                  ) : (
-                    <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
-                      {t.communicationsEmpty}
-                    </p>
-                  )}
-                </section>
+                <AdminNextCaseCommunications
+                  copy={{
+                    allLoaded: t.communicationAllLoaded,
+                    attachments: t.attachments,
+                    deliveredAt: t.deliveredAt,
+                    empty: t.communicationsEmpty,
+                    inbound: t.inbound,
+                    loadFailed: t.communicationLoadFailed,
+                    loadingOlder: t.communicationLoadingOlder,
+                    of: t.of,
+                    openThread: t.openThread,
+                    outbound: t.outbound,
+                    replyTo: t.replyTo,
+                    sentAt: t.sentAt,
+                    showOlder: t.communicationShowOlder,
+                    title: t.communications,
+                  }}
+                  initialItems={value.customerRecord.communications}
+                  initialPageInfo={value.customerRecord.communicationPage}
+                  locale={locale}
+                />
 
                 <div className="min-w-0 space-y-5">
                   <details className="an-elevated group rounded-2xl border">

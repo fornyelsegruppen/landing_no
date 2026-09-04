@@ -54,6 +54,8 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain('data-customer-communications="true"');
     expect(html).toContain("Re: Tilbud på takfornyelse");
     expect(html).toContain("Takk. Kan dere sende tilbudet i dag");
+    expect(html).toContain("Žinutės · 2 iš 27");
+    expect(html).toContain("Rodyti ankstesnes žinutes (25)");
     expect(html).toContain("Priedai · 2");
     expect(html).toContain("tilbud-T-1042-V1.pdf");
     expect(html).toContain("kontrakt-K-1042-V1.pdf");
@@ -174,7 +176,7 @@ describe("Admin Next Case Workspace preview", () => {
       }),
     );
 
-    expect(html.match(/<button/gu)).toHaveLength(3);
+    expect(html.match(/<button/gu)).toHaveLength(4);
     expect(html.match(/href="\/admin-v2\//g)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain(">Peržiūrėti R4<");
     expect(html).toContain(

@@ -102,6 +102,12 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
         fallbackHref: "/admin-v2/cases/1042#message-104202",
       },
     ],
+    communicationPage: {
+      totalCount: 27,
+      remainingCount: 25,
+      nextCursor: "mtlngbeo.28ei",
+      loadMoreHref: "/api/admin-next/cases/1042/communications",
+    },
     commercialVersions: [
       {
         id: "contract-104201",
