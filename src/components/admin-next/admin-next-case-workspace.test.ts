@@ -64,7 +64,11 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("Priedai · 2");
     expect(html).toContain("tilbud-T-1042-V1.pdf");
     expect(html).toContain("kontrakt-K-1042-V1.pdf");
-    expect(html).toContain('data-customer-question-state="resolved"');
+    expect(html).toContain('data-customer-question-state="unresolved"');
+    expect(html).toContain('data-customer-question-focus="true"');
+    expect(html).toContain("Kliento klausimas, kuriam reikia veiksmo");
+    expect(html).toContain("Reikia parengti atsakymą");
+    expect(html).toContain("Atidaryti atsakymo darbo vietą");
     expect(html).toContain('data-commercial-versions="true"');
     expect(html).toContain("K-1042-V1");
     expect(html).toContain("sha256:demo-contract-1042-v1");

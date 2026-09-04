@@ -122,9 +122,22 @@ describe("Admin Next canonical customer record projection", () => {
               id: 41,
               subject: "Re: Quote",
               bodyText: "Is scaffolding included?",
+              channel: "email",
+              createdAt: "2026-09-04T10:00:00.000Z",
+              aiAnalysis: {
+                quoteReference: "T-13-V2",
+                contractReference: "K-13-V2",
+              },
               aiAssisted: false,
             },
-            reply: null,
+            reply: {
+              id: 42,
+              subject: "Re: Quote",
+              bodyText: "Yes, scaffolding is included.",
+              status: "draft",
+              createdAt: "2026-09-04T10:05:00.000Z",
+              aiAssisted: false,
+            },
           },
         ],
         unresolved: {
@@ -132,9 +145,22 @@ describe("Admin Next canonical customer record projection", () => {
             id: 41,
             subject: "Re: Quote",
             bodyText: "Is scaffolding included?",
+            channel: "email",
+            createdAt: "2026-09-04T10:00:00.000Z",
+            aiAnalysis: {
+              quoteReference: "T-13-V2",
+              contractReference: "K-13-V2",
+            },
             aiAssisted: false,
           },
-          reply: null,
+          reply: {
+            id: 42,
+            subject: "Re: Quote",
+            bodyText: "Yes, scaffolding is included.",
+            status: "draft",
+            createdAt: "2026-09-04T10:05:00.000Z",
+            aiAssisted: false,
+          },
         },
       },
       documents: [
@@ -158,7 +184,27 @@ describe("Admin Next canonical customer record projection", () => {
     );
 
     expect(projected.customerRecord).toMatchObject({
-      questions: { total: 1, unresolved: true },
+      questions: {
+        total: 1,
+        unresolved: true,
+        active: {
+          id: "message-41",
+          subject: "Re: Quote",
+          bodyText: "Is scaffolding included?",
+          channel: "email",
+          receivedAt: "2026-09-04T10:00:00.000Z",
+          documentReferences: ["T-13-V2", "K-13-V2"],
+          replyStage: "review",
+          reply: {
+            id: "message-42",
+            subject: "Re: Quote",
+            bodyText: "Yes, scaffolding is included.",
+            status: "draft",
+            at: "2026-09-04T10:05:00.000Z",
+          },
+          fallbackHref: "/admin-v2/cases/13#message-42",
+        },
+      },
       communications: [
         {
           direction: "inbound",

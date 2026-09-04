@@ -100,6 +100,20 @@ const copy = {
     questions: "Kundespørsmål",
     unresolvedQuestion: "Ett eller flere spørsmål venter på svar",
     questionsResolved: "Alle registrerte spørsmål er besvart",
+    activeQuestion: "Kundespørsmål som krever handling",
+    questionReceived: "Mottatt",
+    relatedDocuments: "Gjelder dokument",
+    replyPreview: "Svarutkast eller siste leveringsforsøk",
+    noReply: "Det er ikke opprettet noe svar ennå.",
+    openReplyWorkspace: "Åpne svararbeidsflate",
+    questionReplyStages: {
+      prepare: "Svar må forberedes",
+      review: "Svarutkast klart for kontroll",
+      queued: "Svar ligger i sendekø",
+      sent: "Sendt, venter på levering",
+      delivered: "Svar levert",
+      delivery_failed: "Levering må følges opp",
+    },
     inbound: "Fra kunden",
     outbound: "Til kunden",
     sentAt: "Sendt",
@@ -235,6 +249,20 @@ const copy = {
     questions: "Kliento klausimai",
     unresolvedQuestion: "Vienas ar daugiau klausimų laukia atsakymo",
     questionsResolved: "Į visus užregistruotus klausimus atsakyta",
+    activeQuestion: "Kliento klausimas, kuriam reikia veiksmo",
+    questionReceived: "Gauta",
+    relatedDocuments: "Susijęs dokumentas",
+    replyPreview: "Atsakymo juodraštis arba paskutinis siuntimo bandymas",
+    noReply: "Atsakymas dar nesukurtas.",
+    openReplyWorkspace: "Atidaryti atsakymo darbo vietą",
+    questionReplyStages: {
+      prepare: "Reikia parengti atsakymą",
+      review: "Atsakymo juodraštis parengtas peržiūrai",
+      queued: "Atsakymas laukia siuntimo",
+      sent: "Išsiųsta, laukiama pristatymo",
+      delivered: "Atsakymas pristatytas",
+      delivery_failed: "Reikia spręsti pristatymo klaidą",
+    },
     inbound: "Nuo kliento",
     outbound: "Klientui",
     sentAt: "Išsiųsta",
@@ -369,6 +397,20 @@ const copy = {
     questions: "Customer questions",
     unresolvedQuestion: "One or more questions are awaiting a reply",
     questionsResolved: "All recorded questions have been answered",
+    activeQuestion: "Customer question requiring action",
+    questionReceived: "Received",
+    relatedDocuments: "Related document",
+    replyPreview: "Reply draft or latest delivery attempt",
+    noReply: "No reply has been created yet.",
+    openReplyWorkspace: "Open reply workspace",
+    questionReplyStages: {
+      prepare: "Reply must be prepared",
+      review: "Reply draft ready for review",
+      queued: "Reply is queued",
+      sent: "Sent, awaiting delivery",
+      delivered: "Reply delivered",
+      delivery_failed: "Delivery needs attention",
+    },
     inbound: "From customer",
     outbound: "To customer",
     sentAt: "Sent",
@@ -813,6 +855,111 @@ export function AdminNextCaseWorkspace({
                   </span>
                 </div>
               </div>
+
+              {value.customerRecord.questions.active ? (
+                <section
+                  aria-labelledby="case-active-question-title"
+                  className="mt-5 rounded-2xl border border-[var(--an-danger)] bg-[var(--an-danger-soft)] p-4 sm:p-5"
+                  data-customer-question-focus
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-[10px] font-bold tracking-wider text-[var(--an-danger)] uppercase">
+                        <MessageCircleQuestion
+                          aria-hidden="true"
+                          className="size-4"
+                        />
+                        {t.activeQuestion}
+                      </p>
+                      <h3
+                        className="mt-2 text-base font-bold break-words text-[var(--an-text)]"
+                        id="case-active-question-title"
+                      >
+                        {value.customerRecord.questions.active.subject}
+                      </h3>
+                      <p className="mt-1 text-xs text-[var(--an-subtle)]">
+                        {t.questionReceived}:{" "}
+                        {auditTimestamp(
+                          locale,
+                          value.customerRecord.questions.active.receivedAt,
+                        )}{" "}
+                        · {value.customerRecord.questions.active.channel}
+                      </p>
+                    </div>
+                    <span className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-[var(--an-danger)] px-3 text-xs font-bold text-[var(--an-danger)]">
+                      {
+                        t.questionReplyStages[
+                          value.customerRecord.questions.active.replyStage
+                        ]
+                      }
+                    </span>
+                  </div>
+
+                  <p className="mt-4 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-4 text-sm leading-6 whitespace-pre-wrap text-[var(--an-text)]">
+                    {value.customerRecord.questions.active.bodyText}
+                  </p>
+
+                  {value.customerRecord.questions.active.documentReferences
+                    .length ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      <strong className="text-[var(--an-muted)]">
+                        {t.relatedDocuments}:
+                      </strong>
+                      {value.customerRecord.questions.active.documentReferences.map(
+                        (reference) => (
+                          <span
+                            className="rounded-full border border-[var(--an-border)] bg-[var(--an-elevated)] px-2.5 py-1 font-bold text-[var(--an-text)]"
+                            key={reference}
+                          >
+                            {reference}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  ) : null}
+
+                  {value.customerRecord.questions.active.reply ? (
+                    <details className="group mt-4 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)]">
+                      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
+                        <span>{t.replyPreview}</span>
+                        <span className="flex items-center gap-2 text-[var(--an-muted)]">
+                          {value.customerRecord.questions.active.reply.status}
+                          <ChevronDown
+                            aria-hidden="true"
+                            className="size-4 transition-transform group-open:rotate-180"
+                          />
+                        </span>
+                      </summary>
+                      <div className="border-t border-[var(--an-border)] p-3">
+                        <strong className="block text-sm text-[var(--an-text)]">
+                          {value.customerRecord.questions.active.reply.subject}
+                        </strong>
+                        <p className="mt-2 text-sm leading-6 whitespace-pre-wrap text-[var(--an-muted)]">
+                          {value.customerRecord.questions.active.reply.bodyText}
+                        </p>
+                        <p className="mt-2 text-[10px] text-[var(--an-subtle)]">
+                          {auditTimestamp(
+                            locale,
+                            value.customerRecord.questions.active.reply.at,
+                          )}
+                        </p>
+                      </div>
+                    </details>
+                  ) : (
+                    <p className="mt-4 text-xs font-semibold text-[var(--an-danger)]">
+                      {t.noReply}
+                    </p>
+                  )}
+
+                  <Link
+                    className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--an-action)] bg-[var(--an-surface-base)] px-4 text-sm font-bold text-[var(--an-action)] hover:bg-[var(--an-action-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
+                    href={value.customerRecord.questions.active.fallbackHref}
+                  >
+                    {t.openReplyWorkspace}
+                    <ArrowRight aria-hidden="true" className="size-4" />
+                  </Link>
+                </section>
+              ) : null}
 
               <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.85fr)]">
                 <AdminNextCaseCommunications

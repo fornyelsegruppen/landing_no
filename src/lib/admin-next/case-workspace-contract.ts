@@ -66,6 +66,29 @@ export type AdminNextCustomerRecord = {
   questions: {
     total: number;
     unresolved: boolean;
+    active?: {
+      id: string;
+      subject: string;
+      bodyText: string;
+      channel: string;
+      receivedAt: string;
+      documentReferences: readonly string[];
+      replyStage:
+        | "prepare"
+        | "review"
+        | "queued"
+        | "sent"
+        | "delivered"
+        | "delivery_failed";
+      reply?: {
+        id: string;
+        subject: string;
+        bodyText: string;
+        status: string;
+        at: string;
+      };
+      fallbackHref: string;
+    };
   };
   communications: readonly AdminNextCaseCommunication[];
   communicationPage?: AdminNextCaseCommunicationPage["pageInfo"];

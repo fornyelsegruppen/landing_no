@@ -30,6 +30,10 @@ import {
 } from "@/lib/admin-next/rf-case-entry-projection";
 import { projectStoredNextActionBlocker } from "@/lib/admin-next/stored-next-action-blocker";
 import {
+  customerQuestionDocumentReferences,
+  customerQuestionReplyStage,
+} from "@/lib/messages/customer-question-state";
+import {
   roofFusionCaseIdForLeadV1,
   type AdminRoofFusionPreviewReadAdapterV1,
 } from "@/lib/roof-fusion/preview-read-adapters-v1";
@@ -537,6 +541,9 @@ export function projectAdminCaseWorkspace(
     threads: [],
     unresolved: null,
   };
+  const activeQuestionThread = customerQuestionContext.unresolved;
+  const activeQuestion = activeQuestionThread?.question;
+  const activeReply = activeQuestionThread?.reply;
   const projectedCommunications = messages
     .map((message) => ({
       id: `message-${message.id}`,
@@ -677,6 +684,39 @@ export function projectAdminCaseWorkspace(
       questions: {
         total: customerQuestionContext.threads.length,
         unresolved: Boolean(customerQuestionContext.unresolved),
+        ...(activeQuestion
+          ? {
+              active: {
+                id: `message-${activeQuestion.id}`,
+                subject: activeQuestion.subject || `#${activeQuestion.id}`,
+                bodyText: activeQuestion.bodyText || "",
+                channel: activeQuestion.channel || "—",
+                receivedAt:
+                  activeQuestion.createdAt || activeQuestion.updatedAt || "—",
+                documentReferences:
+                  customerQuestionDocumentReferences(activeQuestion),
+                replyStage: customerQuestionReplyStage(activeReply),
+                ...(activeReply
+                  ? {
+                      reply: {
+                        id: `message-${activeReply.id}`,
+                        subject: activeReply.subject || `#${activeReply.id}`,
+                        bodyText: activeReply.bodyText || "",
+                        status: activeReply.status || "—",
+                        at:
+                          activeReply.deliveredAt ||
+                          activeReply.updatedAt ||
+                          activeReply.createdAt ||
+                          "—",
+                      },
+                    }
+                  : {}),
+                fallbackHref: activeReply
+                  ? `${caseHref}#message-${activeReply.id}`
+                  : caseHref,
+              },
+            }
+          : {}),
       },
       communications,
       communicationPage: options.communicationPage?.pageInfo || {

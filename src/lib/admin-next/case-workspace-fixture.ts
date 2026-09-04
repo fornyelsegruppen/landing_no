@@ -59,7 +59,21 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
     { id: "completion", state: "upcoming" },
   ],
   customerRecord: {
-    questions: { total: 1, unresolved: false },
+    questions: {
+      total: 1,
+      unresolved: true,
+      active: {
+        id: "message-104203",
+        subject: "Re: Tilbud på takfornyelse",
+        bodyText:
+          "Takk. Kan dere sende tilbudet i dag, og bekrefte at stillas er inkludert?",
+        channel: "email",
+        receivedAt: "2026-09-03T15:06:00.000Z",
+        documentReferences: ["T-1042-V1", "K-1042-V1"],
+        replyStage: "prepare",
+        fallbackHref: "/admin-v2/cases/1042",
+      },
+    },
     communications: [
       {
         id: "message-104203",

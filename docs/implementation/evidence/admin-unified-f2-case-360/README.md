@@ -14,6 +14,8 @@ data.
 - `case-360-pagination-1440.png` — exact desktop communication pagination UI
 - `case-360-pagination-375.png` — exact mobile communication pagination UI
 - `case-360-delivery-details-1440.png` — expanded historical delivery journey
+- `case-360-question-focus-1440.png` — exact desktop unresolved-question focus
+- `case-360-question-focus-375.png` — exact mobile unresolved-question focus
 
 The case summary and next action stay visible above a sticky, keyboard-accessible
 three-panel switcher. Only one of customer dialogue, evidence, or history is
@@ -27,6 +29,9 @@ without removing any record data.
 - inbound and outbound message direction, exact body, category, channel,
   delivery state and the exact persistent attachments sent with that message;
 - customer-question total and unresolved state;
+- the exact unresolved question, received time/channel, related quote or contract
+  references, current reply stage and the existing Admin V2 reply-workbench
+  target;
 - quote and contract versions, supersession reference, signature times and
   document hash;
 - every document returned by the current Admin V2 case read model;
