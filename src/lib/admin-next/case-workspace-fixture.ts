@@ -87,6 +87,12 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
         at: "2026-09-03T14:58:00.000Z",
         sentAt: "2026-09-03T14:57:00.000Z",
         deliveredAt: "2026-09-03T14:58:00.000Z",
+        delivery: {
+          approvedAt: "2026-09-03T14:56:00.000Z",
+          queuedAt: "2026-09-03T14:56:30.000Z",
+          recipient: "kari.nilsen@example.no",
+          provider: "Resend",
+        },
         attachments: [
           {
             id: "document-104201",

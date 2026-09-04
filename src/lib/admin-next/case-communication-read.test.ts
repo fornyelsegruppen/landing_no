@@ -35,6 +35,17 @@ describe("Admin Next case communication pagination", () => {
         },
       ],
       replyToMessage: { id: 49 },
+      approvedAt: "2026-09-04T09:57:00.000Z",
+      queuedAt: "2026-09-04T09:58:00.000Z",
+      provider: "resend",
+      aiAnalysis: {
+        deliveryRecipient: "customer@example.no",
+        manualRecovery: {
+          channel: "phone",
+          status: "contacted",
+          contactedAt: "2026-09-04T10:01:00.000Z",
+        },
+      },
       sentAt: "2026-09-04T09:59:00.000Z",
     } as never;
     const find = vi.fn().mockResolvedValue({ docs, totalDocs: 26 });
@@ -57,6 +68,17 @@ describe("Admin Next case communication pagination", () => {
         },
       ],
       fallbackHref: "/admin-v2/cases/13#message-50",
+      delivery: {
+        approvedAt: "2026-09-04T09:57:00.000Z",
+        queuedAt: "2026-09-04T09:58:00.000Z",
+        recipient: "customer@example.no",
+        provider: "resend",
+        manualRecovery: {
+          channel: "phone",
+          status: "contacted",
+          contactedAt: "2026-09-04T10:01:00.000Z",
+        },
+      },
     });
     expect(page.pageInfo).toMatchObject({
       totalCount: 26,

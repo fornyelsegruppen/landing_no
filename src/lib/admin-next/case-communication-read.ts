@@ -31,6 +31,12 @@ function relationId(value: unknown) {
   return numberValue((value as RecordLike).id);
 }
 
+function recordValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as RecordLike)
+    : undefined;
+}
+
 function encodeCursor(cursor: CommunicationCursor) {
   return `${Date.parse(cursor.createdAt).toString(36)}.${cursor.id.toString(36)}`;
 }
@@ -118,7 +124,54 @@ function projectCommunication(
   const updatedAt = stringValue(record.updatedAt);
   const sentAt = stringValue(record.sentAt);
   const deliveredAt = stringValue(record.deliveredAt);
+  const approvedAt = stringValue(record.approvedAt);
+  const queuedAt = stringValue(record.queuedAt);
   const replyToMessageId = relationId(record.replyToMessage);
+  const analysis = recordValue(record.aiAnalysis);
+  const manualRecovery = recordValue(analysis?.manualRecovery);
+  const recipient = stringValue(analysis?.deliveryRecipient);
+  const provider = stringValue(record.provider);
+  const failureCode = stringValue(record.failureCode);
+  const failureMessage = stringValue(record.failureMessage);
+  const projectedManualRecovery = manualRecovery
+    ? {
+        ...(stringValue(manualRecovery.channel)
+          ? { channel: stringValue(manualRecovery.channel) }
+          : {}),
+        ...(stringValue(manualRecovery.status)
+          ? { status: stringValue(manualRecovery.status) }
+          : {}),
+        ...(stringValue(manualRecovery.preparedAt)
+          ? { preparedAt: stringValue(manualRecovery.preparedAt) }
+          : {}),
+        ...(stringValue(manualRecovery.contactedAt)
+          ? { contactedAt: stringValue(manualRecovery.contactedAt) }
+          : {}),
+        ...(stringValue(manualRecovery.resentAt)
+          ? { resentAt: stringValue(manualRecovery.resentAt) }
+          : {}),
+      }
+    : undefined;
+  const delivery =
+    approvedAt ||
+    queuedAt ||
+    recipient ||
+    provider ||
+    failureCode ||
+    failureMessage ||
+    projectedManualRecovery
+      ? {
+          ...(approvedAt ? { approvedAt } : {}),
+          ...(queuedAt ? { queuedAt } : {}),
+          ...(recipient ? { recipient } : {}),
+          ...(provider ? { provider } : {}),
+          ...(failureCode ? { failureCode } : {}),
+          ...(failureMessage ? { failureMessage } : {}),
+          ...(projectedManualRecovery
+            ? { manualRecovery: projectedManualRecovery }
+            : {}),
+        }
+      : undefined;
   return {
     id: `message-${id}`,
     direction: record.direction === "inbound" ? "inbound" : "outbound",
@@ -131,6 +184,7 @@ function projectCommunication(
     ...(sentAt ? { sentAt } : {}),
     ...(deliveredAt ? { deliveredAt } : {}),
     ...(replyToMessageId ? { replyToMessageId } : {}),
+    ...(delivery ? { delivery } : {}),
     attachments: Array.isArray(record.attachments)
       ? record.attachments
           .map(attachment)

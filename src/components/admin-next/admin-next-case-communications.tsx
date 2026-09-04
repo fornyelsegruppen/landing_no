@@ -33,6 +33,66 @@ type CommunicationCopy = {
   title: string;
 };
 
+const deliveryCopy = {
+  nb: {
+    approved: "Godkjent",
+    cancelled: "Forkastet",
+    contactedAt: "Kunden kontaktet",
+    delivered: "Levert",
+    deliveryJourney: "Leveringsforløp",
+    draft: "Utkast",
+    failure: "Leveringsfeil",
+    hide: "Skjul detaljer",
+    manualRecovery: "Manuell oppfølging",
+    notRecorded: "Ikke registrert i denne historiske meldingen",
+    preparedAt: "Oppfølging forberedt",
+    provider: "Leverandør",
+    queued: "I kø",
+    recipient: "Historisk mottaker",
+    resentAt: "Sendt på nytt",
+    sent: "Sendt",
+    show: "Vis detaljer",
+  },
+  lt: {
+    approved: "Patvirtinta",
+    cancelled: "Atšaukta",
+    contactedAt: "Su klientu susisiekta",
+    delivered: "Pristatyta",
+    deliveryJourney: "Pristatymo eiga",
+    draft: "Juodraštis",
+    failure: "Pristatymo klaida",
+    hide: "Slėpti informaciją",
+    manualRecovery: "Rankinis susisiekimas",
+    notRecorded: "Šioje istorinėje žinutėje neužregistruota",
+    preparedAt: "Susisiekimas parengtas",
+    provider: "Teikėjas",
+    queued: "Eilėje",
+    recipient: "Istorinis gavėjas",
+    resentAt: "Išsiųsta dar kartą",
+    sent: "Išsiųsta",
+    show: "Rodyti informaciją",
+  },
+  en: {
+    approved: "Approved",
+    cancelled: "Discarded",
+    contactedAt: "Customer contacted",
+    delivered: "Delivered",
+    deliveryJourney: "Delivery journey",
+    draft: "Draft",
+    failure: "Delivery failure",
+    hide: "Hide details",
+    manualRecovery: "Manual follow-up",
+    notRecorded: "Not recorded on this historical message",
+    preparedAt: "Follow-up prepared",
+    provider: "Provider",
+    queued: "Queued",
+    recipient: "Historical recipient",
+    resentAt: "Sent again",
+    sent: "Sent",
+    show: "Show details",
+  },
+} as const;
+
 function timestamp(locale: PanelLocale, value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -68,6 +128,152 @@ function isCommunicationPage(
     (loadMoreHref === null ||
       (typeof loadMoreHref === "string" &&
         /^\/api\/admin-next\/cases\/\d+\/communications$/u.test(loadMoreHref)))
+  );
+}
+
+function deliveryStatusLabel(
+  locale: PanelLocale,
+  status: string,
+  fallback: string,
+) {
+  const labels = deliveryCopy[locale];
+  if (status === "draft") return labels.draft;
+  if (status === "approved") return labels.approved;
+  if (status === "queued") return labels.queued;
+  if (status === "sent") return labels.sent;
+  if (status === "delivered") return labels.delivered;
+  if (status === "cancelled") return labels.cancelled;
+  return fallback;
+}
+
+function DeliveryJourney({
+  locale,
+  message,
+}: {
+  locale: PanelLocale;
+  message: AdminNextCaseCommunication;
+}) {
+  if (message.direction !== "outbound") return null;
+  const labels = deliveryCopy[locale];
+  const delivery = message.delivery;
+  const rank = ["draft", "approved", "queued", "sent", "delivered"].indexOf(
+    message.status,
+  );
+  const stages = [
+    {
+      id: "approved",
+      label: labels.approved,
+      at: delivery?.approvedAt,
+      rank: 1,
+    },
+    { id: "queued", label: labels.queued, at: delivery?.queuedAt, rank: 2 },
+    { id: "sent", label: labels.sent, at: message.sentAt, rank: 3 },
+    {
+      id: "delivered",
+      label: labels.delivered,
+      at: message.deliveredAt,
+      rank: 4,
+    },
+  ] as const;
+  const failed = ["failed", "attention"].includes(message.status);
+  const recovery = delivery?.manualRecovery;
+
+  return (
+    <details className="group mt-3 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)]">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
+        <span>{labels.deliveryJourney}</span>
+        <span
+          className={
+            failed ? "text-[var(--an-danger)]" : "text-[var(--an-amber)]"
+          }
+        >
+          <span className="group-open:hidden">{labels.show} · </span>
+          <span className="hidden group-open:inline">{labels.hide} · </span>
+          {deliveryStatusLabel(locale, message.status, message.status)}
+        </span>
+      </summary>
+      <div className="border-t border-[var(--an-border)] p-3">
+        <dl className="grid gap-2 text-xs sm:grid-cols-2">
+          <div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-elevated)] p-2.5">
+            <dt className="font-bold text-[var(--an-subtle)]">
+              {labels.recipient}
+            </dt>
+            <dd className="mt-1 break-all text-[var(--an-text)]">
+              {delivery?.recipient || labels.notRecorded}
+            </dd>
+          </div>
+          <div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-elevated)] p-2.5">
+            <dt className="font-bold text-[var(--an-subtle)]">
+              {labels.provider}
+            </dt>
+            <dd className="mt-1 break-words text-[var(--an-text)]">
+              {delivery?.provider || labels.notRecorded}
+            </dd>
+          </div>
+        </dl>
+        <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {stages.map((stage) => {
+            const complete = Boolean(stage.at) || rank > stage.rank;
+            const current = !complete && rank === stage.rank;
+            return (
+              <li
+                className={`rounded-lg border p-2 text-[10px] ${
+                  complete
+                    ? "border-[var(--an-success)] bg-[var(--an-success-soft)] text-[var(--an-success)]"
+                    : current
+                      ? "border-[var(--an-amber)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]"
+                      : "border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-subtle)]"
+                }`}
+                data-delivery-stage={stage.id}
+                key={stage.id}
+              >
+                <strong className="block">{stage.label}</strong>
+                <span className="mt-1 block">
+                  {stage.at ? timestamp(locale, stage.at) : "—"}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        {failed ? (
+          <div className="mt-3 rounded-lg border border-[var(--an-danger)] bg-[var(--an-danger-soft)] p-3 text-xs text-[var(--an-danger)]">
+            <strong>{labels.failure}</strong>
+            <p className="mt-1 break-words">
+              {[delivery?.failureCode, delivery?.failureMessage]
+                .filter(Boolean)
+                .join(" · ") || labels.notRecorded}
+            </p>
+          </div>
+        ) : null}
+        {recovery ? (
+          <div className="mt-3 rounded-lg border border-[var(--an-border)] bg-[var(--an-elevated)] p-3 text-xs text-[var(--an-muted)]">
+            <strong className="text-[var(--an-text)]">
+              {labels.manualRecovery}
+              {recovery.status ? ` · ${recovery.status}` : ""}
+              {recovery.channel ? ` · ${recovery.channel}` : ""}
+            </strong>
+            <ul className="mt-2 space-y-1">
+              {recovery.preparedAt ? (
+                <li>
+                  {labels.preparedAt}: {timestamp(locale, recovery.preparedAt)}
+                </li>
+              ) : null}
+              {recovery.contactedAt ? (
+                <li>
+                  {labels.contactedAt}:{" "}
+                  {timestamp(locale, recovery.contactedAt)}
+                </li>
+              ) : null}
+              {recovery.resentAt ? (
+                <li>
+                  {labels.resentAt}: {timestamp(locale, recovery.resentAt)}
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -194,6 +400,7 @@ export function AdminNextCaseCommunications({
                       </ul>
                     </div>
                   ) : null}
+                  <DeliveryJourney locale={locale} message={message} />
                   <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
                     <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
                       {message.sentAt ? (

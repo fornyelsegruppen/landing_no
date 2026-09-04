@@ -56,6 +56,11 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("Takk. Kan dere sende tilbudet i dag");
     expect(html).toContain("Žinutės · 2 iš 27");
     expect(html).toContain("Rodyti ankstesnes žinutes (25)");
+    expect(html).toContain("Pristatymo eiga");
+    expect(html).toContain("Istorinis gavėjas");
+    expect(html).toContain("kari.nilsen@example.no");
+    expect(html).toContain('data-delivery-stage="approved"');
+    expect(html).toContain('data-delivery-stage="delivered"');
     expect(html).toContain("Priedai · 2");
     expect(html).toContain("tilbud-T-1042-V1.pdf");
     expect(html).toContain("kontrakt-K-1042-V1.pdf");

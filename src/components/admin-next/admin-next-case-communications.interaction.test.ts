@@ -154,4 +154,45 @@ describe("Admin Next paginated customer communications", () => {
     expect(container.textContent).toContain("Message 2");
     expect(container.textContent).toContain("Message 1");
   });
+
+  it("shows the exact historical recipient, delivery failure and manual recovery", async () => {
+    const failed: AdminNextCaseCommunication = {
+      ...communication(2),
+      direction: "outbound",
+      status: "failed",
+      delivery: {
+        approvedAt: "2026-09-02T09:55:00.000Z",
+        queuedAt: "2026-09-02T09:56:00.000Z",
+        recipient: "customer@example.no",
+        provider: "resend",
+        failureCode: "provider_timeout",
+        failureMessage: "Delivery confirmation timed out",
+        manualRecovery: {
+          channel: "phone",
+          status: "contacted",
+          preparedAt: "2026-09-02T10:10:00.000Z",
+          contactedAt: "2026-09-02T10:20:00.000Z",
+        },
+      },
+    };
+
+    await act(async () => {
+      root.render(
+        createElement(AdminNextCaseCommunications, {
+          copy,
+          initialItems: [failed],
+          locale: "lt",
+        }),
+      );
+    });
+
+    expect(container.textContent).toContain("Pristatymo eiga");
+    expect(container.textContent).toContain("Istorinis gavėjas");
+    expect(container.textContent).toContain("customer@example.no");
+    expect(container.textContent).toContain("Pristatymo klaida");
+    expect(container.textContent).toContain("provider_timeout");
+    expect(container.textContent).toContain("Rankinis susisiekimas");
+    expect(container.textContent).toContain("Su klientu susisiekta");
+    expect(container.querySelectorAll("[data-delivery-stage]")).toHaveLength(4);
+  });
 });

@@ -13,6 +13,7 @@ data.
 - `case-360-history-1440.png` — audit-history workspace panel
 - `case-360-pagination-1440.png` — exact desktop communication pagination UI
 - `case-360-pagination-375.png` — exact mobile communication pagination UI
+- `case-360-delivery-details-1440.png` — expanded historical delivery journey
 
 The case summary and next action stay visible above a sticky, keyboard-accessible
 three-panel switcher. Only one of customer dialogue, evidence, or history is
@@ -43,6 +44,11 @@ The continuation cursor combines `createdAt` and message ID, so a newly arrived
 message cannot shift or duplicate the older pages already being traversed.
 Cancelled AI drafts that were never customer communication are excluded; all
 other inbound, outbound, queued, failed and draft messages remain visible.
+Each outbound message has a collapsed delivery disclosure. When expanded it
+shows the exact historical recipient if the send command persisted one,
+provider, approval/queue/send/delivery timestamps, sanitized delivery failure
+and any recorded manual-contact recovery. It never substitutes the lead's
+current email for a missing historical recipient.
 
 ## Deliberate boundary
 

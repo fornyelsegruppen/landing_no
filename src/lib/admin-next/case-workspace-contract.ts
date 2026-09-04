@@ -29,6 +29,21 @@ export type AdminNextCaseCommunication = {
   sentAt?: string;
   deliveredAt?: string;
   replyToMessageId?: number;
+  delivery?: {
+    approvedAt?: string;
+    queuedAt?: string;
+    recipient?: string;
+    provider?: string;
+    failureCode?: string;
+    failureMessage?: string;
+    manualRecovery?: {
+      channel?: string;
+      status?: string;
+      preparedAt?: string;
+      contactedAt?: string;
+      resentAt?: string;
+    };
+  };
   attachments: readonly {
     id: string;
     filename: string;
