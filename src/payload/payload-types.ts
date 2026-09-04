@@ -99,6 +99,8 @@ export interface Config {
     'roof-fusion-snapshots': RoofFusionSnapshot;
     'roof-fusion-commands': RoofFusionCommand;
     'roof-fusion-workbench-drafts': RoofFusionWorkbenchDraft;
+    'case-address-revisions': CaseAddressRevision;
+    'roof-fusion-offer-commands': RoofFusionOfferCommand;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -138,6 +140,8 @@ export interface Config {
     'roof-fusion-snapshots': RoofFusionSnapshotsSelect<false> | RoofFusionSnapshotsSelect<true>;
     'roof-fusion-commands': RoofFusionCommandsSelect<false> | RoofFusionCommandsSelect<true>;
     'roof-fusion-workbench-drafts': RoofFusionWorkbenchDraftsSelect<false> | RoofFusionWorkbenchDraftsSelect<true>;
+    'case-address-revisions': CaseAddressRevisionsSelect<false> | CaseAddressRevisionsSelect<true>;
+    'roof-fusion-offer-commands': RoofFusionOfferCommandsSelect<false> | RoofFusionOfferCommandsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -730,6 +734,7 @@ export interface Lead {
   nextActionOwner: 'administrator' | 'customer' | 'system' | 'worker';
   nextActionBlocker?: string | null;
   caseRevision: number;
+  addressRevision: number;
   lastContactAt?: string | null;
   adminReviewedAt?: string | null;
   adminReviewedBy?: (number | null) | User;
@@ -871,6 +876,14 @@ export interface RoofMeasurement {
   lead: number | Lead;
   version: number;
   supersedes?: (number | null) | RoofMeasurement;
+  sourceKind: 'legacy' | 'roof_fusion';
+  caseRevision?: number | null;
+  addressRevision?: number | null;
+  rfSnapshotId?: string | null;
+  rfSnapshotRevision?: number | null;
+  rfSnapshotHash?: string | null;
+  rfInputHash?: string | null;
+  rfRendererHash?: string | null;
   measurementMode: 'schematic' | 'schematic_with_context' | 'manual_no_visual';
   normalizedAddress: string;
   addressSourceId?: string | null;
@@ -1678,6 +1691,98 @@ export interface RoofFusionWorkbenchDraft {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "case-address-revisions".
+ */
+export interface CaseAddressRevision {
+  id: number;
+  ledgerKey: string;
+  revisionKey: string;
+  lead?: (number | null) | Lead;
+  caseId: string;
+  addressRevision: number;
+  previousAddressRevision: number;
+  expectedCaseRevision: number;
+  resultingCaseRevision: number;
+  idempotencyKey: string;
+  commandHash: string;
+  correlationId: string;
+  actor?: (number | null) | User;
+  reasonCode: 'operator_correction' | 'customer_confirmation' | 'provider_resolution' | 'data_quality_recovery';
+  before:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  after:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  beforeHash: string;
+  afterHash: string;
+  rfInvalidationStatus: 'invalidated' | 'not_applicable';
+  invalidatedRfSnapshotId?: string | null;
+  invalidatedRfSnapshotRevision?: number | null;
+  invalidatedRfSnapshotHash?: string | null;
+  occurredAt: string;
+  result:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-offer-commands".
+ */
+export interface RoofFusionOfferCommand {
+  id: number;
+  ledgerKey: string;
+  idempotencyScopeKey: string;
+  caseId: string;
+  idempotencyKey: string;
+  commandHash: string;
+  caseRevision: number;
+  addressRevision: number;
+  snapshotId: string;
+  snapshotRevision: number;
+  snapshotHash: string;
+  inputHash: string;
+  rendererHash: string;
+  measurement: number | RoofMeasurement;
+  quote: number | Quote;
+  contract: number | Contract;
+  actor: number | User;
+  correlationId: string;
+  occurredAt: string;
+  result:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1827,6 +1932,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'roof-fusion-workbench-drafts';
         value: number | RoofFusionWorkbenchDraft;
+      } | null)
+    | ({
+        relationTo: 'case-address-revisions';
+        value: number | CaseAddressRevision;
+      } | null)
+    | ({
+        relationTo: 'roof-fusion-offer-commands';
+        value: number | RoofFusionOfferCommand;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -2219,6 +2332,7 @@ export interface LeadsSelect<T extends boolean = true> {
   nextActionOwner?: T;
   nextActionBlocker?: T;
   caseRevision?: T;
+  addressRevision?: T;
   lastContactAt?: T;
   adminReviewedAt?: T;
   adminReviewedBy?: T;
@@ -2284,6 +2398,14 @@ export interface RoofMeasurementsSelect<T extends boolean = true> {
   lead?: T;
   version?: T;
   supersedes?: T;
+  sourceKind?: T;
+  caseRevision?: T;
+  addressRevision?: T;
+  rfSnapshotId?: T;
+  rfSnapshotRevision?: T;
+  rfSnapshotHash?: T;
+  rfInputHash?: T;
+  rfRendererHash?: T;
   measurementMode?: T;
   normalizedAddress?: T;
   addressSourceId?: T;
@@ -2826,6 +2948,64 @@ export interface RoofFusionWorkbenchDraftsSelect<T extends boolean = true> {
   state?: T;
   sourceContentHash?: T;
   draft?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "case-address-revisions_select".
+ */
+export interface CaseAddressRevisionsSelect<T extends boolean = true> {
+  ledgerKey?: T;
+  revisionKey?: T;
+  lead?: T;
+  caseId?: T;
+  addressRevision?: T;
+  previousAddressRevision?: T;
+  expectedCaseRevision?: T;
+  resultingCaseRevision?: T;
+  idempotencyKey?: T;
+  commandHash?: T;
+  correlationId?: T;
+  actor?: T;
+  reasonCode?: T;
+  before?: T;
+  after?: T;
+  beforeHash?: T;
+  afterHash?: T;
+  rfInvalidationStatus?: T;
+  invalidatedRfSnapshotId?: T;
+  invalidatedRfSnapshotRevision?: T;
+  invalidatedRfSnapshotHash?: T;
+  occurredAt?: T;
+  result?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "roof-fusion-offer-commands_select".
+ */
+export interface RoofFusionOfferCommandsSelect<T extends boolean = true> {
+  ledgerKey?: T;
+  idempotencyScopeKey?: T;
+  caseId?: T;
+  idempotencyKey?: T;
+  commandHash?: T;
+  caseRevision?: T;
+  addressRevision?: T;
+  snapshotId?: T;
+  snapshotRevision?: T;
+  snapshotHash?: T;
+  inputHash?: T;
+  rendererHash?: T;
+  measurement?: T;
+  quote?: T;
+  contract?: T;
+  actor?: T;
+  correlationId?: T;
+  occurredAt?: T;
+  result?: T;
   updatedAt?: T;
   createdAt?: T;
 }

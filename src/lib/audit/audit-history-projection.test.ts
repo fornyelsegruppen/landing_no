@@ -95,6 +95,52 @@ describe("privacy-safe audit history projection", () => {
     expect(JSON.stringify(item)).not.toContain("customerEmail");
   });
 
+  it("projects only typed trace references for the two Preview case events", () => {
+    const address = projected({
+      action: "case.address_corrected",
+      metadata: {
+        caseRevision: 8,
+        revision: 2,
+        idempotencyDigest: "c".repeat(64),
+        rfInvalidated: true,
+        quoteDraftsInvalidated: 1,
+        contractDraftsInvalidated: 1,
+      },
+    });
+    const offer = projected({
+      action: "roof-fusion.offer-draft-created",
+      metadata: {
+        caseRevision: 8,
+        sourceRevision: 2,
+        snapshotRevision: 4,
+        measurementId: 31,
+        quoteId: 41,
+        contractId: 51,
+        customerSideEffects: false,
+      },
+    });
+
+    expect(address.trace).toEqual({
+      kind: "case_address_corrected",
+      caseRevision: 8,
+      addressRevision: 2,
+      invalidatedQuoteDrafts: 1,
+      invalidatedContractDrafts: 1,
+    });
+    expect(offer.trace).toEqual({
+      kind: "roof_fusion_offer_draft_created",
+      caseRevision: 8,
+      addressRevision: 2,
+      snapshotRevision: 4,
+      measurementId: 31,
+      quoteId: 41,
+      contractId: 51,
+    });
+    expect(JSON.stringify([address, offer])).not.toContain(
+      "idempotencyDigest",
+    );
+  });
+
   it("rejects free-text reason and URL source values instead of leaking them", () => {
     const reason = projected({
       metadata: { reason: "Call Kari at private@example.invalid" },

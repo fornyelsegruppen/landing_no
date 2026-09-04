@@ -403,6 +403,108 @@ describe("Admin Next canonical case audit read", () => {
     expect(serialized).not.toMatch(/Demo ·|TF-1042/u);
   });
 
+  it("localizes Preview address and RF offer events with canonical version references", async () => {
+    const value = {
+      ...workspace(),
+      timeline: [
+        {
+          id: "measurement-31",
+          sourceCollection: "roof-measurements" as const,
+          sourceId: 31,
+          type: "measurement" as const,
+          title: "RF-13-V1",
+          at: "2026-09-04T10:00:00.000Z",
+        },
+        {
+          id: "quote-41",
+          sourceCollection: "quotes" as const,
+          sourceId: 41,
+          type: "quote" as const,
+          title: "T-13-V3",
+          at: "2026-09-04T10:00:00.000Z",
+        },
+        {
+          id: "contract-51",
+          sourceCollection: "contracts" as const,
+          sourceId: 51,
+          type: "contract" as const,
+          title: "K-13-V3",
+          at: "2026-09-04T10:00:00.000Z",
+        },
+      ],
+    } as AdminCaseWorkspace;
+    const addressEvent = event({
+      id: 10,
+      action: "case.address_corrected",
+      correlationId: "corr-address-13",
+      metadata: {
+        caseRevision: 8,
+        revision: 2,
+        idempotencyDigest: "c".repeat(64),
+        rfInvalidated: true,
+        quoteDraftsInvalidated: 1,
+        contractDraftsInvalidated: 1,
+      },
+    });
+    const offerEvent = event({
+      id: 11,
+      action: "roof-fusion.offer-draft-created",
+      correlationId: "corr-offer-13",
+      createdAt: "2026-09-04T11:00:00.000Z",
+      metadata: {
+        caseRevision: 8,
+        sourceRevision: 2,
+        snapshotRevision: 4,
+        measurementId: 31,
+        quoteId: 41,
+        contractId: 51,
+        customerSideEffects: false,
+      },
+    });
+    const find = vi
+      .fn()
+      .mockResolvedValueOnce({ docs: [addressEvent, offerEvent] })
+      .mockResolvedValueOnce({ docs: [addressEvent, offerEvent] });
+    const history = await loadAdminNextCaseAuditHistory(
+      { find } as never,
+      value,
+      "admin",
+    );
+    const projected = projectAdminCaseWorkspace(
+      value,
+      new Date("2026-09-04T09:00:00.000Z"),
+      "lt",
+      history,
+    );
+
+    expect(projected.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Bylos adresas pataisytas",
+          audit: expect.objectContaining({
+            action: "case.address_corrected",
+            label: "Bylos adresas pataisytas",
+            correlationId: "corr-address-13",
+            trace: ["Byla r8 · adresas r2", "Pasenę juodraščiai: 1 / 1"],
+          }),
+        }),
+        expect.objectContaining({
+          title: "Roof Fusion matavimas įtrauktas į pasiūlymo juodraštį",
+          audit: expect.objectContaining({
+            action: "roof-fusion.offer-draft-created",
+            correlationId: "corr-offer-13",
+            trace: [
+              "Byla r8 · adresas r2 · RF snapshot r4",
+              "Matavimas: RF-13-V1",
+              "Pasiūlymas: T-13-V3",
+              "Sutartis: K-13-V3",
+            ],
+          }),
+        }),
+      ]),
+    );
+  });
+
   it.each(truncatedPageMetadata)(
     "fails closed when seed audit pagination reports truncation via %s",
     async (_signal, pagination) => {

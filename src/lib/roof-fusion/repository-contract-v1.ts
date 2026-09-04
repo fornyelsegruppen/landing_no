@@ -247,6 +247,7 @@ export interface RoofSnapshotAppendOnlyRepositoryV1 {
     caseId: string,
     idempotencyKey: string,
   ): Promise<StoredRoofRepositoryCommandV1 | null>;
+  isSnapshotInvalidated(snapshot: RoofSnapshotV1): Promise<boolean>;
   appendAtomically(input: {
     expectedLatest: RoofSnapshotReferenceV1 | null;
     snapshot: RoofSnapshotV1;
@@ -782,6 +783,13 @@ export async function readBoundApprovedRoofRendererV1(
       [binding.snapshotId],
     );
   }
+  if (await repository.isSnapshotInvalidated(snapshot)) {
+    throw new RoofRepositoryCommandErrorV1(
+      "INVALID_STATE",
+      "Roof Fusion source was invalidated by a case address correction",
+      [snapshot.snapshotId],
+    );
+  }
   if (snapshot.subject.caseId !== binding.caseId) {
     throw new RoofRepositoryCommandErrorV1(
       "CASE_MISMATCH",
@@ -840,6 +848,10 @@ export class InMemoryRoofSnapshotRepositoryV1 implements RoofSnapshotAppendOnlyR
     const ids = this.caseSnapshotIds.get(caseId) ?? [];
     const snapshot = ids.length ? this.snapshots.get(ids.at(-1)!) : undefined;
     return snapshot ? clone(snapshot) : null;
+  }
+
+  async isSnapshotInvalidated() {
+    return false;
   }
 
   async readCommand(caseId: string, key: string) {

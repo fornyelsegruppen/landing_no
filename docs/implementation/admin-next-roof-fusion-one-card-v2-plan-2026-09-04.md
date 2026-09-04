@@ -4,10 +4,10 @@
 
 **Status:** IN PROGRESS · Preview branch only
 
-**Implementation:** Phases A–D implemented; Phase E and owner UAT remain gated
+**Implementation:** Phases A–E implemented in Preview; owner UAT remains gated
 
-**Production:** untouched; no offer, pricing, customer, or Production write is
-authorized by this plan
+**Production:** untouched; the offer/pricing bridge is rejected outside Preview
+and no customer send or Production write is authorized by this plan
 
 ## Implementation checkpoint · 2026-09-04
 
@@ -26,10 +26,19 @@ Implemented in the isolated RF Preview branch:
 - reducer, interaction, stale-response, detailed-result, route, and integration
   tests.
 
-Still intentionally gated:
+The separate `PREVIEW MUTATION/SCHEMA GO` authorized Phase E. Implemented behind
+Preview-only feature gates:
 
-- immutable RF measurement approval and add-to-offer command (Phase E);
-- a protected owner UAT Preview and any Production release decision (Phase F).
+- optimistic case/address revisions and append-only address correction history;
+- exact RF snapshot invalidation when a case address changes;
+- strict draft recovery decisions (`Continue old` / `Start new`) without
+  commercial eligibility;
+- hash-bound RF approval and immutable RF-to-measurement projection;
+- one transactional, idempotent measurement → calculation → offer draft →
+  contract draft bridge with no customer side effects.
+
+Still intentionally gated: protected owner UAT and every Production release
+decision (Phase F).
 
 ## 1. Decision
 
@@ -486,6 +495,8 @@ The Phase A–D start condition was:
    provider contract;
 4. work continues on the isolated RF branch/Preview with Production untouched.
 
-Those conditions were satisfied for the protected Preview implementation.
-Phase E still requires a separate mutation/schema GO; Phase F and every
-Production change still require their own explicit release decision.
+Those conditions were satisfied for the protected Preview implementation. The
+owner supplied `PREVIEW MUTATION/SCHEMA GO` on 2026-09-04 and Phase E was
+implemented with fail-closed Preview gates. Phase F and every Production change
+still require their own explicit release decision: `PRODUCTION GO` has not been
+given.

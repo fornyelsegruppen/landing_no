@@ -11,15 +11,19 @@ import {
 } from "./source-adapter-v1";
 import { renderApprovedRoofSnapshotSvgV1 } from "./svg-renderer-v1";
 
-export function buildApprovedGableRoofFixtureV1() {
+export function buildApprovedGableRoofFixtureV1(
+  options: { caseId?: string; snapshotId?: string } = {},
+) {
+  const caseId = options.caseId ?? "case-12";
+  const snapshotId = options.snapshotId ?? "roof-case-12-r1";
   const normalized = normalizedFixture as unknown as NonNullable<
     RoofSourceResultV1["normalized"]
   >;
   const request = buildRoofSourceRequestV1({
     schemaVersion: "roof-source-request.v1",
     requestId: "request-gable-svg-001",
-    caseId: "case-12",
-    targetSnapshotId: "roof-case-12-r1",
+    caseId,
+    targetSnapshotId: snapshotId,
     expectedInputVersion: "fake-provider-roof.v1",
     adapterId: "fake-roof-adapter",
     idempotencyKey: "roof-source:case-12:svg-fixture",

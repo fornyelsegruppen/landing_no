@@ -1,0 +1,70 @@
+{
+  "baseUrl": "http://localhost:3100",
+  "captureCount": 2,
+  "captures": [
+    {
+      "dialogHorizontalOverflowPx": 0,
+      "dialogRect": {
+        "x": 384,
+        "y": 115.25,
+        "width": 672,
+        "height": 1369.5,
+        "top": 115.25,
+        "right": 1056,
+        "bottom": 1484.75,
+        "left": 384
+      },
+      "dialogTitle": "Patvirtinti adreso koregavimą",
+      "dialogWithinViewport": true,
+      "documentHorizontalOverflowPx": 0,
+      "drawerPresent": true,
+      "overlayAboveDrawer": true,
+      "primaryButtons": [
+        "",
+        "Grįžti ir koreguoti"
+      ],
+      "reviewState": "idle",
+      "typedConfirmationCount": 1,
+      "filename": "address-review-1440.png",
+      "mutationRequestCount": 0,
+      "state": "address_review",
+      "viewport": {
+        "height": 1600,
+        "width": 1440
+      }
+    },
+    {
+      "dialogHorizontalOverflowPx": 0,
+      "dialogRect": {
+        "x": 384,
+        "y": 431.3125,
+        "width": 672,
+        "height": 737.375,
+        "top": 431.3125,
+        "right": 1056,
+        "bottom": 1168.6875,
+        "left": 384
+      },
+      "dialogTitle": "Peržiūrėti ir įkelti į pasiūlymą",
+      "dialogWithinViewport": true,
+      "documentHorizontalOverflowPx": 0,
+      "drawerPresent": true,
+      "overlayAboveDrawer": true,
+      "primaryButtons": [
+        "",
+        "Grįžti ir koreguoti"
+      ],
+      "reviewState": null,
+      "typedConfirmationCount": 0,
+      "filename": "offer-review-1440.png",
+      "mutationRequestCount": 0,
+      "state": "offer_review",
+      "viewport": {
+        "height": 1600,
+        "width": 1440
+      }
+    }
+  ],
+  "fixtureRoute": "/admin-next-r4-fixture",
+  "invalidStateReturned404": true
+}

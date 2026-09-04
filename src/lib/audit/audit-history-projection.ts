@@ -73,6 +73,24 @@ export type AuditHistoryActor = {
   display: string | null;
 };
 
+export type AuditHistoryTrace =
+  | {
+      kind: "case_address_corrected";
+      caseRevision: number;
+      addressRevision: number;
+      invalidatedQuoteDrafts: number;
+      invalidatedContractDrafts: number;
+    }
+  | {
+      kind: "roof_fusion_offer_draft_created";
+      caseRevision: number;
+      addressRevision: number;
+      snapshotRevision: number;
+      measurementId: number;
+      quoteId: number;
+      contractId: number;
+    };
+
 export type AuditHistoryHashStatus =
   "not_recorded" | "recorded_unverified" | "invalid";
 
@@ -91,6 +109,7 @@ export type AuditHistoryItem = {
   reason: string | null;
   version: string | number | null;
   source: string | null;
+  trace?: AuditHistoryTrace;
   metadataStatus: "absent" | "projected" | "rejected";
   correlationId: string;
   integrity: {
@@ -224,12 +243,121 @@ function safeVersion(value: unknown) {
   return identifier && /\d/u.test(identifier) ? identifier : null;
 }
 
-function projectMetadata(value: unknown) {
+function positiveInteger(value: unknown) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+function nonNegativeInteger(value: unknown) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
+}
+
+function hasOnlyKeys(
+  metadata: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+) {
+  return Object.keys(metadata).every((key) => allowed.has(key));
+}
+
+function projectKnownTrace(
+  action: string,
+  metadata: Record<string, unknown>,
+): { handled: false } | { handled: true; trace: AuditHistoryTrace | null } {
+  if (action === "case.address_corrected" || action === "case.address-corrected") {
+    const allowed = new Set([
+      "caseRevision",
+      "revision",
+      "idempotencyDigest",
+      "rfInvalidated",
+      "quoteDraftsInvalidated",
+      "contractDraftsInvalidated",
+    ]);
+    const caseRevision = positiveInteger(metadata.caseRevision);
+    const addressRevision = positiveInteger(metadata.revision);
+    const invalidatedQuoteDrafts = nonNegativeInteger(
+      metadata.quoteDraftsInvalidated,
+    );
+    const invalidatedContractDrafts = nonNegativeInteger(
+      metadata.contractDraftsInvalidated,
+    );
+    const digest = metadata.idempotencyDigest;
+    if (
+      !hasOnlyKeys(metadata, allowed) ||
+      caseRevision === null ||
+      addressRevision === null ||
+      invalidatedQuoteDrafts === null ||
+      invalidatedContractDrafts === null ||
+      typeof metadata.rfInvalidated !== "boolean" ||
+      typeof digest !== "string" ||
+      !hashPattern.test(digest)
+    ) {
+      return { handled: true, trace: null };
+    }
+    return {
+      handled: true,
+      trace: {
+        kind: "case_address_corrected",
+        caseRevision,
+        addressRevision,
+        invalidatedQuoteDrafts,
+        invalidatedContractDrafts,
+      },
+    };
+  }
+  if (action === "roof-fusion.offer-draft-created") {
+    const allowed = new Set([
+      "caseRevision",
+      "sourceRevision",
+      "snapshotRevision",
+      "measurementId",
+      "quoteId",
+      "contractId",
+      "customerSideEffects",
+    ]);
+    const caseRevision = positiveInteger(metadata.caseRevision);
+    const addressRevision = positiveInteger(metadata.sourceRevision);
+    const snapshotRevision = positiveInteger(metadata.snapshotRevision);
+    const measurementId = positiveInteger(metadata.measurementId);
+    const quoteId = positiveInteger(metadata.quoteId);
+    const contractId = positiveInteger(metadata.contractId);
+    if (
+      !hasOnlyKeys(metadata, allowed) ||
+      caseRevision === null ||
+      addressRevision === null ||
+      snapshotRevision === null ||
+      measurementId === null ||
+      quoteId === null ||
+      contractId === null ||
+      metadata.customerSideEffects !== false
+    ) {
+      return { handled: true, trace: null };
+    }
+    return {
+      handled: true,
+      trace: {
+        kind: "roof_fusion_offer_draft_created",
+        caseRevision,
+        addressRevision,
+        snapshotRevision,
+        measurementId,
+        quoteId,
+        contractId,
+      },
+    };
+  }
+  return { handled: false };
+}
+
+function projectMetadata(value: unknown, action: string) {
   const empty = {
     result: null,
     reason: null,
     version: null,
     source: null,
+    trace: null as AuditHistoryTrace | null,
   };
   if (value === undefined || value === null) {
     return { ...empty, status: "absent" as const };
@@ -239,6 +367,12 @@ function projectMetadata(value: unknown) {
   }
 
   const metadata = value as Record<string, unknown>;
+  const knownTrace = projectKnownTrace(action, metadata);
+  if (knownTrace.handled) {
+    return knownTrace.trace
+      ? { ...empty, trace: knownTrace.trace, status: "projected" as const }
+      : { ...empty, status: "rejected" as const };
+  }
   if (Object.keys(metadata).some((key) => !metadataKeys.has(key))) {
     return { ...empty, status: "rejected" as const };
   }
@@ -263,6 +397,7 @@ function projectMetadata(value: unknown) {
     reason: (reason as string | undefined) ?? null,
     version: version === undefined ? null : safeVersion(version),
     source: (source as string | undefined) ?? null,
+    trace: null,
     status: "projected" as const,
   };
 }
@@ -327,7 +462,7 @@ export function projectAuditHistoryEvent(
   }
 
   const changedFields = projectChangedFields(event.changedFields);
-  const metadata = projectMetadata(event.metadata);
+  const metadata = projectMetadata(event.metadata, action);
   return {
     ok: true,
     value: {
@@ -342,6 +477,7 @@ export function projectAuditHistoryEvent(
       reason: metadata.reason,
       version: metadata.version,
       source: metadata.source,
+      ...(metadata.trace ? { trace: metadata.trace } : {}),
       metadataStatus: metadata.status,
       correlationId,
       integrity: projectIntegrity(event.beforeHash, event.afterHash),

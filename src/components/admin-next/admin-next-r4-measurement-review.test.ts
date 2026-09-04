@@ -185,6 +185,40 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).not.toContain("Sintetiniai Preview duomenys");
   });
 
+  it("replaces the locked footer only for a verified canonical offer action", () => {
+    expect(measurement).toBeDefined();
+    if (!measurement) return;
+    const approved = {
+      ...measurement,
+      state: "verified" as const,
+      reviewEdges: [],
+      verificationGates: measurement.verificationGates.map((gate) => ({
+        ...gate,
+        state: "verified" as const,
+      })),
+    };
+    const html = renderToStaticMarkup(
+      createElement(AdminNextR4MeasurementReview, {
+        address: "Testgata 13, 0013 Oslo",
+        locale: "lt",
+        caseReference: "TF-13",
+        customer: "UAT-01 Testkunde",
+        measurement: approved,
+        offerAction: createElement(
+          "button",
+          { "data-test-offer-action": true },
+          "Įkelti matavimą į pasiūlymą",
+        ),
+        owner: "Aistė",
+        source: "canonical",
+      }),
+    );
+
+    expect(html).toContain('data-test-offer-action="true"');
+    expect(html).toContain("Įkelti matavimą į pasiūlymą");
+    expect(html).not.toContain("Confirm užrakintas");
+  });
+
   it("renders real evidence previews only through the authenticated admin proxy", () => {
     expect(measurement).toBeDefined();
     if (!measurement) return;

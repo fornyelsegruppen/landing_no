@@ -8,7 +8,8 @@ import {
   type RoofRepositoryCommandV1,
 } from "./repository-contract-v1";
 
-type CollectionName = "roof-fusion-snapshots" | "roof-fusion-commands";
+type CollectionName =
+  "roof-fusion-snapshots" | "roof-fusion-commands" | "case-address-revisions";
 type Row = Record<string, unknown>;
 type Store = Record<CollectionName, Row[]>;
 
@@ -32,6 +33,7 @@ class FakeTransactionalPayload {
   committed: Store = {
     "roof-fusion-snapshots": [],
     "roof-fusion-commands": [],
+    "case-address-revisions": [],
   };
   private readonly transactions = new Map<string, Store>();
   private nextTransaction = 1;
@@ -93,7 +95,9 @@ class FakeTransactionalPayload {
     const uniqueFields =
       input.collection === "roof-fusion-snapshots"
         ? ["snapshotId", "caseRevisionKey"]
-        : ["ledgerKey"];
+        : input.collection === "roof-fusion-commands"
+          ? ["ledgerKey"]
+          : ["ledgerKey", "revisionKey"];
     if (
       store[input.collection].some((row) =>
         uniqueFields.some((field) => row[field] === input.data[field]),
@@ -203,5 +207,32 @@ describe("Payload Roof Snapshot repository v1", () => {
     );
     expect(payload.committed["roof-fusion-snapshots"]).toHaveLength(0);
     expect(payload.committed["roof-fusion-commands"]).toHaveLength(0);
+  });
+
+  it("recognizes only an exact append-only address invalidation binding", async () => {
+    const payload = new FakeTransactionalPayload();
+    const repository = new PayloadRoofSnapshotRepositoryV1(payload.asPayload());
+    const command = calculateCommand();
+    await executeRoofRepositoryCommandV1(repository, command);
+    const snapshot = command.candidateSnapshot;
+    payload.committed["case-address-revisions"].push({
+      ledgerKey: "address-ledger-1",
+      revisionKey: `${snapshot.subject.caseId}:2`,
+      caseId: snapshot.subject.caseId,
+      rfInvalidationStatus: "invalidated",
+      invalidatedRfSnapshotId: snapshot.snapshotId,
+      invalidatedRfSnapshotRevision: snapshot.revision,
+      invalidatedRfSnapshotHash: snapshot.snapshotHash,
+    });
+
+    await expect(repository.isSnapshotInvalidated(snapshot)).resolves.toBe(
+      true,
+    );
+    await expect(
+      repository.isSnapshotInvalidated({
+        ...snapshot,
+        snapshotHash: "0".repeat(64),
+      }),
+    ).resolves.toBe(false);
   });
 });

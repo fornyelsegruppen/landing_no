@@ -111,6 +111,8 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
           id: snapshot.snapshotId,
           revision: snapshot.revision,
           hash: snapshot.snapshotHash,
+          inputHash: snapshot.inputHash,
+          renderHash: snapshot.rendererPayload.renderHash,
         },
       },
     });

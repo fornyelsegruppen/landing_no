@@ -1,19 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildRoofFusionWorkbenchDraftV1,
   ROOF_FUSION_WORKBENCH_DRAFT_SCHEMA_VERSION,
 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 import { ASSISTED_MANUAL_ROOF_GEOMETRY_SCHEMA_VERSION } from "@/lib/roof-fusion/assisted-manual-roof-geometry-v1";
+import { buildWorkbenchDraftRecoveryBindingV1 } from "@/lib/roof-fusion/workbench-draft-recovery-v1";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  findByID: vi.fn(),
   isAdmin: vi.fn(),
   append: vi.fn(),
   readDraft: vi.fn(),
   readLatest: vi.fn(),
+  readDraftRecord: vi.fn(),
+  readLatestRecord: vi.fn(),
   assertCase: vi.fn(),
   previewError: class extends Error {
-    constructor(readonly code: string, message: string) {
+    constructor(
+      readonly code: string,
+      message: string,
+    ) {
       super(message);
     }
   },
@@ -35,14 +42,23 @@ const validDraft = buildRoofFusionWorkbenchDraftV1({
     georeference: {
       crs: "EPSG:25833",
       extentTrust: "actual-visible-extent",
-      bounds: { minEastingM: 500000, minNorthingM: 6640000, maxEastingM: 500010, maxNorthingM: 6640010 },
+      bounds: {
+        minEastingM: 500000,
+        minNorthingM: 6640000,
+        maxEastingM: 500010,
+        maxNorthingM: 6640010,
+      },
       imageWidth: 1920,
       imageHeight: 1080,
     },
   },
   geometry: {
     schemaVersion: ASSISTED_MANUAL_ROOF_GEOMETRY_SCHEMA_VERSION,
-    coordinateSystem: { kind: "projected_crs", reference: "EPSG:25833", axisOrder: "easting_northing" },
+    coordinateSystem: {
+      kind: "projected_crs",
+      reference: "EPSG:25833",
+      axisOrder: "easting_northing",
+    },
     vertices: [
       { vertexId: "v1", xM: 500000, yM: 6640000 },
       { vertexId: "v2", xM: 500010, yM: 6640000 },
@@ -60,7 +76,15 @@ const validDraft = buildRoofFusionWorkbenchDraftV1({
         { xM: 500000, yM: 6640010 },
       ],
     },
-    roofMasses: [{ massId: "mass-test", outlineId: "outline-test", approvedByActorId: "7", approvedAt: "2026-09-03T08:00:00.000Z", vertexIds: ["v1", "v2", "v3", "v4"] }],
+    roofMasses: [
+      {
+        massId: "mass-test",
+        outlineId: "outline-test",
+        approvedByActorId: "7",
+        approvedAt: "2026-09-03T08:00:00.000Z",
+        vertexIds: ["v1", "v2", "v3", "v4"],
+      },
+    ],
     skeletonEdges: [],
     openings: [],
     obstacles: [],
@@ -69,7 +93,10 @@ const validDraft = buildRoofFusionWorkbenchDraftV1({
 });
 
 vi.mock("@/lib/payload", () => ({
-  getPayload: vi.fn(async () => ({ auth: mocks.auth })),
+  getPayload: vi.fn(async () => ({
+    auth: mocks.auth,
+    findByID: mocks.findByID,
+  })),
 }));
 vi.mock("@/payload/access/roles", () => ({ userIsAdmin: mocks.isAdmin }));
 vi.mock("@/lib/roof-fusion/preview-read-adapters-v1", () => ({
@@ -85,6 +112,8 @@ vi.mock("@/lib/roof-fusion/workbench-draft-repository-v1", () => ({
       appendAtomically: mocks.append,
       readDraft: mocks.readDraft,
       readLatestDraft: mocks.readLatest,
+      readDraftRecoveryRecord: mocks.readDraftRecord,
+      readLatestDraftRecoveryRecord: mocks.readLatestRecord,
     };
   }),
   RoofFusionWorkbenchDraftRepositoryError: class extends Error {},
@@ -94,32 +123,50 @@ import { GET, POST } from "./route";
 
 describe("POST /api/admin/roof-fusion/workbench-draft", () => {
   beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "preview");
     mocks.auth.mockReset();
     mocks.isAdmin.mockReset();
+    mocks.findByID.mockReset();
     mocks.append.mockReset();
     mocks.readDraft.mockReset();
     mocks.readLatest.mockReset();
+    mocks.readDraftRecord.mockReset();
+    mocks.readLatestRecord.mockReset();
     mocks.assertCase.mockReset();
     mocks.auth.mockResolvedValue({ user: { id: 7, role: "admin" } });
+    mocks.findByID.mockResolvedValue({ id: 999, addressRevision: 3 });
     mocks.isAdmin.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("fails closed for an unauthenticated caller", async () => {
     mocks.auth.mockResolvedValue({ user: null });
-    const response = await POST(new Request("http://localhost/api", { method: "POST", body: "{}" }));
+    const response = await POST(
+      new Request("http://localhost/api", { method: "POST", body: "{}" }),
+    );
     expect(response.status).toBe(401);
     expect(mocks.append).not.toHaveBeenCalled();
   });
 
   it("fails closed for a non-admin caller", async () => {
     mocks.isAdmin.mockReturnValue(false);
-    const response = await POST(new Request("http://localhost/api", { method: "POST", body: "{}" }));
+    const response = await POST(
+      new Request("http://localhost/api", { method: "POST", body: "{}" }),
+    );
     expect(response.status).toBe(403);
     expect(mocks.append).not.toHaveBeenCalled();
   });
 
   it("rejects malformed draft input before any persistence", async () => {
-    const response = await POST(new Request("http://localhost/api", { method: "POST", body: JSON.stringify({ draft: {} }) }));
+    const response = await POST(
+      new Request("http://localhost/api", {
+        method: "POST",
+        body: JSON.stringify({ draft: {} }),
+      }),
+    );
     expect(response.status).toBe(400);
     expect(mocks.append).not.toHaveBeenCalled();
   });
@@ -156,8 +203,15 @@ describe("POST /api/admin/roof-fusion/workbench-draft", () => {
   });
 
   it("fails closed when the case is not authorized", async () => {
-    mocks.assertCase.mockRejectedValue(new mocks.previewError("CASE_NOT_FOUND", "Case does not exist"));
-    const response = await POST(new Request("http://localhost/api", { method: "POST", body: JSON.stringify({ draft: validDraft }) }));
+    mocks.assertCase.mockRejectedValue(
+      new mocks.previewError("CASE_NOT_FOUND", "Case does not exist"),
+    );
+    const response = await POST(
+      new Request("http://localhost/api", {
+        method: "POST",
+        body: JSON.stringify({ draft: validDraft }),
+      }),
+    );
     expect(response.status).toBe(404);
     expect(mocks.append).not.toHaveBeenCalled();
   });
@@ -165,10 +219,12 @@ describe("POST /api/admin/roof-fusion/workbench-draft", () => {
   it("confirms an applied case-scoped CAS append with its idempotency key", async () => {
     mocks.append.mockResolvedValue("applied");
 
-    const response = await POST(new Request("http://localhost/api", {
-      method: "POST",
-      body: JSON.stringify({ draft: validDraft, expectedLatest: null }),
-    }));
+    const response = await POST(
+      new Request("http://localhost/api", {
+        method: "POST",
+        body: JSON.stringify({ draft: validDraft, expectedLatest: null }),
+      }),
+    );
 
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({
@@ -181,27 +237,151 @@ describe("POST /api/admin/roof-fusion/workbench-draft", () => {
         latest: { draftId: "draft-case-test", revision: 1 },
       },
     });
-    expect(mocks.append).toHaveBeenCalledWith({ draft: validDraft, expectedLatest: null });
+    expect(mocks.append).toHaveBeenCalledWith({
+      draft: validDraft,
+      expectedLatest: null,
+      recoveryBinding: buildWorkbenchDraftRecoveryBindingV1({
+        draft: validDraft,
+        addressRevision: 3,
+      }),
+    });
+  });
+
+  it("rejects a client-supplied recovery binding instead of trusting it", async () => {
+    const response = await POST(
+      new Request("http://localhost/api", {
+        method: "POST",
+        body: JSON.stringify({
+          draft: validDraft,
+          expectedLatest: null,
+          recoveryBinding: { attackerControlled: true },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.append).not.toHaveBeenCalled();
   });
 
   it("loads only the authorized case's latest append-only draft", async () => {
-    mocks.readLatest.mockResolvedValue(validDraft);
+    mocks.readLatestRecord.mockResolvedValue({
+      draft: validDraft,
+      recoveryBinding: null,
+    });
 
-    const response = await GET(new Request("http://localhost/api?caseId=lead%3A999"));
+    const response = await GET(
+      new Request("http://localhost/api?caseId=lead%3A999"),
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ draft: validDraft });
-    expect(mocks.assertCase).toHaveBeenCalledWith("lead:999", expect.anything());
-    expect(mocks.readLatest).toHaveBeenCalledWith("lead:999");
-    expect(mocks.readDraft).not.toHaveBeenCalled();
+    expect(mocks.assertCase).toHaveBeenCalledWith(
+      "lead:999",
+      expect.anything(),
+    );
+    expect(mocks.readLatestRecord).toHaveBeenCalledWith("lead:999");
+    expect(mocks.readDraftRecord).not.toHaveBeenCalled();
   });
 
   it("does not reveal a draft before administrator authorization", async () => {
     mocks.auth.mockResolvedValue({ user: null });
 
-    const response = await GET(new Request("http://localhost/api?caseId=lead%3A999"));
+    const response = await GET(
+      new Request("http://localhost/api?caseId=lead%3A999"),
+    );
 
     expect(response.status).toBe(401);
-    expect(mocks.readLatest).not.toHaveBeenCalled();
+    expect(mocks.readLatestRecord).not.toHaveBeenCalled();
+  });
+
+  it("returns a server-owned exact decision only for the persisted binding and current source", async () => {
+    const recoveryBinding = buildWorkbenchDraftRecoveryBindingV1({
+      draft: validDraft,
+      addressRevision: 3,
+    });
+    mocks.readLatestRecord.mockResolvedValue({
+      draft: validDraft,
+      recoveryBinding,
+    });
+
+    const response = await GET(
+      new Request(
+        `http://localhost/api?caseId=lead%3A999&sourceId=${validDraft.source.sourceId}&sourceHash=${validDraft.source.sourceContentHash}`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      draft: validDraft,
+      recoveryDecision: {
+        state: "continue_or_start_new",
+        reason: "current_binding",
+        continueOld: { available: true },
+        startNew: { available: true },
+        commercialUse: { pricingAllowed: false, offerAllowed: false },
+      },
+    });
+  });
+
+  it("keeps a legacy record fail-closed but exposes authorized Start new", async () => {
+    mocks.readLatestRecord.mockResolvedValue({
+      draft: validDraft,
+      recoveryBinding: null,
+    });
+
+    const response = await GET(
+      new Request(
+        `http://localhost/api?caseId=lead%3A999&sourceId=${validDraft.source.sourceId}&sourceHash=${validDraft.source.sourceContentHash}`,
+      ),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      recoveryDecision: {
+        state: "start_new_only",
+        reason: "recovery_binding_missing",
+        continueOld: { available: false },
+        startNew: {
+          available: true,
+          intent: {
+            expectedLatestDraft: {
+              id: validDraft.draftId,
+              revision: validDraft.revision,
+              hash: validDraft.draftHash,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("marks the binding stale when the visible source changes", async () => {
+    const recoveryBinding = buildWorkbenchDraftRecoveryBindingV1({
+      draft: validDraft,
+      addressRevision: 3,
+    });
+    mocks.readLatestRecord.mockResolvedValue({
+      draft: validDraft,
+      recoveryBinding,
+    });
+
+    const response = await GET(
+      new Request(
+        `http://localhost/api?caseId=lead%3A999&sourceId=norge-capture-new&sourceHash=${"f".repeat(64)}`,
+      ),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      recoveryDecision: {
+        state: "start_new_only",
+        reason: "stale_binding",
+        staleReasons: expect.arrayContaining([
+          "source_id_changed",
+          "source_revision_changed",
+          "source_hash_changed",
+        ]),
+        continueOld: { available: false },
+        startNew: { available: true },
+      },
+    });
   });
 });

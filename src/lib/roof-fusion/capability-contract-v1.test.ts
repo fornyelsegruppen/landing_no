@@ -48,4 +48,20 @@ describe("Roof Fusion I1 capability boundary", () => {
       activation: "preview_only_fail_closed",
     });
   });
+
+  it("allows only administrators to use the gated Preview mutation capabilities", () => {
+    for (const capability of [
+      "roof_fusion.case_address.correct",
+      "roof_fusion.draft.continue",
+      "roof_fusion.draft.create",
+      "roof_fusion.offer.create_draft",
+    ] as const) {
+      expect(
+        roofFusionCapabilityAllowsActorV1(capability, "administrator"),
+      ).toBe(true);
+      expect(roofFusionCapabilityAllowsActorV1(capability, "customer")).toBe(
+        false,
+      );
+    }
+  });
 });

@@ -53,6 +53,7 @@ describe("Roof Fusion Preview UAT golden harness v1", () => {
       readSnapshot: vi.fn(),
       readLatestSnapshot: vi.fn(),
       readCommand: vi.fn(),
+      isSnapshotInvalidated: vi.fn(async () => false),
       appendAtomically: vi.fn(),
     };
     await expect(
@@ -110,6 +111,7 @@ describe("Roof Fusion Preview UAT golden harness v1", () => {
         snapshotId: "different-canonical-snapshot",
       }),
       readCommand: vi.fn(),
+      isSnapshotInvalidated: vi.fn(async () => false),
       appendAtomically: vi.fn(),
     };
 

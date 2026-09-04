@@ -295,12 +295,13 @@ describe("Admin Next Case Workspace preview", () => {
         {
           id: "audit-31",
           kind: "automation",
-          title: "case.updated",
+          title: "case.address_corrected",
           summary: "",
           at: atUtc,
           actor: "Aistė",
           audit: {
-            action: "case.updated",
+            action: "case.address_corrected",
+            label: "Bylos adresas pataisytas",
             actor: { kind: "user", display: "Aistė" },
             atUtc,
             changedFields: ["caseRevision", "status"],
@@ -309,6 +310,11 @@ describe("Admin Next Case Workspace preview", () => {
             reason: "stale_revision",
             version: "v2",
             source: "admin-api",
+            trace: [
+              "Byla r8 · adresas r2",
+              "Pasiūlymas: T-13-V3",
+              "Sutartis: K-13-V3",
+            ],
             correlationId: "corr-case-13",
             integrity: {
               hashStatus: "recorded_unverified",
@@ -332,7 +338,11 @@ describe("Admin Next Case Workspace preview", () => {
     );
 
     expect(html).toContain('data-audit-history-state="ready"');
-    expect(html).toContain("case.updated");
+    expect(html).toContain("Bylos adresas pataisytas");
+    expect(html).not.toContain("case.address_corrected");
+    expect(html).toContain("data-audit-event-trace");
+    expect(html).toContain("Pasiūlymas: T-13-V3");
+    expect(html).toContain("Sutartis: K-13-V3");
     expect(html).toContain(localizedTime);
     expect(html).not.toContain(atUtc);
     expect(html).toContain("Naudotojas · Aistė");

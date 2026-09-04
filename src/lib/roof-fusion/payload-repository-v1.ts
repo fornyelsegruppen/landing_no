@@ -61,6 +61,13 @@ function referencesMatch(
   );
 }
 
+function leadIdForPreviewCase(caseId: string) {
+  if (process.env.VERCEL_ENV !== "preview") return null;
+  const match = /^lead:([1-9]\d*)$/u.exec(caseId);
+  const value = match ? Number(match[1]) : Number.NaN;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
 function parseStoredSnapshot(row: RoofFusionSnapshot): RoofSnapshotV1 {
   let snapshot: RoofSnapshotV1;
   try {
@@ -202,6 +209,26 @@ export class PayloadRoofSnapshotRepositoryV1 implements RoofSnapshotAppendOnlyRe
     return this.findCommand(caseId, idempotencyKey);
   }
 
+  async isSnapshotInvalidated(snapshot: RoofSnapshotV1) {
+    const result = await this.payload.find({
+      collection: "case-address-revisions",
+      depth: 0,
+      limit: 1,
+      overrideAccess: true,
+      pagination: false,
+      where: {
+        and: [
+          { caseId: { equals: snapshot.subject.caseId } },
+          { rfInvalidationStatus: { equals: "invalidated" } },
+          { invalidatedRfSnapshotId: { equals: snapshot.snapshotId } },
+          { invalidatedRfSnapshotRevision: { equals: snapshot.revision } },
+          { invalidatedRfSnapshotHash: { equals: snapshot.snapshotHash } },
+        ],
+      },
+    });
+    return Boolean(result.docs[0]);
+  }
+
   async appendAtomically(input: {
     expectedLatest: RoofSnapshotReferenceV1 | null;
     snapshot: RoofSnapshotV1;
@@ -221,6 +248,43 @@ export class PayloadRoofSnapshotRepositoryV1 implements RoofSnapshotAppendOnlyRe
 
     let committed = false;
     try {
+      const leadId = leadIdForPreviewCase(caseId);
+      if (leadId) {
+        const lead = await this.payload.findByID({
+          collection: "leads",
+          id: leadId,
+          depth: 0,
+          overrideAccess: true,
+          req: request as PayloadRequest,
+        });
+        const caseRevision = Number(lead.caseRevision || 1);
+        const context = {
+          trustedCaseCommand: true,
+          expectedCaseRevision: caseRevision,
+        } as const;
+        request.context = context;
+        request.payloadAPI = "local";
+        const lock = await this.payload.update({
+          collection: "leads",
+          depth: 0,
+          overrideAccess: true,
+          context,
+          req: request as PayloadRequest,
+          where: {
+            and: [
+              { id: { equals: leadId } },
+              { caseRevision: { equals: caseRevision } },
+            ],
+          },
+          data: { caseRevision },
+        });
+        if (!Array.isArray(lock.docs) || lock.docs.length !== 1) {
+          throw repositoryIntegrity(
+            "Roof Fusion append could not acquire the Preview case lock",
+            [caseId],
+          );
+        }
+      }
       const latest = await this.findSnapshot(
         { caseId: { equals: caseId } },
         { req: request, sort: "-revision" },

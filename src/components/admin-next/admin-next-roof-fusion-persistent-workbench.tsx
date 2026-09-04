@@ -16,6 +16,12 @@ import {
   useState,
 } from "react";
 import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
+import type { PanelLocale } from "@/lib/panel-i18n";
+import type {
+  RfContinueOldIntent,
+  RfDraftRecoveryDecision,
+  RfStartNewIntent,
+} from "@/lib/admin-next/rf-draft-recovery-contract";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import {
   AdminNextRoofFusionUnifiedWorkbench,
@@ -25,6 +31,7 @@ import {
 } from "./admin-next-roof-fusion-unified-workbench";
 import {
   buildWorkbenchDraftFromUiV1,
+  loadWorkbenchDraftRecoveryV1,
   loadWorkbenchDraftV1,
   normalizeProjectedWorkbenchPointV1,
   persistAndReloadWorkbenchDraftV1,
@@ -40,6 +47,120 @@ import {
   AdminNextRoofFusionLegacyFallbackPanel,
   type RoofFusionLegacyFallbackSelection,
 } from "./admin-next-roof-fusion-legacy-fallback-panel";
+import { AdminNextRfDraftRecoveryDecision } from "./admin-next-rf-draft-recovery-decision";
+
+export type AdminNextRfDraftRecoveryPanel = Readonly<{
+  decision: RfDraftRecoveryDecision;
+  locale: PanelLocale;
+  onContinueOld: (intent: RfContinueOldIntent) => void;
+  onStartNew: (intent: RfStartNewIntent) => void;
+}>;
+
+function sameDraftReference(
+  draft: RoofFusionWorkbenchDraftV1,
+  reference: Readonly<{ id: string; revision: number; hash: string }>,
+) {
+  return (
+    draft.draftId === reference.id &&
+    draft.revision === reference.revision &&
+    draft.draftHash === reference.hash
+  );
+}
+
+/**
+ * Client-side defense in depth for read-only draft hydration. The recovery
+ * decision is only useful when its exact intent also describes the draft that
+ * was actually loaded and the source currently shown by this workbench.
+ */
+export function loadedDraftMatchesRfContinueIntent(
+  draft: RoofFusionWorkbenchDraftV1,
+  intent: RfContinueOldIntent,
+  current: Readonly<{
+    caseId: string;
+    sourceId?: string;
+    sourceContentHash?: string;
+  }>,
+) {
+  return (
+    sameDraftReference(draft, intent.expected.draft) &&
+    draft.caseId === current.caseId &&
+    intent.expected.case.caseId === current.caseId &&
+    draft.source.sourceId === intent.expected.source.id &&
+    draft.source.sourceContentHash === intent.expected.source.hash &&
+    intent.expected.source.id === current.sourceId &&
+    intent.expected.source.hash === current.sourceContentHash
+  );
+}
+
+function sameContinueIntent(
+  left: RfContinueOldIntent,
+  right: RfContinueOldIntent,
+) {
+  return (
+    left.version === right.version &&
+    left.kind === right.kind &&
+    left.expected.version === right.expected.version &&
+    left.expected.case.caseId === right.expected.case.caseId &&
+    left.expected.case.addressRevision ===
+      right.expected.case.addressRevision &&
+    left.expected.draft.id === right.expected.draft.id &&
+    left.expected.draft.revision === right.expected.draft.revision &&
+    left.expected.draft.hash === right.expected.draft.hash &&
+    left.expected.source.id === right.expected.source.id &&
+    left.expected.source.revision === right.expected.source.revision &&
+    left.expected.source.hash === right.expected.source.hash &&
+    left.expected.snapshot.id === right.expected.snapshot.id &&
+    left.expected.snapshot.revision === right.expected.snapshot.revision &&
+    left.expected.snapshot.hash === right.expected.snapshot.hash
+  );
+}
+
+function startNewIntentMatchesLoadedDraft(
+  draft: RoofFusionWorkbenchDraftV1 | null,
+  intent: RfStartNewIntent,
+  current: Readonly<{
+    caseId: string;
+    sourceId?: string;
+    sourceContentHash?: string;
+  }>,
+) {
+  return (
+    intent.current.case.caseId === current.caseId &&
+    intent.current.source.id === current.sourceId &&
+    intent.current.source.hash === current.sourceContentHash &&
+    (draft
+      ? Boolean(
+          intent.expectedLatestDraft &&
+          sameDraftReference(draft, intent.expectedLatestDraft),
+        )
+      : intent.expectedLatestDraft === null)
+  );
+}
+
+function sameStartNewIntent(left: RfStartNewIntent, right: RfStartNewIntent) {
+  const sameExpectedDraft = left.expectedLatestDraft
+    ? Boolean(
+        right.expectedLatestDraft &&
+        left.expectedLatestDraft.id === right.expectedLatestDraft.id &&
+        left.expectedLatestDraft.revision ===
+          right.expectedLatestDraft.revision &&
+        left.expectedLatestDraft.hash === right.expectedLatestDraft.hash,
+      )
+    : right.expectedLatestDraft === null;
+  return (
+    left.version === right.version &&
+    left.kind === right.kind &&
+    left.current.case.caseId === right.current.case.caseId &&
+    left.current.case.addressRevision === right.current.case.addressRevision &&
+    left.current.source.id === right.current.source.id &&
+    left.current.source.revision === right.current.source.revision &&
+    left.current.source.hash === right.current.source.hash &&
+    left.current.snapshot.id === right.current.snapshot.id &&
+    left.current.snapshot.revision === right.current.snapshot.revision &&
+    left.current.snapshot.hash === right.current.snapshot.hash &&
+    sameExpectedDraft
+  );
+}
 
 type HeightResult = {
   status: "ready" | "review_required" | "blocked";
@@ -222,6 +343,8 @@ function localizedWorkbenchProblem(error: unknown, fallback: string) {
       "Revizijos išsaugojimas užtruko per ilgai. Išsaugojimas nepatvirtintas; patikrinkite ryšį ir dar kartą spauskite „Išsaugoti ir patvirtinti reviziją“.",
     INVALID_DRAFT:
       "Juodraščio geometrija netinkama. Patikrinkite kontūrą ir stogo linijas.",
+    INVALID_RECOVERY_DECISION:
+      "Juodraščio recovery sprendimo patikrinti nepavyko. Geometrija nepritaikyta; perkraukite puslapį.",
     INVALID_GEOMETRY:
       "Juodraščio geometrija netinkama. Patikrinkite kontūrą ir stogo linijas.",
     REVISION_CONFLICT:
@@ -352,6 +475,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
   actorId,
   capture,
   caseId,
+  draftRecovery,
+  draftRecoveryLocale,
   heightSurface,
   horizontalAreaSquareMeters,
   orthoImageAlt,
@@ -365,6 +490,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
   actorId: string;
   capture: NorgeIBilderCaptureResult;
   caseId: string;
+  draftRecovery?: AdminNextRfDraftRecoveryPanel;
+  draftRecoveryLocale?: PanelLocale;
   heightSurface?: KartverketHeightSurfaceV1;
   horizontalAreaSquareMeters: number;
   orthoImageAlt: string;
@@ -400,8 +527,13 @@ export function AdminNextRoofFusionPersistentWorkbench({
     useState<RoofFusionLegacyFallbackSelection | null>(null);
   const [unsupportedLatest, setUnsupportedLatest] = useState(false);
   const [sourceResetRequired, setSourceResetRequired] = useState(false);
+  const [recoveryChoiceRequired, setRecoveryChoiceRequired] = useState(false);
+  const [loadedRecoveryDecision, setLoadedRecoveryDecision] =
+    useState<RfDraftRecoveryDecision | null>(null);
   const [geometryHydrationSignal, setGeometryHydrationSignal] = useState(0);
   const pendingDraft = useRef<RoofFusionWorkbenchDraftV1 | null>(null);
+  const trustedDraftReference =
+    useRef<RoofFusionWorkbenchDraftReferenceV1 | null>(null);
   const sourceOutlineIdentity = sourceOutline
     .map((point) => `${point.x}:${point.y}`)
     .join("|");
@@ -454,7 +586,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
           setProblem(null);
         }
         setGeometryHydrationSignal((current) => current + 1);
-        return;
+        return true;
       }
       setUnsupportedLatest(true);
       setSaveState("idle");
@@ -464,40 +596,113 @@ export function AdminNextRoofFusionPersistentWorkbench({
         setProblem(
           "Naujausioje revizijoje yra keli stogo masyvai, angos, kliūtys arba nepalaikomi kraštai. Ši UAT drobė jų saugiai nepriskiria paviršiams — reikalinga peržiūra.",
         );
-        return;
+        return false;
       }
       setSourceResetRequired(true);
       setProblem(
         "Atnaujinto vaizdo stogo kontūro tapatybė nesutampa su išsaugota revizija. Rankinės anotacijos neišvalytos; patvirtinkite naujos geometrijos pradžią tik jei tikrai norite jų atsisakyti.",
       );
+      return false;
     },
     [capture, registeredSourceOutline, sourceFootprintId],
   );
+
+  const stageDraftForRecovery = useCallback(
+    (
+      draft: RoofFusionWorkbenchDraftV1 | null,
+      recoveryDecision: RfDraftRecoveryDecision | null,
+    ) => {
+      setLatest(draft);
+      setLoadedRecoveryDecision(recoveryDecision);
+      setLoadState(draft ? "loaded" : "none");
+      if (!draft) {
+        setOutline(registeredSourceOutline);
+        setLines([]);
+        setConfirmed(null);
+        setDirty(true);
+        setHeightResult(null);
+        setLegacyFallback(null);
+        setRecoveryChoiceRequired(false);
+        setUnsupportedLatest(false);
+        setSourceResetRequired(false);
+        pendingDraft.current = null;
+        trustedDraftReference.current = null;
+        setGeometryHydrationSignal((current) => current + 1);
+        return;
+      }
+
+      // Loading is discovery only. Never let a legacy or stale stored draft
+      // alter the active geometry before the exact recovery decision is made.
+      setOutline(registeredSourceOutline);
+      setLines([]);
+      setConfirmed(null);
+      setDirty(true);
+      setHeightResult(null);
+      setLegacyFallback(null);
+      setUnsupportedLatest(true);
+      setSourceResetRequired(false);
+      setRecoveryChoiceRequired(true);
+      pendingDraft.current = null;
+      trustedDraftReference.current = null;
+      setGeometryHydrationSignal((current) => current + 1);
+      setProblem(
+        recoveryDecision
+          ? recoveryDecision.reason === "current_binding"
+            ? "Rastas patikrintas ankstesnis juodraštis. Pasirinkite tęsti seną juodraštį arba pradėti naują matavimą."
+            : "Ankstesnio juodraščio susiejimas nėra dabartinis. Jo geometrija nepritaikyta; tęsti negalima, todėl rinkitės pradėti naują matavimą."
+          : "Ankstesnis juodraštis neturi šiame workbench patikrinto recovery susiejimo. Jo geometrija nepritaikyta; norint pradėti iš naujo reikia autorizuoto recovery sprendimo.",
+      );
+    },
+    [registeredSourceOutline],
+  );
+
+  const readLatestDraft = useCallback(async () => {
+    if (draftRecoveryLocale && capture.sourceId && capture.rawContentHash) {
+      return loadWorkbenchDraftRecoveryV1(caseId, {
+        id: capture.sourceId,
+        hash: capture.rawContentHash,
+      });
+    }
+    return {
+      draft: await loadWorkbenchDraftV1(caseId),
+      recoveryDecision: draftRecovery?.decision ?? null,
+    };
+  }, [capture, caseId, draftRecovery?.decision, draftRecoveryLocale]);
 
   const loadLatest = useCallback(async () => {
     setLoadState("loading");
     setProblem(null);
     try {
-      const draft = await loadWorkbenchDraftV1(caseId);
-      setLatest(draft);
-      setLoadState(draft ? "loaded" : "none");
-      if (draft) applyLoadedDraft(draft);
+      const { draft, recoveryDecision } = await readLatestDraft();
+      if (
+        draft &&
+        trustedDraftReference.current?.draftId === draft.draftId &&
+        trustedDraftReference.current.revision === draft.revision &&
+        trustedDraftReference.current.draftHash === draft.draftHash &&
+        draft.source.sourceId === capture.sourceId &&
+        draft.source.sourceContentHash === capture.rawContentHash
+      ) {
+        setLatest(draft);
+        setLoadedRecoveryDecision(recoveryDecision);
+        setLoadState("loaded");
+        applyLoadedDraft(draft);
+      } else {
+        stageDraftForRecovery(draft, recoveryDecision);
+      }
     } catch (error) {
       setLoadState("error");
       setProblem(
         localizedWorkbenchProblem(error, "Juodraščio įkelti nepavyko."),
       );
     }
-  }, [applyLoadedDraft, caseId]);
+  }, [applyLoadedDraft, capture, readLatestDraft, stageDraftForRecovery]);
 
   useEffect(() => {
     let cancelled = false;
-    loadWorkbenchDraftV1(caseId)
-      .then((draft) => {
+    readLatestDraft()
+      .then(({ draft, recoveryDecision }) => {
         if (cancelled) return;
-        setLatest(draft);
-        setLoadState(draft ? "loaded" : "none");
-        if (draft) applyLoadedDraft(draft);
+        stageDraftForRecovery(draft, recoveryDecision);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -509,7 +714,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     return () => {
       cancelled = true;
     };
-  }, [applyLoadedDraft, caseId]);
+  }, [readLatestDraft, stageDraftForRecovery]);
 
   const save =
     useCallback(async (): Promise<RoofFusionWorkbenchDraftV1 | null> => {
@@ -517,6 +722,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       if (
         !evidenceReady ||
         unsupportedLatest ||
+        recoveryChoiceRequired ||
         (loadState !== "loaded" && loadState !== "none") ||
         !capture.geoReference ||
         !capture.sourceId ||
@@ -563,6 +769,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         );
         setLatest(saved.draft);
         setConfirmed(saved.draft);
+        trustedDraftReference.current = reference(saved.draft);
         setDirty(false);
         setSaveState(saved.status);
         setGeometryHydrationSignal((current) => current + 1);
@@ -586,6 +793,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       sourceOutline,
       sourceFootprintId,
       loadState,
+      recoveryChoiceRequired,
       unsupportedLatest,
     ]);
 
@@ -663,8 +871,18 @@ export function AdminNextRoofFusionPersistentWorkbench({
               : "Sudėtingos revizijos paviršių, angų ar kliūčių priklausomybės šioje drobėje negali būti saugiai atkurtos — reikalinga peržiūra.",
           ]
         : []),
+      ...(recoveryChoiceRequired
+        ? [
+            "Ankstesnė revizija nėra pritaikyta: prieš redaguojant pasirinkite autorizuotą recovery veiksmą.",
+          ]
+        : []),
     ],
-    [evidenceReady, sourceResetRequired, unsupportedLatest],
+    [
+      evidenceReady,
+      recoveryChoiceRequired,
+      sourceResetRequired,
+      unsupportedLatest,
+    ],
   );
   const calculationBlockerCodes = workbenchCalculationBlockersV1({
     trustedOrthophoto: evidenceReady,
@@ -711,6 +929,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
     setDirty(true);
     setUnsupportedLatest(false);
     setSourceResetRequired(false);
+    setRecoveryChoiceRequired(false);
     setHeightResult(null);
     setLegacyFallback(null);
     pendingDraft.current = null;
@@ -719,11 +938,106 @@ export function AdminNextRoofFusionPersistentWorkbench({
       "Patvirtinta: ankstesnės rankinės anotacijos pašalintos tik iš naujos neišsaugotos geometrijos.",
     );
   }, [sourceOutline, sourceResetRequired]);
+  const activeDraftRecovery: AdminNextRfDraftRecoveryPanel | undefined =
+    useMemo(
+      () =>
+        draftRecovery ??
+        (draftRecoveryLocale && loadedRecoveryDecision
+          ? {
+              decision: loadedRecoveryDecision,
+              locale: draftRecoveryLocale,
+              onContinueOld: () => undefined,
+              onStartNew: () => undefined,
+            }
+          : undefined),
+      [draftRecovery, draftRecoveryLocale, loadedRecoveryDecision],
+    );
+  const continueRecoveredDraft = useCallback(
+    (intent: RfContinueOldIntent) => {
+      const action = activeDraftRecovery?.decision.continueOld;
+      if (
+        !latest ||
+        !activeDraftRecovery ||
+        activeDraftRecovery.decision.reason !== "current_binding" ||
+        !action?.available ||
+        !sameContinueIntent(action.intent, intent) ||
+        !loadedDraftMatchesRfContinueIntent(latest, intent, {
+          caseId,
+          sourceId: capture.sourceId,
+          sourceContentHash: capture.rawContentHash,
+        })
+      ) {
+        setUnsupportedLatest(true);
+        setRecoveryChoiceRequired(true);
+        setProblem(
+          "Juodraščio susiejimas nesutampa su faktiškai įkelta revizija arba rodomu šaltiniu. Geometrija nepritaikyta; perkraukite recovery kontekstą arba pradėkite naują matavimą.",
+        );
+        return;
+      }
+      if (!applyLoadedDraft(latest)) {
+        setRecoveryChoiceRequired(true);
+        return;
+      }
+      trustedDraftReference.current = reference(latest);
+      setRecoveryChoiceRequired(false);
+      activeDraftRecovery.onContinueOld(intent);
+    },
+    [activeDraftRecovery, applyLoadedDraft, capture, caseId, latest],
+  );
+  const startNewRecoveredDraft = useCallback(
+    (intent: RfStartNewIntent) => {
+      const action = activeDraftRecovery?.decision.startNew;
+      if (
+        !activeDraftRecovery ||
+        !action?.available ||
+        !sameStartNewIntent(action.intent, intent) ||
+        !startNewIntentMatchesLoadedDraft(latest, intent, {
+          caseId,
+          sourceId: capture.sourceId,
+          sourceContentHash: capture.rawContentHash,
+        })
+      ) {
+        setUnsupportedLatest(true);
+        setRecoveryChoiceRequired(Boolean(latest));
+        setProblem(
+          "Naujo matavimo ketinimas nesutampa su naujausia įkelta revizija arba rodomu šaltiniu. Niekas nepakeista; perkraukite recovery kontekstą.",
+        );
+        return;
+      }
+      setOutline(sourceOutline);
+      setLines([]);
+      setConfirmed(null);
+      setDirty(true);
+      setUnsupportedLatest(false);
+      setSourceResetRequired(false);
+      setRecoveryChoiceRequired(false);
+      setHeightResult(null);
+      setLegacyFallback(null);
+      pendingDraft.current = null;
+      trustedDraftReference.current = null;
+      setGeometryHydrationSignal((current) => current + 1);
+      setProblem(
+        "Pradėtas naujas neišsaugotas matavimas; ankstesnė revizija nepanaudota.",
+      );
+      activeDraftRecovery.onStartNew(intent);
+    },
+    [activeDraftRecovery, capture, caseId, latest, sourceOutline],
+  );
   const persistencePanel = (
     <div
       className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
       data-roof-fusion-persistence
     >
+      {activeDraftRecovery ? (
+        <div className="mb-3">
+          <AdminNextRfDraftRecoveryDecision
+            decision={activeDraftRecovery.decision}
+            locale={activeDraftRecovery.locale}
+            onContinueOld={continueRecoveredDraft}
+            onStartNew={startNewRecoveredDraft}
+          />
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <strong className="text-xs tracking-[.12em] text-[#aaa69d] uppercase">
           Išsaugojimas
@@ -774,6 +1088,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
         disabled={
           !evidenceReady ||
           unsupportedLatest ||
+          recoveryChoiceRequired ||
           (loadState !== "loaded" && loadState !== "none") ||
           saveState === "saving"
         }

@@ -12,17 +12,24 @@ import {
 } from "@/lib/admin-next/capability-registry";
 
 describe("Admin Next capability registry", () => {
-  it("defines one fail-closed boundary for every canonical capability", () => {
+  it("defines an explicit fail-closed Preview mutation boundary for every canonical capability", () => {
     expect(Object.keys(adminNextCanonicalCapabilityRegistry).sort()).toEqual(
       [...adminNextCanonicalCapabilityIds].sort(),
     );
     for (const contract of Object.values(
       adminNextCanonicalCapabilityRegistry,
     )) {
-      expect(contract.previewMutationPolicy).toBe("forbidden");
+      expect(["forbidden", "preview_limited"]).toContain(
+        contract.previewMutationPolicy,
+      );
       expect(contract.readContract).toBeTruthy();
       expect(contract.mutationOwner).toBeTruthy();
     }
+    expect(
+      Object.entries(adminNextCanonicalCapabilityRegistry)
+        .filter(([, value]) => value.previewMutationPolicy === "preview_limited")
+        .map(([key]) => key),
+    ).toEqual(["Case", "Property", "Roof"]);
   });
 
   it("gates case audit reads to the existing admin role", () => {
@@ -40,7 +47,7 @@ describe("Admin Next capability registry", () => {
     });
   });
 
-  it("records read adapters while keeping every mutation on the legacy owner", () => {
+  it("records read adapters and limits new mutations to the case and roof Preview modules", () => {
     expect(new Set(adminNextModuleDefinitions.map(({ id }) => id)).size).toBe(
       adminNextModuleDefinitions.length,
     );
@@ -50,7 +57,9 @@ describe("Admin Next capability registry", () => {
         "fixture_only",
         "canonical_read_with_fixture_fallback",
       ]).toContain(definition.previewAdapter);
-      expect(definition.mutationPolicy).toBe("legacy_only");
+      expect(["legacy_only", "preview_limited"]).toContain(
+        definition.mutationPolicy,
+      );
       expect(["legacy_only", "shadow_read", "preview", "canonical"]).toContain(
         definition.rolloutStage,
       );
@@ -71,6 +80,11 @@ describe("Admin Next capability registry", () => {
       adminNextModuleDefinitions.find(({ id }) => id === "documentPreflight")
         ?.previewAdapter,
     ).toBe("fixture_only");
+    expect(
+      adminNextModuleDefinitions
+        .filter(({ mutationPolicy }) => mutationPolicy === "preview_limited")
+        .map(({ id }) => id),
+    ).toEqual(["caseWorkspace", "roofWorkbench"]);
   });
 
   it("keeps every F1 module out of canonical rollout until its domain gate passes", () => {
@@ -94,12 +108,12 @@ describe("Admin Next capability registry", () => {
       maturity: "legacy_bridge",
       targetCanonicalSource: "append-only roof-snapshot.v1 repository",
     });
-    expect(adminNextRoofFusionActionCapabilityIds).toHaveLength(7);
-    expect(new Set(adminNextRoofFusionActionCapabilityIds).size).toBe(7);
+    expect(adminNextRoofFusionActionCapabilityIds).toHaveLength(11);
+    expect(new Set(adminNextRoofFusionActionCapabilityIds).size).toBe(11);
     expect(adminNextRoofFusionI1TargetContract).toMatchObject({
-      status: "r4_preview_read_wired",
+      status: "r4_preview_mutation_gated",
       featureGate: "roofFusionV1",
-      previewMutationPolicy: "forbidden",
+      previewMutationPolicy: "preview_limited",
       downstreamReadPolicy: "approved_renderer_envelope_only",
     });
     expect(adminNextRoofFusionI1TargetContract.adminReadAdapter).toContain(

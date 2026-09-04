@@ -11,6 +11,7 @@ import {
   InMemoryRoofFusionWorkbenchDraftRepositoryV1,
   RoofFusionWorkbenchDraftRepositoryError,
 } from "./workbench-draft-repository-v1";
+import { buildWorkbenchDraftRecoveryBindingV1 } from "./workbench-draft-recovery-v1";
 
 const hash = "a".repeat(64);
 const actor = { actorId: "7", actorType: "administrator" as const };
@@ -101,6 +102,34 @@ function draft(revision = 1, overrides: Record<string, unknown> = {}) {
 }
 
 describe("Roof Fusion workbench draft repository v1", () => {
+  it("stores a recovery binding beside a new draft while legacy appends remain null", async () => {
+    const repository = new InMemoryRoofFusionWorkbenchDraftRepositoryV1();
+    const first = draft();
+    const recoveryBinding = buildWorkbenchDraftRecoveryBindingV1({
+      draft: first,
+      addressRevision: 2,
+    });
+    await repository.appendAtomically({
+      expectedLatest: null,
+      draft: first,
+      recoveryBinding,
+    });
+    expect(await repository.readLatestDraftRecoveryRecord("lead:13")).toEqual({
+      draft: first,
+      recoveryBinding,
+    });
+
+    const legacyRepository = new InMemoryRoofFusionWorkbenchDraftRepositoryV1();
+    await legacyRepository.appendAtomically({
+      expectedLatest: null,
+      draft: first,
+    });
+    expect(
+      (await legacyRepository.readLatestDraftRecoveryRecord("lead:13"))
+        ?.recoveryBinding,
+    ).toBeNull();
+  });
+
   it("appends consecutive revisions and replays the same idempotent command", async () => {
     const repository = new InMemoryRoofFusionWorkbenchDraftRepositoryV1();
     const first = draft();

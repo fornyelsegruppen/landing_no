@@ -153,6 +153,7 @@ export type AdminNextCaseInteraction =
 
 export type AdminNextAuditTimelineDetails = {
   action: string;
+  label?: string;
   actor: {
     kind: AuditHistoryActorKind;
     display: string | null;
@@ -164,6 +165,7 @@ export type AdminNextAuditTimelineDetails = {
   reason: string | null;
   version: string | number | null;
   source: string | null;
+  trace?: readonly string[];
   correlationId: string;
   integrity: {
     hashStatus: AuditHistoryHashStatus;

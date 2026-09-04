@@ -27,7 +27,13 @@ export type AdminNextR4LoadResult =
       value: AdminNextR4MeasurementView;
       binding: {
         measurement: { id: string; revision: number };
-        snapshot: { id: string; revision: number; hash: string };
+        snapshot: {
+          id: string;
+          revision: number;
+          hash: string;
+          inputHash: string;
+          renderHash: string;
+        };
       };
     }
   | {
@@ -304,6 +310,8 @@ export function createAdminNextRoofFusionR4Adapter(
           snapshot: {
             ...measurementIdentity,
             hash: selected.snapshotHash,
+            inputHash: selected.inputHash,
+            renderHash: selected.rendererPayload.renderHash,
           },
         },
       };

@@ -46,6 +46,15 @@ export const quoteSnapshotSchema = z.object({
     approvedAt: z.string().optional(),
     manualAreaSource: z.enum(["customer", "drawing", "admin_estimate", "onsite"]).optional(),
     manualAreaReason: z.string().optional(),
+    rfBinding: z.object({
+      caseRevision: z.number().int().positive(),
+      addressRevision: z.number().int().positive(),
+      snapshotId: z.string().min(1).max(160),
+      snapshotRevision: z.number().int().positive(),
+      snapshotHash: z.string().length(64),
+      sourceInputHash: z.string().length(64),
+      rendererHash: z.string().length(64),
+    }).strict().optional(),
   }),
   pricing: z.object({
     calculationId: z.number().int().positive(), inputHash: z.string().length(64), ruleId: z.number().int().positive(), ruleVersion: z.number().int().positive(),

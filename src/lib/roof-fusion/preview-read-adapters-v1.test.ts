@@ -28,6 +28,7 @@ function approvedRepository() {
       caseId === snapshot.subject.caseId ? structuredClone(snapshot) : null,
     ),
     readCommand: vi.fn(async () => null),
+    isSnapshotInvalidated: vi.fn(async () => false),
     appendAtomically: vi.fn(async () => undefined),
   };
   return { repository, snapshot };
@@ -103,6 +104,27 @@ describe("Roof Fusion Preview read adapters v1", () => {
     ]);
     expect(JSON.stringify(envelope)).not.toContain("provenance");
     expect(JSON.stringify(envelope)).not.toContain("rawContentHash");
+  });
+
+  it("rejects an exact RF snapshot invalidated by a case address correction", async () => {
+    const { repository, snapshot } = approvedRepository();
+    repository.isSnapshotInvalidated = vi.fn(async () => true);
+    const adapter = new AdminRoofFusionPreviewReadAdapterV1(
+      repository,
+      allowedAuthorization(),
+      previewEnvironment,
+    );
+
+    await expect(
+      adapter.readLatestSnapshot(snapshot.subject.caseId, admin),
+    ).rejects.toMatchObject({ code: "SOURCE_INVALIDATED" });
+    await expect(
+      adapter.readSnapshot(snapshot.subject.caseId, snapshot.snapshotId, admin),
+    ).rejects.toMatchObject({ code: "SOURCE_INVALIDATED" });
+    await expect(
+      adapter.readEvidence(snapshot.subject.caseId, snapshot.snapshotId, admin),
+    ).rejects.toMatchObject({ code: "SOURCE_INVALIDATED" });
+    expect(repository.isSnapshotInvalidated).toHaveBeenCalledTimes(3);
   });
 
   it("cannot be enabled by either legacy roof flag", async () => {

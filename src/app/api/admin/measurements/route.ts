@@ -260,6 +260,7 @@ async function createVisualMeasurement(input: {
       lead: input.leadId,
       version,
       supersedes: prior?.id,
+      sourceKind: "legacy",
       measurementMode: approvedRasterEvidence
         ? "schematic_with_context"
         : "schematic",
@@ -547,6 +548,7 @@ export async function POST(request: Request) {
         lead: lead.id,
         version,
         supersedes: prior?.id,
+        sourceKind: "legacy",
         measurementMode: "manual_no_visual",
         normalizedAddress:
           uniqueAddressParts([

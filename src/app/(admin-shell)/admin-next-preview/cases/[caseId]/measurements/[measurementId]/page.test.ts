@@ -93,17 +93,20 @@ describe("Admin Next R4 Preview page route", () => {
   beforeEach(() => {
     vi.stubEnv("ADMIN_NEXT_MODE", "preview");
     vi.stubEnv("FEATURE_ROOF_FUSION_V1", "true");
+    vi.stubEnv("FEATURE_ADMIN_NEXT_CASE_ADDRESS_COMMAND", "true");
     vi.stubEnv("VERCEL_ENV", "preview");
     mocks.requireAdminUser.mockReset().mockResolvedValue(admin);
     mocks.getPayload.mockReset().mockResolvedValue(mocks.payload);
     mocks.payload.findByID.mockReset().mockResolvedValue({
-      address: "Testgata 13",
+      address: "Testgata",
       assignedTo: {
         displayName: "Aistė",
         email: "aiste@example.invalid",
       },
       city: "Oslo",
+      addressRevision: 4,
       caseRevision: 1,
+      houseNumber: "13",
       id: 13,
       name: "Canonical UAT Customer",
       postal: "0013",
@@ -121,6 +124,7 @@ describe("Admin Next R4 Preview page route", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("constructs the Payload RF authorization chain and binds the admin read", async () => {
+    vi.stubEnv("FEATURE_ADMIN_NEXT_RF_OFFER_BRIDGE", "true");
     const plan = await buildRoofFusionPreviewUatGoldenPlanV1(13);
     const snapshot = plan.finalSnapshot;
     const previous = plan.snapshots.find(
@@ -163,8 +167,18 @@ describe("Admin Next R4 Preview page route", () => {
     );
     expect(mocks.adminReader.readLatestSnapshot).not.toHaveBeenCalled();
     expect(element.props).toMatchObject({
-      address: "Testgata 13, 0013, Oslo",
-      addressEditHref: "/admin-v2/cases/13#measurement-section",
+      address: "Testgata 13, 0013 Oslo",
+      addressCorrection: {
+        caseId: 13,
+        currentAddress: {
+          city: "Oslo",
+          houseNumber: "13",
+          postalCode: "0013",
+          street: "Testgata",
+        },
+        expectedAddressRevision: 4,
+        expectedCaseRevision: 1,
+      },
       caseRevision: 1,
       caseReference: "TF-13",
       customer: "Canonical UAT Customer",
@@ -180,7 +194,11 @@ describe("Admin Next R4 Preview page route", () => {
     const html = renderToStaticMarkup(element);
     expect(html).toContain('data-rf-address-context="case_authoritative"');
     expect(html).toContain("Užrakintas matavimo kontekstas");
-    expect(html).toContain('href="/admin-v2/cases/13#measurement-section"');
+    expect(html).toContain('data-address-correction-control="true"');
+    expect(html).toContain("Taisyti bylos adresą");
+    expect(html).toContain("Įkelti matavimą į pasiūlymą");
+    expect(html).toContain('data-rf-offer-bridge="open-review"');
+    expect(html).not.toContain('href="/admin-v2/cases/13#measurement-section"');
     expect(
       html.match(
         /href="\/admin-v2\/cases\/13\?tab=measurement#measurement-section"/gu,

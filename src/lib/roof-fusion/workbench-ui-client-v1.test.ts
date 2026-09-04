@@ -3,10 +3,16 @@ import { parseRoofFusionWorkbenchDraftV1 } from "./workbench-draft-contract-v1";
 import {
   buildWorkbenchDraftFromUiV1,
   constrainWorkbenchPointToOutlineV1,
+  loadWorkbenchDraftRecoveryV1,
   loadWorkbenchDraftV1,
   persistAndReloadWorkbenchDraftV1,
   workbenchCalculationBlockersV1,
 } from "./workbench-ui-client-v1";
+import {
+  resolveRfDraftRecoveryDecision,
+  RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+} from "@/lib/admin-next/rf-draft-recovery-contract";
+import { buildWorkbenchDraftRecoveryBindingV1 } from "./workbench-draft-recovery-v1";
 
 const hash = "a".repeat(64);
 const georeference = {
@@ -378,5 +384,63 @@ describe("Roof Fusion workbench UI persistence contract", () => {
       }),
     );
     await expect(loadWorkbenchDraftV1("lead:13", missing)).resolves.toBeNull();
+  });
+
+  it("loads and validates the server-owned recovery decision with the visible source pin", async () => {
+    const value = await draft();
+    const recoveryBinding = buildWorkbenchDraftRecoveryBindingV1({
+      draft: value,
+      addressRevision: 2,
+    });
+    const recoveryDecision = resolveRfDraftRecoveryDecision({
+      version: RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+      vercelEnvironment: "preview",
+      capabilities: ["roof_fusion.draft.continue", "roof_fusion.draft.create"],
+      current: {
+        case: recoveryBinding.case,
+        source: recoveryBinding.source,
+        snapshot: recoveryBinding.snapshot,
+      },
+      persistedDraft: {
+        draft: recoveryBinding.draft,
+        recoveryBinding,
+      },
+    });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ draft: value, recoveryDecision }), {
+        status: 200,
+      }),
+    );
+
+    await expect(
+      loadWorkbenchDraftRecoveryV1(
+        "lead:13",
+        { id: value.source.sourceId, hash: value.source.sourceContentHash },
+        fetcher,
+      ),
+    ).resolves.toEqual({ draft: value, recoveryDecision });
+    expect(fetcher.mock.calls[0]?.[0]).toContain(
+      `sourceId=${encodeURIComponent(value.source.sourceId)}`,
+    );
+    expect(fetcher.mock.calls[0]?.[0]).toContain(
+      `sourceHash=${value.source.sourceContentHash}`,
+    );
+  });
+
+  it("fails closed when the recovery decision response is missing or malformed", async () => {
+    const value = await draft();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ draft: value }), { status: 200 }),
+      );
+
+    await expect(
+      loadWorkbenchDraftRecoveryV1(
+        "lead:13",
+        { id: value.source.sourceId, hash: value.source.sourceContentHash },
+        fetcher,
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_RECOVERY_DECISION", status: 409 });
   });
 });

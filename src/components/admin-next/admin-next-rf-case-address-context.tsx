@@ -7,6 +7,10 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import {
+  AdminNextCaseAddressCorrection,
+  type AdminNextCaseAddressCorrectionConfig,
+} from "./admin-next-case-address-correction";
 
 const copy = {
   nb: {
@@ -49,6 +53,7 @@ const copy = {
 
 export function AdminNextRfCaseAddressContext({
   address,
+  addressCorrection,
   caseReference,
   caseRevision,
   editHref,
@@ -56,6 +61,7 @@ export function AdminNextRfCaseAddressContext({
   measurementRevision,
 }: {
   address: string;
+  addressCorrection?: AdminNextCaseAddressCorrectionConfig;
   caseReference: string;
   caseRevision?: number;
   editHref?: string;
@@ -77,7 +83,7 @@ export function AdminNextRfCaseAddressContext({
       data-rf-address-context="case_authoritative"
       data-rf-free-address-input="forbidden"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--an-action-soft)] text-[var(--an-action)]">
             <MapPin aria-hidden="true" className="size-5" />
@@ -96,7 +102,13 @@ export function AdminNextRfCaseAddressContext({
             </p>
           </div>
         </div>
-        {editHref ? (
+        {addressCorrection ? (
+          <AdminNextCaseAddressCorrection
+            caseReference={caseReference}
+            config={addressCorrection}
+            locale={locale}
+          />
+        ) : editHref ? (
           <Link
             className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--an-action)] px-3 text-xs font-bold text-[var(--an-action)] hover:bg-[var(--an-action-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
             href={editHref}

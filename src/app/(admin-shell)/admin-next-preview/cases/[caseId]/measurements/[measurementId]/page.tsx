@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { PayloadRequest } from "payload";
 import { AdminNextR4MeasurementReview } from "@/components/admin-next/admin-next-r4-measurement-review";
+import { AdminNextRfOfferBridgeAction } from "@/components/admin-next/admin-next-rf-offer-bridge-action";
 import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-fixture";
 import {
   adminNextFixtureR4Adapter,
@@ -43,6 +44,34 @@ function canonicalOwner(
   return displayName && !displayName.includes("@")
     ? displayName
     : unassignedOwner[locale];
+}
+
+function canonicalAddressLine({
+  city,
+  houseNumber,
+  postalCode,
+  street,
+}: {
+  city?: string | null;
+  houseNumber?: string | null;
+  postalCode: string;
+  street: string;
+}) {
+  const normalizedStreet = street.trim();
+  const normalizedHouseNumber = houseNumber?.trim();
+  const streetLine =
+    normalizedHouseNumber &&
+    !normalizedStreet
+      .toLocaleLowerCase("nb")
+      .endsWith(` ${normalizedHouseNumber.toLocaleLowerCase("nb")}`)
+      ? `${normalizedStreet} ${normalizedHouseNumber}`
+      : normalizedStreet;
+  return [
+    streetLine,
+    [postalCode.trim(), city?.trim()].filter(Boolean).join(" "),
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function serializeSearchParams(values: Awaited<SearchParams>) {
@@ -261,9 +290,12 @@ export default async function AdminNextR4MeasurementPage({
       />
     );
   }
-  const address = [lead.address, lead.postal, lead.city]
-    .filter((part): part is string => Boolean(part?.trim()))
-    .join(", ");
+  const address = canonicalAddressLine({
+    city: lead.city,
+    houseNumber: lead.houseNumber,
+    postalCode: lead.postal,
+    street: lead.address,
+  });
   const assignedTo =
     lead.assignedTo && typeof lead.assignedTo === "object"
       ? lead.assignedTo
@@ -275,11 +307,33 @@ export default async function AdminNextR4MeasurementPage({
     capturedAt: lead.updatedAt,
     locale: user.interfaceLanguage,
   });
+  const addressCorrectionEnabled =
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.FEATURE_ADMIN_NEXT_CASE_ADDRESS_COMMAND === "true";
 
   return (
     <AdminNextR4MeasurementReview
       address={address}
-      addressEditHref={`/admin-v2/cases/${identity.leadId}#measurement-section`}
+      addressCorrection={
+        addressCorrectionEnabled
+          ? {
+              caseId: identity.leadId,
+              currentAddress: {
+                city: lead.city || null,
+                houseNumber: lead.houseNumber || null,
+                postalCode: lead.postal,
+                street: lead.address,
+              },
+              expectedAddressRevision: Number(lead.addressRevision || 1),
+              expectedCaseRevision: Number(lead.caseRevision || 1),
+            }
+          : undefined
+      }
+      addressEditHref={
+        addressCorrectionEnabled
+          ? undefined
+          : `/admin-v2/cases/${identity.leadId}#measurement-section`
+      }
       caseRevision={routeContext.case.revision}
       caseReference={caseId}
       customer={lead.name}
@@ -287,6 +341,24 @@ export default async function AdminNextR4MeasurementPage({
       measurement={measurement}
       measurementRevision={result.binding.measurement.revision}
       owner={canonicalOwner(assignedTo, user.interfaceLanguage)}
+      offerAction={
+        process.env.VERCEL_ENV === "preview" &&
+        process.env.FEATURE_ADMIN_NEXT_RF_OFFER_BRIDGE === "true" ? (
+          <AdminNextRfOfferBridgeAction
+            addressRevision={Number(lead.addressRevision || 1)}
+            caseId={identity.roofFusionCaseId}
+            caseRevision={Number(lead.caseRevision || 1)}
+            locale={user.interfaceLanguage}
+            snapshot={{
+              snapshotId: result.binding.snapshot.id,
+              revision: result.binding.snapshot.revision,
+              snapshotHash: result.binding.snapshot.hash,
+              inputHash: result.binding.snapshot.inputHash,
+              renderHash: result.binding.snapshot.renderHash,
+            }}
+          />
+        ) : undefined
+      }
       returnTo={routeContext.returnTo}
       source="canonical"
     />

@@ -49,7 +49,7 @@ export type AdminNextCanonicalCapabilityContract = {
   targetCanonicalSource?: string;
   targetReadContracts?: readonly string[];
   mutationOwner: string;
-  previewMutationPolicy: "forbidden";
+  previewMutationPolicy: "forbidden" | "preview_limited";
   readCapabilities?: readonly AdminNextReadCapabilityId[];
 };
 
@@ -62,7 +62,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
     maturity: "canonical",
     readContract: "src/lib/admin-v2/case-read-model.ts",
     mutationOwner: "Admin V2 lead APIs and case commands",
-    previewMutationPolicy: "forbidden",
+    previewMutationPolicy: "preview_limited",
     readCapabilities: ["case.read", "audit.read"],
   },
   Property: {
@@ -71,7 +71,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
     maturity: "canonical",
     readContract: "lead address/property projection through the Case adapter",
     mutationOwner: "Admin V2 lead APIs",
-    previewMutationPolicy: "forbidden",
+    previewMutationPolicy: "preview_limited",
   },
   Customer: {
     id: "Customer",
@@ -92,7 +92,7 @@ export const adminNextCanonicalCapabilityRegistry: Readonly<
       "approved-roof-renderer-envelope.v1 (downstream read)",
     ],
     mutationOwner: "canonical measurement APIs and approval workflow",
-    previewMutationPolicy: "forbidden",
+    previewMutationPolicy: "preview_limited",
   },
   Visit: {
     id: "Visit",
@@ -111,6 +111,10 @@ export const adminNextRoofFusionActionCapabilityIds = [
   "roof_fusion.review",
   "roof_fusion.correct",
   "roof_fusion.approve",
+  "roof_fusion.case_address.correct",
+  "roof_fusion.draft.continue",
+  "roof_fusion.draft.create",
+  "roof_fusion.offer.create_draft",
   "roof_fusion.renderer.read_approved",
 ] as const;
 
@@ -118,13 +122,13 @@ export type AdminNextRoofFusionActionCapabilityId =
   (typeof adminNextRoofFusionActionCapabilityIds)[number];
 
 export const adminNextRoofFusionI1TargetContract = {
-  status: "r4_preview_read_wired",
+  status: "r4_preview_mutation_gated",
   snapshotSchemaVersion: "roof-snapshot.v1",
   rendererSchemaVersion: "roof-renderer.v1",
   approvedRendererEnvelopeVersion: "approved-roof-renderer-envelope.v1",
   featureGate: "roofFusionV1",
   actionCapabilities: adminNextRoofFusionActionCapabilityIds,
-  previewMutationPolicy: "forbidden",
+  previewMutationPolicy: "preview_limited",
   downstreamReadPolicy: "approved_renderer_envelope_only",
   snapshotRepository:
     "src/lib/roof-fusion/payload-repository-v1.ts#PayloadRoofSnapshotRepositoryV1",
@@ -136,7 +140,8 @@ export const adminNextRoofFusionI1TargetContract = {
     "src/app/(admin-shell)/admin-next-preview/cases/[caseId]/measurements/[measurementId]/page.tsx",
   previewUatHarness:
     "src/app/(admin-shell)/admin-next-preview/roof-fusion/uat/page.tsx#prepareR4Uat",
-  mutationOwner: "future authorized Roof Fusion command API",
+  mutationOwner:
+    "Preview-only address, draft-recovery and RF offer command boundaries",
 } as const;
 
 export type AdminNextModuleId =
@@ -162,7 +167,7 @@ export type AdminNextModuleDefinition = {
   legacyHref: string;
   workerLegacyHref?: string;
   previewAdapter: "fixture_only" | "canonical_read_with_fixture_fallback";
-  mutationPolicy: "legacy_only";
+  mutationPolicy: "legacy_only" | "preview_limited";
 };
 
 export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] =
@@ -187,7 +192,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] =
       dependencies: ["caseStateEngineV2"],
       legacyHref: "/admin-v2/cases",
       previewAdapter: "canonical_read_with_fixture_fallback",
-      mutationPolicy: "legacy_only",
+      mutationPolicy: "preview_limited",
     },
     {
       id: "roofWorkbench",
@@ -198,7 +203,7 @@ export const adminNextModuleDefinitions: readonly AdminNextModuleDefinition[] =
       dependencies: ["roofFusionV1"],
       legacyHref: "/admin-v2/cases",
       previewAdapter: "canonical_read_with_fixture_fallback",
-      mutationPolicy: "legacy_only",
+      mutationPolicy: "preview_limited",
     },
     {
       id: "documentPreflight",

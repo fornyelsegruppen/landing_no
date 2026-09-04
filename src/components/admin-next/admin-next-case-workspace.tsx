@@ -1478,7 +1478,7 @@ export function AdminNextCaseWorkspace({
                         <div className="min-w-0 pt-0.5">
                           <div className="flex items-start justify-between gap-3">
                             <strong className="text-sm text-[var(--an-text)]">
-                              {audit?.action || item.title}
+                              {audit?.label || audit?.action || item.title}
                             </strong>
                             <small className="shrink-0 text-[var(--an-subtle)]">
                               {audit
@@ -1532,6 +1532,14 @@ export function AdminNextCaseWorkspace({
                                   </div>
                                 ) : null}
                               </dl>
+                              {audit.trace?.length ? (
+                                <p
+                                  className="text-[11px] text-[var(--an-subtle)]"
+                                  data-audit-event-trace
+                                >
+                                  {audit.trace.join(" · ")}
+                                </p>
+                              ) : null}
                               <p className="text-[10px] break-all text-[var(--an-subtle)]">
                                 {t.correlation}: {audit.correlationId} ·{" "}
                                 {t.hashStatus}:{" "}

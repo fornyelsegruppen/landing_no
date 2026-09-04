@@ -1,17 +1,96 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
 import { assertCustomerSignatureProof, assertFullySignedContractProof } from "@/lib/contracts/signing-invariants";
+import { documentHash, quoteSnapshotSchema } from "@/lib/quotes/document";
 import { assertContractTransition, type ContractStatus } from "@/lib/quotes/workflow";
 import { adminOnly } from "../access/roles";
 
 const immutableFields = ["quote", "version", "snapshot", "documentHash", "termsVersion"] as const;
+const roofFusionImmutableFields = [
+  "reference",
+  "quote",
+  "version",
+  "supersedes",
+  "snapshot",
+  "documentHash",
+  "termsVersion",
+] as const;
+
+function hasRoofFusionBinding(snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot))
+    return false;
+  const quote = (snapshot as Record<string, unknown>).quote;
+  if (!quote || typeof quote !== "object" || Array.isArray(quote)) return false;
+  const measurement = (quote as Record<string, unknown>).measurement;
+  return Boolean(
+    measurement &&
+      typeof measurement === "object" &&
+      !Array.isArray(measurement) &&
+      (measurement as Record<string, unknown>).rfBinding,
+  );
+}
+
+function assertRoofFusionContractCreateBinding(data: Record<string, unknown>) {
+  if (!data.snapshot || typeof data.snapshot !== "object" || Array.isArray(data.snapshot)) {
+    throw new Error("Roof Fusion contract snapshot binding is invalid");
+  }
+  const snapshot = data.snapshot as Record<string, unknown>;
+  const quote = quoteSnapshotSchema.safeParse(snapshot.quote);
+  if (
+    !quote.success ||
+    !quote.data.measurement.rfBinding ||
+    snapshot.contractReference !== data.reference ||
+    snapshot.quoteHash !== documentHash(snapshot.quote) ||
+    !snapshot.terms ||
+    typeof snapshot.terms !== "object" ||
+    Array.isArray(snapshot.terms) ||
+    (snapshot.terms as Record<string, unknown>).version !== data.termsVersion ||
+    data.documentHash !== documentHash(data.snapshot)
+  ) {
+    throw new Error(
+      "Roof Fusion contract fields disagree with the immutable quote and contract snapshots",
+    );
+  }
+}
 
 export const protectContractVersion: CollectionBeforeChangeHook = ({ data, originalDoc, operation, context }) => {
   if (operation === "create") {
     if (data.status && data.status !== "draft") throw new Error("New contracts must start as drafts");
+    if (
+      hasRoofFusionBinding(data.snapshot) &&
+      context?.trustedRoofFusionOfferBridge !== true
+    ) {
+      throw new Error(
+        "Roof Fusion contract drafts require the canonical Preview offer bridge",
+      );
+    }
+    if (hasRoofFusionBinding(data.snapshot)) {
+      assertRoofFusionContractCreateBinding(data);
+    }
     return data;
   }
   if (!originalDoc) return data;
   const nextDoc = { ...originalDoc, ...data };
+  if (
+    hasRoofFusionBinding(nextDoc.snapshot) &&
+    !hasRoofFusionBinding(originalDoc.snapshot) &&
+    context?.trustedRoofFusionOfferBridge !== true
+  ) {
+    throw new Error(
+      "Roof Fusion contract bindings require the canonical Preview offer bridge",
+    );
+  }
+  if (hasRoofFusionBinding(originalDoc.snapshot)) {
+    const changed = roofFusionImmutableFields.some(
+      (field) =>
+        field in data &&
+        JSON.stringify(data[field]) !== JSON.stringify(originalDoc[field]),
+    );
+    if (changed) {
+      throw new Error(
+        "A Roof Fusion-bound contract draft is immutable. Create a new version.",
+      );
+    }
+  }
   if (data.status && data.status !== originalDoc.status) {
     assertContractTransition(originalDoc.status as ContractStatus, data.status as ContractStatus);
     if (data.status === "signed" && context?.trustedCustomerSignature !== true) {

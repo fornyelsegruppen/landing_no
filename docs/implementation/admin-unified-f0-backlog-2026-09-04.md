@@ -304,9 +304,12 @@ laimingas E2E kelias nėra pakankamas užbaigimo įrodymas.
 
 - F0 planavimo artefaktas: **sukurtas**.
 - F1–F7 implementacija: **autorizuota**; F1 vietinis vartas žalias, branch CI laukia.
-- RF Phase E/F ir RF→pasiūlymas: **neautorizuota šiame darbe**.
-- Duomenų ar Payload schemos migracija: **neautorizuota**.
+- RF Phase E ir RF→pasiūlymo Preview implementacija: **autorizuota atskiru
+  `PREVIEW MUTATION/SCHEMA GO` ir įgyvendinta už fail-closed vartų**; Phase F
+  owner UAT dar neatliktas.
+- Additive Preview Payload schema ir migracijos: **įgyvendintos lokaliai ir
+  patikrintos up/down; jokiai Production DB nepritaikytos**.
 - Production konfigūracija, duomenys, laiškai, kainodara, routes ir deploy:
   **nepakeisti / NO-GO**.
-- Kitas vartas: gauti žalią F1 branch CI, tada vykdyti F2. Savininko veiksmo
-  reikės prieš bendros Preview DB mutaciją, RF Phase E/F ir Production.
+- Kitas savininko vartas: protected Preview UAT. Prieš bet kokią Production
+  migraciją, aktyvavimą ar deploy būtinas atskiras `PRODUCTION GO`.

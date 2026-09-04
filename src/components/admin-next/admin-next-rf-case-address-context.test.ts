@@ -44,4 +44,33 @@ describe("Admin Next RF authoritative case address", () => {
     expect(html).not.toContain("<a");
     expect(html).not.toContain("<input");
   });
+
+  it("prefers the revision-bound Preview correction control over the legacy target", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRfCaseAddressContext, {
+        address: "Lyngveien 28A, 1182 Oslo",
+        addressCorrection: {
+          caseId: 13,
+          currentAddress: {
+            city: "Oslo",
+            houseNumber: "28A",
+            postalCode: "1182",
+            street: "Lyngveien",
+          },
+          expectedAddressRevision: 4,
+          expectedCaseRevision: 18,
+        },
+        caseReference: "TF-13",
+        caseRevision: 18,
+        editHref: "/admin-v2/cases/13#measurement-section",
+        locale: "lt",
+        measurementRevision: 7,
+      }),
+    );
+
+    expect(html).toContain('data-address-correction-control="true"');
+    expect(html).toContain("Taisyti bylos adresą");
+    expect(html).not.toContain('href="/admin-v2/cases/13#measurement-section"');
+    expect(html).not.toContain("<input");
+  });
 });

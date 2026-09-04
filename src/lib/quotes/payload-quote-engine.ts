@@ -1,4 +1,4 @@
-import type { Payload } from "payload";
+import type { Payload, PayloadRequest } from "payload";
 import { buildContractSnapshot, buildQuoteSnapshot, documentHash, quoteSnapshotSchema, type ContractSnapshot, type QuoteSnapshot } from "./document";
 
 function idOf(value: unknown) {
@@ -40,19 +40,21 @@ export async function createQuoteDraft(
     siblingQuoteId?: number;
     depositBasisPoints?: number;
     controlledChangeFromQuoteId?: number;
+    req?: PayloadRequest;
   } = {},
 ) {
-  const calculation = await payload.findByID({ collection: "price-calculations", id: calculationId, depth: 0, overrideAccess: true });
+  const transaction = options.req ? { req: options.req } : {};
+  const calculation = await payload.findByID({ collection: "price-calculations", id: calculationId, depth: 0, overrideAccess: true, ...transaction });
   if (calculation.status !== "ready") throw new Error("Price calculation is not ready");
   const leadId = idOf(calculation.lead);
   const measurementId = idOf(calculation.measurement);
   const ruleId = idOf(calculation.priceRule);
   const [lead, measurement, rule, termsResult, existing] = await Promise.all([
-    payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true }),
-    payload.findByID({ collection: "roof-measurements", id: measurementId, depth: 0, overrideAccess: true }),
-    payload.findByID({ collection: "price-rules", id: ruleId, depth: 0, overrideAccess: true }),
-    payload.find({ collection: "contract-terms", depth: 0, limit: 1, sort: "-approvedAt", overrideAccess: true, where: { status: { equals: "approved" } } }),
-    payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { lead: { equals: leadId } } }),
+    payload.findByID({ collection: "leads", id: leadId, depth: 0, overrideAccess: true, ...transaction }),
+    payload.findByID({ collection: "roof-measurements", id: measurementId, depth: 0, overrideAccess: true, ...transaction }),
+    payload.findByID({ collection: "price-rules", id: ruleId, depth: 0, overrideAccess: true, ...transaction }),
+    payload.find({ collection: "contract-terms", depth: 0, limit: 1, sort: "-approvedAt", overrideAccess: true, where: { status: { equals: "approved" } }, ...transaction }),
+    payload.find({ collection: "quotes", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { lead: { equals: leadId } }, ...transaction }),
   ]);
   const pendingMeasurementAllowed = options.allowPendingMeasurement === true
     && ["draft", "review_required"].includes(measurement.status);
@@ -111,6 +113,24 @@ export async function createQuoteDraft(
       approvedAt: measurement.approvedAt || undefined,
       manualAreaSource: measurement.manualAreaSource || undefined,
       manualAreaReason: measurement.manualAreaReason || undefined,
+      rfBinding: measurement.sourceKind === "roof_fusion" &&
+        measurement.caseRevision &&
+        measurement.addressRevision &&
+        measurement.rfSnapshotId &&
+        measurement.rfSnapshotRevision &&
+        measurement.rfSnapshotHash &&
+        measurement.rfInputHash &&
+        measurement.rfRendererHash
+        ? {
+            caseRevision: measurement.caseRevision,
+            addressRevision: measurement.addressRevision,
+            snapshotId: measurement.rfSnapshotId,
+            snapshotRevision: measurement.rfSnapshotRevision,
+            snapshotHash: measurement.rfSnapshotHash,
+            sourceInputHash: measurement.rfInputHash,
+            rendererHash: measurement.rfRendererHash,
+          }
+        : undefined,
     },
     pricing: {
       calculationId: calculation.id, inputHash: calculation.inputHash, ruleId: rule.id, ruleVersion: rule.version,
@@ -123,7 +143,10 @@ export async function createQuoteDraft(
     termsVersion: terms.version,
     validUntil: new Date(now.getTime() + 14 * 24 * 60 * 60_000).toISOString(),
   });
-  const quote = await payload.create({ collection: "quotes", overrideAccess: true, data: {
+  const roofFusionWrite = snapshot.measurement.rfBinding
+    ? { context: { trustedRoofFusionOfferBridge: true } }
+    : {};
+  const quote = await payload.create({ collection: "quotes", overrideAccess: true, ...transaction, ...roofFusionWrite, data: {
     reference: quoteReference, lead: leadId, measurement: measurement.id, priceCalculation: calculation.id,
     version, supersedes: controlledChange ? previous?.id : options.preservePrevious ? undefined : previous?.id,
     optionGroup: options.optionGroup, optionKind: options.optionKind, siblingQuote: options.siblingQuoteId,
@@ -140,27 +163,27 @@ export async function createQuoteDraft(
       terms: { version: terms.version, text: terms.contractText, withdrawalInstructions: terms.withdrawalInstructions, withdrawalFormUrl: terms.withdrawalFormUrl },
     });
     const previousContracts = controlledChange && previous
-      ? await payload.find({ collection: "contracts", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { quote: { equals: previous.id } } })
+      ? await payload.find({ collection: "contracts", depth: 0, limit: 1, sort: "-version", overrideAccess: true, where: { quote: { equals: previous.id } }, ...transaction })
       : { docs: [] };
-    const contract = await payload.create({ collection: "contracts", overrideAccess: true, data: {
+    const contract = await payload.create({ collection: "contracts", overrideAccess: true, ...transaction, ...roofFusionWrite, data: {
       reference: contractSnapshot.contractReference, quote: quote.id, version,
       supersedes: previousContracts.docs[0]?.id,
       snapshot: contractSnapshot, documentHash: documentHash(contractSnapshot), termsVersion: terms.version, status: "draft",
     } });
     if (previous && !controlledChange && !options.preservePrevious && !options.retainPreviousStatus) {
-      await payload.update({ collection: "quotes", id: previous.id, overrideAccess: true, data: { status: "superseded" } });
-      const oldContracts = await payload.find({ collection: "contracts", depth: 0, limit: 10, overrideAccess: true, where: { quote: { equals: previous.id } } });
+      await payload.update({ collection: "quotes", id: previous.id, overrideAccess: true, ...transaction, data: { status: "superseded" } });
+      const oldContracts = await payload.find({ collection: "contracts", depth: 0, limit: 10, overrideAccess: true, where: { quote: { equals: previous.id } }, ...transaction });
       for (const old of oldContracts.docs) {
-        if (["draft", "issued"].includes(old.status)) await payload.update({ collection: "contracts", id: old.id, overrideAccess: true, data: { status: "superseded" } });
+        if (["draft", "issued"].includes(old.status)) await payload.update({ collection: "contracts", id: old.id, overrideAccess: true, ...transaction, data: { status: "superseded" } });
       }
     }
-    await payload.update({ collection: "price-calculations", id: calculation.id, overrideAccess: true, data: {
+    await payload.update({ collection: "price-calculations", id: calculation.id, overrideAccess: true, ...transaction, data: {
       reference: `PB-${leadId}-V${version}`,
       status: "superseded",
     } });
     return { quote, contract, snapshot };
   } catch (error) {
-    await payload.delete({ collection: "quotes", id: quote.id, overrideAccess: true }).catch(() => undefined);
+    await payload.delete({ collection: "quotes", id: quote.id, overrideAccess: true, ...transaction }).catch(() => undefined);
     throw error;
   }
 }

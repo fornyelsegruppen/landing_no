@@ -325,6 +325,7 @@ export async function prepareAutomaticLeadMeasurement(
       lead: leadId,
       version,
       supersedes: previousMeasurement?.id,
+      sourceKind: "legacy",
       measurementMode: "schematic",
       normalizedAddress: address.label,
       addressSourceId: address.id,

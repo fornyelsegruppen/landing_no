@@ -4,6 +4,10 @@ import type {
   RoofFusionWorkbenchDraftReferenceV1,
   RoofFusionWorkbenchDraftV1,
 } from "./workbench-draft-contract-v1";
+import {
+  parseRfDraftRecoveryDecision,
+  type RfDraftRecoveryDecision,
+} from "@/lib/admin-next/rf-draft-recovery-contract";
 
 export type NormalizedWorkbenchPointV1 = { x: number; y: number };
 export type NormalizedWorkbenchLineV1 = {
@@ -498,6 +502,51 @@ export async function loadWorkbenchDraftV1(
     );
   }
   return body?.draft as RoofFusionWorkbenchDraftV1;
+}
+
+export async function loadWorkbenchDraftRecoveryV1(
+  caseId: string,
+  currentSource: Readonly<{ id: string; hash: string }>,
+  fetcher: typeof fetch = fetch,
+): Promise<
+  Readonly<{
+    draft: RoofFusionWorkbenchDraftV1 | null;
+    recoveryDecision: RfDraftRecoveryDecision | null;
+  }>
+> {
+  const query = new URLSearchParams({
+    caseId,
+    sourceId: currentSource.id,
+    sourceHash: currentSource.hash,
+  });
+  const response = await fetchWorkbenchV1(
+    fetcher,
+    "load",
+    `/api/admin/roof-fusion/workbench-draft?${query}`,
+  );
+  const body = await responseJson(response);
+  if (response.status === 404 && body?.code === "DRAFT_NOT_FOUND") {
+    return { draft: null, recoveryDecision: null };
+  }
+  if (!response.ok) {
+    throw new WorkbenchUiApiErrorV1(
+      String(body?.code ?? "LOAD_FAILED"),
+      response.status,
+      String(body?.error ?? "Juodraščio nepavyko įkelti"),
+    );
+  }
+  try {
+    return {
+      draft: body?.draft as RoofFusionWorkbenchDraftV1,
+      recoveryDecision: parseRfDraftRecoveryDecision(body?.recoveryDecision),
+    };
+  } catch {
+    throw new WorkbenchUiApiErrorV1(
+      "INVALID_RECOVERY_DECISION",
+      409,
+      "Juodraščio recovery sprendimo patikrinti nepavyko",
+    );
+  }
 }
 
 export async function persistAndReloadWorkbenchDraftV1(

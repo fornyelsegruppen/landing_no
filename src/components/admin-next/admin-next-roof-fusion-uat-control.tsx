@@ -1258,6 +1258,7 @@ export function RealAddressResult({
             actorId={actorId}
             capture={captureResult!}
             caseId={`lead:${leadId}`}
+            draftRecoveryLocale={locale}
             heightSurface={activeHeight?.surface}
             horizontalAreaSquareMeters={selected.horizontalAreaSquareMeters}
             key={`${selected.id}:${captureResult?.capturedAt ?? "capture"}`}

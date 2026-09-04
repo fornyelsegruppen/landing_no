@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowRight,
   ArrowRightLeft,
@@ -22,6 +23,7 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 import type { AdminNextR4MeasurementView } from "@/lib/admin-next/r4-read-adapter";
 import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 import { AdminNextRfCaseAddressContext } from "./admin-next-rf-case-address-context";
+import type { AdminNextCaseAddressCorrectionConfig } from "./admin-next-case-address-correction";
 
 type MeasurementReview = AdminNextR4MeasurementView;
 type Gate = MeasurementReview["verificationGates"][number];
@@ -490,6 +492,7 @@ function projectDiagram(measurement: MeasurementReview) {
 
 export function AdminNextR4MeasurementReview({
   address,
+  addressCorrection,
   addressEditHref,
   caseRevision,
   locale,
@@ -498,10 +501,12 @@ export function AdminNextR4MeasurementReview({
   measurement,
   measurementRevision,
   owner,
+  offerAction,
   returnTo,
   source = "fixture",
 }: {
   address: string;
+  addressCorrection?: AdminNextCaseAddressCorrectionConfig;
   addressEditHref?: string;
   caseRevision?: number;
   locale: PanelLocale;
@@ -510,6 +515,7 @@ export function AdminNextR4MeasurementReview({
   measurement: MeasurementReview;
   measurementRevision?: number;
   owner: string;
+  offerAction?: ReactNode;
   returnTo?: string;
   source?: MeasurementSource;
 }) {
@@ -650,6 +656,7 @@ export function AdminNextR4MeasurementReview({
             </div>
             <AdminNextRfCaseAddressContext
               address={address}
+              addressCorrection={addressCorrection}
               caseReference={caseReference}
               caseRevision={caseRevision}
               editHref={addressEditHref}
@@ -1181,23 +1188,29 @@ export function AdminNextR4MeasurementReview({
                 {t.fallback}
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
-              <button
-                aria-describedby="r4-confirm-disabled"
-                className="an-cta inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-xl px-4 text-xs font-black opacity-55"
-                disabled
-                type="button"
-              >
-                <LockKeyhole aria-hidden="true" className="size-4" />
-                {t.confirm}
-              </button>
+              {isVerified && offerAction ? (
+                offerAction
+              ) : (
+                <button
+                  aria-describedby="r4-confirm-disabled"
+                  className="an-cta inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-2 rounded-xl px-4 text-xs font-black opacity-55"
+                  disabled
+                  type="button"
+                >
+                  <LockKeyhole aria-hidden="true" className="size-4" />
+                  {t.confirm}
+                </button>
+              )}
             </div>
           </div>
-          <p
-            className="mt-2 text-right text-[9px] text-[var(--an-subtle)]"
-            id="r4-confirm-disabled"
-          >
-            {confirmDisabled}
-          </p>
+          {!isVerified || !offerAction ? (
+            <p
+              className="mt-2 text-right text-[9px] text-[var(--an-subtle)]"
+              id="r4-confirm-disabled"
+            >
+              {confirmDisabled}
+            </p>
+          ) : null}
         </footer>
       </aside>
     </div>

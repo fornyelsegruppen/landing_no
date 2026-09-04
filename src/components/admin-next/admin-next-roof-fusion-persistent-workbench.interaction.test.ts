@@ -5,11 +5,18 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoofFusionWorkbenchDraftV1 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
 import { buildWorkbenchDraftFromUiV1 } from "@/lib/roof-fusion/workbench-ui-client-v1";
-import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
+import {
+  AdminNextRoofFusionPersistentWorkbench,
+  type AdminNextRfDraftRecoveryPanel,
+} from "./admin-next-roof-fusion-persistent-workbench";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
 import { buildApprovedGableRoofFixtureV1 } from "@/lib/roof-fusion/gable-roof-fixture-v1";
 import { projectRoofFusionWorkbenchDetailedResultV1 } from "@/lib/roof-fusion/workbench-detailed-result-v1";
+import {
+  resolveRfDraftRecoveryDecision,
+  RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+} from "@/lib/admin-next/rf-draft-recovery-contract";
 
 const geoReference = {
   crs: "EPSG:25833" as const,
@@ -118,12 +125,86 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
   let container: HTMLDivElement;
   let latest: RoofFusionWorkbenchDraftV1 | null;
   let heightResponse: "error" | "blocked" | "review";
+  let serverRecoveryDecision: AdminNextRfDraftRecoveryPanel["decision"] | null;
+
+  const recoveryPanelFor = (
+    activeCapture: NorgeIBilderCaptureResult,
+    options?: Readonly<{
+      addressRevision?: number;
+      bindingAddressRevision?: number;
+      recoveryBinding?: boolean;
+      onContinueOld?: AdminNextRfDraftRecoveryPanel["onContinueOld"];
+      onStartNew?: AdminNextRfDraftRecoveryPanel["onStartNew"];
+    }>,
+  ): AdminNextRfDraftRecoveryPanel | undefined => {
+    if (!latest || !activeCapture.sourceId || !activeCapture.rawContentHash) {
+      return undefined;
+    }
+    const draftReference = {
+      id: latest.draftId,
+      revision: latest.revision,
+      hash: latest.draftHash,
+    };
+    const current = {
+      case: {
+        caseId: latest.caseId,
+        addressRevision: options?.addressRevision ?? 7,
+      },
+      source: {
+        id: activeCapture.sourceId,
+        revision: 4,
+        hash: activeCapture.rawContentHash,
+      },
+      snapshot: {
+        id: "snapshot-lead-13",
+        revision: 3,
+        hash: "b".repeat(64),
+      },
+    };
+    const decision = resolveRfDraftRecoveryDecision({
+      version: RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+      vercelEnvironment: "preview",
+      capabilities: ["roof_fusion.draft.continue", "roof_fusion.draft.create"],
+      current,
+      persistedDraft: {
+        draft: draftReference,
+        recoveryBinding:
+          options?.recoveryBinding === false
+            ? null
+            : {
+                version: RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+                case: {
+                  caseId: latest.caseId,
+                  addressRevision: options?.bindingAddressRevision ?? 7,
+                },
+                draft: draftReference,
+                source: {
+                  id: latest.source.sourceId,
+                  revision: 4,
+                  hash: latest.source.sourceContentHash,
+                },
+                snapshot: current.snapshot,
+              },
+      },
+    });
+    return {
+      decision,
+      locale: "lt",
+      onContinueOld: options?.onContinueOld ?? vi.fn(),
+      onStartNew: options?.onStartNew ?? vi.fn(),
+    };
+  };
 
   const renderWorkbench = (
     activeCapture = capture,
     activeHeightSurface?: KartverketHeightSurfaceV1,
-  ) =>
-    createElement(AdminNextRoofFusionPersistentWorkbench, {
+    draftRecovery?: AdminNextRfDraftRecoveryPanel | null,
+  ) => {
+    const recovery =
+      draftRecovery === undefined
+        ? recoveryPanelFor(activeCapture)
+        : (draftRecovery ?? undefined);
+    return createElement(AdminNextRoofFusionPersistentWorkbench, {
       actorId: "7",
       capture: activeCapture,
       caseId: "lead:13",
@@ -131,7 +212,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       orthoImageAlt: "Test roof",
       sourceOutline,
       heightSurface: activeHeightSurface,
+      draftRecovery: recovery,
     });
+  };
 
   const stage = () =>
     container
@@ -160,6 +243,12 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
   const closeAdvanced = async () => {
     if (!container.querySelector("[data-roof-fusion-advanced]")) return;
     await click("[data-roof-fusion-advanced-close]");
+  };
+
+  const continueLatestDraft = async () => {
+    await openAdvanced();
+    await click('[data-rf-draft-recovery-action="continue_old"]');
+    await closeAdvanced();
   };
 
   const dispatchCanvasPointerActivation = async (clientX: number) => {
@@ -288,6 +377,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       sourceOutline,
     });
     heightResponse = "error";
+    serverRecoveryDecision = null;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -307,10 +397,18 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         }
         if (url.startsWith("/api/admin/roof-fusion/workbench-draft?")) {
           return latest
-            ? new Response(JSON.stringify({ draft: latest }), {
-                headers: { "content-type": "application/json" },
-                status: 200,
-              })
+            ? new Response(
+                JSON.stringify({
+                  draft: latest,
+                  ...(serverRecoveryDecision
+                    ? { recoveryDecision: serverRecoveryDecision }
+                    : {}),
+                }),
+                {
+                  headers: { "content-type": "application/json" },
+                  status: 200,
+                },
+              )
             : new Response(JSON.stringify({ code: "DRAFT_NOT_FOUND" }), {
                 headers: { "content-type": "application/json" },
                 status: 404,
@@ -371,11 +469,20 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     vi.unstubAllGlobals();
   });
 
-  it("hydrates approved geometry and a saved line after the latest draft loads asynchronously", async () => {
+  it("does not hydrate a loaded draft before an exact Continue old decision", async () => {
     await act(async () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.1,0.1 0.9,0.1 0.9,0.9 0.1,0.9");
+    expect(renderedLines()).toHaveLength(0);
+
+    await continueLatestDraft();
 
     expect(
       container
@@ -390,11 +497,203 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe("ridge");
   });
 
-  it("carries persisted annotations across a same-footprint capture refresh", async () => {
+  it("uses the server-owned recovery decision when the real callsite enables recovery", async () => {
+    serverRecoveryDecision = recoveryPanelFor(capture)!.decision;
     await act(async () => {
-      root.render(renderWorkbench());
+      root.render(
+        createElement(AdminNextRoofFusionPersistentWorkbench, {
+          actorId: "7",
+          capture,
+          caseId: "lead:13",
+          draftRecoveryLocale: "lt",
+          horizontalAreaSquareMeters: 142,
+          orthoImageAlt: "Test roof",
+          sourceOutline,
+        }),
+      );
       await flushAsyncWork();
     });
+    await openAdvanced();
+
+    expect(renderedLines()).toHaveLength(0);
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([url]) =>
+            String(url).includes("sourceId=norge-capture-91") &&
+            String(url).includes(`sourceHash=${"a".repeat(64)}`),
+        ),
+    ).toBe(true);
+    await click('[data-rf-draft-recovery-action="continue_old"]');
+    await closeAdvanced();
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    expect(renderedLines()).toHaveLength(1);
+  });
+
+  it("renders the exact-binding recovery decision in the persistent utility rail and forwards exact intents", async () => {
+    const onContinueOld = vi.fn();
+    const onStartNew = vi.fn();
+    const recovery = recoveryPanelFor(capture, {
+      onContinueOld,
+      onStartNew,
+    })!;
+
+    await act(async () => {
+      root.render(renderWorkbench(capture, undefined, recovery));
+      await flushAsyncWork();
+    });
+    await openAdvanced();
+
+    const persistence = container.querySelector(
+      "[data-roof-fusion-persistence]",
+    );
+    expect(persistence).not.toBeNull();
+    expect(
+      persistence?.querySelector('[data-rf-commercial-use="forbidden"]'),
+    ).not.toBeNull();
+
+    expect(renderedLines()).toHaveLength(0);
+    await click('[data-rf-draft-recovery-action="continue_old"]');
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.4,0.3 0.6,0.3 0.6,0.7 0.4,0.7");
+    await click('[data-rf-draft-recovery-action="start_new"]');
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.1,0.1 0.9,0.1 0.9,0.9 0.1,0.9");
+
+    expect(onContinueOld).toHaveBeenCalledWith(
+      recovery.decision.continueOld.intent,
+    );
+    expect(onStartNew).toHaveBeenCalledWith(recovery.decision.startNew.intent);
+  });
+
+  it("keeps a legacy draft with no recovery binding out of geometry and offers only Start new", async () => {
+    const onContinueOld = vi.fn();
+    const onStartNew = vi.fn();
+    const recovery = recoveryPanelFor(capture, {
+      recoveryBinding: false,
+      onContinueOld,
+      onStartNew,
+    })!;
+
+    await act(async () => {
+      root.render(renderWorkbench(capture, undefined, recovery));
+      await flushAsyncWork();
+    });
+    await openAdvanced();
+
+    expect(renderedLines()).toHaveLength(0);
+    expect(container.textContent).toContain(
+      "neturi patikrinamo adreso ir snapshot susiejimo",
+    );
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        '[data-rf-draft-recovery-action="continue_old"]',
+      )?.disabled,
+    ).toBe(true);
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      true,
+    );
+
+    await click('[data-rf-draft-recovery-action="start_new"]');
+
+    expect(onContinueOld).not.toHaveBeenCalled();
+    expect(onStartNew).toHaveBeenCalledOnce();
+    expect(renderedLines()).toHaveLength(0);
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      false,
+    );
+  });
+
+  it("rejects an exact decision when the API loads a different draft revision", async () => {
+    const onContinueOld = vi.fn();
+    const mismatchedDraft = {
+      id: "uat-lead-13-r2-other",
+      revision: 2,
+      hash: "f".repeat(64),
+    };
+    const current = {
+      case: { caseId: "lead:13", addressRevision: 7 },
+      source: {
+        id: capture.sourceId!,
+        revision: 4,
+        hash: capture.rawContentHash!,
+      },
+      snapshot: {
+        id: "snapshot-lead-13",
+        revision: 3,
+        hash: "b".repeat(64),
+      },
+    };
+    const decision = resolveRfDraftRecoveryDecision({
+      version: RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+      vercelEnvironment: "preview",
+      capabilities: ["roof_fusion.draft.continue", "roof_fusion.draft.create"],
+      current,
+      persistedDraft: {
+        draft: mismatchedDraft,
+        recoveryBinding: {
+          version: RF_DRAFT_RECOVERY_CONTRACT_VERSION,
+          case: current.case,
+          draft: mismatchedDraft,
+          source: current.source,
+          snapshot: current.snapshot,
+        },
+      },
+    });
+
+    await act(async () => {
+      root.render(
+        renderWorkbench(capture, undefined, {
+          decision,
+          locale: "lt",
+          onContinueOld,
+          onStartNew: vi.fn(),
+        }),
+      );
+      await flushAsyncWork();
+    });
+    await openAdvanced();
+    await click('[data-rf-draft-recovery-action="continue_old"]');
+
+    expect(onContinueOld).not.toHaveBeenCalled();
+    expect(renderedLines()).toHaveLength(0);
+    expect(
+      container
+        .querySelector('[data-roof-fusion-layer="approvedOutline"]')
+        ?.getAttribute("points"),
+    ).toBe("0.1,0.1 0.9,0.1 0.9,0.9 0.1,0.9");
+    expect(container.textContent).toContain(
+      "nesutampa su faktiškai įkelta revizija",
+    );
+  });
+
+  it("fails closed when an old draft is loaded without a recovery decision", async () => {
+    await act(async () => {
+      root.render(renderWorkbench(capture, undefined, null));
+      await flushAsyncWork();
+    });
+    await openAdvanced();
+
+    expect(renderedLines()).toHaveLength(0);
+    expect(container.textContent).toContain(
+      "neturi šiame workbench patikrinto recovery susiejimo",
+    );
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      true,
+    );
+    expect(
+      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
+    ).toBeNull();
+  });
+
+  it("fails closed instead of carrying annotations across a changed source", async () => {
     const refreshedCapture = {
       ...capture,
       sourceId: "norge-capture-92",
@@ -406,33 +705,29 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(refreshedCapture, heightSurface));
       await flushAsyncWork();
     });
-    await click('[data-roof-fusion-stage-tab="skeleton"]');
     await openAdvanced();
 
-    expect(renderedLines()).toHaveLength(1);
+    expect(renderedLines()).toHaveLength(0);
+    expect(container.textContent).toContain("Ankstesnis juodraštis paseno");
     expect(
       container.querySelector<HTMLButtonElement>(
-        "[data-roof-fusion-undo-last-line]",
+        '[data-rf-draft-recovery-action="continue_old"]',
       )?.disabled,
-    ).toBe(false);
-    expect(container.textContent).toContain(
-      "Ankstesnės rankinės anotacijos perkeltos",
+    ).toBe(true);
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      true,
     );
-    expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
-    await act(async () => {
-      buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
-      await vi.waitFor(() => expect(latest?.revision).toBe(2));
-      await flushAsyncWork();
-    });
+    await click('[data-rf-draft-recovery-action="start_new"]');
 
-    expect(latest?.revision).toBe(2);
-    expect(latest?.source.sourceId).toBe(refreshedCapture.sourceId);
-    expect(latest?.geometry.skeletonEdges).toHaveLength(1);
-    expect(stage()).toBe("skeleton");
+    expect(renderedLines()).toHaveLength(0);
+    expect(container.textContent).toContain("ankstesnė revizija nepanaudota");
+    expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
+      false,
+    );
   });
 
-  it("blocks a mismatched capture from clearing annotations until explicit confirmation", async () => {
+  it("offers only authorized Start new for a stale mismatched capture", async () => {
     const mismatchedCapture = {
       ...capture,
       sourceId: "norge-capture-other",
@@ -452,20 +747,20 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     });
     await openAdvanced();
 
-    expect(container.textContent).toContain("Rankinės anotacijos neišvalytos");
+    expect(container.textContent).toContain("Ankstesnis juodraštis paseno");
     expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
       true,
     );
     expect(
-      container.querySelector("[data-roof-fusion-confirm-source-reset]"),
-    ).not.toBeNull();
+      container.querySelector<HTMLButtonElement>(
+        '[data-rf-draft-recovery-action="continue_old"]',
+      )?.disabled,
+    ).toBe(true);
     expect(latest?.revision).toBe(1);
 
-    await click("[data-roof-fusion-confirm-source-reset]");
+    await click('[data-rf-draft-recovery-action="start_new"]');
 
-    expect(container.textContent).toContain(
-      "ankstesnės rankinės anotacijos pašalintos tik iš naujos neišsaugotos geometrijos",
-    );
+    expect(container.textContent).toContain("ankstesnė revizija nepanaudota");
     expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
       false,
     );
@@ -477,6 +772,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(capture, heightSurface));
       await flushAsyncWork();
     });
+    await continueLatestDraft();
     await act(async () => {
       buttonWithText("Apskaičiuoti")!.click();
       await flushAsyncWork();
@@ -605,6 +901,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+    await continueLatestDraft();
     await click('[data-roof-fusion-stage-tab="skeleton"]');
     await click('[data-roof-fusion-line-mode="valley"]');
 
@@ -690,6 +987,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(capture, heightSurface));
       await flushAsyncWork();
     });
+    await continueLatestDraft();
     await click('[data-roof-fusion-stage-tab="skeleton"]');
     await click('[data-roof-fusion-line-mode="ridge"]');
 
@@ -761,6 +1059,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+    await continueLatestDraft();
     await click('[data-roof-fusion-stage-tab="skeleton"]');
     await click('[data-roof-fusion-line-mode="ridge"]');
 
@@ -907,6 +1206,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     await openAdvanced();
+    await click('[data-rf-draft-recovery-action="start_new"]');
 
     const fallbackButton = buttonWithText(
       "Naudoti rankinį rezultatą peržiūrai",

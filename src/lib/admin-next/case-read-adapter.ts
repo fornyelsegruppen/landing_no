@@ -3,6 +3,10 @@ import {
   adaptCanonicalCaseAuditHistory,
   type CaseAuditHistoryReadResult,
 } from "@/lib/audit/case-audit-history-read-adapter";
+import type {
+  AuditHistoryItem,
+  AuditHistoryTrace,
+} from "@/lib/audit/audit-history-projection";
 import {
   loadAdminCaseWorkspace,
   type AdminCaseWorkspace,
@@ -372,7 +376,94 @@ function auditTimelineKind(entityType: string): AdminNextTimelineKind {
   return "automation";
 }
 
-function projectAuditTimeline(result: AdminNextCaseAuditHistoryResult) {
+const auditEventCopy = {
+  nb: {
+    addressCorrected: "Saksadressen ble korrigert",
+    offerDraftCreated: "Roof Fusion-måling lagt til i tilbudsutkast",
+    caseRevision: "Sak",
+    addressRevision: "adresse",
+    snapshotRevision: "RF-snapshot",
+    measurement: "Takmåling",
+    quote: "Tilbud",
+    contract: "Kontrakt",
+    invalidated: "Utdaterte utkast",
+  },
+  lt: {
+    addressCorrected: "Bylos adresas pataisytas",
+    offerDraftCreated: "Roof Fusion matavimas įtrauktas į pasiūlymo juodraštį",
+    caseRevision: "Byla",
+    addressRevision: "adresas",
+    snapshotRevision: "RF snapshot",
+    measurement: "Matavimas",
+    quote: "Pasiūlymas",
+    contract: "Sutartis",
+    invalidated: "Pasenę juodraščiai",
+  },
+  en: {
+    addressCorrected: "Case address corrected",
+    offerDraftCreated: "Roof Fusion measurement added to offer draft",
+    caseRevision: "Case",
+    addressRevision: "address",
+    snapshotRevision: "RF snapshot",
+    measurement: "Measurement",
+    quote: "Offer",
+    contract: "Contract",
+    invalidated: "Invalidated drafts",
+  },
+} as const;
+
+function auditActionLabel(action: string, locale: CaseNextActionLocale) {
+  const copy = auditEventCopy[locale];
+  if (action === "case.address_corrected" || action === "case.address-corrected") {
+    return copy.addressCorrected;
+  }
+  if (action === "roof-fusion.offer-draft-created") {
+    return copy.offerDraftCreated;
+  }
+  return action;
+}
+
+function timelineReference(
+  value: AdminCaseWorkspace,
+  sourceCollection: TimelineSourceCollection,
+  sourceId: number,
+  fallback: string,
+) {
+  return (
+    value.timeline.find(
+      (item) =>
+        item.sourceCollection === sourceCollection && item.sourceId === sourceId,
+    )?.title || `${fallback} #${sourceId}`
+  );
+}
+
+function auditTrace(
+  trace: AuditHistoryTrace | undefined,
+  value: AdminCaseWorkspace,
+  locale: CaseNextActionLocale,
+) {
+  if (!trace) return undefined;
+  const copy = auditEventCopy[locale];
+  const revisions = `${copy.caseRevision} r${trace.caseRevision} · ${copy.addressRevision} r${trace.addressRevision}`;
+  if (trace.kind === "case_address_corrected") {
+    return [
+      revisions,
+      `${copy.invalidated}: ${trace.invalidatedQuoteDrafts} / ${trace.invalidatedContractDrafts}`,
+    ];
+  }
+  return [
+    `${revisions} · ${copy.snapshotRevision} r${trace.snapshotRevision}`,
+    `${copy.measurement}: ${timelineReference(value, "roof-measurements", trace.measurementId, copy.measurement)}`,
+    `${copy.quote}: ${timelineReference(value, "quotes", trace.quoteId, copy.quote)}`,
+    `${copy.contract}: ${timelineReference(value, "contracts", trace.contractId, copy.contract)}`,
+  ];
+}
+
+function projectAuditTimeline(
+  result: AdminNextCaseAuditHistoryResult,
+  value: AdminCaseWorkspace,
+  locale: CaseNextActionLocale,
+) {
   if (result.status === "denied") {
     return {
       timeline: [],
@@ -394,15 +485,16 @@ function projectAuditTimeline(result: AdminNextCaseAuditHistoryResult) {
     };
   }
   return {
-    timeline: result.value.items.slice(0, 50).map((item) => ({
+    timeline: result.value.items.slice(0, 50).map((item: AuditHistoryItem) => ({
       id: `audit-${item.id}`,
       kind: auditTimelineKind(item.entity.type),
-      title: item.action,
+      title: auditActionLabel(item.action, locale),
       summary: "",
       at: item.atUtc,
       actor: item.actor.display || item.actor.kind,
       audit: {
         action: item.action,
+        label: auditActionLabel(item.action, locale),
         actor: {
           kind: item.actor.kind,
           display: item.actor.display,
@@ -414,6 +506,7 @@ function projectAuditTimeline(result: AdminNextCaseAuditHistoryResult) {
         reason: item.reason,
         version: item.version,
         source: item.source,
+        trace: auditTrace(item.trace, value, locale),
         correlationId: item.correlationId,
         integrity: {
           hashStatus: item.integrity.hashStatus,
@@ -531,7 +624,7 @@ export function projectAdminCaseWorkspace(
     recordedAt: document.createdAt || "—",
     fallbackHref: operatorHref(document.href),
   }));
-  const auditTimeline = projectAuditTimeline(auditHistory);
+  const auditTimeline = projectAuditTimeline(auditHistory, value, locale);
   const messages = value.messages || [];
   const commercial = value.commercial || {
     quoteVersions: [],
