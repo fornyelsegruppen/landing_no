@@ -105,6 +105,7 @@ type RoofFusionPanGesture = Readonly<{
 type RoofFusionLineEndpointDrag = Readonly<{
   lineId: string;
   endpoint: "start" | "end";
+  originalLine: RoofFusionLine;
   pointerId: number;
   moved: boolean;
 }>;
@@ -1007,6 +1008,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       endpoint: "start" | "end",
     ) => {
       if (!event.isPrimary || event.button !== 0) return;
+      const originalLine = draftLinesRef.current.find(
+        (line) => line.id === lineId,
+      );
+      if (!originalLine) return;
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -1014,6 +1019,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         endpoint,
         lineId,
         moved: false,
+        originalLine: {
+          ...originalLine,
+          start: { ...originalLine.start },
+          end: { ...originalLine.end },
+        },
         pointerId: event.pointerId,
       } as const;
       draggingLineEndpointRef.current = drag;
@@ -1079,12 +1089,25 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       if (!drag || drag.pointerId !== event.pointerId) return;
       event.preventDefault();
       event.stopPropagation();
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
       const changedLine = draftLinesRef.current.find(
         (line) => line.id === drag.lineId,
       );
       draggingLineEndpointRef.current = null;
       setDraggingLineEndpoint(null);
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      }
+      if (event.type !== "pointerup") {
+        if (drag.moved) {
+          const restoredLines = draftLinesRef.current.map((line) =>
+            line.id === drag.lineId ? drag.originalLine : line,
+          );
+          draftLinesRef.current = restoredLines;
+          setDraftLines(restoredLines);
+          setLineCaptureNotice("Linijos galinio taško keitimas atšauktas.");
+        }
+        return;
+      }
       if (drag.moved) {
         setRestoredMarkingNotice(null);
         setLineCaptureNotice("Linijos galinis taškas patikslintas.");
@@ -1941,6 +1964,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                             }
                             fill="transparent"
                             onClick={(event) => event.stopPropagation()}
+                            onLostPointerCapture={finishLineEndpointDrag}
                             onPointerCancel={finishLineEndpointDrag}
                             onPointerDown={(event) =>
                               startLineEndpointDrag(
