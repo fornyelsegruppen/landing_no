@@ -1,10 +1,35 @@
 # Roof Fusion One Card v2 plan
 
-**Owner:** RF  
-**Status:** PROPOSED / PLANNING ONLY  
-**Implementation:** not started  
+**Owner:** RF
+
+**Status:** IN PROGRESS · Preview branch only
+
+**Implementation:** Phases A–D implemented; Phase E and owner UAT remain gated
+
 **Production:** untouched; no offer, pricing, customer, or Production write is
 authorized by this plan
+
+## Implementation checkpoint · 2026-09-04
+
+Implemented in the isolated RF Preview branch:
+
+- the state-driven `Objektas → Patikslinimas → Rezultatas` card;
+- one disclosed address action that resolves the address and obtains one Norge
+  orthophoto;
+- direct pointer and keyboard building selection on that orthophoto;
+- automatic height preparation only after building selection;
+- one `Apskaičiuoti` action for CAS save, reload/hash proof, and calculation;
+- authoritative calculated surface polygons with stable IDs, per-slope area,
+  pitch, direction, confidence, and row-to-polygon highlighting;
+- image-adjacent overlay opacity, thinner ridge lines, and a modal `Advanced`
+  recovery drawer with the guarded legacy fallback;
+- reducer, interaction, stale-response, detailed-result, route, and integration
+  tests.
+
+Still intentionally gated:
+
+- immutable RF measurement approval and add-to-offer command (Phase E);
+- a protected owner UAT Preview and any Production release decision (Phase F).
 
 ## 1. Decision
 
@@ -167,7 +192,7 @@ what it cannot determine safely.
 
 ### Agreed interaction details
 
-- saved ridge/valley line: screen-stable `2 px`; pending line: `1.5 px`;
+- saved ridge/valley line: screen-stable `1.5 px`; pending line: `1.5 px`;
 - small screen-stable endpoints with the larger invisible hit target retained;
 - boundary magnet/tolerance: a near-edge endpoint snaps to the approved contour;
 - a far outside endpoint is rejected with a clear reason;

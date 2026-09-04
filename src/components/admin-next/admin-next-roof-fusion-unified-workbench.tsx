@@ -34,7 +34,7 @@ export type RoofFusionViewport = Readonly<{
 export const MIN_ROOF_FUSION_ZOOM = 1;
 export const MAX_ROOF_FUSION_ZOOM = 4;
 export const ROOF_FUSION_PAN_THRESHOLD_PX = 5;
-export const ROOF_FUSION_SKELETON_LINE_STROKE = "2px";
+export const ROOF_FUSION_SKELETON_LINE_STROKE = "1.5px";
 export const ROOF_FUSION_PENDING_LINE_STROKE = "1.5px";
 export const ROOF_FUSION_SKELETON_ENDPOINT_RADIUS = 0.0025;
 export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
@@ -44,6 +44,7 @@ export const DEFAULT_ROOF_FUSION_VIEWPORT: RoofFusionViewport = {
 };
 
 export type RoofFusionStage = "outline" | "skeleton" | "slopes" | "review";
+export type RoofFusionOneCardStep = "object" | "refine" | "result";
 export type RoofFusionLineKind = "ridge" | "valley";
 export type RoofFusionConfidence = "high" | "medium" | "low";
 export type RoofFusionLayer =
@@ -60,9 +61,20 @@ export type RoofFusionRoofPlane = Readonly<{
   id: string;
   label?: string;
   points: readonly RoofFusionPoint[];
+  horizontalAreaSquareMeters?: number;
   areaSquareMeters?: number;
+  netAreaSquareMeters?: number;
   slopeDegrees?: number;
+  azimuthDegrees?: number;
   confidence?: RoofFusionConfidence;
+  confidenceReason?: string;
+}>;
+
+export type RoofFusionResultIdentity = Readonly<{
+  snapshotId: string;
+  revision: number;
+  snapshotHash: string;
+  measurementMethod: string;
 }>;
 
 export type RoofFusionHeightPoint = Readonly<{
@@ -103,6 +115,7 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   footprintPerimeterMeters?: number;
   confidence?: RoofFusionConfidence;
   confidenceReason?: string;
+  resultIdentity?: RoofFusionResultIdentity;
   blockers?: readonly string[];
   stageBlockers?: Partial<Record<RoofFusionStage, readonly string[]>>;
   guardNotice?: string;
@@ -126,6 +139,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   advancedPanel?: ReactNode;
   /** Reserved integration point for the legacy manual calculation fallback. */
   legacyFallbackPanel?: ReactNode;
+  onChangeBuilding?: () => void;
+  onEditResult?: () => void;
 }>;
 
 export const ROOF_FUSION_STAGES: readonly RoofFusionStage[] = [
@@ -133,6 +148,12 @@ export const ROOF_FUSION_STAGES: readonly RoofFusionStage[] = [
   "skeleton",
   "slopes",
   "review",
+];
+
+export const ROOF_FUSION_ONE_CARD_STEPS: readonly RoofFusionOneCardStep[] = [
+  "object",
+  "refine",
+  "result",
 ];
 
 export const DEFAULT_ROOF_FUSION_LAYERS: Readonly<
@@ -287,11 +308,10 @@ function formatNumber(value: number | undefined, suffix = "") {
   return `${new Intl.NumberFormat("lt-LT", { maximumFractionDigits: 1 }).format(value)}${suffix}`;
 }
 
-const stageLabels: Record<RoofFusionStage, string> = {
-  outline: "Kontūras",
-  skeleton: "Kraigai ir slėniai",
-  slopes: "Nuolydžiai",
-  review: "Patikra",
+const oneCardStepLabels: Record<RoofFusionOneCardStep, string> = {
+  object: "Objektas",
+  refine: "Patikslinimas",
+  result: "Rezultatas",
 };
 
 const layerLabels: Record<RoofFusionLayer, string> = {
@@ -348,6 +368,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   footprintPerimeterMeters,
   confidence = "medium",
   confidenceReason,
+  resultIdentity,
   blockers = [],
   stageBlockers,
   guardNotice = "Nieko neišsaugo, kol nepatvirtinta",
@@ -362,6 +383,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onLayerVisibilityChange,
   persistencePanel,
   legacyFallbackPanel,
+  onChangeBuilding,
+  onEditResult,
 }: RoofFusionUnifiedWorkbenchProps) {
   const canvasShellRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<RoofFusionStage>(initialStage);
@@ -400,6 +423,61 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const suppressCanvasClickRef = useRef(false);
   const [approvedOutlineFillOpacity, setApprovedOutlineFillOpacity] =
     useState(8);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedDialogRef = useRef<HTMLElement>(null);
+  const advancedTriggerRef = useRef<HTMLButtonElement>(null);
+  const [selectedRoofPlaneId, setSelectedRoofPlaneId] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!advancedOpen) return;
+    const previouslyFocused = document.activeElement;
+    const restoreTarget = advancedTriggerRef.current;
+    const dialog = advancedDialogRef.current;
+    const focusableSelector =
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+    const focusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+      ).filter((element) => !element.hasAttribute("aria-hidden"));
+    focusable()[0]?.focus();
+
+    const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setAdvancedOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      if (
+        previouslyFocused instanceof HTMLElement &&
+        previouslyFocused !== document.body
+      ) {
+        previouslyFocused.focus();
+      } else {
+        restoreTarget?.focus();
+      }
+    };
+  }, [advancedOpen]);
 
   useEffect(() => {
     if (
@@ -736,6 +814,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       if (nextStage === "skeleton") {
         setLayerVisibility((current) => ({ ...current, skeleton: true }));
       }
+      if (nextStage === "review") {
+        setLayerVisibility((current) => ({ ...current, roofPlanes: true }));
+      }
       setLineMode(null);
       setPendingLinePoint(null);
       setLineCaptureProblem(null);
@@ -746,12 +827,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     [onStageChange],
   );
 
-  const primaryActionLabel = useMemo(() => {
-    if (stage === "outline") return "Patvirtinti kontūrą";
-    if (stage === "skeleton") return "Patvirtinti kraigus ir slėnius";
-    if (stage === "slopes") return "Apskaičiuoti nuolydžius";
-    return null;
-  }, [stage]);
+  const primaryActionLabel = stage === "review" ? null : "Apskaičiuoti";
 
   const activeBlockers = useMemo(
     () => [...blockers, ...(stageBlockers?.[stage] ?? [])],
@@ -759,14 +835,19 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   );
 
   const handlePrimaryAction = useCallback(async () => {
-    if (activeBlockers.length || primaryActionPending) return;
+    if (primaryActionPending) return;
+    if (activeBlockers.length) {
+      setAdvancedOpen(true);
+      return;
+    }
     setPrimaryActionPending(true);
     try {
       const shouldAdvance = await onPrimaryAction?.(stage);
-      if (shouldAdvance === false) return;
-      const currentIndex = ROOF_FUSION_STAGES.indexOf(stage);
-      const nextStage = ROOF_FUSION_STAGES[currentIndex + 1];
-      if (nextStage) goToStage(nextStage);
+      if (shouldAdvance === false) {
+        setAdvancedOpen(true);
+        return;
+      }
+      goToStage("review");
     } finally {
       setPrimaryActionPending(false);
     }
@@ -777,6 +858,14 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     primaryActionPending,
     stage,
   ]);
+
+  const activeOneCardStep: RoofFusionOneCardStep =
+    stage === "review" ? "result" : "refine";
+  const activeSelectedRoofPlaneId = roofPlanes.some(
+    (plane) => plane.id === selectedRoofPlaneId,
+  )
+    ? selectedRoofPlaneId
+    : (roofPlanes[0]?.id ?? null);
 
   const displayLines = [
     ...draftLines,
@@ -855,24 +944,39 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
           {sourceStatusPanel}
 
-          <nav
-            aria-label="Matavimo etapai"
-            className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-[#171e2a] p-1"
-          >
-            {ROOF_FUSION_STAGES.map((item, index) => (
-              <button
-                aria-current={item === stage ? "step" : undefined}
-                className={`min-h-11 rounded-xl px-2 py-2 text-left text-xs transition sm:px-3 ${item === stage ? "bg-[#e8a317] font-semibold text-[#101318]" : "text-[#bdb9b0] hover:bg-white/5"}`}
-                data-roof-fusion-stage-tab={item}
-                key={item}
-                onClick={() => goToStage(item)}
-                type="button"
-              >
-                <span className="mr-1.5 opacity-60">0{index + 1}</span>
-                {stageLabels[item]}
-              </button>
-            ))}
-          </nav>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <nav
+              aria-label="Matavimo eiga"
+              className="grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-[#171e2a] p-1"
+              data-roof-fusion-one-card-progress
+            >
+              {ROOF_FUSION_ONE_CARD_STEPS.map((item, index) => {
+                const active = item === activeOneCardStep;
+                const complete = item === "object" || stage === "review";
+                return (
+                  <div
+                    aria-current={active ? "step" : undefined}
+                    className={`min-h-11 rounded-xl px-2 py-2 text-left text-xs sm:px-3 ${active ? "bg-[#e8a317] font-semibold text-[#101318]" : complete ? "text-[#71e6b4]" : "text-[#777f8c]"}`}
+                    data-roof-fusion-one-card-step={item}
+                    key={item}
+                  >
+                    <span className="mr-1.5 opacity-60">0{index + 1}</span>
+                    {oneCardStepLabels[item]}
+                  </div>
+                );
+              })}
+            </nav>
+            <button
+              aria-expanded={advancedOpen}
+              className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#ddd8cd] hover:bg-white/10"
+              data-roof-fusion-advanced-trigger
+              onClick={() => setAdvancedOpen(true)}
+              ref={advancedTriggerRef}
+              type="button"
+            >
+              Advanced
+            </button>
+          </div>
 
           <div
             aria-label="Vaizdo mastelio ir pozicijos valdikliai"
@@ -1000,12 +1104,37 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                 <g data-roof-fusion-layer="roofPlanes">
                   {roofPlanes.map((plane, index) => (
                     <polygon
+                      aria-label={plane.label ?? `Stogo plokštuma ${index + 1}`}
+                      className={
+                        stage === "review" ? "cursor-pointer" : undefined
+                      }
+                      data-roof-fusion-roof-plane={plane.id}
                       fill={index % 2 ? "#ef9b4f" : "#55c7a3"}
-                      fillOpacity=".22"
+                      fillOpacity={
+                        activeSelectedRoofPlaneId === plane.id ? ".42" : ".2"
+                      }
                       key={plane.id}
+                      onClick={(event) => {
+                        if (stage !== "review") return;
+                        event.stopPropagation();
+                        setSelectedRoofPlaneId(plane.id);
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          stage === "review" &&
+                          (event.key === "Enter" || event.key === " ")
+                        ) {
+                          event.preventDefault();
+                          setSelectedRoofPlaneId(plane.id);
+                        }
+                      }}
                       points={pointsAttribute(plane.points)}
+                      role={stage === "review" ? "button" : undefined}
                       stroke={index % 2 ? "#ef9b4f" : "#55c7a3"}
-                      strokeWidth=".004"
+                      strokeWidth={
+                        activeSelectedRoofPlaneId === plane.id ? "3px" : "2px"
+                      }
+                      tabIndex={stage === "review" ? 0 : undefined}
                       vectorEffect="non-scaling-stroke"
                     >
                       <title>
@@ -1176,6 +1305,59 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             )}
           </div>
 
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <label
+              className="flex min-w-[220px] flex-1 items-center gap-3 text-xs font-medium text-[#ddd8cd]"
+              data-roof-fusion-approved-outline-opacity-control
+            >
+              <span className="shrink-0">Kontūro ryškumas</span>
+              <input
+                aria-label="Patvirtinto ploto spalvos ryškumas"
+                className="w-full accent-[#46d69a] disabled:opacity-40"
+                disabled={!layerVisibility.approvedOutline}
+                max="100"
+                min="0"
+                onChange={(event) =>
+                  setApprovedOutlineFillOpacity(Number(event.target.value))
+                }
+                type="range"
+                value={approvedOutlineFillOpacity}
+              />
+              <output aria-live="polite" className="w-9 text-right">
+                {approvedOutlineFillOpacity}%
+              </output>
+            </label>
+            {stage !== "review" ? (
+              <div
+                aria-label="Žymėjimo įrankiai"
+                className="flex rounded-xl border border-white/10 bg-[#171e2a] p-1"
+                data-roof-fusion-edit-mode
+                role="group"
+              >
+                <button
+                  aria-pressed={stage === "outline"}
+                  className={`min-h-9 rounded-lg px-3 text-xs font-semibold ${stage === "outline" ? "bg-white/10 text-white" : "text-[#aaa69d]"}`}
+                  data-roof-fusion-edit-mode-option="outline"
+                  data-roof-fusion-stage-tab="outline"
+                  onClick={() => goToStage("outline")}
+                  type="button"
+                >
+                  Kontūras
+                </button>
+                <button
+                  aria-pressed={stage === "skeleton"}
+                  className={`min-h-9 rounded-lg px-3 text-xs font-semibold ${stage === "skeleton" ? "bg-[#e8a317]/15 text-[#f3c66b]" : "text-[#aaa69d]"}`}
+                  data-roof-fusion-edit-mode-option="skeleton"
+                  data-roof-fusion-stage-tab="skeleton"
+                  onClick={() => goToStage("skeleton")}
+                  type="button"
+                >
+                  Sudėtingas stogas
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           {stage === "outline" && (
             <div
               className="mt-3 flex flex-wrap items-center gap-2"
@@ -1270,91 +1452,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
 
         <aside className="w-full shrink-0 border-t border-white/10 bg-[#151c28] p-4 sm:p-5 xl:w-[360px] xl:border-t-0 xl:border-l">
           <div className="space-y-4">
-            <details
-              className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
-              data-roof-fusion-advanced
-            >
-              <summary className="cursor-pointer text-sm font-semibold text-[#f5f0e8]">
-                Advanced · techniniai sluoksniai ir kontrolės
-              </summary>
-              <p className="mt-2 text-xs text-[#aaa69d]">
-                Papildomi šaltinio ir vaizdo valdikliai. Pirminiam matavimo
-                keliui jų atverti nereikia.
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-2">
-                {(Object.keys(layerLabels) as RoofFusionLayer[]).map(
-                  (layer) => (
-                    <button
-                      aria-pressed={layerVisibility[layer]}
-                      className="flex min-h-11 items-center justify-between rounded-xl border border-white/10 bg-[#0f151f] px-3 text-left text-sm hover:border-white/20"
-                      data-roof-fusion-layer-toggle={layer}
-                      key={layer}
-                      onClick={() => setLayer(layer)}
-                      type="button"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          aria-hidden
-                          className={`h-2.5 w-2.5 rounded-full ${layerVisibility[layer] ? "bg-[#46d69a]" : "bg-[#626b79]"}`}
-                        />
-                        {layerLabels[layer]}
-                      </span>
-                      <span className="text-xs text-[#aaa69d]">
-                        {layerVisibility[layer] ? "Rodyti" : "Paslėpta"}
-                      </span>
-                    </button>
-                  ),
-                )}
-              </div>
-              <label
-                className="mt-3 block rounded-xl border border-white/10 bg-[#0f151f] p-3 text-xs font-medium text-[#ddd8cd]"
-                data-roof-fusion-approved-outline-opacity-control
-              >
-                <span className="flex items-center justify-between gap-3">
-                  <span>Patvirtinto ploto spalvos ryškumas</span>
-                  <output aria-live="polite">
-                    {approvedOutlineFillOpacity}%
-                  </output>
-                </span>
-                <input
-                  aria-label="Patvirtinto ploto spalvos ryškumas"
-                  className="mt-2 w-full accent-[#46d69a] disabled:opacity-40"
-                  disabled={!layerVisibility.approvedOutline}
-                  max="100"
-                  min="0"
-                  onChange={(event) =>
-                    setApprovedOutlineFillOpacity(Number(event.target.value))
-                  }
-                  type="range"
-                  value={approvedOutlineFillOpacity}
-                />
-              </label>
-              {advancedPanel ? (
-                <div
-                  className="mt-3 border-t border-white/10 pt-3"
-                  data-roof-fusion-advanced-source-actions
-                >
-                  {advancedPanel}
-                </div>
-              ) : null}
-              <div
-                className="mt-3 rounded-xl border border-dashed border-white/15 p-3 text-xs text-[#aaa69d]"
-                data-roof-fusion-legacy-fallback-slot
-              >
-                {legacyFallbackPanel ?? (
-                  <>
-                    <strong className="block text-[#ddd8cd]">
-                      Senas rankinis skaičiavimas (fallback)
-                    </strong>
-                    <span className="mt-1 block">
-                      Integracijos vieta paruošta. Kol kas naudokite unified
-                      kontūro, kraigo ir slėnio įrankius.
-                    </span>
-                  </>
-                )}
-              </div>
-            </details>
-
             <div
               aria-live="polite"
               className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
@@ -1421,6 +1518,59 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               </div>
             </dl>
 
+            {stage === "review" && roofPlanes.length ? (
+              <div
+                className="rounded-2xl border border-white/10 bg-[#0f151f] p-3"
+                data-roof-fusion-surface-results
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-sm">Stogo šlaitai</strong>
+                  <span className="text-xs text-[#aaa69d]">
+                    {roofPlanes.length}
+                  </span>
+                </div>
+                <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto">
+                  {roofPlanes.map((plane, index) => (
+                    <button
+                      aria-pressed={activeSelectedRoofPlaneId === plane.id}
+                      className={`grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2 text-left ${activeSelectedRoofPlaneId === plane.id ? "border-[#e8a317]/60 bg-[#e8a317]/10" : "border-white/10 bg-[#151c28] hover:border-white/20"}`}
+                      data-roof-fusion-surface-result={plane.id}
+                      key={plane.id}
+                      onClick={() => setSelectedRoofPlaneId(plane.id)}
+                      type="button"
+                    >
+                      <span>
+                        <strong className="block text-xs">
+                          {plane.label ?? `Šlaitas ${index + 1}`}
+                        </strong>
+                        <span className="mt-0.5 block text-[10px] text-[#aaa69d]">
+                          Nuolydis {formatNumber(plane.slopeDegrees, "°")}
+                          {plane.confidence
+                            ? ` · ${confidenceLabels[plane.confidence]}`
+                            : ""}
+                        </span>
+                        {plane.netAreaSquareMeters !== undefined &&
+                        plane.netAreaSquareMeters !== plane.areaSquareMeters ? (
+                          <span className="mt-0.5 block text-[10px] text-[#aaa69d]">
+                            Grynasis plotas{" "}
+                            {formatNumber(plane.netAreaSquareMeters, " m²")}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="text-right">
+                        <strong className="block text-sm text-[#f3c66b]">
+                          {formatNumber(plane.areaSquareMeters, " m²")}
+                        </strong>
+                        <span className="block text-[9px] text-[#aaa69d]">
+                          paviršius
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border border-[#e8a317]/25 bg-[#e8a317]/10 p-3 text-xs leading-relaxed text-[#ddd8cd]">
               <strong className="text-[#f3c66b]">
                 Šaltinio kontūras nekintamas.
@@ -1429,41 +1579,185 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               atskiras patvirtintas kontūras.
             </div>
 
-            {persistencePanel}
-
             {stage === "review" ? (
-              <div
-                className="rounded-2xl border border-[#46d69a]/30 bg-[#46d69a]/10 p-4 text-sm text-[#ddd8cd]"
-                data-roof-fusion-preview-complete
-                role="status"
-              >
-                <strong className="block text-[#71e6b4]">
-                  Preview skaičiavimas parengtas rankinei peržiūrai
-                </strong>
-                <span className="mt-1 block text-xs leading-relaxed">
-                  Tai nėra galutinis matavimo patvirtinimas. Rezultatas
-                  neišsiųstas ir nebus naudojamas kainodarai.
-                </span>
+              <div className="grid gap-2">
+                <div
+                  className="rounded-2xl border border-[#46d69a]/30 bg-[#46d69a]/10 p-4 text-sm text-[#ddd8cd]"
+                  data-roof-fusion-preview-complete
+                  role="status"
+                >
+                  <strong className="block text-[#71e6b4]">
+                    Matavimo rezultatas parengtas peržiūrai
+                  </strong>
+                  <span className="mt-1 block text-xs leading-relaxed">
+                    Rezultatas neišsiųstas klientui ir dar nenaudojamas
+                    kainodarai.
+                  </span>
+                  {resultIdentity ? (
+                    <span
+                      className="mt-2 block truncate font-mono text-[10px] text-[#aaa69d]"
+                      data-roof-fusion-result-identity={
+                        resultIdentity.snapshotId
+                      }
+                      title={`${resultIdentity.snapshotId} · ${resultIdentity.snapshotHash}`}
+                    >
+                      {resultIdentity.measurementMethod} · r
+                      {resultIdentity.revision} · {resultIdentity.snapshotId}
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  className="min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#ddd8cd] hover:bg-white/10"
+                  data-roof-fusion-edit-result
+                  onClick={() => {
+                    goToStage("outline");
+                    onEditResult?.();
+                  }}
+                  type="button"
+                >
+                  Keisti žymėjimą
+                </button>
               </div>
             ) : (
               <button
                 className="min-h-12 w-full rounded-xl bg-[#e8a317] px-4 py-3 text-sm font-bold text-[#101318] shadow-lg shadow-[#e8a317]/10 transition hover:bg-[#f0b12e] disabled:cursor-not-allowed disabled:opacity-45"
-                data-roof-fusion-primary-action={stage}
-                disabled={activeBlockers.length > 0 || primaryActionPending}
+                data-roof-fusion-primary-action="calculate"
+                disabled={primaryActionPending}
                 onClick={() => void handlePrimaryAction()}
                 type="button"
               >
-                {primaryActionLabel}
+                {primaryActionPending ? "Skaičiuojama…" : primaryActionLabel}
               </button>
             )}
-            {stage !== "review" && activeBlockers.length > 0 && (
+            {stage !== "review" && activeBlockers.length > 0 ? (
               <p className="text-center text-xs text-[#ffadad]">
-                Pirmiausia išspręskite blokatorius.
+                Paspaudus „Apskaičiuoti“ bus parodyti reikalingi sprendimai.
               </p>
-            )}
+            ) : null}
+            {onChangeBuilding ? (
+              <button
+                className="min-h-10 w-full rounded-xl border border-white/10 px-3 text-xs font-semibold text-[#aaa69d] hover:border-white/20 hover:text-white"
+                data-roof-fusion-change-building
+                onClick={onChangeBuilding}
+                type="button"
+              >
+                Keisti pastatą
+              </button>
+            ) : null}
           </div>
         </aside>
       </div>
+
+      {advancedOpen ? (
+        <div
+          aria-label="Advanced nustatymai"
+          aria-modal="true"
+          className="fixed inset-0 z-[90] flex justify-end bg-black/65"
+          data-roof-fusion-advanced
+          role="dialog"
+        >
+          <button
+            aria-label="Uždaryti Advanced nustatymus"
+            className="absolute inset-0 cursor-default"
+            data-roof-fusion-advanced-backdrop
+            onClick={() => setAdvancedOpen(false)}
+            type="button"
+          />
+          <aside
+            className="relative z-10 h-full w-full max-w-md overflow-y-auto border-l border-white/10 bg-[#111722] p-5 shadow-2xl"
+            ref={advancedDialogRef}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold">Advanced</h3>
+                <p className="mt-1 text-xs leading-5 text-[#aaa69d]">
+                  Papildomi šaltiniai, sluoksniai ir atsarginiai veiksmai.
+                  Normaliam matavimo keliui jų atverti nereikia.
+                </p>
+              </div>
+              <button
+                aria-label="Uždaryti Advanced nustatymus"
+                className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/15 text-xl text-[#ddd8cd] hover:bg-white/10"
+                data-roof-fusion-advanced-close
+                onClick={() => setAdvancedOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+
+            {activeBlockers.length ? (
+              <div className="mt-5 rounded-2xl border border-red-400/30 bg-red-400/10 p-3">
+                <strong className="text-sm text-red-100">
+                  Rekomenduojami kiti veiksmai
+                </strong>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-red-100">
+                  {activeBlockers.map((blocker) => (
+                    <li key={blocker}>{blocker}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-1 gap-2">
+              <strong className="text-xs tracking-[.12em] text-[#aaa69d] uppercase">
+                Techniniai sluoksniai
+              </strong>
+              {(Object.keys(layerLabels) as RoofFusionLayer[]).map((layer) => (
+                <button
+                  aria-pressed={layerVisibility[layer]}
+                  className="flex min-h-11 items-center justify-between rounded-xl border border-white/10 bg-[#0f151f] px-3 text-left text-sm hover:border-white/20"
+                  data-roof-fusion-layer-toggle={layer}
+                  key={layer}
+                  onClick={() => setLayer(layer)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className={`h-2.5 w-2.5 rounded-full ${layerVisibility[layer] ? "bg-[#46d69a]" : "bg-[#626b79]"}`}
+                    />
+                    {layerLabels[layer]}
+                  </span>
+                  <span className="text-xs text-[#aaa69d]">
+                    {layerVisibility[layer] ? "Rodomas" : "Paslėptas"}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {advancedPanel ? (
+              <div
+                className="mt-5 border-t border-white/10 pt-5"
+                data-roof-fusion-advanced-source-actions
+              >
+                {advancedPanel}
+              </div>
+            ) : null}
+
+            {persistencePanel ? (
+              <div className="mt-5">{persistencePanel}</div>
+            ) : null}
+
+            <div
+              className="mt-5 rounded-xl border border-dashed border-white/15 p-3 text-xs text-[#aaa69d]"
+              data-roof-fusion-legacy-fallback-slot
+            >
+              {legacyFallbackPanel ?? (
+                <>
+                  <strong className="block text-[#ddd8cd]">
+                    Senas rankinis skaičiavimas (fallback)
+                  </strong>
+                  <span className="mt-1 block">
+                    Naudokite tik tada, kai patikimesnis RF skaičiavimas
+                    negalimas.
+                  </span>
+                </>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }

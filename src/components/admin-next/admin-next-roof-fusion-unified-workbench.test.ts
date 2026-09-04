@@ -8,6 +8,7 @@ import {
   MAX_ROOF_FUSION_ZOOM,
   MIN_ROOF_FUSION_ZOOM,
   ROOF_FUSION_PENDING_LINE_STROKE,
+  ROOF_FUSION_ONE_CARD_STEPS,
   ROOF_FUSION_SKELETON_ENDPOINT_RADIUS,
   ROOF_FUSION_SKELETON_LINE_STROKE,
   ROOF_FUSION_STAGES,
@@ -35,7 +36,8 @@ const sourceOutline = [
 ] as const;
 
 describe("Admin Next unified Roof Fusion workbench", () => {
-  it("exports a four-stage guided workflow and safe normalized-point helper", () => {
+  it("exports the three-step one-card progress and safe normalized-point helper", () => {
+    expect(ROOF_FUSION_ONE_CARD_STEPS).toEqual(["object", "refine", "result"]);
     expect(ROOF_FUSION_STAGES).toEqual([
       "outline",
       "skeleton",
@@ -177,7 +179,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).not.toContain('data-roof-fusion-layer="skeleton"');
   });
 
-  it("keeps technical controls and the legacy fallback slot in a closed Advanced panel", () => {
+  it("keeps technical controls out of the normal card until Advanced opens", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
         advancedPanel: createElement("button", null, "Atnaujinti šaltinį"),
@@ -186,19 +188,12 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       }),
     );
 
-    const advancedStart = html.indexOf("data-roof-fusion-advanced");
-    const advancedTagStart = html.lastIndexOf("<details", advancedStart);
-    const advancedEnd = html.indexOf("</details>", advancedStart);
-    const advanced = html.slice(advancedStart, advancedEnd);
-    expect(advancedStart).toBeGreaterThan(-1);
-    expect(
-      html.slice(advancedTagStart, html.indexOf(">", advancedTagStart)),
-    ).not.toContain(" open");
-    expect(advanced).toContain("Advanced · techniniai sluoksniai ir kontrolės");
-    expect(advanced).toContain("data-roof-fusion-layer-toggle");
-    expect(advanced).toContain("Atnaujinti šaltinį");
-    expect(advanced).toContain("data-roof-fusion-legacy-fallback-slot");
-    expect(advanced).toContain("Senas rankinis skaičiavimas (fallback)");
+    expect(html).toContain("data-roof-fusion-advanced-trigger");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain("data-roof-fusion-advanced-source-actions");
+    expect(html).not.toContain("data-roof-fusion-layer-toggle");
+    expect(html).not.toContain("Atnaujinti šaltinį");
+    expect(html).not.toContain("data-roof-fusion-legacy-fallback-slot");
   });
 
   it("localizes adapter blocker prose and never exposes unknown English reasons", () => {
@@ -263,7 +258,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(atThreeX.ry * 3).toBeCloseTo(atOneX.ry);
     expect(atMaxZoom.rx * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.rx);
     expect(atMaxZoom.ry * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(atOneX.ry);
-    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("2px");
+    expect(ROOF_FUSION_SKELETON_LINE_STROKE).toBe("1.5px");
     expect(ROOF_FUSION_PENDING_LINE_STROKE).toBe("1.5px");
   });
 
@@ -303,7 +298,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).toContain('data-roof-fusion-layer="skeleton"');
     expect(html).toContain('data-roof-fusion-line-kind="ridge"');
-    expect(html).toContain('stroke-width="2px"');
+    expect(html).toContain('stroke-width="1.5px"');
     expect(html).toContain('data-roof-fusion-line-endpoint="ridge-a:0"');
     expect(html).toContain('rx="0.0025"');
     expect(html).toContain('stroke-width="1px"');
@@ -311,8 +306,10 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(html).toContain('rx="0.022"');
     expect(html).toContain('data-roof-fusion-obstacle="chimney"');
     expect(html).toContain("Trūksta patvirtinto nuolydžio");
-    expect(html).toContain("Pirmiausia išspręskite blokatorius");
-    expect(html).toContain('disabled=""');
+    expect(html).toContain(
+      "Paspaudus „Apskaičiuoti“ bus parodyti reikalingi sprendimai",
+    );
+    expect(html).toContain('data-roof-fusion-primary-action="calculate"');
   });
 
   it("applies only the blockers for the active guided stage", () => {
@@ -335,10 +332,8 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     expect(outlineHtml).not.toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("data-roof-fusion-preview-complete");
-    expect(reviewHtml).toContain(
-      "Preview skaičiavimas parengtas rankinei peržiūrai",
-    );
-    expect(reviewHtml).toContain("nebus naudojamas kainodarai");
+    expect(reviewHtml).toContain("Matavimo rezultatas parengtas peržiūrai");
+    expect(reviewHtml).toContain("dar nenaudojamas kainodarai");
     expect(reviewHtml).not.toContain("Patvirtinti R4 matavimą");
     expect(reviewHtml).not.toContain("Pirmiausia išspręskite blokatorius");
     expect(reviewHtml).not.toContain(
@@ -346,7 +341,7 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
   });
 
-  it("keeps save, reload proof and height gating inside the approved one-window UI", () => {
+  it("keeps save and reload controls outside the closed normal path", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionPersistentWorkbench, {
         actorId: "7",
@@ -378,9 +373,10 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-workbench="unified"');
-    expect(html).toContain('data-roof-fusion-persistence="true"');
-    expect(html).toContain("Išsaugoti ir patvirtinti reviziją");
-    expect(html).toContain("Perkrauti");
+    expect(html).toContain("data-roof-fusion-advanced-trigger");
+    expect(html).not.toContain('data-roof-fusion-persistence="true"');
+    expect(html).not.toContain("Išsaugoti ir patvirtinti reviziją");
+    expect(html).not.toContain(">Perkrauti<");
     expect(html).not.toContain("pakeitimai šiame pjūvyje dar neišsaugomi");
   });
 });

@@ -8,6 +8,8 @@ import { buildWorkbenchDraftFromUiV1 } from "@/lib/roof-fusion/workbench-ui-clie
 import { AdminNextRoofFusionPersistentWorkbench } from "./admin-next-roof-fusion-persistent-workbench";
 import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
 import type { KartverketHeightSurfaceV1 } from "@/lib/providers/kartverket-hoydedata-provider";
+import { buildApprovedGableRoofFixtureV1 } from "@/lib/roof-fusion/gable-roof-fixture-v1";
+import { projectRoofFusionWorkbenchDetailedResultV1 } from "@/lib/roof-fusion/workbench-detailed-result-v1";
 
 const geoReference = {
   crs: "EPSG:25833" as const,
@@ -92,6 +94,20 @@ const heightSurface = {
   },
 } satisfies KartverketHeightSurfaceV1;
 
+function detailedResultFixture() {
+  const result = projectRoofFusionWorkbenchDetailedResultV1(
+    buildApprovedGableRoofFixtureV1().approvedSnapshot,
+  );
+  return {
+    ...result,
+    vertices: result.vertices.map((vertex) => ({
+      ...vertex,
+      xM: vertex.xM + 500_005,
+      yM: vertex.yM + 6_640_001,
+    })),
+  };
+}
+
 async function flushAsyncWork() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -135,6 +151,16 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
       (button) => button.textContent?.includes(text),
     );
+
+  const openAdvanced = async () => {
+    if (container.querySelector("[data-roof-fusion-advanced]")) return;
+    await click("[data-roof-fusion-advanced-trigger]");
+  };
+
+  const closeAdvanced = async () => {
+    if (!container.querySelector("[data-roof-fusion-advanced]")) return;
+    await click("[data-roof-fusion-advanced-close]");
+  };
 
   const dispatchCanvasPointerActivation = async (clientX: number) => {
     const canvas = container.querySelector<SVGSVGElement>(
@@ -323,6 +349,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
                     heightResponse === "review"
                       ? { averageSlopeDegrees: 27 }
                       : {},
+                  detailedResult:
+                    heightResponse === "review"
+                      ? detailedResultFixture()
+                      : undefined,
                 }),
                 {
                   headers: { "content-type": "application/json" },
@@ -377,6 +407,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       await flushAsyncWork();
     });
     await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await openAdvanced();
 
     expect(renderedLines()).toHaveLength(1);
     expect(
@@ -419,6 +450,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench(mismatchedCapture, heightSurface));
       await flushAsyncWork();
     });
+    await openAdvanced();
 
     expect(container.textContent).toContain("Rankinės anotacijos neišvalytos");
     expect(buttonWithText("Išsaugoti ir patvirtinti reviziją")?.disabled).toBe(
@@ -440,48 +472,64 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(latest?.revision).toBe(1);
   });
 
-  it("keeps the slopes stage on calculation failure and advances only after success", async () => {
+  it("runs save and calculation behind one action and advances only after success", async () => {
     await act(async () => {
       root.render(renderWorkbench(capture, heightSurface));
       await flushAsyncWork();
     });
-    await click('[data-roof-fusion-stage-tab="slopes"]');
-
     await act(async () => {
-      buttonWithText("Apskaičiuoti nuolydžius")!.click();
+      buttonWithText("Apskaičiuoti")!.click();
       await flushAsyncWork();
     });
 
-    expect(stage()).toBe("slopes");
+    expect(stage()).toBe("outline");
     expect(container.textContent).toContain("Šaltinių tapatybė");
     expect(container.textContent).not.toContain(
       "Workbench height calculation could not be prepared",
     );
+    await closeAdvanced();
 
     heightResponse = "blocked";
     await act(async () => {
-      buttonWithText("Apskaičiuoti nuolydžius")!.click();
+      buttonWithText("Apskaičiuoti")!.click();
       await flushAsyncWork();
     });
 
-    expect(stage()).toBe("slopes");
+    expect(stage()).toBe("outline");
     expect(container.textContent).toContain("SKELETON_DANGLING_ENDPOINT");
     expect(container.textContent).toContain(
       "Kraigo arba slėnio galas nesujungtas",
     );
     expect(container.textContent).not.toContain("Endpoint is not attached");
+    await closeAdvanced();
 
     heightResponse = "review";
     await act(async () => {
-      buttonWithText("Apskaičiuoti nuolydžius")!.click();
+      buttonWithText("Apskaičiuoti")!.click();
       await flushAsyncWork();
     });
 
     expect(stage()).toBe("review");
     expect(container.textContent).toContain("27°");
-    expect(container.textContent).toContain("Reikalinga peržiūra");
+    expect(container.textContent).toContain(
+      "Matavimo rezultatas parengtas peržiūrai",
+    );
     expect(container.textContent).not.toContain("review_required");
     expect(container.textContent).not.toContain("Manual ridge");
+    const surfaceRows = container.querySelectorAll(
+      "[data-roof-fusion-surface-result]",
+    );
+    expect(surfaceRows).toHaveLength(2);
+    expect(
+      container.querySelector('[data-roof-fusion-roof-plane="surface-south"]'),
+    ).not.toBeNull();
+    expect(surfaceRows.item(0).getAttribute("aria-pressed")).toBe("true");
+    await act(async () => (surfaceRows.item(1) as HTMLButtonElement).click());
+    expect(surfaceRows.item(0).getAttribute("aria-pressed")).toBe("false");
+    expect(surfaceRows.item(1).getAttribute("aria-pressed")).toBe("true");
+    expect(container.textContent).toContain("Pietinis šlaitas");
+    expect(container.textContent).toContain("Šiaurinis šlaitas");
+    await openAdvanced();
 
     const fallback = container.querySelector<HTMLElement>(
       "[data-roof-fusion-legacy-fallback]",
@@ -522,6 +570,34 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(
       container.querySelector("[data-roof-fusion-legacy-fallback-active]"),
     ).toBeNull();
+  });
+
+  it("keeps Advanced modal keyboard focus contained and restores it on Escape", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      "[data-roof-fusion-advanced-trigger]",
+    );
+    await openAdvanced();
+    expect(
+      container.querySelector("[data-roof-fusion-advanced]"),
+    ).not.toBeNull();
+    expect(
+      document.activeElement?.getAttribute("data-roof-fusion-advanced-close"),
+    ).not.toBeNull();
+
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }),
+      );
+      await flushAsyncWork();
+    });
+
+    expect(container.querySelector("[data-roof-fusion-advanced]")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("snaps a near valley endpoint at 100% and preserves pending on far/zero rejection", async () => {
@@ -669,6 +745,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).not.toBeNull();
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
+    await openAdvanced();
     await act(async () => {
       buttonWithText("Išsaugoti ir patvirtinti reviziją")!.click();
       await flushAsyncWork();
@@ -730,7 +807,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(renderedLines().item(1).getAttribute("x1")).not.toBe(
       renderedLines().item(1).getAttribute("x2"),
     );
-    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("2px");
+    expect(renderedLines().item(1).getAttribute("stroke-width")).toBe("1.5px");
     expect(
       container.querySelectorAll("[data-roof-fusion-line-endpoint]"),
     ).toHaveLength(4);
@@ -746,6 +823,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
+    await openAdvanced();
     const saveButton = buttonWithText("Išsaugoti ir patvirtinti reviziją");
     expect(saveButton).toBeDefined();
     expect(saveButton!.disabled).toBe(false);
@@ -828,6 +906,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       root.render(renderWorkbench());
       await flushAsyncWork();
     });
+    await openAdvanced();
 
     const fallbackButton = buttonWithText(
       "Naudoti rankinį rezultatą peržiūrai",
@@ -839,9 +918,9 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       "Preview · aktyvus senas rankinis fallback",
     );
 
-    await click('[data-roof-fusion-stage-tab="slopes"]');
+    await closeAdvanced();
     const primary = container.querySelector<HTMLButtonElement>(
-      '[data-roof-fusion-primary-action="slopes"]',
+      '[data-roof-fusion-primary-action="calculate"]',
     );
     expect(primary).not.toBeNull();
     expect(primary!.disabled).toBe(false);
@@ -855,10 +934,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       container.querySelector("[data-roof-fusion-preview-complete]"),
     ).not.toBeNull();
     expect(container.textContent).toContain(
-      "Preview skaičiavimas parengtas rankinei peržiūrai",
+      "Matavimo rezultatas parengtas peržiūrai",
     );
     expect(
-      container.querySelector('[data-roof-fusion-primary-action="review"]'),
+      container.querySelector('[data-roof-fusion-primary-action="calculate"]'),
     ).toBeNull();
   });
 });

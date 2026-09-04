@@ -3,8 +3,14 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RealAddressResult } from "./admin-next-roof-fusion-uat-control";
-import type { NorgeIBilderCaptureResult } from "./norgeibilder-capture-control";
+import {
+  RealAddressResult,
+  type RoofFusionHeightAnalysisState,
+} from "./admin-next-roof-fusion-uat-control";
+import type {
+  NorgeIBilderCaptureApi,
+  NorgeIBilderCaptureResult,
+} from "./norgeibilder-capture-control";
 
 const address = {
   id: "0301-1-2-0-0-Lyngveien 28A",
@@ -86,24 +92,27 @@ describe("Roof Fusion one-card Preview flow", () => {
       sourceId: "norge-i-bilder:91",
     };
     let resolveCapture: (result: NorgeIBilderCaptureResult) => void = () => {};
-    const captureApi = vi.fn(
-      () =>
-        new Promise<NorgeIBilderCaptureResult>((resolve) => {
-          resolveCapture = resolve;
-        }),
-    );
+    const captureApi = vi.fn<NorgeIBilderCaptureApi>((request) => {
+      void request;
+      return new Promise<NorgeIBilderCaptureResult>((resolve) => {
+        resolveCapture = resolve;
+      });
+    });
     let resolveHeight: (result: {
       kind: "error";
       code: "HEIGHT_DATA_UNAVAILABLE";
     }) => void = () => {};
     const heightAnalysisAction = vi.fn(
-      () =>
-        new Promise<{
+      (previousState: RoofFusionHeightAnalysisState, formData: FormData) => {
+        void previousState;
+        void formData;
+        return new Promise<{
           kind: "error";
           code: "HEIGHT_DATA_UNAVAILABLE";
         }>((resolve) => {
           resolveHeight = resolve;
-        }),
+        });
+      },
     );
     await act(async () => {
       root.render(
@@ -274,16 +283,25 @@ describe("Roof Fusion one-card Preview flow", () => {
 
   it("ignores a late capture when the operator selected another building", async () => {
     let resolveCapture: (result: NorgeIBilderCaptureResult) => void = () => {};
-    const captureApi = vi.fn(
-      () =>
-        new Promise<NorgeIBilderCaptureResult>((resolve) => {
-          resolveCapture = resolve;
-        }),
+    const captureApi = vi.fn<NorgeIBilderCaptureApi>((request) => {
+      void request;
+      return new Promise<NorgeIBilderCaptureResult>((resolve) => {
+        resolveCapture = resolve;
+      });
+    });
+    const heightAnalysisAction = vi.fn(
+      async (
+        previousState: RoofFusionHeightAnalysisState,
+        formData: FormData,
+      ) => {
+        void previousState;
+        void formData;
+        return {
+          kind: "error" as const,
+          code: "HEIGHT_DATA_UNAVAILABLE" as const,
+        };
+      },
     );
-    const heightAnalysisAction = vi.fn(async () => ({
-      kind: "error" as const,
-      code: "HEIGHT_DATA_UNAVAILABLE" as const,
-    }));
     const candidate = {
       id: "way/123",
       label: "house · 87 m²",

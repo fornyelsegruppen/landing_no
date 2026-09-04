@@ -21,7 +21,7 @@ import {
   AdminNextRoofFusionUnifiedWorkbench,
   type RoofFusionLine,
   type RoofFusionPoint,
-  type RoofFusionStage,
+  type RoofFusionRoofPlane,
 } from "./admin-next-roof-fusion-unified-workbench";
 import {
   buildWorkbenchDraftFromUiV1,
@@ -35,6 +35,7 @@ import type {
   RoofFusionWorkbenchDraftReferenceV1,
   RoofFusionWorkbenchDraftV1,
 } from "@/lib/roof-fusion/workbench-draft-contract-v1";
+import type { RoofFusionWorkbenchDetailedResultV1 } from "@/lib/roof-fusion/workbench-detailed-result-v1";
 import {
   AdminNextRoofFusionLegacyFallbackPanel,
   type RoofFusionLegacyFallbackSelection,
@@ -50,7 +51,118 @@ type HeightResult = {
     averageSlopeDegrees?: number;
     footprintPerimeterMeters?: number;
   };
+  detailedResult?: RoofFusionWorkbenchDetailedResultV1;
 };
+
+function measurementMidpoint(value: {
+  min: number | null;
+  max: number | null;
+}) {
+  if (value.min === null || value.max === null) return undefined;
+  return (value.min + value.max) / 2;
+}
+
+function roofPlaneConfidence(
+  surface: RoofFusionWorkbenchDetailedResultV1["surfaces"][number],
+): RoofFusionRoofPlane["confidence"] {
+  const levels = [
+    surface.pitch.confidence.level,
+    surface.grossSurfaceArea.confidence.level,
+  ];
+  if (levels.includes("low") || levels.includes("unknown")) return "low";
+  if (levels.includes("medium")) return "medium";
+  return "high";
+}
+
+function roofPlaneDirection(azimuthDegrees?: number | null) {
+  if (azimuthDegrees == null || !Number.isFinite(azimuthDegrees)) {
+    return null;
+  }
+  const directions = [
+    "Šiaurinis",
+    "Šiaurės rytų",
+    "Rytinis",
+    "Pietryčių",
+    "Pietinis",
+    "Pietvakarių",
+    "Vakarinis",
+    "Šiaurės vakarų",
+  ] as const;
+  const normalized = ((azimuthDegrees % 360) + 360) % 360;
+  return directions[Math.round(normalized / 45) % directions.length];
+}
+
+/**
+ * Projects the authoritative calculated snapshot surfaces back onto the exact
+ * captured orthophoto. Invalid or incomplete contours are omitted rather than
+ * silently replaced with a preliminary Høydedata visualization.
+ */
+export function roofFusionDetailedResultPlanes(
+  detailedResult: RoofFusionWorkbenchDetailedResultV1 | undefined,
+  reference: NonNullable<NorgeIBilderCaptureResult["geoReference"]> | undefined,
+): RoofFusionRoofPlane[] {
+  if (
+    !detailedResult ||
+    !reference ||
+    detailedResult.schemaVersion !==
+      "roof-fusion-workbench-detailed-result.v1" ||
+    detailedResult.usage !== "preview_only" ||
+    detailedResult.pricingReady !== false
+  ) {
+    return [];
+  }
+  const spanX = reference.bounds.maxEastingM - reference.bounds.minEastingM;
+  const spanY = reference.bounds.maxNorthingM - reference.bounds.minNorthingM;
+  if (!(spanX > 0) || !(spanY > 0)) return [];
+  const vertices = new Map(
+    detailedResult.vertices.map((vertex) => [vertex.vertexId, vertex]),
+  );
+  const contours = new Map(
+    detailedResult.contours.map((contour) => [contour.contourId, contour]),
+  );
+
+  return detailedResult.surfaces.flatMap((surface, index) => {
+    const contour = contours.get(surface.outerContourId);
+    if (!contour || contour.vertexIds.length < 3) return [];
+    const points = contour.vertexIds.flatMap((vertexId) => {
+      const vertex = vertices.get(vertexId);
+      if (!vertex) return [];
+      const point = {
+        x: (vertex.xM - reference.bounds.minEastingM) / spanX,
+        y: (reference.bounds.maxNorthingM - vertex.yM) / spanY,
+      };
+      if (
+        !Number.isFinite(point.x) ||
+        !Number.isFinite(point.y) ||
+        point.x < 0 ||
+        point.x > 1 ||
+        point.y < 0 ||
+        point.y > 1
+      ) {
+        return [];
+      }
+      return [point];
+    });
+    if (points.length !== contour.vertexIds.length) return [];
+    const direction = roofPlaneDirection(surface.azimuthDegrees);
+    return [
+      {
+        id: surface.surfaceId,
+        label: direction ? `${direction} šlaitas` : `Šlaitas ${index + 1}`,
+        points,
+        horizontalAreaSquareMeters: measurementMidpoint(
+          surface.grossHorizontalArea,
+        ),
+        areaSquareMeters: measurementMidpoint(surface.grossSurfaceArea),
+        netAreaSquareMeters: measurementMidpoint(surface.netSurfaceArea),
+        slopeDegrees: measurementMidpoint(surface.pitch),
+        azimuthDegrees: surface.azimuthDegrees ?? undefined,
+        confidence: roofPlaneConfidence(surface),
+        confidenceReason: surface.pitch.confidence.rationale,
+      },
+    ];
+  });
+}
 
 const heightStatusCopy: Record<HeightResult["status"], string> = {
   ready: "Parengta peržiūrai",
@@ -246,6 +358,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
   sourceStatusPanel,
   sourceOutline,
   sourceFootprintId,
+  onChangeBuilding,
+  onWorkflowStateChange,
 }: {
   advancedPanel?: ReactNode;
   actorId: string;
@@ -257,6 +371,11 @@ export function AdminNextRoofFusionPersistentWorkbench({
   sourceStatusPanel?: ReactNode;
   sourceOutline: readonly RoofFusionPoint[];
   sourceFootprintId?: string;
+  onChangeBuilding?: () => void;
+  onWorkflowStateChange?: (
+    state: "annotate" | "calculating" | "result" | "blocked",
+    detail?: string,
+  ) => void;
 }) {
   const [outline, setOutline] =
     useState<readonly RoofFusionPoint[]>(sourceOutline);
@@ -392,131 +511,143 @@ export function AdminNextRoofFusionPersistentWorkbench({
     };
   }, [applyLoadedDraft, caseId]);
 
-  const save = useCallback(async () => {
-    if (
-      !evidenceReady ||
-      unsupportedLatest ||
-      (loadState !== "loaded" && loadState !== "none") ||
-      !capture.geoReference ||
-      !capture.sourceId ||
-      !capture.rawContentHash ||
-      !capture.capturedAt
-    )
-      return;
-    setSaveState("saving");
-    setProblem(null);
-    try {
-      let draft = pendingDraft.current;
-      if (!draft || draft.revision !== (latest?.revision ?? 0) + 1 || !dirty) {
-        const revision = (latest?.revision ?? 0) + 1;
-        const nonce = safeNonce();
-        draft = await buildWorkbenchDraftFromUiV1({
-          caseId,
-          actorId,
-          revision,
-          supersedes: latest ? reference(latest) : null,
-          draftId: `uat-${caseId.replace(":", "-")}-r${revision}-${nonce}`,
-          idempotencyKey: `workbench:${caseId}:r${revision}:${nonce}`,
-          createdAt: new Date().toISOString(),
-          sourceOutline,
-          sourceFootprintId,
-          approvedOutline: outline,
-          lines,
-          evidence: {
-            sourceId: capture.sourceId,
-            sourceContentHash: capture.rawContentHash,
-            attribution: capture.attribution ?? "©norgeibilder.no",
-            imageId: capture.mediaId,
-            georeference: capture.geoReference,
-          },
-        });
-        pendingDraft.current = draft;
-      }
-      const saved = await persistAndReloadWorkbenchDraftV1(
-        draft,
-        latest ? reference(latest) : null,
-      );
-      setLatest(saved.draft);
-      setConfirmed(saved.draft);
-      setDirty(false);
-      setSaveState(saved.status);
-      setGeometryHydrationSignal((current) => current + 1);
-      pendingDraft.current = null;
-    } catch (error) {
-      setSaveState("error");
-      setProblem(localizedWorkbenchProblem(error, "Išsaugoti nepavyko."));
-    }
-  }, [
-    actorId,
-    capture,
-    caseId,
-    dirty,
-    evidenceReady,
-    latest,
-    lines,
-    outline,
-    sourceOutline,
-    sourceFootprintId,
-    loadState,
-    unsupportedLatest,
-  ]);
-
-  const calculate = useCallback(async () => {
-    if (
-      !confirmed ||
-      dirty ||
-      !heightSurface ||
-      !capture.geoReference ||
-      !capture.sourceId ||
-      !capture.rawContentHash ||
-      !capture.capturedAt
-    )
-      return false;
-    setHeightState("running");
-    setProblem(null);
-    try {
-      const response = await fetch(
-        "/api/admin/roof-fusion/workbench-height-adapter",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
+  const save =
+    useCallback(async (): Promise<RoofFusionWorkbenchDraftV1 | null> => {
+      if (confirmed && !dirty) return confirmed;
+      if (
+        !evidenceReady ||
+        unsupportedLatest ||
+        (loadState !== "loaded" && loadState !== "none") ||
+        !capture.geoReference ||
+        !capture.sourceId ||
+        !capture.rawContentHash ||
+        !capture.capturedAt
+      )
+        return null;
+      setSaveState("saving");
+      setProblem(null);
+      try {
+        let draft = pendingDraft.current;
+        if (
+          !draft ||
+          draft.revision !== (latest?.revision ?? 0) + 1 ||
+          !dirty
+        ) {
+          const revision = (latest?.revision ?? 0) + 1;
+          const nonce = safeNonce();
+          draft = await buildWorkbenchDraftFromUiV1({
             caseId,
-            draftId: confirmed.draftId,
-            draftHash: confirmed.draftHash,
-            targetSnapshotId: `uat-height-${confirmed.draftId}`,
-            idempotencyKey: `height-adapter:${caseId}:${confirmed.draftHash}`,
-            heightSurface,
-            orthophoto: {
+            actorId,
+            revision,
+            supersedes: latest ? reference(latest) : null,
+            draftId: `uat-${caseId.replace(":", "-")}-r${revision}-${nonce}`,
+            idempotencyKey: `workbench:${caseId}:r${revision}:${nonce}`,
+            createdAt: new Date().toISOString(),
+            sourceOutline,
+            sourceFootprintId,
+            approvedOutline: outline,
+            lines,
+            evidence: {
               sourceId: capture.sourceId,
-              rawContentHash: capture.rawContentHash,
-              capturedAt: capture.capturedAt,
+              sourceContentHash: capture.rawContentHash,
               attribution: capture.attribution ?? "©norgeibilder.no",
-              provider: "norgeibilder.no",
-              providerObjectId: String(capture.mediaId ?? capture.sourceId),
-              geoReference: capture.geoReference,
+              imageId: capture.mediaId,
+              georeference: capture.geoReference,
             },
-          }),
-        },
-      );
-      const body = (await response.json().catch(() => null)) as
-        (HeightResult & { code?: string; error?: string }) | null;
-      if (!response.ok || !body)
-        throw new WorkbenchUiApiErrorV1(
-          body?.code ?? "HEIGHT_FAILED",
-          response.status,
-          body?.error ?? "Skaičiavimas nepavyko",
+          });
+          pendingDraft.current = draft;
+        }
+        const saved = await persistAndReloadWorkbenchDraftV1(
+          draft,
+          latest ? reference(latest) : null,
         );
-      setHeightResult(body);
-      setLegacyFallback(null);
-      setHeightState("idle");
-      return body.status !== "blocked";
-    } catch (error) {
-      setHeightState("error");
-      setProblem(localizedWorkbenchProblem(error, "Skaičiavimas nepavyko."));
-      return false;
-    }
-  }, [capture, caseId, confirmed, dirty, heightSurface]);
+        setLatest(saved.draft);
+        setConfirmed(saved.draft);
+        setDirty(false);
+        setSaveState(saved.status);
+        setGeometryHydrationSignal((current) => current + 1);
+        pendingDraft.current = null;
+        return saved.draft;
+      } catch (error) {
+        setSaveState("error");
+        setProblem(localizedWorkbenchProblem(error, "Išsaugoti nepavyko."));
+        return null;
+      }
+    }, [
+      actorId,
+      capture,
+      caseId,
+      confirmed,
+      dirty,
+      evidenceReady,
+      latest,
+      lines,
+      outline,
+      sourceOutline,
+      sourceFootprintId,
+      loadState,
+      unsupportedLatest,
+    ]);
+
+  const calculate = useCallback(
+    async (draftOverride?: RoofFusionWorkbenchDraftV1) => {
+      const calculationDraft = draftOverride ?? confirmed;
+      if (
+        !calculationDraft ||
+        !heightSurface ||
+        !capture.geoReference ||
+        !capture.sourceId ||
+        !capture.rawContentHash ||
+        !capture.capturedAt
+      )
+        return false;
+      setHeightState("running");
+      setProblem(null);
+      try {
+        const response = await fetch(
+          "/api/admin/roof-fusion/workbench-height-adapter",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              caseId,
+              draftId: calculationDraft.draftId,
+              draftHash: calculationDraft.draftHash,
+              targetSnapshotId: `uat-height-${calculationDraft.draftId}`,
+              idempotencyKey: `height-adapter:${caseId}:${calculationDraft.draftHash}`,
+              heightSurface,
+              orthophoto: {
+                sourceId: capture.sourceId,
+                rawContentHash: capture.rawContentHash,
+                capturedAt: capture.capturedAt,
+                attribution: capture.attribution ?? "©norgeibilder.no",
+                provider: "norgeibilder.no",
+                providerObjectId: String(capture.mediaId ?? capture.sourceId),
+                geoReference: capture.geoReference,
+              },
+            }),
+          },
+        );
+        const body = (await response.json().catch(() => null)) as
+          (HeightResult & { code?: string; error?: string }) | null;
+        if (!response.ok || !body)
+          throw new WorkbenchUiApiErrorV1(
+            body?.code ?? "HEIGHT_FAILED",
+            response.status,
+            body?.error ?? "Skaičiavimas nepavyko",
+          );
+        setHeightResult(body);
+        setLegacyFallback(null);
+        setHeightState("idle");
+        return body.status !== "blocked";
+      } catch (error) {
+        setHeightState("error");
+        setProblem(localizedWorkbenchProblem(error, "Skaičiavimas nepavyko."));
+        return false;
+      }
+    },
+    [capture, caseId, confirmed, heightSurface],
+  );
 
   const blockers = useMemo(
     () => [
@@ -552,6 +683,14 @@ export function AdminNextRoofFusionPersistentWorkbench({
     (code) => calculationBlockerCopy[code],
   );
   const roofFusionMetrics = heightResult?.metrics;
+  const calculatedRoofPlanes = useMemo(
+    () =>
+      roofFusionDetailedResultPlanes(
+        heightResult?.detailedResult,
+        capture.geoReference,
+      ),
+    [capture.geoReference, heightResult?.detailedResult],
+  );
   const metrics = legacyFallback
     ? {
         horizontalAreaSquareMeters: legacyFallback.horizontalAreaM2,
@@ -676,9 +815,25 @@ export function AdminNextRoofFusionPersistentWorkbench({
     </div>
   );
 
-  async function primaryAction(stage: RoofFusionStage) {
-    if (stage === "slopes") return legacyFallback ? true : calculate();
-    return true;
+  async function primaryAction() {
+    onWorkflowStateChange?.("calculating");
+    if (legacyFallback) {
+      onWorkflowStateChange?.("result", `${caseId}:legacy-preview`);
+      return true;
+    }
+    const savedDraft = await save();
+    if (!savedDraft) {
+      onWorkflowStateChange?.("blocked", "Juodraščio nepavyko patvirtinti.");
+      return false;
+    }
+    const calculated = await calculate(savedDraft);
+    onWorkflowStateChange?.(
+      calculated ? "result" : "blocked",
+      calculated
+        ? `uat-height-${savedDraft.draftId}`
+        : "Skaičiavimo nepavyko užbaigti.",
+    );
+    return calculated;
   }
 
   return (
@@ -688,14 +843,23 @@ export function AdminNextRoofFusionPersistentWorkbench({
       averageSlopeDegrees={metrics?.averageSlopeDegrees}
       blockers={blockers}
       confidence={
-        legacyFallback || heightResult?.status === "blocked" ? "low" : "medium"
+        legacyFallback ||
+        heightResult?.status === "blocked" ||
+        heightResult?.detailedResult?.snapshot.confidence.level === "low" ||
+        heightResult?.detailedResult?.snapshot.confidence.level === "unknown"
+          ? "low"
+          : heightResult?.detailedResult?.snapshot.confidence.level === "high"
+            ? "high"
+            : "medium"
       }
       confidenceReason={
         legacyFallback
           ? "Naudojamas operatoriaus pasirinktas senas rankinis nuolydžio metodas; rezultatas yra preliminarus ir lieka Preview peržiūrai."
-          : heightResult
-            ? `${heightStatusCopy[heightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
-            : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
+          : heightResult?.detailedResult
+            ? heightResult.detailedResult.snapshot.confidence.rationale
+            : heightResult
+              ? `${heightStatusCopy[heightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
+              : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
       }
       footprintPerimeterMeters={metrics?.footprintPerimeterMeters}
       guardNotice={
@@ -745,6 +909,8 @@ export function AdminNextRoofFusionPersistentWorkbench({
         setLegacyFallback(null);
       }}
       onPrimaryAction={primaryAction}
+      onChangeBuilding={onChangeBuilding}
+      onEditResult={() => onWorkflowStateChange?.("annotate")}
       orthoAttribution={capture.attribution ?? "©norgeibilder.no"}
       orthoImageAlt={orthoImageAlt}
       orthoImageHeight={capture.geoReference?.imageHeight}
@@ -752,8 +918,32 @@ export function AdminNextRoofFusionPersistentWorkbench({
       orthoImageWidth={capture.geoReference?.imageWidth}
       sourceStatusPanel={sourceStatusPanel}
       persistencePanel={persistencePanel}
+      resultIdentity={
+        heightResult?.detailedResult
+          ? {
+              snapshotId: heightResult.detailedResult.snapshot.snapshotId,
+              revision: heightResult.detailedResult.snapshot.revision,
+              snapshotHash: heightResult.detailedResult.snapshot.snapshotHash,
+              measurementMethod:
+                heightResult.detailedResult.snapshot.measurementMethod,
+            }
+          : undefined
+      }
+      roofPlanes={calculatedRoofPlanes}
       sourceOutline={sourceOutline}
       stageBlockers={{
+        outline: legacyFallback
+          ? []
+          : calculationBlockers.filter(
+              (blocker) =>
+                blocker !== calculationBlockerCopy.STORED_DRAFT_HASH_REQUIRED,
+            ),
+        skeleton: legacyFallback
+          ? []
+          : calculationBlockers.filter(
+              (blocker) =>
+                blocker !== calculationBlockerCopy.STORED_DRAFT_HASH_REQUIRED,
+            ),
         slopes: legacyFallback ? [] : calculationBlockers,
         review: [
           "Preview rezultatas visada reikalauja peržiūros ir negali būti perduotas kainodarai.",
