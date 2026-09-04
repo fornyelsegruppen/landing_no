@@ -64,9 +64,17 @@ export type NorgeIBilderCaptureApi = (
 ) => Promise<NorgeIBilderCaptureResult>;
 
 type CaptureDedupeEntry =
-  | { kind: "loading"; promise: Promise<NorgeIBilderCaptureResult> }
-  | { kind: "success"; result: NorgeIBilderCaptureResult }
-  | { kind: "error"; message: string };
+  | {
+      kind: "loading";
+      clickId: string;
+      promise: Promise<NorgeIBilderCaptureResult>;
+    }
+  | {
+      kind: "success";
+      clickId: string;
+      result: NorgeIBilderCaptureResult;
+    }
+  | { kind: "error"; clickId: string; message: string };
 
 const defaultCaptureDedupe = new Map<string, CaptureDedupeEntry>();
 
@@ -174,10 +182,18 @@ export function captureMatchesSelectedAddress(
   if (!captured || !selected) return false;
   if (captured.id.trim() === selected.id.trim()) return true;
   const normalized = (value: string) =>
-    value.trim().toLocaleLowerCase("nb-NO").replace(/\s+/g, " ");
+    value
+      .trim()
+      .toLocaleLowerCase("nb-NO")
+      .replace(/[.,]/g, " ")
+      .replace(/\s+/g, " ");
+  const streetAddress = (candidate: AddressCandidate) =>
+    normalized(candidate.label.split(",", 1)[0] ?? "");
   if (
-    captured.postalCode !== selected.postalCode ||
-    normalized(captured.label) !== normalized(selected.label)
+    !captured.postalCode.trim() ||
+    normalized(captured.postalCode) !== normalized(selected.postalCode) ||
+    !streetAddress(captured) ||
+    streetAddress(captured) !== streetAddress(selected)
   ) {
     return false;
   }
@@ -530,7 +546,15 @@ export function NorgeIBilderCaptureControl({
         });
         return;
       }
-      const clickId = crypto.randomUUID();
+      // A retry after an uncertain transport failure must retain the original
+      // employee-click identity. The server may already have completed and
+      // stored that licensed capture even though its response did not reach
+      // this browser. Reusing the click ID fails closed at the server ledger
+      // instead of opening a second browser capture.
+      const clickId =
+        reason === "explicit" && existing?.kind === "error"
+          ? existing.clickId
+          : crypto.randomUUID();
       onCaptureResultChange?.(null, {
         candidateId: requestedCandidateId,
         phase: "loading",
@@ -544,11 +568,16 @@ export function NorgeIBilderCaptureControl({
         return result;
       });
       if (dedupeKey) {
-        registry.set(dedupeKey, { kind: "loading", promise: capturePromise });
+        registry.set(dedupeKey, {
+          kind: "loading",
+          clickId,
+          promise: capturePromise,
+        });
       }
       try {
         const result = await capturePromise;
-        if (dedupeKey) registry.set(dedupeKey, { kind: "success", result });
+        if (dedupeKey)
+          registry.set(dedupeKey, { kind: "success", clickId, result });
         if (!mounted.current) return;
         setState({
           kind: "success",
@@ -564,7 +593,8 @@ export function NorgeIBilderCaptureControl({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Nepavyko gauti vaizdo.";
-        if (dedupeKey) registry.set(dedupeKey, { kind: "error", message });
+        if (dedupeKey)
+          registry.set(dedupeKey, { kind: "error", clickId, message });
         if (!mounted.current) return;
         setState({
           kind: "error",

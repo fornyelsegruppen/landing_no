@@ -154,4 +154,35 @@ describe("Norge i bilder capture control", () => {
       }),
     ).toBe(true);
   });
+
+  it("accepts the same canonical address across Entur and Kartverket display identities", () => {
+    expect(
+      captureMatchesSelectedAddress(capturedAddress, {
+        ...capturedAddress,
+        id: "KVE:PostalAddress:0301:Lyngveien:28:A",
+        label: "Lyngveien 28A, Oslo",
+        source: "entur",
+        latitude: capturedAddress.latitude + 0.000_02,
+        longitude: capturedAddress.longitude - 0.000_02,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not accept coordinate proximity without matching postal and street identity", () => {
+    expect(
+      captureMatchesSelectedAddress(capturedAddress, {
+        ...capturedAddress,
+        id: "KVE:PostalAddress:nearby",
+        label: "Annen vei 1, Oslo",
+      }),
+    ).toBe(false);
+    expect(
+      captureMatchesSelectedAddress(capturedAddress, {
+        ...capturedAddress,
+        id: "KVE:PostalAddress:wrong-postal",
+        label: "Lyngveien 28A, Oslo",
+        postalCode: "1181",
+      }),
+    ).toBe(false);
+  });
 });

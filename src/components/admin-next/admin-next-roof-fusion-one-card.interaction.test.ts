@@ -154,6 +154,9 @@ describe("Roof Fusion one-card Preview flow", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(captureApi).toHaveBeenCalledTimes(2);
+    expect(captureApi.mock.calls[1]?.[0].clickId).toBe(
+      captureApi.mock.calls[0]?.[0].clickId,
+    );
 
     await act(async () => {
       resolveRetry({
@@ -317,6 +320,19 @@ describe("Roof Fusion one-card Preview flow", () => {
     ).toBe("true");
     await act(async () => {
       resolveCapture(capturedResult);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const initialImage = container.querySelector<HTMLImageElement>(
+      '[alt^="Anksčiau gautas stogo vaizdas"]',
+    );
+    expect(initialImage).not.toBeNull();
+    expect(
+      container
+        .querySelector("[data-roof-fusion-ortho-canvas]")
+        ?.getAttribute("aria-busy"),
+    ).toBe("true");
+    await act(async () => {
+      initialImage!.dispatchEvent(new Event("load"));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -510,6 +526,14 @@ describe("Roof Fusion one-card Preview flow", () => {
       resolveCapture(refreshedCapture);
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+    await act(async () => {
+      container
+        .querySelector<HTMLImageElement>(
+          '[alt^="Anksčiau gautas stogo vaizdas"]',
+        )!
+        .dispatchEvent(new Event("load"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     await vi.waitFor(() =>
       expect(
         container
@@ -600,6 +624,14 @@ describe("Roof Fusion one-card Preview flow", () => {
         ...refreshedCapture,
         capturedAt: "2026-09-04T09:10:00.000Z",
       });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLImageElement>(
+          '[alt^="Anksčiau gautas stogo vaizdas"]',
+        )!
+        .dispatchEvent(new Event("load"));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     const reselection = container.querySelector(
@@ -852,7 +884,132 @@ describe("Roof Fusion one-card Preview flow", () => {
     expect(heightAnalysisAction).not.toHaveBeenCalled();
   });
 
-  it("keeps a valid address capture when the candidate changes while it is loading", async () => {
+  it("keeps the workflow blocked until media renders and retries the same image without a new capture", async () => {
+    let resolveCapture: (result: NorgeIBilderCaptureResult) => void = () => {};
+    const captureApi = vi.fn<NorgeIBilderCaptureApi>(
+      () =>
+        new Promise<NorgeIBilderCaptureResult>((resolve) => {
+          resolveCapture = resolve;
+        }),
+    );
+    const heightAnalysisAction = vi.fn(
+      async (
+        previousState: RoofFusionHeightAnalysisState,
+        formData: FormData,
+      ) => {
+        void previousState;
+        void formData;
+        return { kind: "idle" as const };
+      },
+    );
+
+    await act(async () => {
+      root.render(
+        createElement(RealAddressResult, {
+          actorId: "7",
+          captureApi,
+          caseReference: "TF-13",
+          heightAnalysisAction,
+          leadId: 13,
+          locale: "lt",
+          result: {
+            kind: "success" as const,
+            address,
+            candidates: [
+              {
+                id: "way/123",
+                label: "house · 87 m²",
+                polygon,
+                horizontalAreaSquareMeters: 87,
+                distanceToAddressMeters: 0,
+                containsAddress: true,
+                confidence: "high" as const,
+                confidenceReasoning: "Address point is inside",
+                source: "OpenStreetMap building footprint via Overpass API",
+                sourceUrl: "https://www.openstreetmap.org/way/123",
+                license: "Open Database License (ODbL) 1.0",
+                credits: "© OpenStreetMap contributors",
+              },
+            ],
+            enginePreviews: [],
+          },
+        }),
+      );
+    });
+    await vi.waitFor(() => expect(captureApi).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      resolveCapture({
+        address,
+        addressLabel: address.label,
+        attribution: "©norgeibilder.no",
+        capturedAt: "2026-09-04T09:00:00.000Z",
+        geoReference: {
+          crs: "EPSG:25833",
+          extentTrust: "actual-visible-extent",
+          bounds: {
+            minEastingM: 0,
+            minNorthingM: 0,
+            maxEastingM: 10_000_000,
+            maxNorthingM: 10_000_000,
+          },
+          imageWidth: 1_000,
+          imageHeight: 500,
+        },
+        imageUrl: "/api/admin/media/91",
+        rawContentHash: "a".repeat(64),
+        sourceId: "norge-i-bilder:91",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const image = container.querySelector<HTMLImageElement>(
+      '[alt^="Anksčiau gautas stogo vaizdas"]',
+    );
+    expect(image).not.toBeNull();
+    expect(
+      container.querySelector<HTMLSelectElement>(
+        "[data-roof-fusion-candidate-select]",
+      )?.disabled,
+    ).toBe(true);
+    expect(
+      container.querySelector("[data-roof-fusion-building-selection]"),
+    ).toBeNull();
+
+    await act(async () => {
+      image!.dispatchEvent(new Event("error"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const retry = container.querySelector<HTMLButtonElement>(
+      "[data-roof-fusion-ortho-image-retry]",
+    );
+    expect(retry?.closest("[role='alert']")?.textContent).toContain(
+      "Ortofoto gautas, bet jo vaizdo failo nepavyko saugiai įkelti",
+    );
+    expect(captureApi).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      retry!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(captureApi).toHaveBeenCalledTimes(1);
+    const retriedImage = container.querySelector<HTMLImageElement>(
+      '[alt^="Anksčiau gautas stogo vaizdas"]',
+    );
+    expect(retriedImage?.src).toContain("roofFusionImageRetry=1");
+    await act(async () => {
+      retriedImage!.dispatchEvent(new Event("load"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(
+      container.querySelector("[data-roof-fusion-building-selection]"),
+    ).not.toBeNull();
+    expect(
+      container.querySelector("[data-roof-fusion-ortho-image-error]"),
+    ).toBeNull();
+    expect(heightAnalysisAction).not.toHaveBeenCalled();
+  });
+
+  it("blocks candidate changes until the exact address image has loaded", async () => {
     let resolveCapture: (result: NorgeIBilderCaptureResult) => void = () => {};
     const captureApi = vi.fn<NorgeIBilderCaptureApi>((request) => {
       void request;
@@ -899,7 +1056,12 @@ describe("Roof Fusion one-card Preview flow", () => {
           locale: "lt",
           result: {
             kind: "success" as const,
-            address,
+            address: {
+              ...address,
+              id: "KVE:PostalAddress:0301:Lyngveien:28:A",
+              label: "Lyngveien 28A, Oslo",
+              source: "entur",
+            },
             candidates: [
               candidate,
               {
@@ -916,16 +1078,13 @@ describe("Roof Fusion one-card Preview flow", () => {
       );
     });
 
-    const candidateSelect =
-      container.querySelector<HTMLSelectElement>("select");
+    const candidateSelect = container.querySelector<HTMLSelectElement>(
+      "[data-roof-fusion-candidate-select]",
+    );
     expect(candidateSelect).not.toBeNull();
 
     await vi.waitFor(() => expect(captureApi).toHaveBeenCalledTimes(1));
-    await act(async () => {
-      candidateSelect!.value = "way/456";
-      candidateSelect!.dispatchEvent(new Event("change", { bubbles: true }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    expect(candidateSelect?.disabled).toBe(true);
     await act(async () => {
       resolveCapture({
         address,
@@ -955,17 +1114,33 @@ describe("Roof Fusion one-card Preview flow", () => {
     expect(
       container.querySelector("[data-roof-fusion-workbench='unified']"),
     ).toBeNull();
+    expect(
+      container.querySelector("[data-roof-fusion-building-selection]"),
+    ).toBeNull();
+    const pendingImage = container.querySelector<HTMLImageElement>(
+      '[alt^="Anksčiau gautas stogo vaizdas"]',
+    );
+    expect(pendingImage).not.toBeNull();
+    await act(async () => {
+      pendingImage!.dispatchEvent(new Event("load"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     const buildingSelection = container.querySelector(
       "[data-roof-fusion-building-selection]",
     );
     expect(buildingSelection).not.toBeNull();
     const currentCandidate = buildingSelection?.querySelector<SVGGElement>(
-      '[data-roof-fusion-building-candidate="way/456"]',
+      '[data-roof-fusion-building-candidate="way/123"]',
     );
     expect(currentCandidate?.getAttribute("aria-pressed")).toBe("true");
 
+    const changedCandidate = buildingSelection?.querySelector<SVGGElement>(
+      '[data-roof-fusion-building-candidate="way/456"]',
+    );
+
     await act(async () => {
-      currentCandidate!.dispatchEvent(
+      changedCandidate!.dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
       );
       await new Promise((resolve) => setTimeout(resolve, 0));

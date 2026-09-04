@@ -186,4 +186,23 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
     expect(response.status).toBe(404);
     expect(mocks.capture).not.toHaveBeenCalled();
   });
+
+  it("fails without exposing provider details or returning a false media success", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mocks.capture.mockRejectedValue(
+      new Error("private upstream token and blob location"),
+    );
+
+    const response = await POST(request(body));
+
+    expect(response.status).toBe(500);
+    const payload = await response.json();
+    expect(payload).toMatchObject({ error: "Norge i bilder capture failed" });
+    expect(JSON.stringify(payload)).not.toContain("private upstream token");
+    expect(payload).not.toHaveProperty("imageUrl");
+    expect(mocks.audit).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
 });

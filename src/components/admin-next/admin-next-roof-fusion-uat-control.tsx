@@ -141,6 +141,25 @@ export function selectActiveHeightState(
   return lastSuccessful?.candidateId === candidateId ? lastSuccessful : null;
 }
 
+function orthoImageRequestUrl(imageUrl: string, attempt: number) {
+  if (attempt === 0) return imageUrl;
+  const separator = imageUrl.includes("?") ? "&" : "?";
+  return `${imageUrl}${separator}roofFusionImageRetry=${attempt}`;
+}
+
+function orthoImageBindingKey(
+  candidateId: string,
+  capture: NorgeIBilderCaptureResult,
+) {
+  return [
+    candidateId,
+    capture.sourceId,
+    capture.rawContentHash,
+    capture.capturedAt,
+    capture.imageUrl,
+  ].join(":");
+}
+
 const copy = {
   nb: {
     eyebrow: "Roof Fusion · beskyttet Preview",
@@ -164,6 +183,9 @@ const copy = {
     addressAction: "Finn adresse og åpne ortofoto",
     addressWorking: "Finner og åpner …",
     orthoLoading: "Laster ortofoto …",
+    orthoImageError:
+      "Ortofotoet ble hentet, men bildefilen kunne ikke lastes sikkert. Kontroller forbindelsen og prøv samme bilde på nytt.",
+    orthoImageRetry: "Prøv samme bilde igjen",
     candidateLabel: "Velg riktig bygning",
     footprint: "Horisontalt fotavtrykk",
     distance: "Avstand til adressepunkt",
@@ -279,6 +301,9 @@ const copy = {
     addressAction: "Rasti adresą ir atverti ortofoto",
     addressWorking: "Ieškoma ir atveriama…",
     orthoLoading: "Kraunamas ortofoto…",
+    orthoImageError:
+      "Ortofoto gautas, bet jo vaizdo failo nepavyko saugiai įkelti. Patikrinkite ryšį ir bandykite įkelti tą patį vaizdą dar kartą.",
+    orthoImageRetry: "Bandyti tą patį vaizdą dar kartą",
     candidateLabel: "Pasirinkti teisingą pastatą",
     footprint: "Horizontalus kontūro plotas",
     distance: "Atstumas iki adreso taško",
@@ -395,6 +420,9 @@ const copy = {
     addressAction: "Find address and open orthophoto",
     addressWorking: "Finding and opening…",
     orthoLoading: "Loading orthophoto…",
+    orthoImageError:
+      "The orthophoto was captured, but its image file could not be loaded safely. Check the connection and retry the same image.",
+    orthoImageRetry: "Retry the same image",
     candidateLabel: "Choose the correct building",
     footprint: "Horizontal footprint",
     distance: "Distance to address point",
@@ -824,8 +852,12 @@ export function RealAddressResult({
     result: NorgeIBilderCaptureResult;
   } | null>(null);
   const [capturePhase, setCapturePhase] = useState<
-    "loading" | "ready" | "error"
+    "loading" | "image_loading" | "ready" | "error"
   >("loading");
+  const [captureImageAttempt, setCaptureImageAttempt] = useState(0);
+  const [captureImageError, setCaptureImageError] = useState(false);
+  const captureImageKey = useRef<string | null>(null);
+  const captureImageReadyKey = useRef<string | null>(null);
   const captureResult = captureBinding?.result ?? null;
   const [lastSuccessfulHeight, setLastSuccessfulHeight] = useState<Extract<
     RoofFusionHeightAnalysisState,
@@ -948,6 +980,9 @@ export function RealAddressResult({
     ) => {
       if (context.phase === "loading") {
         setCapturePhase("loading");
+        setCaptureImageError(false);
+        captureImageKey.current = null;
+        captureImageReadyKey.current = null;
         automaticHeightGeneration.current += 1;
         automaticHeightRequestKey.current = null;
         latestAutomaticHeightBinding.current = null;
@@ -956,6 +991,9 @@ export function RealAddressResult({
       }
       if (context.phase === "error") {
         setCapturePhase("error");
+        setCaptureImageError(false);
+        captureImageKey.current = null;
+        captureImageReadyKey.current = null;
         automaticHeightGeneration.current += 1;
         automaticHeightRequestKey.current = null;
         latestAutomaticHeightBinding.current = null;
@@ -965,6 +1003,7 @@ export function RealAddressResult({
       const candidateId = selectedCandidateIdRef.current;
       if (!nextCapture || !candidateId) {
         setCapturePhase("error");
+        setCaptureImageError(false);
         return;
       }
       if (
@@ -975,6 +1014,7 @@ export function RealAddressResult({
         !nextCapture.capturedAt
       ) {
         setCapturePhase("error");
+        setCaptureImageError(false);
         const binding = {
           candidateId,
           addressQuery: result.address.label,
@@ -990,32 +1030,84 @@ export function RealAddressResult({
         });
         return;
       }
-      setCapturePhase("ready");
+      const imageKey = orthoImageBindingKey(candidateId, nextCapture);
+      captureImageKey.current = imageKey;
+      captureImageReadyKey.current = null;
+      setCaptureImageAttempt(0);
+      setCaptureImageError(false);
+      setCapturePhase("image_loading");
       setCaptureBinding({ candidateId, result: nextCapture });
-      dispatchOneCard({
-        type: "CAPTURE_READY",
-        requestId: workflowRequestId,
-        sourceId: nextCapture.sourceId,
-      });
-      const binding = {
-        candidateId,
-        addressQuery: result.address.label,
-        requestKey: [
-          candidateId,
-          nextCapture.sourceId,
-          nextCapture.rawContentHash,
-          nextCapture.capturedAt,
-        ].join(":"),
-      };
-      if (
-        "candidateId" in oneCardState &&
-        oneCardState.candidateId === candidateId
-      ) {
-        runAutomaticHeight(binding);
-      }
     },
-    [oneCardState, result.address, runAutomaticHeight, workflowRequestId],
+    [result.address],
   );
+
+  const handleCaptureImageLoad = useCallback(() => {
+    if (!captureBinding) return;
+    const imageKey = orthoImageBindingKey(
+      captureBinding.candidateId,
+      captureBinding.result,
+    );
+    if (
+      captureImageKey.current !== imageKey ||
+      captureImageReadyKey.current === imageKey
+    ) {
+      return;
+    }
+    captureImageReadyKey.current = imageKey;
+    setCaptureImageError(false);
+    setCapturePhase("ready");
+    dispatchOneCard({
+      type: "CAPTURE_READY",
+      requestId: workflowRequestId,
+      sourceId: captureBinding.result.sourceId!,
+    });
+    const binding = {
+      candidateId: captureBinding.candidateId,
+      addressQuery: result.address.label,
+      requestKey: [
+        captureBinding.candidateId,
+        captureBinding.result.sourceId,
+        captureBinding.result.rawContentHash,
+        captureBinding.result.capturedAt,
+      ].join(":"),
+    };
+    if (
+      "candidateId" in oneCardState &&
+      oneCardState.candidateId === captureBinding.candidateId
+    ) {
+      runAutomaticHeight(binding);
+    }
+  }, [
+    captureBinding,
+    oneCardState,
+    result.address.label,
+    runAutomaticHeight,
+    workflowRequestId,
+  ]);
+
+  const handleCaptureImageError = useCallback(() => {
+    if (!captureBinding) return;
+    const imageKey = orthoImageBindingKey(
+      captureBinding.candidateId,
+      captureBinding.result,
+    );
+    if (captureImageKey.current !== imageKey) return;
+    captureImageReadyKey.current = null;
+    setCaptureImageError(true);
+    setCapturePhase("error");
+  }, [captureBinding]);
+
+  const retryCaptureImage = useCallback(() => {
+    if (!captureBinding) return;
+    captureImageKey.current = orthoImageBindingKey(
+      captureBinding.candidateId,
+      captureBinding.result,
+    );
+    captureImageReadyKey.current = null;
+    setCaptureImageError(false);
+    setCapturePhase("image_loading");
+    setCaptureImageAttempt((attempt) => attempt + 1);
+  }, [captureBinding]);
 
   const confirmBuilding = useCallback(
     (candidateId: string) => {
@@ -1137,15 +1229,23 @@ export function RealAddressResult({
           }))
           .filter((item) => item.points.length >= 3)
       : [];
+  const captureImageSrc = captureResult
+    ? orthoImageRequestUrl(captureResult.imageUrl, captureImageAttempt)
+    : null;
   const orthoCaptureLoading =
-    Boolean(leadId) && (addressPending || capturePhase === "loading");
+    Boolean(leadId) &&
+    (addressPending ||
+      capturePhase === "loading" ||
+      capturePhase === "image_loading");
   const buildingSelectionActive =
     !orthoCaptureLoading &&
+    capturePhase === "ready" &&
     oneCardState.status === "building_select" &&
     Boolean(captureResult?.imageUrl);
   const canRenderUnifiedWorkbench =
     Boolean(leadId) &&
     !orthoCaptureLoading &&
+    capturePhase === "ready" &&
     Boolean(captureResult?.imageUrl) &&
     normalizedSourceOutline.length >= 3 &&
     captureMatchesSelection &&
@@ -1350,7 +1450,10 @@ export function RealAddressResult({
               <img
                 alt={`Anksčiau gautas stogo vaizdas · ${result.address.label}`}
                 className="absolute inset-0 size-full object-contain"
-                src={captureResult.imageUrl}
+                key={captureImageSrc}
+                onError={handleCaptureImageError}
+                onLoad={handleCaptureImageLoad}
+                src={captureImageSrc!}
               />
               <span className="pointer-events-none absolute right-3 bottom-3 rounded-lg bg-black/75 px-2 py-1 text-[10px] font-semibold text-white">
                 {captureResult.attribution ?? "©norgeibilder.no"}
@@ -1376,7 +1479,9 @@ export function RealAddressResult({
               <img
                 alt={`Pasirinkite pastatą · ${result.address.label}`}
                 className="absolute inset-0 size-full object-contain"
-                src={captureResult.imageUrl}
+                onError={handleCaptureImageError}
+                onLoad={handleCaptureImageLoad}
+                src={captureImageSrc!}
               />
               <svg
                 aria-label="Galimi pastatai ortofoto vaizde"
@@ -1652,6 +1757,29 @@ export function RealAddressResult({
 
       {!canRenderUnifiedWorkbench ? (
         <div className="grid content-start gap-3">
+          {captureImageError ? (
+            <div
+              className="rounded-xl border border-red-400/35 bg-red-400/10 p-3 text-xs font-bold text-red-200"
+              data-roof-fusion-ortho-image-error
+              role="alert"
+            >
+              <div className="flex items-start gap-2">
+                <TriangleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0"
+                />
+                <p>{t.orthoImageError}</p>
+              </div>
+              <button
+                className="mt-3 min-h-11 rounded-lg border border-current px-3"
+                data-roof-fusion-ortho-image-retry
+                onClick={retryCaptureImage}
+                type="button"
+              >
+                {t.orthoImageRetry}
+              </button>
+            </div>
+          ) : null}
           {buildingSelectionActive && !orthoCaptureLoading ? (
             <div className="grid gap-2" data-roof-fusion-building-list>
               <strong className="text-xs">{t.candidateLabel}</strong>
@@ -1677,7 +1805,10 @@ export function RealAddressResult({
             <label className="grid gap-2 text-xs font-bold">
               {t.candidateLabel}
               <select
-                className="min-h-11 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 text-sm"
+                aria-disabled={capturePhase !== "ready"}
+                className="min-h-11 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 text-sm disabled:cursor-wait disabled:opacity-60"
+                data-roof-fusion-candidate-select
+                disabled={capturePhase !== "ready"}
                 onChange={(event) => setSelectedId(event.target.value)}
                 value={selected.id}
               >
@@ -1733,7 +1864,11 @@ export function RealAddressResult({
             <input name="candidateId" type="hidden" value={selected.id} />
             <button
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-xs font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
-              disabled={heightPending}
+              disabled={
+                heightPending ||
+                capturePhase !== "ready" ||
+                !captureMatchesSelection
+              }
               type="submit"
             >
               {heightPending ? (
