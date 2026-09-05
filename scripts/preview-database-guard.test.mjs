@@ -118,6 +118,18 @@ describe("Preview migration database guard", () => {
     );
   });
 
+  it("rejects Preview release controls on a non-Preview deployment target", () => {
+    assert.throws(
+      () =>
+        assertPreviewMigrationDatabase({
+          PREVIEW_BASE_DATABASE_ENDPOINT_SHA256: baseFingerprint,
+          PREVIEW_EXPECTED_NEON_PROJECT_ID: "approved-neon-project",
+          VERCEL_ENV: "production",
+        }),
+      /VERCEL_ENV is not preview/,
+    );
+  });
+
   it("fingerprints the supplied environment file instead of an ambient URL", async () => {
     const directory = await mkdtemp(join(tmpdir(), "preview-db-fingerprint-"));
     const environmentFile = join(directory, "preview.env");

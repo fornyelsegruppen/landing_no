@@ -28,7 +28,18 @@ export function normalizedNeonEndpointId(databaseUrl) {
 }
 
 export function assertPreviewMigrationDatabase(environment = process.env) {
-  if (environment.VERCEL_ENV !== "preview") return null;
+  const hasPreviewReleaseControls = Boolean(
+    environment.PREVIEW_BASE_DATABASE_ENDPOINT_SHA256?.trim() ||
+    environment.PREVIEW_EXPECTED_NEON_PROJECT_ID?.trim(),
+  );
+  if (environment.VERCEL_ENV !== "preview") {
+    if (hasPreviewReleaseControls) {
+      throw new Error(
+        "Refusing Preview-controlled migration because VERCEL_ENV is not preview.",
+      );
+    }
+    return null;
+  }
   if (environment.DATABASE_URL_MIGRATE?.trim()) {
     throw new Error(
       "Refusing Preview migration while DATABASE_URL_MIGRATE overrides the deployment database branch.",
