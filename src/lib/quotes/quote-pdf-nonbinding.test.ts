@@ -87,7 +87,7 @@ describe("quote PDF Preview nonbinding branding", () => {
     expect(pages.length).toBeGreaterThan(1);
     expect(pages[0]).toContain("ingen bindende bestilling");
     for (const page of pages) {
-      expect(page).toContain("PREVIEW TEST - IKKE BINDENDE");
+      expect(page).toContain("PREVIEW TEST – IKKE BINDENDE");
     }
   });
 

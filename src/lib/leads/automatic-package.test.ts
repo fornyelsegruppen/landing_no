@@ -94,6 +94,12 @@ describe("automatic building selection", () => {
       address: "Lyngveien 28A",
       postal: "1182",
       city: "Oslo",
+      addressVerificationStatus: "verified",
+      addressVerificationProvider: "kartverket-address-rest-v1",
+      addressVerificationProviderId: "address-7",
+      addressLatitude: 59.86,
+      addressLongitude: 10.81,
+      addressVerifiedAt: "2026-09-05T08:00:00.000Z",
       caseRevision: 1,
     };
     const payload = {
@@ -164,5 +170,34 @@ describe("automatic building selection", () => {
         "contracts",
       ]),
     );
+    expect(addressProvider.searchAddress).not.toHaveBeenCalled();
+  });
+
+  it("blocks automatic measurement when address text has no server verification evidence", async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const payload = {
+      findByID: vi.fn().mockResolvedValue({
+        id: 8,
+        status: "new",
+        address: "Manualveien 8",
+        postal: "1182",
+        city: "Oslo",
+        addressVerificationStatus: "manual",
+        caseRevision: 1,
+      }),
+      find: vi.fn().mockResolvedValue({ docs: [] }),
+      update,
+    } as unknown as Payload;
+    const buildings = { findBuildings: vi.fn() };
+
+    const result = await prepareAutomaticLeadMeasurement(payload, 8, {
+      buildings: buildings as never,
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      code: "ADDRESS_UNVERIFIED",
+    });
+    expect(buildings.findBuildings).not.toHaveBeenCalled();
   });
 });

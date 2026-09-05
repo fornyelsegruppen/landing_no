@@ -44,7 +44,7 @@ describe("Preview E2E operator capabilities", () => {
     ).toEqual([]);
   });
 
-  it("fails closed when a feature dependency or recipient policy is missing", () => {
+  it("keeps manual drafting available while AI and sending stay independently gated", () => {
     expect(
       resolvePreviewE2eOperatorCapabilities({
         ...previewAdmin,
@@ -53,7 +53,11 @@ describe("Preview E2E operator capabilities", () => {
           FEATURE_AI_DRAFTS: "true",
         },
       }),
-    ).toEqual(["case.read"]);
+    ).toEqual([
+      "case.read",
+      "case.reply.prepare",
+      "case.question.reply.prepare",
+    ]);
 
     const capabilities = resolvePreviewE2eOperatorCapabilities({
       ...previewAdmin,

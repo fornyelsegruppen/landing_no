@@ -214,6 +214,7 @@ function projectRow(
         customerName: canonicalCustomerName(row.item),
         id: caseId,
         postalAddress: row.item.postalAddress,
+        receivedAt: row.item.createdAt,
         revision: row.caseRevision,
         reference: `TF-${row.item.id}`,
         href: row.item.href,
@@ -243,6 +244,7 @@ function itemFingerprint(item: WorkQueueItem) {
     case: {
       customerName: item.case.customerName,
       postalAddress: item.case.postalAddress,
+      receivedAt: item.case.receivedAt,
       revision: item.case.revision,
     },
     kind: item.action.kind,

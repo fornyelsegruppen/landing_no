@@ -14,10 +14,19 @@ import {
   buildLeadEmailText,
 } from "@/lib/lead-email";
 import { buildLeadPdf, leadPdfFilename } from "@/lib/lead-pdf";
+import {
+  adminNotificationFallbackLocale,
+  parseAdminNotificationRecipients,
+  resolveAdminNotificationRecipients,
+  type AdminNotificationProfile,
+} from "@/lib/lead-admin-notification-recipient";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { verifyTurnstile } from "@/lib/turnstile";
-import { captureException } from "@/lib/monitoring";
-import { contactMethodSchema } from "@/lib/lead-contact-validation";
+import { captureException, captureOperationalNotice } from "@/lib/monitoring";
+import {
+  contactMethodSchema,
+  optionalPhoneSchema,
+} from "@/lib/lead-contact-validation";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import {
   createReceiptMessage,
@@ -27,6 +36,11 @@ import {
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { readFeatureFlags } from "@/lib/platform/features";
 import { processOperationalJobs } from "@/lib/jobs/operational-job-processor";
+import {
+  clearedAddressVerification,
+  resolveKartverketAddressClaim,
+  verifiedAddressFields,
+} from "@/lib/leads/address-verification";
 
 const optionalAttributionText = (max: number) =>
   z.string().trim().max(max).optional();
@@ -40,15 +54,29 @@ const inquiryTypes = [
   "usikker",
 ] as const;
 
+const addressSelectionSchema = z
+  .object({
+    provider: z.literal("kartverket-address-rest-v1"),
+    providerAddressId: z.string().trim().min(1).max(300),
+    canonicalLabel: z.string().trim().min(4).max(200),
+    streetAddress: z.string().trim().min(2).max(200),
+    postalCode: z.string().trim().min(3).max(12),
+    city: z.string().trim().min(1).max(120),
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
+  })
+  .strict();
+
 const leadSchema = z
   .object({
     name: z.string().min(2).max(120),
-    phone: z.string().min(5).max(40).optional(),
+    phone: optionalPhoneSchema,
     postal: z.string().min(3).max(12),
     type: z.enum(inquiryTypes),
     locale: z.enum(["no", "en"]),
     email: z.string().email().max(200).optional(),
     address: z.string().trim().max(200).optional(),
+    addressSelection: addressSelectionSchema.optional(),
     roofSize: z
       .string()
       .max(20)
@@ -88,6 +116,23 @@ const leadSchema = z
   .refine((data) => contactMethodSchema.safeParse(data).success, {
     message: "Phone or email is required",
     path: ["phone"],
+  })
+  .superRefine((data, context) => {
+    if (!data.addressSelection) return;
+    if (data.address?.trim() !== data.addressSelection.streetAddress) {
+      context.addIssue({
+        code: "custom",
+        message: "Selected address does not match the submitted address",
+        path: ["addressSelection", "streetAddress"],
+      });
+    }
+    if (data.postal.trim() !== data.addressSelection.postalCode) {
+      context.addIssue({
+        code: "custom",
+        message: "Selected address does not match the submitted postal code",
+        path: ["addressSelection", "postalCode"],
+      });
+    }
   });
 
 function parsePhotoUrls(value: unknown): string[] {
@@ -203,6 +248,7 @@ export async function POST(request: Request) {
       message,
       email,
       address,
+      addressSelection,
       roofSize,
       photoUrls = [],
       consentText,
@@ -224,6 +270,27 @@ export async function POST(request: Request) {
     } = parsed.data;
 
     const approxSqm = roofSize ? Number(roofSize) : undefined;
+    let resolvedAddress = null;
+    if (addressSelection) {
+      try {
+        resolvedAddress = await resolveKartverketAddressClaim(addressSelection);
+      } catch (error) {
+        captureException(error, {
+          route: "POST /api/lead",
+          operation: "verify-address-selection",
+          correlationId,
+        });
+      }
+    }
+    const addressVerification = resolvedAddress
+      ? verifiedAddressFields(resolvedAddress, new Date())
+      : clearedAddressVerification(
+          addressSelection
+            ? "verification_failed"
+            : address
+              ? "manual"
+              : "unverified",
+        );
 
     const payload = await getPayload();
     const created = await payload.create({
@@ -238,7 +305,9 @@ export async function POST(request: Request) {
         message: message || "",
         ...(email ? { email } : {}),
         preferredChannel: email ? "email" : "sms",
-        address: address || "Ikke oppgitt",
+        address: resolvedAddress?.streetAddress || address || "Ikke oppgitt",
+        ...(resolvedAddress ? { city: resolvedAddress.city } : {}),
+        ...addressVerification,
         ...(approxSqm && Number.isFinite(approxSqm) ? { approxSqm } : {}),
         ...(photoUrls.length ? { photoUrls: photoUrls.join("\n") } : {}),
         consentAt: new Date().toISOString(),
@@ -346,7 +415,7 @@ export async function POST(request: Request) {
       type,
       locale,
       email,
-      address,
+      address: resolvedAddress?.label || address,
       approxSqm:
         approxSqm && Number.isFinite(approxSqm) ? approxSqm : undefined,
       message,
@@ -370,37 +439,118 @@ export async function POST(request: Request) {
     if (process.env.RESEND_API_KEY) {
       try {
         const resend = new Resend(process.env.RESEND_API_KEY);
-        let attachments:
-          | { filename: string; content: Buffer; contentType: string }[]
-          | undefined;
-        try {
-          const pdfBytes = await buildLeadPdf(emailPayload);
-          attachments = [
-            {
-              filename: leadPdfFilename(emailPayload),
-              content: Buffer.from(pdfBytes),
-              contentType: "application/pdf",
-            },
-          ];
-        } catch (pdfErr) {
-          captureException(pdfErr, {
-            route: "POST /api/lead",
-            operation: "build-pdf",
-          });
-        }
-
         const notificationRecipient =
           process.env.LEAD_TO_EMAIL || siteConfig.email;
         assertPreviewEmailRecipientsAllowed({ to: notificationRecipient });
-        await resend.emails.send({
-          from: process.env.LEAD_FROM_EMAIL || "leads@takfornyelse.as",
-          to: notificationRecipient,
-          ...(email ? { replyTo: email } : {}),
-          subject: previewEmailSubject(buildLeadEmailSubject(emailPayload)),
-          text: buildLeadEmailText(emailPayload),
-          html: buildLeadEmailHtml(emailPayload),
-          ...(attachments ? { attachments } : {}),
+        const configuredRecipients = parseAdminNotificationRecipients(
+          notificationRecipient,
+        );
+        if (!configuredRecipients.length) {
+          throw new TypeError(
+            "No valid lead notification recipient configured",
+          );
+        }
+
+        let profiles: AdminNotificationProfile[] = [];
+        let profileLookupFailed = false;
+        try {
+          const matchedProfiles = await payload.find({
+            collection: "users",
+            depth: 0,
+            limit: configuredRecipients.length,
+            pagination: false,
+            overrideAccess: true,
+            select: {
+              active: true,
+              email: true,
+              interfaceLanguage: true,
+              role: true,
+            },
+            where: {
+              and: [
+                {
+                  email: {
+                    in: configuredRecipients.map(
+                      (recipient) => recipient.email,
+                    ),
+                  },
+                },
+                { active: { equals: true } },
+                { role: { equals: "admin" } },
+              ],
+            },
+          });
+          profiles = matchedProfiles.docs;
+        } catch (profileLookupError) {
+          profileLookupFailed = true;
+          captureException(profileLookupError, {
+            route: "POST /api/lead",
+            operation: "resolve-admin-notification-language",
+          });
+        }
+
+        const recipients = resolveAdminNotificationRecipients({
+          configuredRecipients: notificationRecipient,
+          fallbackLocale: adminNotificationFallbackLocale(),
+          profiles,
         });
+        const fallbackRecipients = recipients.filter(
+          (recipient) => recipient.localeSource === "fallback",
+        );
+        if (fallbackRecipients.length) {
+          captureOperationalNotice("admin_notification_language_fallback", {
+            count: fallbackRecipients.length,
+            fallbackLocale: adminNotificationFallbackLocale(),
+            reason: profileLookupFailed
+              ? "profile_lookup_failed"
+              : "matching_active_admin_profile_missing_or_invalid",
+            route: "POST /api/lead",
+          });
+        }
+
+        for (const recipient of recipients) {
+          try {
+            let attachments:
+              | { filename: string; content: Buffer; contentType: string }[]
+              | undefined;
+            try {
+              const pdfBytes = await buildLeadPdf(
+                emailPayload,
+                recipient.locale,
+              );
+              attachments = [
+                {
+                  filename: leadPdfFilename(emailPayload, recipient.locale),
+                  content: Buffer.from(pdfBytes),
+                  contentType: "application/pdf",
+                },
+              ];
+            } catch (pdfErr) {
+              captureException(pdfErr, {
+                route: "POST /api/lead",
+                operation: "build-admin-notification-pdf",
+              });
+            }
+
+            assertPreviewEmailRecipientsAllowed({ to: recipient.to });
+            await resend.emails.send({
+              from: process.env.LEAD_FROM_EMAIL || "leads@takfornyelse.as",
+              to: recipient.to,
+              ...(email ? { replyTo: email } : {}),
+              subject: previewEmailSubject(
+                buildLeadEmailSubject(emailPayload, recipient.locale),
+              ),
+              text: buildLeadEmailText(emailPayload, recipient.locale),
+              html: buildLeadEmailHtml(emailPayload, recipient.locale),
+              ...(attachments ? { attachments } : {}),
+            });
+          } catch (recipientError) {
+            captureException(recipientError, {
+              route: "POST /api/lead",
+              operation: "send-admin-notification-email",
+            });
+          }
+        }
       } catch (err) {
         captureException(err, {
           route: "POST /api/lead",

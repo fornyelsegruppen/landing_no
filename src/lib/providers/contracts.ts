@@ -72,6 +72,8 @@ export interface SmsProvider {
 export type AddressCandidate = {
   id: string;
   label: string;
+  /** Structured street and house number when supplied by the provider. */
+  streetAddress?: string;
   postalCode: string;
   city: string;
   latitude: number;

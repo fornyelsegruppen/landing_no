@@ -160,6 +160,75 @@ describe("Admin Next case communication pagination", () => {
     });
   });
 
+  it("marks provider-accepted queued delivery evidence as unreconciled", async () => {
+    const find = vi.fn().mockResolvedValue({
+      docs: [
+        {
+          ...message(28),
+          category: "receipt",
+          direction: "outbound",
+          status: "queued",
+          sentAt: "2026-09-05T06:48:00.000Z",
+          provider: "resend",
+          providerMessageId: "resend-message-28",
+          failureCode: "Error",
+          failureMessage: "Application finalization failed",
+        },
+      ],
+      totalDocs: 1,
+    });
+    const count = vi.fn().mockResolvedValue({ totalDocs: 1 });
+
+    const page = await loadAdminNextCaseCommunicationPage(
+      { count, find } as never,
+      2,
+    );
+
+    expect(page.items[0]).toMatchObject({
+      id: "message-28",
+      status: "queued",
+      sentAt: "2026-09-05T06:48:00.000Z",
+      delivery: {
+        provider: "resend",
+        providerMessageId: "resend-message-28",
+        failureCode: "Error",
+        failureMessage: "Application finalization failed",
+        reconciliationState: "provider_accepted_unreconciled",
+      },
+    });
+    expect(page.items[0]).not.toHaveProperty("deliveredAt");
+  });
+
+  it.each([
+    ["provider ID only", { providerMessageId: "resend-message-id-only" }],
+    ["sentAt only", { sentAt: "2026-09-05T06:48:00.000Z" }],
+  ] as const)(
+    "marks nonterminal %s evidence as unreconciled",
+    async (_label, evidence) => {
+      const find = vi.fn().mockResolvedValue({
+        docs: [
+          {
+            ...message(28),
+            direction: "outbound",
+            status: "queued",
+            ...evidence,
+          },
+        ],
+        totalDocs: 1,
+      });
+      const count = vi.fn().mockResolvedValue({ totalDocs: 1 });
+
+      const page = await loadAdminNextCaseCommunicationPage(
+        { count, find } as never,
+        2,
+      );
+
+      expect(page.items[0].delivery?.reconciliationState).toBe(
+        "provider_accepted_unreconciled",
+      );
+    },
+  );
+
   it("rejects malformed cursors before reading canonical data", async () => {
     const find = vi.fn();
     const count = vi.fn();

@@ -34,8 +34,10 @@ export type AdminNextCaseCommunication = {
     queuedAt?: string;
     recipient?: string;
     provider?: string;
+    providerMessageId?: string;
     failureCode?: string;
     failureMessage?: string;
+    reconciliationState?: "provider_accepted_unreconciled";
     manualRecovery?: {
       channel?: string;
       status?: string;
@@ -62,33 +64,63 @@ export type AdminNextCaseCommunicationPage = {
   };
 };
 
+export type AdminNextCustomerQuestion = {
+  id: string;
+  subject: string;
+  bodyText: string;
+  channel: string;
+  receivedAt: string;
+  documentReferences: readonly string[];
+  replyStage:
+    "prepare" | "review" | "queued" | "sent" | "delivered" | "delivery_failed";
+  reply?: {
+    id: string;
+    subject: string;
+    bodyText: string;
+    status: string;
+    at: string;
+  };
+  fallbackHref: string;
+};
+
+export type AdminNextOriginalInquiry = {
+  receivedAt: string | null;
+  inquiryType: string | null;
+  message: string | null;
+  approximateAreaSquareMeters?: number | null;
+  areaProvenance?: "customer_reported_unverified";
+  contact: {
+    email: string | null;
+    phone: string | null;
+  };
+  address: {
+    streetAddress: string | null;
+    postalCode: string | null;
+    city: string | null;
+  };
+  photoCount: number;
+};
+
 export type AdminNextCustomerRecord = {
+  originalInquiry?: AdminNextOriginalInquiry;
+  activeReplyDraft?: {
+    id: number;
+    aiAssisted: boolean;
+    bodyText: string;
+    manualReplyRequiresEditing: boolean;
+    replyTarget?: {
+      id: number;
+      subject: string;
+      bodyText: string;
+    };
+    subject: string;
+    updatedAt: string;
+  };
   questions: {
     total: number;
     unresolved: boolean;
-    active?: {
-      id: string;
-      subject: string;
-      bodyText: string;
-      channel: string;
-      receivedAt: string;
-      documentReferences: readonly string[];
-      replyStage:
-        | "prepare"
-        | "review"
-        | "queued"
-        | "sent"
-        | "delivered"
-        | "delivery_failed";
-      reply?: {
-        id: string;
-        subject: string;
-        bodyText: string;
-        status: string;
-        at: string;
-      };
-      fallbackHref: string;
-    };
+    outstanding: readonly AdminNextCustomerQuestion[];
+    active?: AdminNextCustomerQuestion;
   };
   communications: readonly AdminNextCaseCommunication[];
   communicationPage?: AdminNextCaseCommunicationPage["pageInfo"];
@@ -182,9 +214,15 @@ export type AdminNextTimelineState =
     };
 
 export type AdminNextCaseWorkspaceView = {
+  leadId?: number;
+  caseRevision?: number;
   reference: string;
   customer: string;
   address: string;
+  addressVerification?: {
+    status: "manual" | "unverified" | "verification_failed" | "verified";
+    verifiedAt: string | null;
+  };
   service: string;
   status: "attention" | "on_track" | "waiting";
   owner: {

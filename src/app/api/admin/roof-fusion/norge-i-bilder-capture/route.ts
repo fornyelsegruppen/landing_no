@@ -12,7 +12,7 @@ import {
   NorgeIBilderCaptureError,
   NorgeIBilderCaptureProvider,
 } from "@/lib/providers/norge-i-bilder-capture-provider";
-import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
+import { verifiedLeadAddressCandidate } from "@/lib/leads/address-verification";
 import { NorgeIBilderInteractiveUrlBuilder } from "@/lib/providers/norge-i-bilder-interactive-url";
 import { NorgeIBilderVercelBrowserRuntime } from "@/lib/providers/norge-i-bilder-vercel-browser";
 import { evaluateMutationOrigin } from "@/lib/security/request-origin";
@@ -36,21 +36,6 @@ const requestSchema = z.object({
     })
     .default({ width: 1920, height: 1080 }),
 });
-
-function addressQuery(parts: Array<string | null | undefined>) {
-  return parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
-    .filter(
-      (part, index, normalized) =>
-        normalized.findIndex(
-          (candidate) =>
-            candidate.toLocaleLowerCase("nb-NO") ===
-            part.toLocaleLowerCase("nb-NO"),
-        ) === index,
-    )
-    .join(" ");
-}
 
 export async function POST(request: Request) {
   const correlationId = correlationIdFromHeaders(request.headers);
@@ -87,35 +72,13 @@ export async function POST(request: Request) {
   if (!lead)
     return NextResponse.json({ error: "Case not found" }, { status: 404 });
   const caseId = `lead-${lead.id}`;
-  const query = addressQuery([
-    lead.address,
-    lead.houseNumber,
-    lead.postal,
-    lead.city,
-  ]);
-  if (query.length < 4) {
-    return NextResponse.json(
-      { error: "Case address is incomplete" },
-      { status: 409 },
-    );
-  }
-  let address;
-  try {
-    const candidates = await new KartverketAddressProvider().searchAddress(
-      query,
-    );
-    address =
-      candidates.find((candidate) => candidate.postalCode === lead.postal) ||
-      candidates[0];
-  } catch {
-    return NextResponse.json(
-      { error: "Case address could not be resolved" },
-      { status: 503 },
-    );
-  }
+  const address = verifiedLeadAddressCandidate(lead);
   if (!address) {
     return NextResponse.json(
-      { error: "Case address could not be resolved" },
+      {
+        error: "Case address must be server-verified",
+        code: "ADDRESS_UNVERIFIED",
+      },
       { status: 409 },
     );
   }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assertSources: vi.fn(),
   assertTrackingReady: vi.fn(),
+  aiLeadReply: vi.fn(),
   approvePackage: vi.fn(),
   auth: vi.fn(),
   capture: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   enqueue: vi.fn(),
   findByID: vi.fn(),
   find: vi.fn(),
+  manualLeadReply: vi.fn(),
   manualReply: vi.fn(),
   loadUnresolved: vi.fn(),
   markLeadReviewed: vi.fn(),
@@ -36,16 +38,23 @@ vi.mock("@/lib/payload", () => ({
   })),
 }));
 vi.mock("@/lib/monitoring", () => ({ captureException: mocks.capture }));
-vi.mock("@/lib/messages/message-engine", () => ({
-  assertCustomerReplyDeliveryTrackingReady: mocks.assertTrackingReady,
-  createCustomerReplyDraft: mocks.customerReply,
-  createLeadAiReply: vi.fn(),
-  createManualCustomerQuestionReplyDraft: mocks.manualReply,
-  deliverMessage: mocks.deliver,
-  enqueueMessageJob: mocks.enqueue,
-  manualQuestionReplyPlaceholder:
-    "Skriv et kontrollert svar til kunden her før utsending.",
-}));
+vi.mock("@/lib/messages/message-engine", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/messages/message-engine")
+  >("@/lib/messages/message-engine");
+  return {
+    ...actual,
+    assertCustomerReplyDeliveryTrackingReady: mocks.assertTrackingReady,
+    createCustomerReplyDraft: mocks.customerReply,
+    createLeadAiReply: mocks.aiLeadReply,
+    createManualLeadReplyDraft: mocks.manualLeadReply,
+    createManualCustomerQuestionReplyDraft: mocks.manualReply,
+    deliverMessage: mocks.deliver,
+    enqueueMessageJob: mocks.enqueue,
+    manualQuestionReplyPlaceholder:
+      "Skriv et kontrollert svar til kunden her før utsending.",
+  };
+});
 vi.mock("@/lib/ai/payload-usage-limit", async () => {
   const actual = await vi.importActual<
     typeof import("@/lib/ai/payload-usage-limit")
@@ -114,6 +123,10 @@ describe("admin lead review marker", () => {
       .mockResolvedValue({ context: { purpose: "question" } });
     mocks.assertTrackingReady.mockReset();
     mocks.approvePackage.mockReset();
+    mocks.aiLeadReply.mockReset().mockResolvedValue({
+      duplicate: false,
+      message: { id: 47 },
+    });
     mocks.create.mockReset();
     mocks.customerReply.mockReset().mockResolvedValue({
       duplicate: false,
@@ -145,13 +158,20 @@ describe("admin lead review marker", () => {
         subject: "Forbedret svar på spørsmålet ditt",
       },
     });
+    mocks.provider.health
+      .mockReset()
+      .mockReturnValue({ provider: "log-email", status: "ready" });
     mocks.manualReply.mockReset().mockResolvedValue({
       duplicate: false,
       message: { id: 44 },
     });
+    mocks.manualLeadReply.mockReset().mockResolvedValue({
+      duplicate: false,
+      message: { id: 46 },
+    });
     mocks.loadUnresolved.mockReset().mockResolvedValue({
       question: { id: 33 },
-      reply: null,
+      reply: { id: 44, status: "draft" },
     });
     mocks.reserveUsage.mockReset().mockResolvedValue({ reserved: 1 });
     mocks.update.mockReset();
@@ -182,6 +202,10 @@ describe("admin lead review marker", () => {
   });
 
   it("creates a human-only draft without requiring the AI provider", async () => {
+    mocks.loadUnresolved.mockResolvedValue({
+      question: { id: 33 },
+      reply: null,
+    });
     const response = await POST(
       request({
         action: "prepare_manual_question_reply",
@@ -203,6 +227,51 @@ describe("admin lead review marker", () => {
       expect.anything(),
       expect.objectContaining({ leadId: 10, sourceMessageId: 33 }),
     );
+  });
+
+  it("creates a generic manual lead draft without enabling or calling AI", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("PREVIEW_E2E_OPERATOR_ACCESS", "true");
+    vi.stubEnv("FEATURE_CASE_STATE_ENGINE_V2", "true");
+    vi.stubEnv("FEATURE_AI_DRAFTS", "false");
+    const response = await POST(
+      request({ action: "prepare_manual_reply", expectedRevision: 12 }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a manual lead reply response");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      duplicate: false,
+      manual: true,
+      messageId: 46,
+      ok: true,
+    });
+    expect(mocks.manualLeadReply).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ leadId: 10 }),
+    );
+    expect(mocks.customerReply).not.toHaveBeenCalled();
+    expect(mocks.aiLeadReply).not.toHaveBeenCalled();
+  });
+
+  it("enforces Preview reply capabilities in the endpoint before any mutation", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("PREVIEW_E2E_OPERATOR_ACCESS", "false");
+    vi.stubEnv("FEATURE_CASE_STATE_ENGINE_V2", "true");
+
+    const response = await POST(
+      request({ action: "prepare_manual_reply", expectedRevision: 12 }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a Preview capability response");
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      code: "PREVIEW_CAPABILITY_REQUIRED",
+    });
+    expect(mocks.manualLeadReply).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it.each(["prepare_question_reply", "prepare_manual_question_reply"] as const)(
@@ -268,6 +337,10 @@ describe("admin lead review marker", () => {
       duplicate: false,
       message: { id: 45, status: "draft" },
     });
+    mocks.loadUnresolved.mockResolvedValue({
+      question: { id: 33 },
+      reply: null,
+    });
 
     const response = await POST(
       request({
@@ -297,6 +370,10 @@ describe("admin lead review marker", () => {
         "AI reply contains a price that is not in the approved quote snapshot",
       ),
     );
+    mocks.loadUnresolved.mockResolvedValue({
+      question: { id: 33 },
+      reply: null,
+    });
 
     const response = await POST(
       request({
@@ -320,6 +397,10 @@ describe("admin lead review marker", () => {
     mocks.customerReply.mockRejectedValue(
       new AiUsageLimitError("daily", "2026-08-30T00:00:00.000Z"),
     );
+    mocks.loadUnresolved.mockResolvedValue({
+      question: { id: 33 },
+      reply: null,
+    });
 
     const response = await POST(
       request({
@@ -529,7 +610,103 @@ describe("admin lead review marker", () => {
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
 
-  it("clears the previous provider attempt before retrying delivery", async () => {
+  it.each([
+    {
+      status: "queued",
+      sentAt: "2026-09-05T07:31:00.000Z",
+      providerMessageId: "email_tf2_queued",
+    },
+    {
+      status: "attention",
+      sentAt: "2026-09-05T07:31:00.000Z",
+      providerMessageId: "email_tf2_attention",
+    },
+  ])(
+    "refuses $status retry when provider acceptance requires reconciliation",
+    async ({ status, sentAt, providerMessageId }) => {
+      mocks.findByID
+        .mockReset()
+        .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+        .mockResolvedValueOnce({
+          aiAnalysis: { purpose: "question" },
+          approvedAt: "2026-08-28T09:00:00.000Z",
+          approvedBy: 3,
+          category: "ai_reply",
+          deliveredAt: null,
+          failureCode: "Error",
+          id: 44,
+          lead: 10,
+          provider: "resend",
+          providerMessageId,
+          replyToMessage: 33,
+          sentAt,
+          status,
+        });
+
+      const response = await POST(
+        request({ action: "retry_send", messageId: 44 }),
+        { params: Promise.resolve({ id: "10" }) },
+      );
+
+      if (!response) throw new Error("Expected a reconciliation response");
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        code: "MESSAGE_DELIVERY_RECONCILIATION_REQUIRED",
+        error:
+          "Message has provider acceptance evidence and must be reconciled before another delivery attempt.",
+      });
+      expect(mocks.assertSources).not.toHaveBeenCalled();
+      expect(mocks.provider.health).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+      expect(mocks.enqueue).not.toHaveBeenCalled();
+      expect(mocks.deliver).not.toHaveBeenCalled();
+      expect(mocks.recordAudit).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses retry while the canonical delivery job is still in flight", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({
+        caseRevision: 12,
+        id: 10,
+        recordState: "active",
+        status: "customer_waiting",
+      })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        approvedAt: "2026-08-28T09:00:00.000Z",
+        approvedBy: 3,
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        providerMessageId: null,
+        replyToMessage: 33,
+        sentAt: null,
+        status: "failed",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.find.mockResolvedValueOnce({
+      docs: [{ id: 73, status: "running" }],
+    });
+
+    const response = await POST(
+      request({ action: "retry_send", messageId: 44 }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected an in-flight retry response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining("already in progress"),
+    });
+    expect(mocks.assertSources).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+  });
+
+  it("retries an ordinary failed message without provider acceptance", async () => {
     mocks.findByID
       .mockReset()
       .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
@@ -538,19 +715,26 @@ describe("admin lead review marker", () => {
         approvedAt: "2026-08-28T09:00:00.000Z",
         approvedBy: 3,
         category: "ai_reply",
-        failureCode: "EMAIL_BOUNCED",
-        failureMessage: "Previous delivery failed.",
+        deliveredAt: null,
+        failureCode: "ProviderUnavailableError",
+        failureMessage: "Provider was unavailable before acceptance.",
         id: 44,
         lead: 10,
-        provider: "resend",
-        providerMessageId: "old-provider-message",
+        provider: null,
+        providerMessageId: null,
         replyToMessage: 33,
-        status: "attention",
+        sentAt: null,
+        status: "failed",
+        updatedAt: "2026-08-28T09:00:00.000Z",
       });
     mocks.update.mockResolvedValueOnce({
-      id: 44,
-      status: "queued",
-      updatedAt: "2026-08-28T09:10:00.000Z",
+      docs: [
+        {
+          id: 44,
+          status: "queued",
+          updatedAt: "2026-08-28T09:10:00.000Z",
+        },
+      ],
     });
 
     const response = await POST(
@@ -566,8 +750,16 @@ describe("admin lead review marker", () => {
     });
     expect(mocks.update).toHaveBeenCalledWith({
       collection: "messages",
-      id: 44,
       overrideAccess: true,
+      where: {
+        and: expect.arrayContaining([
+          { id: { equals: 44 } },
+          { status: { equals: "failed" } },
+          { updatedAt: { equals: "2026-08-28T09:00:00.000Z" } },
+          { sentAt: { equals: null } },
+          { providerMessageId: { equals: null } },
+        ]),
+      },
       data: {
         status: "queued",
         approvedBy: 3,
@@ -577,10 +769,6 @@ describe("admin lead review marker", () => {
           purpose: "question",
           deliveryAttempt: 1,
         },
-        sentAt: null,
-        deliveredAt: null,
-        provider: null,
-        providerMessageId: null,
       },
     });
     expect(mocks.enqueue).toHaveBeenCalledWith(
@@ -598,6 +786,49 @@ describe("admin lead review marker", () => {
     );
   });
 
+  it("rejects retry when provider evidence wins the conditional queue race", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        approvedAt: "2026-08-28T09:00:00.000Z",
+        approvedBy: 3,
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        providerMessageId: null,
+        replyToMessage: 33,
+        sentAt: null,
+        status: "failed",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.update.mockResolvedValueOnce({ docs: [] });
+
+    const response = await POST(
+      request({ action: "retry_send", messageId: 44 }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a retry race response");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "MESSAGE_REVISION_CONFLICT",
+    });
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          and: expect.arrayContaining([
+            { sentAt: { equals: null } },
+            { providerMessageId: { equals: null } },
+          ]),
+        },
+      }),
+    );
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+  });
+
   it("refuses and persistently marks a stale customer reply before approval", async () => {
     mocks.findByID
       .mockReset()
@@ -608,6 +839,7 @@ describe("admin lead review marker", () => {
         category: "ai_reply",
         id: 44,
         lead: 10,
+        replyToMessage: 33,
         status: "draft",
         subject: "Svar på spørsmålet ditt",
         updatedAt: "2026-08-28T09:00:00.000Z",
@@ -650,19 +882,126 @@ describe("admin lead review marker", () => {
     expect(mocks.enqueue).not.toHaveBeenCalled();
   });
 
-  it("does not approve an untouched manual-reply placeholder", async () => {
+  it("approves only the canonical active reply for the oldest unanswered question", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({
+        caseRevision: 12,
+        id: 10,
+        recordState: "active",
+        status: "customer_waiting",
+      })
+      .mockResolvedValueOnce({
+        aiAnalysis: { purpose: "question" },
+        bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+        category: "ai_reply",
+        id: 44,
+        lead: 10,
+        replyToMessage: 33,
+        status: "draft",
+        subject: "Svar på spørsmålet ditt",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+    mocks.loadUnresolved.mockResolvedValue({
+      question: { id: 33 },
+      reply: { id: 45, status: "draft" },
+    });
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Svar på spørsmålet ditt",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a canonical-reply rejection");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining("active reply"),
+    });
+    expect(mocks.assertSources).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+  });
+
+  it.each(["approve_send", "retry_send"] as const)(
+    "rejects %s for a closed customer case",
+    async (action) => {
+      mocks.findByID
+        .mockReset()
+        .mockResolvedValueOnce({
+          caseRevision: 12,
+          id: 10,
+          recordState: "active",
+          status: "closed",
+        })
+        .mockResolvedValueOnce({
+          aiAnalysis: { purpose: "question" },
+          approvedAt:
+            action === "retry_send" ? "2026-08-28T09:00:00.000Z" : undefined,
+          bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+          category: "ai_reply",
+          id: 44,
+          lead: 10,
+          providerMessageId: null,
+          replyToMessage: 33,
+          sentAt: null,
+          status: action === "retry_send" ? "failed" : "draft",
+          subject: "Svar på spørsmålet ditt",
+          updatedAt: "2026-08-28T09:00:00.000Z",
+        });
+      const body =
+        action === "approve_send"
+          ? {
+              action,
+              bodyText: "Et kontrollert svar med tilstrekkelig innhold.",
+              expectedCaseRevision: 12,
+              expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+              messageId: 44,
+              subject: "Svar på spørsmålet ditt",
+            }
+          : { action, messageId: 44 };
+
+      const response = await POST(request(body), {
+        params: Promise.resolve({ id: "10" }),
+      });
+
+      if (!response) throw new Error("Expected a terminal-case rejection");
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: expect.stringContaining("closed, converted or archived"),
+      });
+      expect(mocks.assertSources).not.toHaveBeenCalled();
+      expect(mocks.find).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+      expect(mocks.enqueue).not.toHaveBeenCalled();
+      expect(mocks.deliver).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects a restored Unicode-obfuscated manual placeholder after a previous save", async () => {
     mocks.findByID
       .mockReset()
       .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
       .mockResolvedValueOnce({
         aiAnalysis: {
           manualQuestionReply: true,
-          manualReplyRequiresEditing: true,
+          manualReplyRequiresEditing: false,
+          manualReplyPlaceholder:
+            "Skriv et kontrollert svar til kunden her før utsending.",
         },
-        bodyText: "Skriv et kontrollert svar til kunden her før utsending.",
+        bodyText:
+          "Skriv et kontrollert svar\u200B til kunden her før utsending.",
         category: "follow_up",
         id: 44,
         lead: 10,
+        replyToMessage: 33,
         status: "draft",
         subject: "Svar på spørsmålet ditt",
         updatedAt: "2026-08-28T09:00:00.000Z",
@@ -688,6 +1027,87 @@ describe("admin lead review marker", () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
+  it("rejects the manual placeholder on every save even after prior editing", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: {
+          manualLeadReply: true,
+          manualReplyDraft: true,
+          manualReplyRequiresEditing: false,
+          manualReplyPlaceholder:
+            "Write a reviewed, customer-specific reply here before sending.",
+        },
+        bodyText: "A previously edited customer-specific reply.",
+        category: "follow_up",
+        id: 44,
+        lead: 10,
+        status: "draft",
+        subject: "Reply to your roof enquiry",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+
+    const response = await POST(
+      request({
+        action: "save_draft",
+        bodyText:
+          "Write a reviewed, customer-specific reply here before sending.",
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Reply to your roof enquiry",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected a manual save rejection");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "Write and save a customer-specific answer before sending",
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks a generic reply while an older customer question is unanswered", async () => {
+    mocks.findByID
+      .mockReset()
+      .mockResolvedValueOnce({ caseRevision: 12, id: 10 })
+      .mockResolvedValueOnce({
+        aiAnalysis: {
+          manualLeadReply: true,
+          manualReplyDraft: true,
+          manualReplyRequiresEditing: false,
+        },
+        bodyText: "A reviewed but generic lead reply with enough content.",
+        category: "follow_up",
+        id: 44,
+        lead: 10,
+        status: "draft",
+        subject: "Reply to your roof enquiry",
+        updatedAt: "2026-08-28T09:00:00.000Z",
+      });
+
+    const response = await POST(
+      request({
+        action: "approve_send",
+        bodyText: "A reviewed but generic lead reply with enough content.",
+        expectedCaseRevision: 12,
+        expectedMessageUpdatedAt: "2026-08-28T09:00:00.000Z",
+        messageId: 44,
+        subject: "Reply to your roof enquiry",
+      }),
+      { params: Promise.resolve({ id: "10" }) },
+    );
+
+    if (!response) throw new Error("Expected an active-question rejection");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining("oldest unanswered customer question"),
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
   it("marks a manual reply ready only after administrator text is saved", async () => {
     mocks.findByID
       .mockReset()
@@ -702,6 +1122,7 @@ describe("admin lead review marker", () => {
         category: "follow_up",
         id: 44,
         lead: 10,
+        replyToMessage: 33,
         status: "draft",
         subject: "Svar på spørsmålet ditt",
         updatedAt: "2026-08-28T09:00:00.000Z",
@@ -755,6 +1176,7 @@ describe("admin lead review marker", () => {
         category: "follow_up",
         id: 44,
         lead: 10,
+        replyToMessage: 33,
         status: "draft",
         subject: "Svar på spørsmålet ditt",
         updatedAt: "2026-08-28T09:00:00.000Z",
@@ -1132,6 +1554,7 @@ describe("admin lead review marker", () => {
         category: "ai_reply",
         id: 44,
         lead: 10,
+        replyToMessage: 33,
         status: "draft",
         subject: "Svar om maksimalprisen",
         updatedAt: "2026-08-28T09:00:00.000Z",

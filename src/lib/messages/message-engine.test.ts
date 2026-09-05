@@ -7,12 +7,15 @@ import {
 import {
   createCustomerReplyDraft,
   createLeadAiReply,
+  createManualLeadReplyDraft,
   createManualCustomerQuestionReplyDraft,
   createReceiptMessage,
   deliverMessage,
   enqueueCustomerReplyDraft,
   enqueueMessageJob,
   manualQuestionReplyPlaceholder,
+  messageDeliveryRequiresReconciliation,
+  MessageDeliveryReconciliationRequiredError,
 } from "./message-engine";
 import { loadCustomerReplySourceBundle } from "./customer-reply-sources";
 import { PaymentOperationInProgressError } from "@/lib/invoices/payment-operation-lock";
@@ -92,6 +95,7 @@ function matchesWhere(document: TestDocument, where?: TestWhere) {
 
 function repository(
   options: {
+    beforeLeadUpdate?: () => void | Promise<void>;
     beforeConditionalMessageUpdate?: (
       messages: TestDocument[],
       nextTimestamp: () => string,
@@ -140,7 +144,10 @@ function repository(
       collection: string;
       where?: {
         and?: Array<
-          Record<string, { contains?: string; not_equals?: unknown }>
+          Record<
+            string,
+            { contains?: string; equals?: unknown; not_equals?: unknown }
+          >
         >;
         idempotencyKey?: { equals?: string };
       };
@@ -158,6 +165,9 @@ function repository(
               }
               if (comparison.not_equals !== undefined) {
                 return document[field] !== comparison.not_equals;
+              }
+              if (comparison.equals !== undefined) {
+                return document[field] === comparison.equals;
               }
               return true;
             }),
@@ -205,6 +215,9 @@ function repository(
       where?: TestWhere;
     }) {
       const target = collections[collection] || [];
+      if (collection === "leads") {
+        await options.beforeLeadUpdate?.();
+      }
       if (where && collection === "messages") {
         await options.beforeConditionalMessageUpdate?.(messages, nextTimestamp);
       }
@@ -247,6 +260,138 @@ const validCustomerQuestionReply = {
 };
 
 describe("message engine", () => {
+  it("creates an idempotent human-only lead reply draft without sending", async () => {
+    const state = repository();
+    state.leads[0]!.caseRevision = 4;
+
+    const first = await createManualLeadReplyDraft(state.payload, {
+      correlationId: "manual-lead-reply",
+      expectedRevision: 4,
+      leadId: 1,
+    });
+    const duplicate = await createManualLeadReplyDraft(state.payload, {
+      correlationId: "manual-lead-reply-double-click",
+      expectedRevision: 4,
+      leadId: 1,
+    });
+
+    expect(first).toMatchObject({ duplicate: false });
+    expect(duplicate).toMatchObject({
+      duplicate: true,
+      message: { id: first.message.id },
+    });
+    expect(state.messages).toHaveLength(1);
+    expect(state.jobs).toHaveLength(0);
+    expect(first.message).toMatchObject({
+      aiAssisted: false,
+      category: "follow_up",
+      channel: "email",
+      status: "draft",
+    });
+    expect(first.message.aiAnalysis).toMatchObject({
+      manualLeadReply: true,
+      manualReplyDraft: true,
+      manualReplyRequiresEditing: true,
+      sourceLeadRevision: 4,
+    });
+    expect(first.message.modelVersion).toBeNull();
+    expect(first.message.providerMessageId).toBeNull();
+    expect(first.message.queuedAt).toBeNull();
+    expect(first.message.sentAt).toBeNull();
+  });
+
+  it("rejects manual reply creation for a closed or archived lead", async () => {
+    const closed = repository();
+    closed.leads[0]!.status = "closed";
+    await expect(
+      createManualLeadReplyDraft(closed.payload, {
+        correlationId: "manual-lead-reply-closed",
+        expectedRevision: 1,
+        leadId: 1,
+      }),
+    ).rejects.toThrow(/closed or archived/i);
+    expect(closed.messages).toHaveLength(0);
+
+    const archived = repository();
+    archived.leads[0]!.recordState = "archived";
+    await expect(
+      createManualLeadReplyDraft(archived.payload, {
+        correlationId: "manual-lead-reply-archived",
+        expectedRevision: 1,
+        leadId: 1,
+      }),
+    ).rejects.toThrow(/closed or archived/i);
+    expect(archived.messages).toHaveLength(0);
+  });
+
+  it("cancels the new manual draft when the case CAS loses a concurrent update", async () => {
+    const previousFeature = process.env.FEATURE_CASE_STATE_ENGINE_V2;
+    process.env.FEATURE_CASE_STATE_ENGINE_V2 = "true";
+    let rejectCaseUpdate = true;
+    const state = repository({
+      beforeLeadUpdate: () => {
+        if (rejectCaseUpdate) {
+          rejectCaseUpdate = false;
+          throw new Error("CASE_REVISION_CONFLICT:4:5");
+        }
+      },
+    });
+    state.leads[0]!.caseRevision = 4;
+
+    try {
+      await expect(
+        createManualLeadReplyDraft(state.payload, {
+          correlationId: "manual-lead-reply-cas-conflict",
+          expectedRevision: 4,
+          leadId: 1,
+        }),
+      ).rejects.toThrow("Case revision conflict: expected 4, actual 5");
+      expect(state.messages).toHaveLength(1);
+      expect(state.messages[0]).toMatchObject({ status: "cancelled" });
+      expect(state.jobs).toHaveLength(0);
+    } finally {
+      if (previousFeature === undefined) {
+        delete process.env.FEATURE_CASE_STATE_ENGINE_V2;
+      } else {
+        process.env.FEATURE_CASE_STATE_ENGINE_V2 = previousFeature;
+      }
+    }
+  });
+
+  it("uses the canonical communication email when the original email is empty", async () => {
+    const state = repository();
+    state.leads[0]!.email = null;
+    state.leads[0]!.communicationEmail = "confirmed@example.no";
+
+    const result = await createManualLeadReplyDraft(state.payload, {
+      correlationId: "manual-lead-reply-confirmed-recipient",
+      expectedRevision: 1,
+      leadId: 1,
+    });
+
+    expect(result.message).toMatchObject({ channel: "email" });
+    expect(result.message).toMatchObject({
+      approvedAt: null,
+      queuedAt: null,
+      sentAt: null,
+      providerMessageId: null,
+      status: "draft",
+    });
+  });
+
+  it.each([
+    ["provider message id", { status: "queued", providerMessageId: "email_1" }],
+    [
+      "acceptance timestamp",
+      { status: "attention", sentAt: "2026-09-05T07:31:00.000Z" },
+    ],
+  ])(
+    "requires reconciliation for nonterminal %s evidence",
+    (_label, message) => {
+      expect(messageDeliveryRequiresReconciliation(message)).toBe(true);
+    },
+  );
+
   it("rechecks unpaid status under the invoice lock immediately before sending", async () => {
     const state = repository({
       initialCollections: {
@@ -513,7 +658,8 @@ describe("message engine", () => {
       expect(subjects[0]).toMatch(/^\[PREVIEW TEST\] /u);
       expect(state.messages[0]?.subject).toBe(subjects[0]);
     } finally {
-      if (previousVercelEnvironment === undefined) delete process.env.VERCEL_ENV;
+      if (previousVercelEnvironment === undefined)
+        delete process.env.VERCEL_ENV;
       else process.env.VERCEL_ENV = previousVercelEnvironment;
     }
   });
@@ -665,6 +811,46 @@ describe("message engine", () => {
       startedAt: null,
       completedAt: null,
       result: null,
+    });
+  });
+
+  it("blocks transport when a queued message retains prior provider acceptance", async () => {
+    const state = repository();
+    await createReceiptMessage(state.payload, 1, "receipt-reconciliation");
+    const message = state.messages[0]!;
+    Object.assign(message, {
+      status: "queued",
+      sentAt: "2026-08-28T12:15:00.000Z",
+      deliveredAt: null,
+      provider: "resend",
+      providerMessageId: "email_tf2",
+      failureCode: "Error",
+      failureMessage:
+        "The operation failed. Review provider and correlation logs.",
+    });
+    const send = vi.fn();
+
+    await expect(
+      deliverMessage(
+        state.payload,
+        {
+          health: () => ({ status: "ready", provider: "resend" }),
+          send,
+        },
+        message.id,
+        "receipt-reconciliation-attempt",
+        "customer_initiated",
+      ),
+    ).rejects.toBeInstanceOf(MessageDeliveryReconciliationRequiredError);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(message).toMatchObject({
+      status: "queued",
+      sentAt: "2026-08-28T12:15:00.000Z",
+      deliveredAt: null,
+      provider: "resend",
+      providerMessageId: "email_tf2",
+      failureCode: "Error",
     });
   });
 
@@ -912,6 +1098,7 @@ describe("message engine", () => {
 
     const result = await createManualCustomerQuestionReplyDraft(state.payload, {
       correlationId: "manual-question",
+      expectedRevision: 1,
       leadId: 1,
       sourceMessageId: source.id,
     });
@@ -952,6 +1139,7 @@ describe("message engine", () => {
     });
     const draft = await createManualCustomerQuestionReplyDraft(state.payload, {
       correlationId: "manual-question-recipient",
+      expectedRevision: 1,
       leadId: 1,
       sourceMessageId: source.id,
     });
@@ -1232,6 +1420,73 @@ describe("message engine", () => {
     },
   );
 
+  it("returns the canonical active question draft across different generation keys", async () => {
+    const state = repository();
+    const source = await state.payload.create({
+      collection: "messages",
+      overrideAccess: true,
+      data: {
+        lead: 1,
+        direction: "inbound",
+        category: "customer_question",
+        channel: "email",
+        subject: "Spørsmål om tilbud T-1-V1",
+        bodyText: "Hva er inkludert før jeg signerer?",
+        status: "delivered",
+        idempotencyKey: "question-source-cross-generation",
+        aiAssisted: false,
+      },
+    });
+    const initial = await createManualCustomerQuestionReplyDraft(
+      state.payload,
+      {
+        correlationId: "manual-question-cross-generation",
+        expectedRevision: 1,
+        generationKey: "manual-first",
+        leadId: 1,
+        sourceMessageId: source.id,
+      },
+    );
+    const provider = new DeterministicAiProvider(validCustomerQuestionReply);
+    const generate = vi.spyOn(provider, "generate");
+
+    const aiDuplicate = await createCustomerReplyDraft(
+      state.payload,
+      provider,
+      {
+        correlationId: "ai-question-cross-generation",
+        generationKey: "ai-second",
+        leadId: 1,
+        purpose: "question",
+        sourceMessageId: source.id,
+      },
+    );
+    const manualDuplicate = await createManualCustomerQuestionReplyDraft(
+      state.payload,
+      {
+        correlationId: "manual-question-cross-generation-retry",
+        expectedRevision: 999,
+        generationKey: "manual-third",
+        leadId: 1,
+        sourceMessageId: source.id,
+      },
+    );
+
+    expect(initial).toMatchObject({ duplicate: false });
+    expect(aiDuplicate).toMatchObject({
+      duplicate: true,
+      message: { id: initial.message.id },
+    });
+    expect(manualDuplicate).toMatchObject({
+      duplicate: true,
+      message: { id: initial.message.id },
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(
+      state.messages.filter((message) => message.status === "draft"),
+    ).toHaveLength(1);
+  });
+
   it.each(["draft", "queued", "sent"] as const)(
     "returns the active %s concurrency winner when cancelled reactivation loses CAS",
     async (winnerStatus) => {
@@ -1337,12 +1592,14 @@ describe("message engine", () => {
 
     const first = await createManualCustomerQuestionReplyDraft(state.payload, {
       correlationId: "manual-question-replacement",
+      expectedRevision: 1,
       generationKey: "regenerate-44",
       leadId: 1,
       sourceMessageId: source.id,
     });
     const retry = await createManualCustomerQuestionReplyDraft(state.payload, {
       correlationId: "manual-question-replacement-retry",
+      expectedRevision: 1,
       generationKey: "regenerate-44",
       leadId: 1,
       sourceMessageId: source.id,
@@ -1376,6 +1633,7 @@ describe("message engine", () => {
     await expect(
       createManualCustomerQuestionReplyDraft(state.payload, {
         correlationId: "manual-question-invalid",
+        expectedRevision: 1,
         leadId: 1,
         sourceMessageId: source.id,
       }),

@@ -13,6 +13,7 @@ import {
 } from "@/lib/roof-fusion/roof-snapshot-v1";
 
 export type AdminNextRfCaseEntryBlockReason =
+  | "address_unverified"
   | "action_not_eligible"
   | "canonical_snapshot_missing"
   | "context_mismatch"
@@ -111,6 +112,9 @@ export function projectAdminNextRfCaseEntry(
   value: AdminCaseWorkspace,
   rawSnapshot: unknown | null,
 ): AdminNextRfCaseEntryProjection {
+  if (value.lead.addressVerificationStatus !== "verified") {
+    return blocked("address_unverified");
+  }
   const measurement = value.measurement;
 
   if (!measurement) {

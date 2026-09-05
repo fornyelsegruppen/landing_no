@@ -120,6 +120,7 @@ function projectCommunication(
   const record = value as RecordLike;
   const id = numberValue(record.id);
   if (!id) return null;
+  const status = stringValue(record.status) || "—";
   const createdAt = stringValue(record.createdAt);
   const updatedAt = stringValue(record.updatedAt);
   const sentAt = stringValue(record.sentAt);
@@ -131,8 +132,14 @@ function projectCommunication(
   const manualRecovery = recordValue(analysis?.manualRecovery);
   const recipient = stringValue(analysis?.deliveryRecipient);
   const provider = stringValue(record.provider);
+  const providerMessageId = stringValue(record.providerMessageId);
   const failureCode = stringValue(record.failureCode);
   const failureMessage = stringValue(record.failureMessage);
+  const reconciliationState =
+    !["sent", "delivered"].includes(status) &&
+    Boolean(providerMessageId?.trim() || sentAt?.trim())
+      ? ("provider_accepted_unreconciled" as const)
+      : undefined;
   const projectedManualRecovery = manualRecovery
     ? {
         ...(stringValue(manualRecovery.channel)
@@ -157,16 +164,20 @@ function projectCommunication(
     queuedAt ||
     recipient ||
     provider ||
+    providerMessageId ||
     failureCode ||
     failureMessage ||
+    reconciliationState ||
     projectedManualRecovery
       ? {
           ...(approvedAt ? { approvedAt } : {}),
           ...(queuedAt ? { queuedAt } : {}),
           ...(recipient ? { recipient } : {}),
           ...(provider ? { provider } : {}),
+          ...(providerMessageId ? { providerMessageId } : {}),
           ...(failureCode ? { failureCode } : {}),
           ...(failureMessage ? { failureMessage } : {}),
+          ...(reconciliationState ? { reconciliationState } : {}),
           ...(projectedManualRecovery
             ? { manualRecovery: projectedManualRecovery }
             : {}),
@@ -177,7 +188,7 @@ function projectCommunication(
     direction: record.direction === "inbound" ? "inbound" : "outbound",
     channel: stringValue(record.channel) || "—",
     category: stringValue(record.category) || "—",
-    status: stringValue(record.status) || "—",
+    status,
     subject: stringValue(record.subject) || `#${id}`,
     bodyText: stringValue(record.bodyText) || "",
     at: deliveredAt || sentAt || updatedAt || createdAt || "—",

@@ -81,15 +81,23 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       houseNumber: "28A",
       postal: "1182",
       city: "OSLO",
+      addressVerificationStatus: "verified",
+      addressVerificationProvider: "kartverket-address-rest-v1",
+      addressVerificationProviderId: "0301-149-181",
+      addressLatitude: 59.8964,
+      addressLongitude: 10.798,
+      addressVerifiedAt: "2026-09-05T08:00:00.000Z",
     });
     mocks.searchAddress.mockReset().mockResolvedValue([
       {
         id: "0301-149-181",
         label: "Lyngveien 28A, 1182 OSLO",
+        streetAddress: "Lyngveien 28A",
         postalCode: "1182",
         latitude: 59.8964,
         longitude: 10.798,
-        source: "Kartverket",
+        source:
+          "Kartverket Matrikkelen Adresse REST API v1 (© Kartverket)",
       },
     ]);
     mocks.getPayload.mockReset().mockResolvedValue({
@@ -131,10 +139,13 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
       address: {
         id: "0301-149-181",
         label: "Lyngveien 28A, 1182 OSLO",
+        streetAddress: "Lyngveien 28A",
         postalCode: "1182",
+        city: "OSLO",
         latitude: 59.8964,
         longitude: 10.798,
-        source: "Kartverket",
+        source:
+          "Kartverket Matrikkelen Adresse REST API v1 (© Kartverket)",
       },
       addressLabel: "Lyngveien 28A, 1182 OSLO",
       attribution: "©norgeibilder.no",
@@ -155,6 +166,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
     expect(mocks.findByID).toHaveBeenCalledWith(
       expect.objectContaining({ collection: "leads", id: 18 }),
     );
+    expect(mocks.searchAddress).not.toHaveBeenCalled();
     expect(mocks.capture).toHaveBeenCalledWith(
       expect.objectContaining({
         caseId: "lead-18",

@@ -35,6 +35,7 @@ import {
 import { createPreparedPackageForMeasurement } from "@/lib/quotes/payload-quote-engine";
 import { measurementWorkflowMode } from "@/lib/measurements/workflow-mode";
 import { userIsAdmin } from "@/payload/access/roles";
+import { verifiedLeadAddressCandidate } from "@/lib/leads/address-verification";
 
 const candidateSchema = z.object({
   id: z.string(),
@@ -129,38 +130,6 @@ async function priorMeasurement(payload: Payload, leadId: number) {
     where: { lead: { equals: leadId } },
   });
   return result.docs[0];
-}
-
-type LeadAddressFields = {
-  address?: string | null;
-  city?: string | null;
-  houseNumber?: string | null;
-  postal?: string | null;
-};
-
-/** Resolves the only address an approved capture may be bound to: its Lead. */
-async function resolveCurrentLeadAddress(lead: LeadAddressFields) {
-  const query = uniqueAddressParts([
-    lead.address,
-    lead.houseNumber,
-    lead.postal,
-    lead.city,
-  ]).join(" ");
-  if (query.length < 4) return { kind: "incomplete" as const };
-  try {
-    const candidates = await new KartverketAddressProvider().searchAddress(
-      query,
-    );
-    const address =
-      candidates.find((candidate) =>
-        lead.postal ? candidate.postalCode === lead.postal : true,
-      ) || candidates[0];
-    return address
-      ? { kind: "resolved" as const, address }
-      : { kind: "missing" as const };
-  } catch {
-    return { kind: "unavailable" as const };
-  }
 }
 
 async function createVisualMeasurement(input: {
@@ -368,39 +337,18 @@ export async function GET(request: Request) {
       depth: 0,
       overrideAccess: true,
     });
-    const query = uniqueAddressParts([
-      lead.address,
-      lead.houseNumber,
-      lead.postal,
-      lead.city,
-    ]).join(" ");
-    if (query.length < 4)
-      return NextResponse.json(
-        {
-          error: "Address is incomplete",
-          code: "ADDRESS_REQUIRED",
-          addresses: [],
-          candidates: [],
-        },
-        { status: 409 },
-      );
-    const addresses = await new KartverketAddressProvider().searchAddress(
-      query,
-    );
-    const selectedAddress =
-      addresses.find(
-        (address) => !lead.postal || address.postalCode === lead.postal,
-      ) || addresses[0];
+    const selectedAddress = verifiedLeadAddressCandidate(lead);
     if (!selectedAddress)
       return NextResponse.json(
         {
-          error: "Kartverket could not resolve the address",
-          code: "ADDRESS_NOT_FOUND",
+          error: "Address must be server-verified",
+          code: "ADDRESS_UNVERIFIED",
           addresses: [],
           candidates: [],
         },
         { status: 409 },
       );
+    const addresses = [selectedAddress];
     let candidates: BuildingFootprintCandidate[];
     try {
       candidates = await new OpenStreetMapBuildingProvider().findBuildings({
@@ -453,6 +401,7 @@ export async function POST(request: Request) {
     depth: 0,
     overrideAccess: true,
   });
+  const verifiedAddress = verifiedLeadAddressCandidate(lead);
   if (
     parsed.data.expectedRevision !== undefined &&
     Number(lead.caseRevision || 1) !== parsed.data.expectedRevision
@@ -464,6 +413,15 @@ export async function POST(request: Request) {
         code: "CASE_REVISION_CONFLICT",
         expected: parsed.data.expectedRevision,
         actual: Number(lead.caseRevision || 1),
+      },
+      { status: 409 },
+    );
+  }
+  if (parsed.data.action !== "create_manual" && !verifiedAddress) {
+    return NextResponse.json(
+      {
+        error: "Address must be server-verified before visual measurement",
+        code: "ADDRESS_UNVERIFIED",
       },
       { status: 409 },
     );
@@ -650,17 +608,8 @@ export async function POST(request: Request) {
   let reason = "Administrator-created measurement";
   if (parsed.data.action === "create_from_candidate") {
     const { addressId, buildingId, slopeDegrees } = parsed.data;
-    const query = uniqueAddressParts([
-      lead.address,
-      lead.houseNumber,
-      lead.postal,
-      lead.city,
-    ]).join(" ");
-    const addresses = await new KartverketAddressProvider().searchAddress(
-      query,
-    );
-    const address = addresses.find((candidate) => candidate.id === addressId);
-    if (!address)
+    const address = verifiedAddress!;
+    if (address.id !== addressId)
       return NextResponse.json(
         { error: "Address candidate is no longer available" },
         { status: 409 },
@@ -733,28 +682,9 @@ export async function POST(request: Request) {
         credits: "© OpenStreetMap contributors",
       },
     ] satisfies BuildingFootprintCandidate[];
-    let address = parsed.data.address;
-    if (isNorgeIBilderScreenshotSource(parsed.data.imagerySource)) {
-      const resolved = await resolveCurrentLeadAddress(lead);
-      if (resolved.kind === "unavailable")
-        return NextResponse.json(
-          { error: "Case address could not be resolved" },
-          { status: 503 },
-        );
-      if (resolved.kind !== "resolved")
-        return NextResponse.json(
-          {
-            error:
-              resolved.kind === "incomplete"
-                ? "Case address is incomplete"
-                : "Case address could not be resolved",
-          },
-          { status: 409 },
-        );
-      // The client can display the capture address, but it cannot select a
-      // different address for a case-bound Norge i bilder screenshot.
-      address = resolved.address;
-    }
+    // The browser-provided address is display context only. Every visual
+    // measurement binds to the server-verified address stored on the Lead.
+    const address = verifiedAddress!;
     result = await createVisualMeasurement({
       payload,
       actorId: user.id,

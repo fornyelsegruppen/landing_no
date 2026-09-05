@@ -14,3 +14,14 @@ export function captureException(
     redactContext(context ?? {}),
   );
 }
+
+export function captureOperationalNotice(
+  event: string,
+  context?: Record<string, unknown>,
+): void {
+  console.warn(
+    "[monitoring] Operational notice",
+    event,
+    redactContext(context ?? {}),
+  );
+}

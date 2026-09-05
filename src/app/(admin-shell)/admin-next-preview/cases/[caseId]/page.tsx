@@ -16,6 +16,7 @@ import { resolveAdminNextServerRead } from "@/lib/admin-next/server-read-resolve
 import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { resolvePreviewE2eOperatorCapabilities } from "@/lib/admin-next/preview-e2e-operator-capabilities";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
+import { adminNextReplyDraftingReadiness } from "@/lib/admin-next/reply-drafting-readiness";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
@@ -120,8 +121,7 @@ export default async function AdminNextCaseWorkspacePage({
     try {
       const payload = await getPayload();
       const rfReview =
-        roofWorkbenchAccess.kind === "legacy_fallback" ||
-        !canReadCases
+        roofWorkbenchAccess.kind === "legacy_fallback" || !canReadCases
           ? undefined
           : {
               reader: new AdminRoofFusionPreviewReadAdapterV1(
@@ -180,6 +180,14 @@ export default async function AdminNextCaseWorkspacePage({
   return (
     <AdminNextCaseWorkspace
       locale={user.interfaceLanguage}
+      replyDrafting={adminNextReplyDraftingReadiness()}
+      replyPermissions={{
+        approveSend: grantedCapabilities.includes("message.approve_send"),
+        prepareGeneral: grantedCapabilities.includes("case.reply.prepare"),
+        prepareQuestion: grantedCapabilities.includes(
+          "case.question.reply.prepare",
+        ),
+      }}
       returnTo={returnTo}
       source={result.source}
       value={result.value}

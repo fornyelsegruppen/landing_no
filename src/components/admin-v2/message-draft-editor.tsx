@@ -53,6 +53,8 @@ const copy = {
       "Den automatiske faktakontrollen avviste teksten. Rett svaret manuelt, eller lag et nytt AI-utkast.",
     regenerateManual: "Start nytt manuelt svar",
     aiUnavailable: "AI-funksjonen er ikke tilgjengelig nå. Prøv igjen senere.",
+    sendDenied:
+      "Denne kontoen kan lagre utkast, men kan ikke godkjenne og sende meldinger.",
     manualRequired:
       "Erstatt hjelpeteksten med et kundespesifikt svar før du lagrer eller sender.",
     regenerateConfirm:
@@ -98,6 +100,8 @@ const copy = {
       "Automatinė faktų patikra atmetė tekstą. Pataisykite atsakymą rankiniu būdu arba sukurkite naują DI juodraštį.",
     regenerateManual: "Pradėti naują rankinį atsakymą",
     aiUnavailable: "DI funkcija dabar nepasiekiama. Bandykite vėliau.",
+    sendDenied:
+      "Ši paskyra gali išsaugoti juodraštį, bet negali jo patvirtinti ir išsiųsti.",
     manualRequired:
       "Prieš išsaugodami arba siųsdami pakeiskite pagalbinį tekstą konkrečiu atsakymu klientui.",
     regenerateConfirm:
@@ -142,6 +146,8 @@ const copy = {
       "The automated fact check rejected the text. Correct the reply manually or create a new AI draft.",
     regenerateManual: "Start a new manual reply",
     aiUnavailable: "The AI feature is unavailable right now. Try again later.",
+    sendDenied:
+      "This account can save a draft, but cannot approve and send messages.",
     manualRequired:
       "Replace the helper text with a customer-specific reply before saving or sending.",
     regenerateConfirm:
@@ -167,8 +173,12 @@ class CustomerReplyDraftActionError extends Error {
 
 export function MessageDraftEditor(props: {
   aiAssisted?: boolean;
+  aiAvailable?: boolean;
+  aiUnavailableReason?: string;
   blockedByActiveQuestion?: boolean;
   bodyText: string;
+  canApproveSend?: boolean;
+  canEditDraft?: boolean;
   factWarnings?: string[];
   initialRecovery?: CustomerReplyRecoveryKind | null;
   caseRevision: number;
@@ -188,6 +198,9 @@ export function MessageDraftEditor(props: {
   subject: string;
 }) {
   const labels = copy[props.locale];
+  const aiAvailable = props.aiAvailable !== false;
+  const canApproveSend = props.canApproveSend !== false;
+  const canEditDraft = props.canEditDraft !== false;
   const router = useRouter();
   const sourceChangedAlert = useRef<HTMLDivElement>(null);
   const incomingSnapshot = {
@@ -247,7 +260,7 @@ export function MessageDraftEditor(props: {
   const sourceChanged = recovery === "source_changed";
   const interactionBlocked =
     Boolean(props.blockedByActiveQuestion) || editorState.hasServerConflict;
-  const readOnly = sourceChanged || interactionBlocked;
+  const readOnly = sourceChanged || interactionBlocked || !canEditDraft;
   const actionVisibility = customerReplyEditorActionVisibility({
     aiAssisted: Boolean(props.aiAssisted),
     hasSourceContext,
@@ -301,7 +314,10 @@ export function MessageDraftEditor(props: {
     });
     const response = await fetch(`/api/admin/leads/${props.leadId}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Admin-Next-Preview-Mutation": "reply-draft",
+      },
       body: JSON.stringify(requestBody),
     });
     const result = (await response.json().catch(() => ({}))) as {
@@ -327,6 +343,8 @@ export function MessageDraftEditor(props: {
     kind: "cancel" | "polish" | "save" | "regenerate" | "send",
   ) {
     if (busy) return;
+    if (kind === "send" && !canApproveSend) return;
+    if (kind !== "send" && !canEditDraft) return;
     if (kind === "send" && !window.confirm(labels.sendingConfirm)) return;
     if (kind === "cancel" && !window.confirm(labels.cancelConfirm)) return;
     if (
@@ -508,6 +526,14 @@ export function MessageDraftEditor(props: {
           {labels.manualRequired}
         </p>
       ) : null}
+      {!aiAvailable ? (
+        <p
+          className="mt-3 rounded-xl border border-white/10 bg-black/15 p-3 text-sm text-white/70"
+          data-message-draft-ai-state="unavailable"
+        >
+          {props.aiUnavailableReason || labels.aiUnavailable}
+        </p>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
         {actionVisibility.showDraftActions && !readOnly ? (
           <button
@@ -524,7 +550,10 @@ export function MessageDraftEditor(props: {
             {busy === "save" ? labels.processing : labels.save}
           </button>
         ) : null}
-        {actionVisibility.showDraftActions && hasSourceContext && !readOnly ? (
+        {actionVisibility.showDraftActions &&
+        hasSourceContext &&
+        aiAvailable &&
+        !readOnly ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={
@@ -556,7 +585,10 @@ export function MessageDraftEditor(props: {
             {labels.undoPolish}
           </button>
         ) : null}
-        {actionVisibility.showRegenerateAction && !interactionBlocked ? (
+        {actionVisibility.showRegenerateAction &&
+        aiAvailable &&
+        canEditDraft &&
+        !interactionBlocked ? (
           <button
             className="border-accent/40 text-accent hover:bg-accent/10 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-50"
             disabled={Boolean(busy)}
@@ -572,7 +604,10 @@ export function MessageDraftEditor(props: {
                   : labels.regenerateManual}
           </button>
         ) : null}
-        {actionVisibility.showDraftActions && !readOnly ? (
+        {actionVisibility.showDraftActions &&
+        canApproveSend &&
+        !sourceChanged &&
+        !interactionBlocked ? (
           <button
             className="bg-accent text-accent-foreground hover:bg-accent-hover min-h-11 rounded-xl px-4 font-bold disabled:opacity-50"
             disabled={
@@ -587,7 +622,7 @@ export function MessageDraftEditor(props: {
             {busy === "send" ? labels.processing : labels.send}
           </button>
         ) : null}
-        {!interactionBlocked ? (
+        {canEditDraft && !interactionBlocked ? (
           <button
             className="min-h-11 rounded-xl border border-red-400/40 px-4 font-bold text-red-200 hover:bg-red-400/10 disabled:opacity-50"
             disabled={Boolean(busy)}
@@ -598,6 +633,11 @@ export function MessageDraftEditor(props: {
           </button>
         ) : null}
       </div>
+      {!canApproveSend ? (
+        <p className="mt-3 text-sm font-semibold text-amber-200">
+          {labels.sendDenied}
+        </p>
+      ) : null}
       {notice && !sourceChanged ? (
         <p
           aria-live="polite"

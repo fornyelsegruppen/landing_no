@@ -10,7 +10,7 @@ import {
   MessageSquareText,
   Send,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AdminNextCaseCommunication,
   AdminNextCaseCommunicationPage,
@@ -18,13 +18,19 @@ import type {
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 type CommunicationCopy = {
+  allCategories: string;
   allLoaded: string;
+  allStatuses: string;
   attachments: string;
   categoryLabels: Readonly<Record<string, string>>;
   channelLabels: Readonly<Record<string, string>>;
   customerPortal: string;
   deliveredAt: string;
+  documentsView: string;
   empty: string;
+  filters: string;
+  fullHistoryView: string;
+  historyViews: string;
   inbound: string;
   loadFailed: string;
   loadingOlder: string;
@@ -34,18 +40,37 @@ type CommunicationCopy = {
   otherChannel: string;
   otherStatus: string;
   outbound: string;
+  quoteContractView: string;
   rawCategory: string;
   rawChannel: string;
   rawDirection: string;
   rawStatus: string;
   recordId: string;
   replyTo: string;
+  recentHistoryView: string;
+  search: string;
+  searchPlaceholder: string;
   sentAt: string;
   showOlder: string;
+  statusFilter: string;
   statusLabels: Readonly<Record<string, string>>;
   technicalDetails: string;
   title: string;
+  typeFilter: string;
+  noMatches: string;
 };
+
+type CustomerHistoryView = "commercial" | "documents" | "full" | "recent";
+
+const recentHistoryLimit = 5;
+
+function customerHistoryViewFromHash(hash: string): CustomerHistoryView {
+  const anchor = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (anchor === "case-communications-history") return "full";
+  if (anchor === "case-commercial-versions-title") return "commercial";
+  if (anchor === "case-document-register-title") return "documents";
+  return "recent";
+}
 
 const deliveryCopy = {
   nb: {
@@ -61,11 +86,16 @@ const deliveryCopy = {
     notRecorded: "Ikke registrert i denne historiske meldingen",
     preparedAt: "Oppfølging forberedt",
     provider: "Leverandør",
+    providerMessageId: "Leverandørens meldings-ID",
     queued: "I kø",
+    reconcileBeforeResend:
+      "Avstem leverandørloggen før eventuell ny sending. Dette er ikke bekreftet levering.",
     recipient: "Historisk mottaker",
+    recordedSentAt: "Registrert sentAt (ikke leveringsbekreftelse)",
     resentAt: "Sendt på nytt",
     sent: "Sendt",
     show: "Vis detaljer",
+    statusUnclear: "Status uklar",
   },
   lt: {
     approved: "Patvirtinta",
@@ -80,11 +110,16 @@ const deliveryCopy = {
     notRecorded: "Šioje istorinėje žinutėje neužregistruota",
     preparedAt: "Susisiekimas parengtas",
     provider: "Teikėjas",
+    providerMessageId: "Teikėjo žinutės ID",
     queued: "Eilėje",
+    reconcileBeforeResend:
+      "Prieš galimą pakartotinį siuntimą suderinkite teikėjo žurnalą. Tai nėra patvirtintas pristatymas.",
     recipient: "Istorinis gavėjas",
+    recordedSentAt: "Užregistruotas sentAt (ne pristatymo patvirtinimas)",
     resentAt: "Išsiųsta dar kartą",
     sent: "Išsiųsta",
     show: "Rodyti informaciją",
+    statusUnclear: "Būsena neaiški",
   },
   en: {
     approved: "Approved",
@@ -99,11 +134,16 @@ const deliveryCopy = {
     notRecorded: "Not recorded on this historical message",
     preparedAt: "Follow-up prepared",
     provider: "Provider",
+    providerMessageId: "Provider message ID",
     queued: "Queued",
+    reconcileBeforeResend:
+      "Reconcile the provider log before any resend. This is not confirmed delivery.",
     recipient: "Historical recipient",
+    recordedSentAt: "Recorded sentAt (not delivery confirmation)",
     resentAt: "Sent again",
     sent: "Sent",
     show: "Show details",
+    statusUnclear: "Status unclear",
   },
 } as const;
 
@@ -181,6 +221,12 @@ function communicationChannelLabel(
   return copy.channelLabels[message.channel] || copy.otherChannel;
 }
 
+function isProviderAcceptedUnreconciled(message: AdminNextCaseCommunication) {
+  return (
+    message.delivery?.reconciliationState === "provider_accepted_unreconciled"
+  );
+}
+
 function DeliveryJourney({
   copy,
   locale,
@@ -193,6 +239,7 @@ function DeliveryJourney({
   if (message.direction !== "outbound") return null;
   const labels = deliveryCopy[locale];
   const delivery = message.delivery;
+  const unreconciled = isProviderAcceptedUnreconciled(message);
   const rank = ["draft", "approved", "queued", "sent", "delivered"].indexOf(
     message.status,
   );
@@ -212,7 +259,9 @@ function DeliveryJourney({
       rank: 4,
     },
   ] as const;
-  const failed = ["failed", "attention"].includes(message.status);
+  const failed =
+    ["failed", "attention"].includes(message.status) ||
+    Boolean(delivery?.failureCode || delivery?.failureMessage);
   const recovery = delivery?.manualRecovery;
 
   return (
@@ -226,11 +275,13 @@ function DeliveryJourney({
         >
           <span className="group-open:hidden">{labels.show} · </span>
           <span className="hidden group-open:inline">{labels.hide} · </span>
-          {deliveryStatusLabel(
-            locale,
-            message.status,
-            communicationStatusLabel(copy, message.status),
-          )}
+          {unreconciled
+            ? labels.statusUnclear
+            : deliveryStatusLabel(
+                locale,
+                message.status,
+                communicationStatusLabel(copy, message.status),
+              )}
         </span>
       </summary>
       <div className="border-t border-[var(--an-border)] p-3">
@@ -251,24 +302,52 @@ function DeliveryJourney({
               {delivery?.provider || labels.notRecorded}
             </dd>
           </div>
+          {delivery?.providerMessageId ? (
+            <div className="rounded-lg border border-[var(--an-border)] bg-[var(--an-elevated)] p-2.5 sm:col-span-2">
+              <dt className="font-bold text-[var(--an-subtle)]">
+                {labels.providerMessageId}
+              </dt>
+              <dd className="mt-1 break-all text-[var(--an-text)]">
+                {delivery.providerMessageId}
+              </dd>
+            </div>
+          ) : null}
         </dl>
+        {unreconciled ? (
+          <div
+            className="mt-3 rounded-lg border border-[var(--an-danger)] bg-[var(--an-danger-soft)] p-3 text-xs text-[var(--an-danger)]"
+            data-delivery-reconciliation="provider_accepted_unreconciled"
+          >
+            <strong>{labels.statusUnclear}</strong>
+            <p className="mt-1">{labels.reconcileBeforeResend}</p>
+          </div>
+        ) : null}
         <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {stages.map((stage) => {
-            const complete = Boolean(stage.at) || rank > stage.rank;
+            const stageUnreconciled = unreconciled && stage.id === "sent";
+            const complete =
+              !stageUnreconciled && (Boolean(stage.at) || rank > stage.rank);
             const current = !complete && rank === stage.rank;
             return (
               <li
                 className={`rounded-lg border p-2 text-[10px] ${
-                  complete
-                    ? "border-[var(--an-success)] bg-[var(--an-success-soft)] text-[var(--an-success)]"
-                    : current
-                      ? "border-[var(--an-amber)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]"
-                      : "border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-subtle)]"
+                  stageUnreconciled
+                    ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]"
+                    : complete
+                      ? "border-[var(--an-success)] bg-[var(--an-success-soft)] text-[var(--an-success)]"
+                      : current
+                        ? "border-[var(--an-amber)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]"
+                        : "border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-subtle)]"
                 }`}
                 data-delivery-stage={stage.id}
+                data-delivery-stage-state={
+                  stageUnreconciled ? "unreconciled" : undefined
+                }
                 key={stage.id}
               >
-                <strong className="block">{stage.label}</strong>
+                <strong className="block">
+                  {stageUnreconciled ? labels.statusUnclear : stage.label}
+                </strong>
                 <span className="mt-1 block">
                   {stage.at ? timestamp(locale, stage.at) : "—"}
                 </span>
@@ -343,8 +422,35 @@ export function AdminNextCaseCommunications({
     },
   );
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const [historyView, setHistoryView] = useState<CustomerHistoryView>("recent");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState("all");
   const focusCompletion = useRef(false);
   const completionStatus = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const syncHistoryView = () =>
+      setHistoryView(customerHistoryViewFromHash(window.location.hash));
+    syncHistoryView();
+    window.addEventListener("hashchange", syncHistoryView);
+    window.addEventListener("popstate", syncHistoryView);
+    return () => {
+      window.removeEventListener("hashchange", syncHistoryView);
+      window.removeEventListener("popstate", syncHistoryView);
+    };
+  }, []);
+
+  useEffect(() => {
+    const anchor = window.location.hash.slice(1);
+    if (customerHistoryViewFromHash(window.location.hash) !== historyView) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(anchor)?.scrollIntoView?.({ block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [historyView]);
 
   useEffect(() => {
     if (
@@ -357,6 +463,43 @@ export function AdminNextCaseCommunications({
     focusCompletion.current = false;
     completionStatus.current?.focus();
   }, [pageInfo.remainingCount, state]);
+
+  const categories = useMemo(
+    () => [...new Set(items.map((message) => message.category))].sort(),
+    [items],
+  );
+  const statuses = useMemo(
+    () => [...new Set(items.map((message) => message.status))].sort(),
+    [items],
+  );
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredItems = useMemo(
+    () =>
+      items.filter((message) => {
+        if (category !== "all" && message.category !== category) return false;
+        if (status !== "all" && message.status !== status) return false;
+        if (!normalizedQuery) return true;
+        return [
+          message.subject,
+          message.bodyText,
+          message.channel,
+          message.category,
+          message.status,
+          ...message.attachments.map((attachment) => attachment.filename),
+        ]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(normalizedQuery);
+      }),
+    [category, items, normalizedQuery, status],
+  );
+  const fullHistory = historyView === "full";
+  const visibleItems = fullHistory
+    ? filteredItems
+    : items.slice(0, recentHistoryLimit);
+  const filtersActive = Boolean(
+    normalizedQuery || category !== "all" || status !== "all",
+  );
 
   async function loadOlder() {
     if (state === "loading" || !pageInfo.loadMoreHref || !pageInfo.nextCursor) {
@@ -388,7 +531,54 @@ export function AdminNextCaseCommunications({
   }
 
   return (
-    <section className="min-w-0" aria-labelledby="case-communications-title">
+    <section
+      className="min-w-0 scroll-mt-64"
+      aria-labelledby="case-communications-title"
+      data-communication-history-mode={fullHistory ? "full" : "recent"}
+      id={fullHistory ? "case-communications-history" : undefined}
+    >
+      <span className="block scroll-mt-64" id="case-recent-communications" />
+      {!fullHistory ? (
+        <span className="block scroll-mt-64" id="case-communications-history" />
+      ) : null}
+      <nav
+        aria-label={copy.historyViews}
+        className="sticky top-[8.25rem] z-10 mb-4 grid grid-cols-2 gap-1 rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-1.5 shadow-lg shadow-black/15 sm:flex sm:w-fit"
+        data-communication-history-navigation
+      >
+        {[
+          {
+            href: "#case-recent-communications",
+            id: "recent" as const,
+            label: copy.recentHistoryView,
+          },
+          {
+            href: "#case-communications-history",
+            id: "full" as const,
+            label: copy.fullHistoryView,
+          },
+          {
+            href: "#case-commercial-versions-title",
+            id: "commercial" as const,
+            label: copy.quoteContractView,
+          },
+          {
+            href: "#case-document-register-title",
+            id: "documents" as const,
+            label: copy.documentsView,
+          },
+        ].map((view) => (
+          <a
+            aria-current={historyView === view.id ? "page" : undefined}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-center text-xs font-bold text-[var(--an-text-muted)] hover:bg-[var(--an-soft)] hover:text-[var(--an-amber)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)] aria-[current=page]:bg-[var(--an-amber-soft)] aria-[current=page]:text-[var(--an-amber)]"
+            href={view.href}
+            key={view.id}
+            onClick={() => setHistoryView(view.id)}
+          >
+            {view.label}
+          </a>
+        ))}
+      </nav>
       <h3
         className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]"
         id="case-communications-title"
@@ -397,13 +587,66 @@ export function AdminNextCaseCommunications({
           aria-hidden="true"
           className="size-4 text-[var(--an-amber)]"
         />
-        {copy.title} · {items.length} {copy.of} {pageInfo.totalCount}
+        {fullHistory ? copy.fullHistoryView : copy.recentHistoryView} ·{" "}
+        {visibleItems.length} {copy.of}{" "}
+        {filtersActive ? items.length : pageInfo.totalCount}
       </h3>
-      {items.length ? (
+      {fullHistory ? (
+        <fieldset
+          className="mt-3 grid gap-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-3 sm:grid-cols-3"
+          data-communication-history-filters
+        >
+          <legend className="px-1 text-xs font-bold text-[var(--an-text)]">
+            {copy.filters}
+          </legend>
+          <label className="grid gap-1 text-xs font-bold text-[var(--an-muted)]">
+            {copy.search}
+            <input
+              className="min-h-11 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface-base)] px-3 text-sm font-normal text-[var(--an-text)] outline-none focus:border-[var(--an-amber)] focus:ring-2 focus:ring-[var(--an-focus-ring)]"
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder={copy.searchPlaceholder}
+              type="search"
+              value={query}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-[var(--an-muted)]">
+            {copy.typeFilter}
+            <select
+              className="min-h-11 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface-base)] px-3 text-sm font-normal text-[var(--an-text)] outline-none focus:border-[var(--an-amber)] focus:ring-2 focus:ring-[var(--an-focus-ring)]"
+              onChange={(event) => setCategory(event.currentTarget.value)}
+              value={category}
+            >
+              <option value="all">{copy.allCategories}</option>
+              {categories.map((value) => (
+                <option key={value} value={value}>
+                  {communicationCategoryLabel(copy, value)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-[var(--an-muted)]">
+            {copy.statusFilter}
+            <select
+              className="min-h-11 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface-base)] px-3 text-sm font-normal text-[var(--an-text)] outline-none focus:border-[var(--an-amber)] focus:ring-2 focus:ring-[var(--an-focus-ring)]"
+              onChange={(event) => setStatus(event.currentTarget.value)}
+              value={status}
+            >
+              <option value="all">{copy.allStatuses}</option>
+              {statuses.map((value) => (
+                <option key={value} value={value}>
+                  {communicationStatusLabel(copy, value)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </fieldset>
+      ) : null}
+      {visibleItems.length ? (
         <ol className="mt-3 space-y-3" data-customer-communications>
-          {items.map((message) => {
+          {visibleItems.map((message) => {
             const DirectionIcon =
               message.direction === "inbound" ? Inbox : Send;
+            const unreconciled = isProviderAcceptedUnreconciled(message);
             return (
               <li key={message.id}>
                 <details
@@ -430,8 +673,17 @@ export function AdminNextCaseCommunications({
                         {timestamp(locale, message.at)}
                       </small>
                     </span>
-                    <span className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
-                      {communicationStatusLabel(copy, message.status)}
+                    <span
+                      className={`flex shrink-0 items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-bold ${unreconciled ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" : "border-[var(--an-border)] bg-[var(--an-surface)] text-[var(--an-muted)]"}`}
+                      data-message-reconciliation={
+                        unreconciled
+                          ? "provider_accepted_unreconciled"
+                          : undefined
+                      }
+                    >
+                      {unreconciled
+                        ? deliveryCopy[locale].statusUnclear
+                        : communicationStatusLabel(copy, message.status)}
                       <ChevronDown
                         aria-hidden="true"
                         className="size-3.5 transition-transform group-open:rotate-180"
@@ -528,7 +780,10 @@ export function AdminNextCaseCommunications({
                         {message.sentAt ? (
                           <div>
                             <dt className="inline font-bold">
-                              {copy.sentAt}:{" "}
+                              {unreconciled
+                                ? deliveryCopy[locale].recordedSentAt
+                                : copy.sentAt}
+                              :{" "}
                             </dt>
                             <dd className="inline">
                               {timestamp(locale, message.sentAt)}
@@ -560,13 +815,18 @@ export function AdminNextCaseCommunications({
             );
           })}
         </ol>
+      ) : items.length ? (
+        <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
+          {copy.noMatches}
+        </p>
       ) : (
         <p className="mt-3 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4 text-sm text-[var(--an-muted)]">
           {copy.empty}
         </p>
       )}
 
-      {pageInfo.remainingCount > 0 &&
+      {fullHistory &&
+      pageInfo.remainingCount > 0 &&
       pageInfo.loadMoreHref &&
       pageInfo.nextCursor ? (
         <div className="mt-3">
@@ -595,7 +855,7 @@ export function AdminNextCaseCommunications({
               : `${items.length} ${copy.of} ${pageInfo.totalCount}`}
           </p>
         </div>
-      ) : items.length ? (
+      ) : fullHistory && items.length ? (
         <p
           aria-live="polite"
           className="mt-3 text-center text-xs text-[var(--an-subtle)]"

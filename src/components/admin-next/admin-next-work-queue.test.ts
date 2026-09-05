@@ -464,6 +464,36 @@ describe("Admin Next Work Queue", () => {
     expect(html).not.toContain("Adresas į eilės duomenis nepatenka");
   });
 
+  it("keeps TF-2 identity and received time compact in the row and selected detail", () => {
+    const base = createAdminNextWorkQueueFixture("lt", query()).items[0];
+    const item = {
+      ...base,
+      case: {
+        ...base.case,
+        id: "case:2",
+        reference: "TF-2",
+        customerName: "TEST – pilnas kelias",
+        postalAddress: "lyngveien, 28 1182",
+        receivedAt: "2026-09-05T06:47:59.000Z",
+      },
+    } satisfies WorkQueueItem;
+    const html = renderSingleItem("lt", item);
+
+    expect(html).toContain("data-work-queue-case-identity");
+    expect(html.match(/TEST – pilnas kelias/gu)?.length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(html.match(/lyngveien, 28 1182/gu)?.length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(
+      html.match(/dateTime="2026-09-05T06:47:59.000Z"/gu)?.length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('data-work-queue-detail="case:2"');
+    expect(html).toContain("data-work-queue-advanced-filters");
+    expect(html).toContain("data-work-queue-view-filter");
+  });
+
   it("describes an absent deadline from canonical priority evidence", () => {
     const base = createAdminNextWorkQueueFixture("en", query()).items[0];
     const noDeadline = {

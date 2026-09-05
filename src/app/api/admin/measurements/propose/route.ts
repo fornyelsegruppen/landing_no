@@ -12,8 +12,8 @@ import {
   FeatureUnavailableError,
 } from "@/lib/platform/features";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
-import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
 import { userIsAdmin } from "@/payload/access/roles";
+import { verifiedLeadAddressCandidate } from "@/lib/leads/address-verification";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,21 +26,6 @@ const inputSchema = z.object({
   trainingProhibited: z.literal(true),
   credits: z.literal("©norgeibilder.no"),
 });
-
-function addressQuery(parts: Array<string | null | undefined>) {
-  return parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
-    .filter(
-      (part, index, normalized) =>
-        normalized.findIndex(
-          (candidate) =>
-            candidate.toLocaleLowerCase("nb-NO") ===
-            part.toLocaleLowerCase("nb-NO"),
-        ) === index,
-    )
-    .join(" ");
-}
 
 export async function POST(request: Request) {
   const correlationId = correlationIdFromHeaders(request.headers);
@@ -71,30 +56,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Case not found" }, { status: 404 });
     }
 
-    const query = addressQuery([
-      lead.address,
-      lead.houseNumber,
-      lead.postal,
-      lead.city,
-    ]);
-    if (query.length < 4) {
+    const address = verifiedLeadAddressCandidate(lead);
+    if (!address) {
       return NextResponse.json(
-        { error: "Case address is incomplete" },
+        {
+          error: "Case address must be server-verified",
+          code: "ADDRESS_UNVERIFIED",
+        },
         { status: 409 },
       );
     }
-    const candidates = await new KartverketAddressProvider().searchAddress(
-      query,
-    );
-    if (!candidates.length) {
-      return NextResponse.json(
-        { error: "Case address is incomplete" },
-        { status: 409 },
-      );
-    }
-    const address =
-      candidates.find((candidate) => candidate.postalCode === lead.postal) ||
-      candidates[0];
 
     const media = await payload.findByID({
       collection: "private-media",

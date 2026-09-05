@@ -84,4 +84,48 @@ describe("Admin Next Case Workspace panel navigation", () => {
         ?.getAttribute("aria-selected"),
     ).toBe("true");
   });
+
+  it("preserves tab focus and restores the selected panel with browser Back", async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          TestPanelSwitcher,
+          {
+            labels: {
+              "case-customer-record": "Kliento dialogas",
+              "case-evidence": "Įrodymai",
+              "case-history": "Istorija",
+            },
+            navigationLabel: "Navigacija byloje",
+          },
+          createElement("div", null, "Customer"),
+          createElement("div", null, "Evidence"),
+          createElement("div", null, "History"),
+        ),
+      );
+      await Promise.resolve();
+    });
+    const historyTab = container.querySelector(
+      '[data-case-context-link="case-history"]',
+    ) as HTMLButtonElement;
+    historyTab.focus();
+
+    await act(async () => historyTab.click());
+
+    expect(window.location.hash).toBe("#case-history");
+    expect(historyTab.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(historyTab);
+
+    await act(async () => {
+      window.history.back();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+
+    expect(window.location.hash).toBe("#case-evidence-title");
+    expect(
+      container
+        .querySelector('[data-case-context-link="case-evidence"]')
+        ?.getAttribute("aria-selected"),
+    ).toBe("true");
+  });
 });

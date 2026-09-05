@@ -16,8 +16,13 @@ const panelIds = [
 type PanelId = (typeof panelIds)[number];
 
 const panelByAnchor: Readonly<Record<string, PanelId>> = {
+  "case-commercial-versions-title": "case-customer-record",
+  "case-communications-history": "case-customer-record",
   "case-customer-record-title": "case-customer-record",
+  "case-document-register-title": "case-customer-record",
   "case-evidence-title": "case-evidence",
+  "case-outstanding-questions": "case-customer-record",
+  "case-recent-communications": "case-customer-record",
   "case-timeline-title": "case-history",
 };
 
@@ -75,7 +80,9 @@ export function AdminNextCaseWorkspacePanelSwitcher({
 
   function activate(panelId: PanelId) {
     setActivePanel(panelId);
-    window.history.replaceState(null, "", `#${panelId}`);
+    if (window.location.hash !== `#${panelId}`) {
+      window.history.pushState(null, "", `#${panelId}`);
+    }
   }
 
   function handleKeyDown(

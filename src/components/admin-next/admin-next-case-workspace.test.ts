@@ -66,6 +66,35 @@ describe("Admin Next Case Workspace preview", () => {
     );
   });
 
+  it("shows server address verification truth and an explicit RF block for manual addresses", () => {
+    const verifiedHtml = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "en",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          addressVerification: {
+            status: "verified",
+            verifiedAt: "2026-09-05T08:00:00.000Z",
+          },
+        },
+      }),
+    );
+    const manualHtml = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "en",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          addressVerification: { status: "manual", verifiedAt: null },
+        },
+      }),
+    );
+
+    expect(verifiedHtml).toContain('data-case-address-verification="verified"');
+    expect(verifiedHtml).toContain("Server-verified address");
+    expect(manualHtml).toContain('data-case-address-verification="manual"');
+    expect(manualHtml).toContain("Manually entered address — RF is blocked");
+  });
+
   it("keeps the no-action fallback inside the new Work Queue", () => {
     const returnTo =
       "/admin-next-preview/work?view=today&queue=mine&limit=10&selected=case%3A1042#work-queue-detail";
@@ -109,8 +138,9 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain('data-customer-communications="true"');
     expect(html).toContain("Re: Tilbud på takfornyelse");
     expect(html).toContain("Takk. Kan dere sende tilbudet i dag");
-    expect(html).toContain("Žinutės · 2 iš 27");
-    expect(html).toContain("Rodyti ankstesnes žinutes (25)");
+    expect(html).toContain("Naujausios žinutės · 2 iš 27");
+    expect(html).not.toContain("Rodyti ankstesnes žinutes (25)");
+    expect(html).toContain('href="#case-communications-history"');
     expect(html).toContain("Pristatymo eiga");
     expect(html).toContain("Istorinis gavėjas");
     expect(html).toContain("kari.nilsen@example.no");
@@ -139,9 +169,242 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("group-open:rotate-180");
     expect(html).not.toMatch(/\smax-h-(?:\[24rem\]|64|80)\b/u);
     expect(html).not.toMatch(/\soverflow-auto\b/u);
-    expect(html).toContain("sm:max-h-[24rem]");
-    expect(html).toContain("sm:max-h-64");
-    expect(html).toContain("sm:max-h-80");
+    expect(html).not.toContain("sm:max-h-[24rem]");
+    expect(html).not.toContain("sm:max-h-64");
+    expect(html).not.toContain("sm:max-h-80");
+  });
+
+  it("renders the exact original intake before the message history without reclassifying it", () => {
+    const customerRecord = adminNextCaseWorkspaceFixture.customerRecord;
+    if (!customerRecord) throw new Error("Expected fixture customer record");
+    const exactMessage =
+      "Eksakt takareal er ukjent.\nKunden oppga omtrent 300 m² i skjemaet.";
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "en",
+        source: "canonical",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          reference: "TF-2",
+          customer: "TEST – pilnas kelias",
+          service: "takvask",
+          customerRecord: {
+            ...customerRecord,
+            originalInquiry: {
+              receivedAt: "2026-09-05T06:47:59.000Z",
+              inquiryType: "takvask",
+              message: exactMessage,
+              approximateAreaSquareMeters: 300,
+              areaProvenance: "customer_reported_unverified",
+              contact: {
+                email: "fornyelsegruppen@gmail.com",
+                phone: "fornyelsegruppen@gmail.com",
+              },
+              address: {
+                streetAddress: "lyngveien, 28",
+                postalCode: "1182",
+                city: null,
+              },
+              photoCount: 0,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain("data-original-inquiry");
+    expect(html).toMatch(/<details[^>]*data-original-inquiry[^>]*open/iu);
+    expect(html).toContain("Original inquiry");
+    expect(html).toContain("Roof cleaning");
+    expect(html).toContain("fornyelsegruppen@gmail.com");
+    expect(html).toContain("lyngveien, 28, 1182");
+    expect(html).toContain(exactMessage);
+    expect(html).toContain("300 m²");
+    expect(html).toContain("Customer estimate · unverified");
+    expect(html.indexOf("data-original-inquiry")).toBeLessThan(
+      html.indexOf("data-customer-communications"),
+    );
+    expect(html).not.toContain(
+      'data-original-inquiry category="customer_question"',
+    );
+  });
+
+  it.each([
+    ["nb", "takvask", "Takvask"],
+    ["nb", "takvask_impregnering", "Takvask og impregnering"],
+    ["nb", "impregnering", "Takimpregnering"],
+    ["nb", "takmaling", "Takmaling"],
+    ["nb", "nytt_tak", "Nytt tak"],
+    ["nb", "usikker", "Usikker / trenger veiledning"],
+    ["lt", "takvask", "Stogo plovimas"],
+    ["lt", "takvask_impregnering", "Stogo plovimas ir impregnavimas"],
+    ["lt", "impregnering", "Stogo impregnavimas"],
+    ["lt", "takmaling", "Stogo dažymas"],
+    ["lt", "nytt_tak", "Naujas stogas"],
+    ["lt", "usikker", "Nežinau / reikia konsultacijos"],
+    ["en", "takvask", "Roof cleaning"],
+    ["en", "takvask_impregnering", "Roof cleaning and impregnation"],
+    ["en", "impregnering", "Roof impregnation"],
+    ["en", "takmaling", "Roof painting"],
+    ["en", "nytt_tak", "New roof"],
+    ["en", "usikker", "Unsure / needs guidance"],
+  ] as const)("labels public inquiry %s/%s as %s", (locale, service, label) => {
+    const customerRecord = adminNextCaseWorkspaceFixture.customerRecord;
+    if (!customerRecord) throw new Error("Expected fixture customer record");
+    const originalInquiry = customerRecord.originalInquiry;
+    if (!originalInquiry) throw new Error("Expected fixture original inquiry");
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale,
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          service: "legacy-derived-service",
+          customerRecord: {
+            ...customerRecord,
+            originalInquiry: {
+              ...originalInquiry,
+              inquiryType: service,
+            },
+          },
+        },
+      }),
+    );
+
+    const originalInquiryHtml = html.slice(
+      html.indexOf("data-original-inquiry"),
+      html.indexOf("data-customer-communications"),
+    );
+    expect(originalInquiryHtml).toContain(label);
+    if (service === "takvask" && locale === "nb") {
+      expect(originalInquiryHtml).not.toContain("Annen takjeneste");
+    }
+  });
+
+  it.each([
+    [
+      "nb",
+      "Ingen oppfølgingsspørsmål er registrert",
+      "Alle registrerte spørsmål er besvart",
+    ],
+    [
+      "lt",
+      "Tolesnių klausimų neužregistruota",
+      "Į visus užregistruotus klausimus atsakyta",
+    ],
+    [
+      "en",
+      "No follow-up questions tracked",
+      "All recorded questions have been answered",
+    ],
+  ] as const)(
+    "distinguishes zero tracked questions from all answered in %s",
+    (locale, none, resolved) => {
+      const customerRecord = adminNextCaseWorkspaceFixture.customerRecord;
+      if (!customerRecord) throw new Error("Expected fixture customer record");
+      const html = renderToStaticMarkup(
+        createElement(AdminNextCaseWorkspace, {
+          locale,
+          value: {
+            ...adminNextCaseWorkspaceFixture,
+            customerRecord: {
+              ...customerRecord,
+              questions: {
+                total: 0,
+                unresolved: false,
+                outstanding: [],
+              },
+            },
+          },
+        }),
+      );
+
+      expect(html).toContain('data-customer-question-state="none"');
+      expect(html).toContain(none);
+      expect(html).not.toContain(resolved);
+    },
+  );
+
+  it("keeps all-answered copy only when tracked questions exist and are resolved", () => {
+    const customerRecord = adminNextCaseWorkspaceFixture.customerRecord;
+    if (!customerRecord) throw new Error("Expected fixture customer record");
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "en",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          customerRecord: {
+            ...customerRecord,
+            questions: {
+              total: 1,
+              unresolved: false,
+              outstanding: [],
+            },
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain('data-customer-question-state="resolved"');
+    expect(html).toContain("All recorded questions have been answered");
+    expect(html).not.toContain("No follow-up questions tracked");
+  });
+
+  it("keeps an oldest unanswered question discoverable outside the five-message preview", () => {
+    const customerRecord = adminNextCaseWorkspaceFixture.customerRecord;
+    if (!customerRecord || !customerRecord.questions.active) {
+      throw new Error("Expected fixture customer question");
+    }
+    const communications = Array.from({ length: 27 }, (_, index) => ({
+      id: `message-${1000 - index}`,
+      direction: index % 2 ? ("outbound" as const) : ("inbound" as const),
+      channel: "email",
+      category: index % 2 ? "follow_up" : "customer_reply",
+      status: index % 2 ? "delivered" : "received",
+      subject: `Recent message ${index + 1}`,
+      bodyText: `Recent body ${index + 1}`,
+      at: new Date(Date.UTC(2026, 8, 5, 10, -index)).toISOString(),
+      attachments: [],
+      fallbackHref: `/admin-v2/cases/1042#message-${1000 - index}`,
+    }));
+    const oldest = {
+      ...customerRecord.questions.active,
+      id: "message-39",
+      subject: "Oldest unanswered question",
+      bodyText: "This question predates the loaded communication page.",
+      receivedAt: "2026-08-20T10:00:00.000Z",
+    };
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "lt",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          customerRecord: {
+            ...customerRecord,
+            questions: {
+              ...customerRecord.questions,
+              total: 2,
+              outstanding: [customerRecord.questions.active, oldest],
+            },
+            communications,
+            communicationPage: {
+              totalCount: 27,
+              remainingCount: 0,
+              nextCursor: null,
+              loadMoreHref: null,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(html.match(/data-customer-message=/gu)).toHaveLength(5);
+    expect(html).toContain("Kliento klausimai: 2");
+    expect(html).toContain("Oldest unanswered question");
+    expect(html).toContain("data-outstanding-question-list");
+    expect(html).toContain('href="#case-outstanding-questions"');
+    expect(html).toContain('href="#case-communications-history"');
+    expect(html).toContain('href="#case-commercial-versions-title"');
+    expect(html).toContain('href="#case-document-register-title"');
   });
 
   it("keeps the effective signed contract visible in the collapsed commercial summary", () => {
@@ -392,7 +655,7 @@ describe("Admin Next Case Workspace preview", () => {
       }),
     );
 
-    expect(html.match(/<button/gu)).toHaveLength(4);
+    expect(html.match(/<button/gu)).toHaveLength(3);
     expect(html.match(/href="\/admin-v2\//g)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain(">Peržiūrėti R4<");
     expect(html).toContain(
@@ -401,7 +664,7 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("data-case-fallback-tools");
     expect(html).toContain("Papildomi bylos įrankiai");
     expect(html).toContain(
-      "Esami dokumentų ir darbų maršrutai palikti saugiam grįžimui.",
+      "Prireikus išsamesnio darbo, atverkite dokumentus arba darbų planą.",
     );
     expect(html).not.toMatch(/Atidaryti Admin V2|veikiančią bylą/iu);
   });

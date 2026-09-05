@@ -126,6 +126,7 @@ export type WorkQueueItem = {
     customerName: string | null;
     id: string;
     postalAddress: string | null;
+    receivedAt: string | null;
     revision: number;
     reference: string;
     href: string;
@@ -159,6 +160,7 @@ export type CreateWorkQueueItemInput = {
     customerName?: string | null;
     id: string;
     postalAddress?: string | null;
+    receivedAt?: string | null;
     revision: number;
     reference: string;
     href: string;
@@ -569,6 +571,7 @@ export function createWorkQueueItem(
       ...input.case,
       customerName: input.case.customerName?.trim() || null,
       postalAddress: input.case.postalAddress?.trim() || null,
+      receivedAt: normalizeUtcInstant(input.case.receivedAt),
     },
     locale: input.locale,
     action: { kind: input.actionKind, presentation },

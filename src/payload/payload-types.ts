@@ -13,53 +13,53 @@
  * via the `definition` "supportedTimezones".
  */
 export type SupportedTimezones =
-  | 'Pacific/Midway'
-  | 'Pacific/Niue'
-  | 'Pacific/Honolulu'
-  | 'Pacific/Rarotonga'
-  | 'America/Anchorage'
-  | 'Pacific/Gambier'
-  | 'America/Los_Angeles'
-  | 'America/Tijuana'
-  | 'America/Denver'
-  | 'America/Phoenix'
-  | 'America/Chicago'
-  | 'America/Guatemala'
-  | 'America/New_York'
-  | 'America/Bogota'
-  | 'America/Caracas'
-  | 'America/Santiago'
-  | 'America/Buenos_Aires'
-  | 'America/Sao_Paulo'
-  | 'Atlantic/South_Georgia'
-  | 'Atlantic/Azores'
-  | 'Atlantic/Cape_Verde'
-  | 'Europe/London'
-  | 'Europe/Berlin'
-  | 'Africa/Lagos'
-  | 'Europe/Athens'
-  | 'Africa/Cairo'
-  | 'Europe/Moscow'
-  | 'Asia/Riyadh'
-  | 'Asia/Dubai'
-  | 'Asia/Baku'
-  | 'Asia/Karachi'
-  | 'Asia/Tashkent'
-  | 'Asia/Calcutta'
-  | 'Asia/Dhaka'
-  | 'Asia/Almaty'
-  | 'Asia/Jakarta'
-  | 'Asia/Bangkok'
-  | 'Asia/Shanghai'
-  | 'Asia/Singapore'
-  | 'Asia/Tokyo'
-  | 'Asia/Seoul'
-  | 'Australia/Brisbane'
-  | 'Australia/Sydney'
-  | 'Pacific/Guam'
-  | 'Pacific/Noumea'
-  | 'Pacific/Auckland'
-  | 'Pacific/Fiji';
+  | "Pacific/Midway"
+  | "Pacific/Niue"
+  | "Pacific/Honolulu"
+  | "Pacific/Rarotonga"
+  | "America/Anchorage"
+  | "Pacific/Gambier"
+  | "America/Los_Angeles"
+  | "America/Tijuana"
+  | "America/Denver"
+  | "America/Phoenix"
+  | "America/Chicago"
+  | "America/Guatemala"
+  | "America/New_York"
+  | "America/Bogota"
+  | "America/Caracas"
+  | "America/Santiago"
+  | "America/Buenos_Aires"
+  | "America/Sao_Paulo"
+  | "Atlantic/South_Georgia"
+  | "Atlantic/Azores"
+  | "Atlantic/Cape_Verde"
+  | "Europe/London"
+  | "Europe/Berlin"
+  | "Africa/Lagos"
+  | "Europe/Athens"
+  | "Africa/Cairo"
+  | "Europe/Moscow"
+  | "Asia/Riyadh"
+  | "Asia/Dubai"
+  | "Asia/Baku"
+  | "Asia/Karachi"
+  | "Asia/Tashkent"
+  | "Asia/Calcutta"
+  | "Asia/Dhaka"
+  | "Asia/Almaty"
+  | "Asia/Jakarta"
+  | "Asia/Bangkok"
+  | "Asia/Shanghai"
+  | "Asia/Singapore"
+  | "Asia/Tokyo"
+  | "Asia/Seoul"
+  | "Australia/Brisbane"
+  | "Australia/Sydney"
+  | "Pacific/Guam"
+  | "Pacific/Noumea"
+  | "Pacific/Auckland"
+  | "Pacific/Fiji";
 
 export interface Config {
   auth: {
@@ -78,33 +78,33 @@ export interface Config {
     redirects: Redirect;
     leads: Lead;
     messages: Message;
-    'roof-measurements': RoofMeasurement;
-    'price-rules': PriceRule;
-    'price-calculations': PriceCalculation;
+    "roof-measurements": RoofMeasurement;
+    "price-rules": PriceRule;
+    "price-calculations": PriceCalculation;
     quotes: Quote;
     contracts: Contract;
-    'change-agreements': ChangeAgreement;
-    'contract-terms': ContractTerm;
-    'work-orders': WorkOrder;
-    'invoice-records': InvoiceRecord;
-    'official-invoices': OfficialInvoice;
-    'customer-contract-requests': CustomerContractRequest;
+    "change-agreements": ChangeAgreement;
+    "contract-terms": ContractTerm;
+    "work-orders": WorkOrder;
+    "invoice-records": InvoiceRecord;
+    "official-invoices": OfficialInvoice;
+    "customer-contract-requests": CustomerContractRequest;
     warranties: Warranty;
-    'seo-topics': SeoTopic;
-    'seo-runs': SeoRun;
-    'audit-events': AuditEvent;
-    'operational-jobs': OperationalJob;
-    'access-tokens': AccessToken;
-    'private-media': PrivateMedia;
-    'roof-fusion-snapshots': RoofFusionSnapshot;
-    'roof-fusion-commands': RoofFusionCommand;
-    'roof-fusion-workbench-drafts': RoofFusionWorkbenchDraft;
-    'case-address-revisions': CaseAddressRevision;
-    'roof-fusion-offer-commands': RoofFusionOfferCommand;
-    'payload-kv': PayloadKv;
-    'payload-locked-documents': PayloadLockedDocument;
-    'payload-preferences': PayloadPreference;
-    'payload-migrations': PayloadMigration;
+    "seo-topics": SeoTopic;
+    "seo-runs": SeoRun;
+    "audit-events": AuditEvent;
+    "operational-jobs": OperationalJob;
+    "access-tokens": AccessToken;
+    "private-media": PrivateMedia;
+    "roof-fusion-snapshots": RoofFusionSnapshot;
+    "roof-fusion-commands": RoofFusionCommand;
+    "roof-fusion-workbench-drafts": RoofFusionWorkbenchDraft;
+    "case-address-revisions": CaseAddressRevision;
+    "roof-fusion-offer-commands": RoofFusionOfferCommand;
+    "payload-kv": PayloadKv;
+    "payload-locked-documents": PayloadLockedDocument;
+    "payload-preferences": PayloadPreference;
+    "payload-migrations": PayloadMigration;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -119,43 +119,60 @@ export interface Config {
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     messages: MessagesSelect<false> | MessagesSelect<true>;
-    'roof-measurements': RoofMeasurementsSelect<false> | RoofMeasurementsSelect<true>;
-    'price-rules': PriceRulesSelect<false> | PriceRulesSelect<true>;
-    'price-calculations': PriceCalculationsSelect<false> | PriceCalculationsSelect<true>;
+    "roof-measurements":
+      RoofMeasurementsSelect<false> | RoofMeasurementsSelect<true>;
+    "price-rules": PriceRulesSelect<false> | PriceRulesSelect<true>;
+    "price-calculations":
+      PriceCalculationsSelect<false> | PriceCalculationsSelect<true>;
     quotes: QuotesSelect<false> | QuotesSelect<true>;
     contracts: ContractsSelect<false> | ContractsSelect<true>;
-    'change-agreements': ChangeAgreementsSelect<false> | ChangeAgreementsSelect<true>;
-    'contract-terms': ContractTermsSelect<false> | ContractTermsSelect<true>;
-    'work-orders': WorkOrdersSelect<false> | WorkOrdersSelect<true>;
-    'invoice-records': InvoiceRecordsSelect<false> | InvoiceRecordsSelect<true>;
-    'official-invoices': OfficialInvoicesSelect<false> | OfficialInvoicesSelect<true>;
-    'customer-contract-requests': CustomerContractRequestsSelect<false> | CustomerContractRequestsSelect<true>;
+    "change-agreements":
+      ChangeAgreementsSelect<false> | ChangeAgreementsSelect<true>;
+    "contract-terms": ContractTermsSelect<false> | ContractTermsSelect<true>;
+    "work-orders": WorkOrdersSelect<false> | WorkOrdersSelect<true>;
+    "invoice-records": InvoiceRecordsSelect<false> | InvoiceRecordsSelect<true>;
+    "official-invoices":
+      OfficialInvoicesSelect<false> | OfficialInvoicesSelect<true>;
+    "customer-contract-requests":
+      | CustomerContractRequestsSelect<false>
+      | CustomerContractRequestsSelect<true>;
     warranties: WarrantiesSelect<false> | WarrantiesSelect<true>;
-    'seo-topics': SeoTopicsSelect<false> | SeoTopicsSelect<true>;
-    'seo-runs': SeoRunsSelect<false> | SeoRunsSelect<true>;
-    'audit-events': AuditEventsSelect<false> | AuditEventsSelect<true>;
-    'operational-jobs': OperationalJobsSelect<false> | OperationalJobsSelect<true>;
-    'access-tokens': AccessTokensSelect<false> | AccessTokensSelect<true>;
-    'private-media': PrivateMediaSelect<false> | PrivateMediaSelect<true>;
-    'roof-fusion-snapshots': RoofFusionSnapshotsSelect<false> | RoofFusionSnapshotsSelect<true>;
-    'roof-fusion-commands': RoofFusionCommandsSelect<false> | RoofFusionCommandsSelect<true>;
-    'roof-fusion-workbench-drafts': RoofFusionWorkbenchDraftsSelect<false> | RoofFusionWorkbenchDraftsSelect<true>;
-    'case-address-revisions': CaseAddressRevisionsSelect<false> | CaseAddressRevisionsSelect<true>;
-    'roof-fusion-offer-commands': RoofFusionOfferCommandsSelect<false> | RoofFusionOfferCommandsSelect<true>;
-    'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
-    'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
-    'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
-    'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    "seo-topics": SeoTopicsSelect<false> | SeoTopicsSelect<true>;
+    "seo-runs": SeoRunsSelect<false> | SeoRunsSelect<true>;
+    "audit-events": AuditEventsSelect<false> | AuditEventsSelect<true>;
+    "operational-jobs":
+      OperationalJobsSelect<false> | OperationalJobsSelect<true>;
+    "access-tokens": AccessTokensSelect<false> | AccessTokensSelect<true>;
+    "private-media": PrivateMediaSelect<false> | PrivateMediaSelect<true>;
+    "roof-fusion-snapshots":
+      RoofFusionSnapshotsSelect<false> | RoofFusionSnapshotsSelect<true>;
+    "roof-fusion-commands":
+      RoofFusionCommandsSelect<false> | RoofFusionCommandsSelect<true>;
+    "roof-fusion-workbench-drafts":
+      | RoofFusionWorkbenchDraftsSelect<false>
+      | RoofFusionWorkbenchDraftsSelect<true>;
+    "case-address-revisions":
+      CaseAddressRevisionsSelect<false> | CaseAddressRevisionsSelect<true>;
+    "roof-fusion-offer-commands":
+      | RoofFusionOfferCommandsSelect<false>
+      | RoofFusionOfferCommandsSelect<true>;
+    "payload-kv": PayloadKvSelect<false> | PayloadKvSelect<true>;
+    "payload-locked-documents":
+      PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
+    "payload-preferences":
+      PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
+    "payload-migrations":
+      PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
     defaultIDType: number;
   };
   fallbackLocale: null;
   globals: {
-    'site-settings': SiteSetting;
+    "site-settings": SiteSetting;
   };
   globalsSelect: {
-    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    "site-settings": SiteSettingsSelect<false> | SiteSettingsSelect<true>;
   };
   locale: null;
   widgets: {
@@ -201,8 +218,8 @@ export interface User {
   /**
    * Gjelder bare /user. Kundetekster, tilbud og kontrakter forblir på norsk.
    */
-  interfaceLanguage: 'nb' | 'lt' | 'en';
-  role: 'admin' | 'worker';
+  interfaceLanguage: "nb" | "lt" | "en";
+  role: "admin" | "worker";
   /**
    * Slå av for å stanse innlogging og tilbakekalle aktive sesjoner.
    */
@@ -224,7 +241,7 @@ export interface User {
       }[]
     | null;
   password?: string | null;
-  collection: 'users';
+  collection: "users";
 }
 /**
  * Upload images here (stored on Vercel Blob). Then pick them in Site Settings or Project stages. Prefer WebP when possible; large JPEG/PNG are auto-converted when supported.
@@ -238,7 +255,7 @@ export interface Media {
    * Short description for accessibility / SEO
    */
   alt: string;
-  stockProvider?: ('manual' | 'pexels') | null;
+  stockProvider?: ("manual" | "pexels") | null;
   stockAssetId?: string | null;
   stockSourceUrl?: string | null;
   stockPhotographer?: string | null;
@@ -287,12 +304,22 @@ export interface Service {
   titleEn: string;
   descriptionNo: string;
   descriptionEn: string;
-  icon?: ('check' | 'shield' | 'droplets' | 'paint' | 'home' | 'wrench' | 'sparkles') | null;
+  icon?:
+    | (
+        | "check"
+        | "shield"
+        | "droplets"
+        | "paint"
+        | "home"
+        | "wrench"
+        | "sparkles"
+      )
+    | null;
   featured?: boolean | null;
   order?: number | null;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -305,7 +332,7 @@ export interface Project {
   order?: number | null;
   stages?:
     | {
-        label: 'before' | 'during' | 'after';
+        label: "before" | "during" | "after";
         captionNo: string;
         captionEn: string;
         /**
@@ -321,7 +348,7 @@ export interface Project {
     | null;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -350,7 +377,7 @@ export interface Product {
   order?: number | null;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -365,7 +392,7 @@ export interface Faq {
   order?: number | null;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -396,7 +423,7 @@ export interface Page {
   publishedAt?: string | null;
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -426,12 +453,20 @@ export interface Post {
   seoDescriptionNo?: string | null;
   seoDescriptionEn?: string | null;
   publishedAt?: string | null;
-  editorialStatus: 'draft' | 'ai_qa' | 'human_review' | 'rejected' | 'approved' | 'scheduled' | 'published';
+  editorialStatus:
+    | "draft"
+    | "ai_qa"
+    | "human_review"
+    | "rejected"
+    | "approved"
+    | "scheduled"
+    | "published";
   /**
    * Kan bare lagres når redaksjonell status er Godkjent eller Planlagt.
    */
   scheduledAt?: string | null;
-  searchIntent?: ('informational' | 'commercial' | 'local' | 'comparison') | null;
+  searchIntent?:
+    ("informational" | "commercial" | "local" | "comparison") | null;
   primaryKeyword?: string | null;
   secondaryKeywords?:
     | {
@@ -498,7 +533,7 @@ export interface Post {
   };
   relatedPosts?: (number | Post)[] | null;
   relatedServices?: (number | Service)[] | null;
-  ctaVariant?: ('assessment' | 'wash' | 'renewal' | 'new_roof') | null;
+  ctaVariant?: ("assessment" | "wash" | "renewal" | "new_roof") | null;
   faqItems?:
     | {
         questionNo: string;
@@ -529,7 +564,7 @@ export interface Post {
    * Systemets anbefaling er beslutningsstøtte. Administrator må kontrollere og utføre eventuell endring.
    */
   contentAudit?: {
-    recommendation?: ('keep' | 'update' | 'merge' | 'redirect') | null;
+    recommendation?: ("keep" | "update" | "merge" | "redirect") | null;
     reason?: string | null;
     generatedAt?: string | null;
     targetPost?: (number | null) | Post;
@@ -537,7 +572,7 @@ export interface Post {
   };
   updatedAt: string;
   createdAt: string;
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
 }
 /**
  * Ikke-sensitive spor for temavalg, utkast og kvalitetssjekk.
@@ -549,10 +584,10 @@ export interface SeoRun {
   id: number;
   idempotencyKey: string;
   jobType: string;
-  triggerSource: 'manual' | 'cron' | 'regenerate';
+  triggerSource: "manual" | "cron" | "regenerate";
   weekKey?: string | null;
   slot?: string | null;
-  status: 'running' | 'completed' | 'failed' | 'attention';
+  status: "running" | "completed" | "failed" | "attention";
   startedAt: string;
   finishedAt?: string | null;
   selectedTopics?: (number | SeoTopic)[] | null;
@@ -593,11 +628,11 @@ export interface SeoTopic {
         id?: string | null;
       }[]
     | null;
-  searchIntent: 'informational' | 'commercial' | 'local' | 'comparison';
+  searchIntent: "informational" | "commercial" | "local" | "comparison";
   service?: (number | null) | Service;
   location?: string | null;
   season?: string | null;
-  source: 'search_console' | 'ads' | 'trends' | 'lead' | 'manual';
+  source: "search_console" | "ads" | "trends" | "lead" | "manual";
   /**
    * Kun aggregerte tall; aldri kundedata eller tokens.
    */
@@ -640,7 +675,8 @@ export interface SeoTopic {
       }[]
     | null;
   reasonForSelection: string;
-  status: 'candidate' | 'rejected' | 'queued' | 'drafted' | 'approved' | 'published';
+  status:
+    "candidate" | "rejected" | "queued" | "drafted" | "approved" | "published";
   checkedAt?: string | null;
   relatedPost?: (number | null) | Post;
   updatedAt: string;
@@ -685,43 +721,60 @@ export interface Lead {
   communicationEmailUpdatedAt?: string | null;
   communicationEmailSourceMessage?: (number | null) | Message;
   phone?: string | null;
-  preferredChannel?: ('email' | 'sms') | null;
+  preferredChannel?: ("email" | "sms") | null;
   address: string;
   houseNumber?: string | null;
   postal: string;
   city?: string | null;
+  addressVerificationStatus?:
+    ("unverified" | "manual" | "verification_failed" | "verified") | null;
+  addressVerificationProvider?: string | null;
+  addressVerificationProviderId?: string | null;
+  addressLatitude?: number | null;
+  addressLongitude?: number | null;
+  addressVerifiedAt?: string | null;
   approxSqm?: number | null;
   /**
    * Lead photos from the website form. Previews work in admin; direct Blob links are private.
    */
   photoUrls?: string | null;
   inquiryType:
-    | 'takvask'
-    | 'takvask_impregnering'
-    | 'impregnering'
-    | 'takmaling'
-    | 'nytt_tak'
-    | 'usikker'
-    | 'vedlikehold'
-    | 'kledning';
+    | "takvask"
+    | "takvask_impregnering"
+    | "impregnering"
+    | "takmaling"
+    | "nytt_tak"
+    | "usikker"
+    | "vedlikehold"
+    | "kledning";
   message?: string | null;
-  language: 'no' | 'en';
+  language: "no" | "en";
   status?:
     | (
-        | 'new'
-        | 'draft_ready'
-        | 'customer_waiting'
-        | 'waiting_customer'
-        | 'qualified'
-        | 'measuring'
-        | 'quoted'
-        | 'converted'
-        | 'closed'
-        | 'contacted'
+        | "new"
+        | "draft_ready"
+        | "customer_waiting"
+        | "waiting_customer"
+        | "qualified"
+        | "measuring"
+        | "quoted"
+        | "converted"
+        | "closed"
+        | "contacted"
       )
     | null;
-  recordState: 'active' | 'archived' | 'trashed';
-  archiveClassification?: ('completed' | 'declined' | 'lost' | 'invalid' | 'spam' | 'duplicate' | 'other') | null;
+  recordState: "active" | "archived" | "trashed";
+  archiveClassification?:
+    | (
+        | "completed"
+        | "declined"
+        | "lost"
+        | "invalid"
+        | "spam"
+        | "duplicate"
+        | "other"
+      )
+    | null;
   archiveReason?: string | null;
   archivedAt?: string | null;
   archivedBy?: (number | null) | User;
@@ -731,7 +784,7 @@ export interface Lead {
   assignedTo?: (number | null) | User;
   nextAction?: string | null;
   nextActionAt?: string | null;
-  nextActionOwner: 'administrator' | 'customer' | 'system' | 'worker';
+  nextActionOwner: "administrator" | "customer" | "system" | "worker";
   nextActionBlocker?: string | null;
   caseRevision: number;
   addressRevision: number;
@@ -772,7 +825,7 @@ export interface Lead {
    */
   contentSourcePath?: string | null;
   referrer?: string | null;
-  marketingConsent?: ('granted' | 'denied' | 'unknown') | null;
+  marketingConsent?: ("granted" | "denied" | "unknown") | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -786,23 +839,23 @@ export interface Message {
   id: number;
   lead?: (number | null) | Lead;
   replyToMessage?: (number | null) | Message;
-  direction: 'outbound' | 'inbound';
+  direction: "outbound" | "inbound";
   category:
-    | 'receipt'
-    | 'ai_reply'
-    | 'information_request'
-    | 'follow_up'
-    | 'quote'
-    | 'contract'
-    | 'customer_question'
-    | 'change_agreement'
-    | 'change_confirmation'
-    | 'measurement_confirmation'
-    | 'schedule_confirmation'
-    | 'completion'
-    | 'invoice'
-    | 'reminder';
-  channel: 'email' | 'sms';
+    | "receipt"
+    | "ai_reply"
+    | "information_request"
+    | "follow_up"
+    | "quote"
+    | "contract"
+    | "customer_question"
+    | "change_agreement"
+    | "change_confirmation"
+    | "measurement_confirmation"
+    | "schedule_confirmation"
+    | "completion"
+    | "invoice"
+    | "reminder";
+  channel: "email" | "sms";
   subject: string;
   bodyText: string;
   bodyHtml?: string | null;
@@ -810,7 +863,15 @@ export interface Message {
    * Private, varige dokumenter lagt ved av kontrollert arbeidsflyt.
    */
   attachments?: (number | PrivateMedia)[] | null;
-  status: 'draft' | 'approved' | 'queued' | 'sent' | 'delivered' | 'failed' | 'attention' | 'cancelled';
+  status:
+    | "draft"
+    | "approved"
+    | "queued"
+    | "sent"
+    | "delivered"
+    | "failed"
+    | "attention"
+    | "cancelled";
   idempotencyKey: string;
   aiAssisted?: boolean | null;
   aiAnalysis?:
@@ -847,7 +908,8 @@ export interface Message {
  */
 export interface PrivateMedia {
   id: number;
-  classification: 'customer' | 'measurement' | 'contract' | 'work' | 'invoice' | 'warranty';
+  classification:
+    "customer" | "measurement" | "contract" | "work" | "invoice" | "warranty";
   ownerType?: string | null;
   ownerId?: string | null;
   /**
@@ -876,7 +938,7 @@ export interface RoofMeasurement {
   lead: number | Lead;
   version: number;
   supersedes?: (number | null) | RoofMeasurement;
-  sourceKind: 'legacy' | 'roof_fusion';
+  sourceKind: "legacy" | "roof_fusion";
   caseRevision?: number | null;
   addressRevision?: number | null;
   rfSnapshotId?: string | null;
@@ -884,7 +946,7 @@ export interface RoofMeasurement {
   rfSnapshotHash?: string | null;
   rfInputHash?: string | null;
   rfRendererHash?: string | null;
-  measurementMode: 'schematic' | 'schematic_with_context' | 'manual_no_visual';
+  measurementMode: "schematic" | "schematic_with_context" | "manual_no_visual";
   normalizedAddress: string;
   addressSourceId?: string | null;
   latitude?: number | null;
@@ -920,7 +982,8 @@ export interface RoofMeasurement {
   imageryCapturedAt?: string | null;
   selectionConfirmedBy?: (number | null) | User;
   selectionConfirmedAt?: string | null;
-  manualAreaSource?: ('customer' | 'drawing' | 'admin_estimate' | 'onsite') | null;
+  manualAreaSource?:
+    ("customer" | "drawing" | "admin_estimate" | "onsite") | null;
   manualAreaReason?: string | null;
   /**
    * Polygonpunkter (lat/lon) og vinkelintervall per takflate. Redigering oppretter ny versjon via kontrollen under.
@@ -956,9 +1019,9 @@ export interface RoofMeasurement {
     | boolean
     | null;
   inputHash: string;
-  confidence: 'high' | 'medium' | 'low';
+  confidence: "high" | "medium" | "low";
   confidenceReasoning: string;
-  status: 'draft' | 'review_required' | 'blocked' | 'approved' | 'superseded';
+  status: "draft" | "review_required" | "blocked" | "approved" | "superseded";
   blockingReasons?:
     | {
         [k: string]: unknown;
@@ -983,7 +1046,12 @@ export interface PriceRule {
   id: number;
   reference: string;
   version: number;
-  serviceKey: 'takvask' | 'takvask_impregnering' | 'impregnering' | 'takmaling' | 'nytt_tak';
+  serviceKey:
+    | "takvask"
+    | "takvask_impregnering"
+    | "impregnering"
+    | "takmaling"
+    | "nytt_tak";
   unitPriceExVatOre: number;
   vatBasisPoints: number;
   minimumExVatOre: number;
@@ -993,7 +1061,7 @@ export interface PriceRule {
   validTo?: string | null;
   termsVersion: string;
   notes?: string | null;
-  status: 'draft' | 'approved' | 'retired';
+  status: "draft" | "approved" | "retired";
   approvedBy?: (number | null) | User;
   approvedAt?: string | null;
   updatedAt: string;
@@ -1034,7 +1102,7 @@ export interface PriceCalculation {
   vatOre: number;
   totalIncVatOre: number;
   maximumTotalIncVatOre?: number | null;
-  status: 'draft' | 'ready' | 'blocked' | 'superseded';
+  status: "draft" | "ready" | "blocked" | "superseded";
   blockingReasons?:
     | {
         [k: string]: unknown;
@@ -1062,7 +1130,7 @@ export interface Quote {
   version: number;
   supersedes?: (number | null) | Quote;
   optionGroup?: string | null;
-  optionKind?: ('base' | 'recommended') | null;
+  optionKind?: ("base" | "recommended") | null;
   siblingQuote?: (number | null) | Quote;
   snapshot:
     | {
@@ -1079,7 +1147,16 @@ export interface Quote {
   maximumTotalIncVatOre?: number | null;
   termsVersion: string;
   validUntil: string;
-  status: 'draft' | 'approved' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired' | 'revoked' | 'superseded';
+  status:
+    | "draft"
+    | "approved"
+    | "sent"
+    | "viewed"
+    | "accepted"
+    | "declined"
+    | "expired"
+    | "revoked"
+    | "superseded";
   approvedBy?: (number | null) | User;
   approvedAt?: string | null;
   selectedOptionQuote?: (number | null) | Quote;
@@ -1115,7 +1192,7 @@ export interface Contract {
     | null;
   documentHash: string;
   termsVersion: string;
-  status: 'draft' | 'issued' | 'signed' | 'declined' | 'revoked' | 'superseded';
+  status: "draft" | "issued" | "signed" | "declined" | "revoked" | "superseded";
   /**
    * Kundens signaturbevis.
    */
@@ -1182,12 +1259,20 @@ export interface ChangeAgreement {
     | boolean
     | null;
   documentHash: string;
-  reasonCode: 'over_tolerance' | 'over_maximum' | 'scope_change';
+  reasonCode: "over_tolerance" | "over_maximum" | "scope_change";
   reasonDescription: string;
   beforeTotalIncVatOre: number;
   afterTotalIncVatOre: number;
   validUntil: string;
-  status: 'draft' | 'approved' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'revoked' | 'superseded';
+  status:
+    | "draft"
+    | "approved"
+    | "sent"
+    | "viewed"
+    | "accepted"
+    | "declined"
+    | "revoked"
+    | "superseded";
   approvedBy?: (number | null) | User;
   approvedAt?: string | null;
   sentAt?: string | null;
@@ -1236,32 +1321,43 @@ export interface WorkOrder {
   customerCancellationResolvedAt?: string | null;
   customerCancellationResolution?: string | null;
   status:
-    | 'unassigned'
-    | 'assigned'
-    | 'scheduled'
-    | 'on_way'
-    | 'arrived'
-    | 'precheck'
-    | 'ready'
-    | 'blocked'
-    | 'in_progress'
-    | 'completed'
-    | 'documented'
-    | 'cancelled';
+    | "unassigned"
+    | "assigned"
+    | "scheduled"
+    | "on_way"
+    | "arrived"
+    | "precheck"
+    | "ready"
+    | "blocked"
+    | "in_progress"
+    | "completed"
+    | "documented"
+    | "cancelled";
   workSummary: string;
   beforePhotos?: (number | PrivateMedia)[] | null;
-  roofType?: ('betongstein' | 'teglstein' | 'metall' | 'skifer' | 'shingel' | 'annet') | null;
+  roofType?:
+    | ("betongstein" | "teglstein" | "metall" | "skifer" | "shingel" | "annet")
+    | null;
   actualAreaTenths?: number | null;
-  measurementMethod?: ('laser' | 'målebånd' | 'tegning' | 'kart_kontrollert' | 'annet') | null;
+  measurementMethod?:
+    ("laser" | "målebånd" | "tegning" | "kart_kontrollert" | "annet") | null;
   slopeBasis?: string | null;
   visibleCondition?: string | null;
-  safetyStatus?: ('safe' | 'blocked') | null;
+  safetyStatus?: ("safe" | "blocked") | null;
   safetyNotes?: string | null;
   scopeChanged?: boolean | null;
   scopeChangeDetails?: string | null;
-  precheckDecision?: ('ready' | 'blocked') | null;
+  precheckDecision?: ("ready" | "blocked") | null;
   priceOutcome?:
-    ('lower' | 'within_contract' | 'over_tolerance' | 'over_maximum' | 'scope_change' | 'hms_blocked') | null;
+    | (
+        | "lower"
+        | "within_contract"
+        | "over_tolerance"
+        | "over_maximum"
+        | "scope_change"
+        | "hms_blocked"
+      )
+    | null;
   allowedAreaMaxTenths?: number | null;
   actualSubtotalExVatOre?: number | null;
   actualVatOre?: number | null;
@@ -1313,7 +1409,7 @@ export interface ContractTerm {
   contractText: string;
   withdrawalInstructions: string;
   withdrawalFormUrl: string;
-  status: 'draft' | 'approved' | 'retired';
+  status: "draft" | "approved" | "retired";
   legalReviewReference?: string | null;
   approvedBy?: (number | null) | User;
   approvedAt?: string | null;
@@ -1331,7 +1427,14 @@ export interface InvoiceRecord {
   reference: string;
   lead: number | Lead;
   workOrder: number | WorkOrder;
-  status: 'draft' | 'approved' | 'exported' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  status:
+    | "draft"
+    | "approved"
+    | "exported"
+    | "sent"
+    | "paid"
+    | "overdue"
+    | "cancelled";
   snapshot:
     | {
         [k: string]: unknown;
@@ -1369,10 +1472,18 @@ export interface OfficialInvoice {
   lead: number | Lead;
   workOrder: number | WorkOrder;
   invoiceRecord: number | InvoiceRecord;
-  status: 'needs_review' | 'issued' | 'sent' | 'awaiting_payment' | 'paid' | 'overdue' | 'credited' | 'cancelled';
+  status:
+    | "needs_review"
+    | "issued"
+    | "sent"
+    | "awaiting_payment"
+    | "paid"
+    | "overdue"
+    | "credited"
+    | "cancelled";
   originalDocument: number | PrivateMedia;
   originalHash: string;
-  extractionStatus: 'needs_review' | 'confirmed' | 'failed';
+  extractionStatus: "needs_review" | "confirmed" | "failed";
   extractedData?:
     | {
         [k: string]: unknown;
@@ -1413,32 +1524,41 @@ export interface CustomerContractRequest {
   quote: number | Quote;
   contract: number | Contract;
   workOrder?: (number | null) | WorkOrder;
-  kind: 'withdrawal' | 'change_or_cancel';
+  kind: "withdrawal" | "change_or_cancel";
   reasonCode:
-    | 'price'
-    | 'wait'
-    | 'timing'
-    | 'other_supplier'
-    | 'scope'
-    | 'need_information'
-    | 'personal_financial'
-    | 'communication'
-    | 'not_needed'
-    | 'other'
-    | 'prefer_not_to_say';
+    | "price"
+    | "wait"
+    | "timing"
+    | "other_supplier"
+    | "scope"
+    | "need_information"
+    | "personal_financial"
+    | "communication"
+    | "not_needed"
+    | "other"
+    | "prefer_not_to_say";
   reasonText?: string | null;
   followUpConsent: boolean;
-  preferredFollowUp?: ('one_month' | 'three_months' | 'six_months' | 'next_spring' | 'custom' | 'never') | null;
+  preferredFollowUp?:
+    | (
+        | "one_month"
+        | "three_months"
+        | "six_months"
+        | "next_spring"
+        | "custom"
+        | "never"
+      )
+    | null;
   preferredFollowUpAt?: string | null;
   status:
-    | 'received'
-    | 'admin_review'
-    | 'alternative_requested'
-    | 'follow_up_scheduled'
-    | 'recovered'
-    | 'closed'
-    | 'do_not_contact';
-  recoveryPotential: 'green' | 'yellow' | 'red';
+    | "received"
+    | "admin_review"
+    | "alternative_requested"
+    | "follow_up_scheduled"
+    | "recovered"
+    | "closed"
+    | "do_not_contact";
+  recoveryPotential: "green" | "yellow" | "red";
   receivedAt: string;
   contractSignedAt?: string | null;
   companySignedAt?: string | null;
@@ -1472,7 +1592,7 @@ export interface Warranty {
   reference: string;
   lead: number | Lead;
   workOrder: number | WorkOrder;
-  status: 'active' | 'expired' | 'revoked';
+  status: "active" | "expired" | "revoked";
   scope: string;
   startsAt: string;
   endsAt: string;
@@ -1544,7 +1664,14 @@ export interface AuditEvent {
 export interface OperationalJob {
   id: number;
   type: string;
-  status: 'pending' | 'running' | 'retry' | 'completed' | 'failed' | 'attention' | 'cancelled';
+  status:
+    | "pending"
+    | "running"
+    | "retry"
+    | "completed"
+    | "failed"
+    | "attention"
+    | "cancelled";
   idempotencyKey: string;
   correlationId: string;
   attempts: number;
@@ -1707,7 +1834,11 @@ export interface CaseAddressRevision {
   commandHash: string;
   correlationId: string;
   actor?: (number | null) | User;
-  reasonCode: 'operator_correction' | 'customer_confirmation' | 'provider_resolution' | 'data_quality_recovery';
+  reasonCode:
+    | "operator_correction"
+    | "customer_confirmation"
+    | "provider_resolution"
+    | "data_quality_recovery";
   before:
     | {
         [k: string]: unknown;
@@ -1728,7 +1859,7 @@ export interface CaseAddressRevision {
     | null;
   beforeHash: string;
   afterHash: string;
-  rfInvalidationStatus: 'invalidated' | 'not_applicable';
+  rfInvalidationStatus: "invalidated" | "not_applicable";
   invalidatedRfSnapshotId?: string | null;
   invalidatedRfSnapshotRevision?: number | null;
   invalidatedRfSnapshotHash?: string | null;
@@ -1806,144 +1937,144 @@ export interface PayloadLockedDocument {
   id: number;
   document?:
     | ({
-        relationTo: 'users';
+        relationTo: "users";
         value: number | User;
       } | null)
     | ({
-        relationTo: 'media';
+        relationTo: "media";
         value: number | Media;
       } | null)
     | ({
-        relationTo: 'services';
+        relationTo: "services";
         value: number | Service;
       } | null)
     | ({
-        relationTo: 'projects';
+        relationTo: "projects";
         value: number | Project;
       } | null)
     | ({
-        relationTo: 'products';
+        relationTo: "products";
         value: number | Product;
       } | null)
     | ({
-        relationTo: 'faq';
+        relationTo: "faq";
         value: number | Faq;
       } | null)
     | ({
-        relationTo: 'pages';
+        relationTo: "pages";
         value: number | Page;
       } | null)
     | ({
-        relationTo: 'posts';
+        relationTo: "posts";
         value: number | Post;
       } | null)
     | ({
-        relationTo: 'redirects';
+        relationTo: "redirects";
         value: number | Redirect;
       } | null)
     | ({
-        relationTo: 'leads';
+        relationTo: "leads";
         value: number | Lead;
       } | null)
     | ({
-        relationTo: 'messages';
+        relationTo: "messages";
         value: number | Message;
       } | null)
     | ({
-        relationTo: 'roof-measurements';
+        relationTo: "roof-measurements";
         value: number | RoofMeasurement;
       } | null)
     | ({
-        relationTo: 'price-rules';
+        relationTo: "price-rules";
         value: number | PriceRule;
       } | null)
     | ({
-        relationTo: 'price-calculations';
+        relationTo: "price-calculations";
         value: number | PriceCalculation;
       } | null)
     | ({
-        relationTo: 'quotes';
+        relationTo: "quotes";
         value: number | Quote;
       } | null)
     | ({
-        relationTo: 'contracts';
+        relationTo: "contracts";
         value: number | Contract;
       } | null)
     | ({
-        relationTo: 'change-agreements';
+        relationTo: "change-agreements";
         value: number | ChangeAgreement;
       } | null)
     | ({
-        relationTo: 'contract-terms';
+        relationTo: "contract-terms";
         value: number | ContractTerm;
       } | null)
     | ({
-        relationTo: 'work-orders';
+        relationTo: "work-orders";
         value: number | WorkOrder;
       } | null)
     | ({
-        relationTo: 'invoice-records';
+        relationTo: "invoice-records";
         value: number | InvoiceRecord;
       } | null)
     | ({
-        relationTo: 'official-invoices';
+        relationTo: "official-invoices";
         value: number | OfficialInvoice;
       } | null)
     | ({
-        relationTo: 'customer-contract-requests';
+        relationTo: "customer-contract-requests";
         value: number | CustomerContractRequest;
       } | null)
     | ({
-        relationTo: 'warranties';
+        relationTo: "warranties";
         value: number | Warranty;
       } | null)
     | ({
-        relationTo: 'seo-topics';
+        relationTo: "seo-topics";
         value: number | SeoTopic;
       } | null)
     | ({
-        relationTo: 'seo-runs';
+        relationTo: "seo-runs";
         value: number | SeoRun;
       } | null)
     | ({
-        relationTo: 'audit-events';
+        relationTo: "audit-events";
         value: number | AuditEvent;
       } | null)
     | ({
-        relationTo: 'operational-jobs';
+        relationTo: "operational-jobs";
         value: number | OperationalJob;
       } | null)
     | ({
-        relationTo: 'access-tokens';
+        relationTo: "access-tokens";
         value: number | AccessToken;
       } | null)
     | ({
-        relationTo: 'private-media';
+        relationTo: "private-media";
         value: number | PrivateMedia;
       } | null)
     | ({
-        relationTo: 'roof-fusion-snapshots';
+        relationTo: "roof-fusion-snapshots";
         value: number | RoofFusionSnapshot;
       } | null)
     | ({
-        relationTo: 'roof-fusion-commands';
+        relationTo: "roof-fusion-commands";
         value: number | RoofFusionCommand;
       } | null)
     | ({
-        relationTo: 'roof-fusion-workbench-drafts';
+        relationTo: "roof-fusion-workbench-drafts";
         value: number | RoofFusionWorkbenchDraft;
       } | null)
     | ({
-        relationTo: 'case-address-revisions';
+        relationTo: "case-address-revisions";
         value: number | CaseAddressRevision;
       } | null)
     | ({
-        relationTo: 'roof-fusion-offer-commands';
+        relationTo: "roof-fusion-offer-commands";
         value: number | RoofFusionOfferCommand;
       } | null);
   globalSlug?: string | null;
   user: {
-    relationTo: 'users';
+    relationTo: "users";
     value: number | User;
   };
   updatedAt: string;
@@ -1956,7 +2087,7 @@ export interface PayloadLockedDocument {
 export interface PayloadPreference {
   id: number;
   user: {
-    relationTo: 'users';
+    relationTo: "users";
     value: number | User;
   };
   key?: string | null;
@@ -2312,6 +2443,12 @@ export interface LeadsSelect<T extends boolean = true> {
   houseNumber?: T;
   postal?: T;
   city?: T;
+  addressVerificationStatus?: T;
+  addressVerificationProvider?: T;
+  addressVerificationProviderId?: T;
+  addressLatitude?: T;
+  addressLongitude?: T;
+  addressVerifiedAt?: T;
   approxSqm?: T;
   photoUrls?: T;
   inquiryType?: T;
@@ -3447,7 +3584,7 @@ export interface SiteSetting {
     rightsNo?: string | null;
     rightsEn?: string | null;
   };
-  _status?: ('draft' | 'published') | null;
+  _status?: ("draft" | "published") | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -3887,7 +4024,7 @@ export interface CollectionsWidget {
   data?: {
     [k: string]: unknown;
   };
-  width: 'full';
+  width: "full";
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -3897,7 +4034,6 @@ export interface Auth {
   [k: string]: unknown;
 }
 
-
-declare module 'payload' {
+declare module "payload" {
   export interface GeneratedTypes extends Config {}
 }

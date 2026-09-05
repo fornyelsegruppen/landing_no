@@ -334,6 +334,13 @@ export type AdminCase = {
   documents: CaseDocument[];
   lead: {
     address: string;
+    addressVerificationStatus?: string;
+    addressVerificationProvider?: string;
+    addressVerificationProviderId?: string;
+    addressLatitude?: number;
+    addressLongitude?: number;
+    addressVerifiedAt?: string;
+    approxSqm?: number;
     city?: string;
     archiveClassification?: string;
     archiveReason?: string;
@@ -1521,6 +1528,17 @@ export async function loadAdminCase(
         lead.communicationEmailUpdatedAt,
       ),
       phone: stringValue(lead.phone),
+      addressVerificationStatus: stringValue(lead.addressVerificationStatus),
+      addressVerificationProvider: stringValue(
+        lead.addressVerificationProvider,
+      ),
+      addressVerificationProviderId: stringValue(
+        lead.addressVerificationProviderId,
+      ),
+      addressLatitude: numberValue(lead.addressLatitude),
+      addressLongitude: numberValue(lead.addressLongitude),
+      addressVerifiedAt: stringValue(lead.addressVerifiedAt),
+      approxSqm: numberValue(lead.approxSqm),
       address: [
         stringValue(lead.address),
         stringValue(lead.houseNumber),

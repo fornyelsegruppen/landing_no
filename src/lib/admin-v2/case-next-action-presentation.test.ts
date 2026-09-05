@@ -424,6 +424,32 @@ describe("case next-action presentation", () => {
     );
   });
 
+  it.each([
+    ["nb", "adresse", "målegrunnlag"],
+    ["lt", "adresą", "matavimo pagrindą"],
+    ["en", "address", "measurement basis"],
+  ] as const)(
+    "states address and measurement prerequisites before a commercial package in %s",
+    (locale, address, measurement) => {
+      const presentation = getCaseNextActionPresentation(
+        "prepare_package",
+        locale,
+      );
+
+      expect(presentation.copy.reason).toContain(address);
+      expect(presentation.copy.reason).toContain(measurement);
+      expect(presentation.copy.cta).not.toMatch(
+        /(?:måling, pris, tilbud og kontrakt|matavimą, kainą, pasiūlymą ir sutartį|measurement, price, quote and contract)/iu,
+      );
+      expect(presentation).toMatchObject({
+        processStage: "evidence",
+        requiredCapability: "commercial.package.prepare",
+        reviewMode: "inline",
+        target: { entity: "case" },
+      });
+    },
+  );
+
   it("keeps no-action state contextual instead of claiming completion", () => {
     expect(caseNextActionPresentations.none).toMatchObject({
       caseStateHint: "derive_from_case",

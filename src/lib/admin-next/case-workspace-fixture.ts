@@ -59,9 +59,38 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
     { id: "completion", state: "upcoming" },
   ],
   customerRecord: {
+    originalInquiry: {
+      receivedAt: "2026-09-03T14:40:00.000Z",
+      inquiryType: "takvask_impregnering",
+      message:
+        "Vi ønsker en vurdering av taket før vi bestemmer om impregnering.",
+      contact: {
+        email: "kari.nilsen@example.no",
+        phone: "+47 900 00 000",
+      },
+      address: {
+        streetAddress: "Testveien 12",
+        postalCode: "0164",
+        city: "Oslo",
+      },
+      photoCount: 2,
+    },
     questions: {
       total: 1,
       unresolved: true,
+      outstanding: [
+        {
+          id: "message-104203",
+          subject: "Re: Tilbud på takfornyelse",
+          bodyText:
+            "Takk. Kan dere sende tilbudet i dag, og bekrefte at stillas er inkludert?",
+          channel: "email",
+          receivedAt: "2026-09-03T15:06:00.000Z",
+          documentReferences: ["T-1042-V1", "K-1042-V1"],
+          replyStage: "prepare",
+          fallbackHref: "/admin-v2/cases/1042",
+        },
+      ],
       active: {
         id: "message-104203",
         subject: "Re: Tilbud på takfornyelse",

@@ -17,6 +17,7 @@ function workspace(): AdminCaseWorkspace {
   return {
     lead: {
       id: 13,
+      addressVerificationStatus: "verified",
       name: "Canonical customer",
       recordState: "active",
       revision: 1,
@@ -74,6 +75,71 @@ const truncatedPageMetadata = [
 ] as const;
 
 describe("Admin Next canonical customer record projection", () => {
+  it("projects the exact TF-2-style original intake separately from messages", () => {
+    const exactMessage =
+      "Eksakt takareal er ukjent.\nKunden oppga omtrent 300 m² i skjemaet.";
+    const projected = projectAdminCaseWorkspace(
+      {
+        ...workspace(),
+        lead: {
+          ...workspace().lead,
+          id: 2,
+          addressVerifiedAt: "2026-09-05T06:50:00.000Z",
+          name: "TEST – pilnas kelias",
+          createdAt: "2026-09-05T06:47:59.000Z",
+          inquiryType: "takvask",
+          message: exactMessage,
+          email: "fornyelsegruppen@gmail.com",
+          communicationEmail: "corrected-contact@example.no",
+          phone: "fornyelsegruppen@gmail.com",
+          address: "lyngveien, 28 1182",
+          approxSqm: 300,
+          streetAddress: "lyngveien, 28",
+          postal: "1182",
+          city: undefined,
+          photoCount: 0,
+        },
+        messages: [],
+        customerQuestionContext: {
+          latest: null,
+          status: "none",
+          threads: [],
+          unresolved: null,
+        },
+      } as unknown as AdminCaseWorkspace,
+      new Date("2026-09-05T07:00:00.000Z"),
+      "nb",
+    );
+
+    expect(projected.customerRecord?.originalInquiry).toEqual({
+      receivedAt: "2026-09-05T06:47:59.000Z",
+      inquiryType: "takvask",
+      message: exactMessage,
+      approximateAreaSquareMeters: 300,
+      areaProvenance: "customer_reported_unverified",
+      contact: {
+        email: "fornyelsegruppen@gmail.com",
+        phone: "fornyelsegruppen@gmail.com",
+      },
+      address: {
+        streetAddress: "lyngveien, 28",
+        postalCode: "1182",
+        city: null,
+      },
+      photoCount: 0,
+    });
+    expect(projected.customerRecord?.questions).toMatchObject({
+      total: 0,
+      unresolved: false,
+      outstanding: [],
+    });
+    expect(projected.customerRecord?.communications).toEqual([]);
+    expect(projected.addressVerification).toEqual({
+      status: "verified",
+      verifiedAt: "2026-09-05T06:50:00.000Z",
+    });
+  });
+
   it("preserves message bodies, question state, commercial lineage, signatures and documents", () => {
     const value = {
       ...workspace(),
@@ -139,6 +205,17 @@ describe("Admin Next canonical customer record projection", () => {
               aiAssisted: false,
             },
           },
+          {
+            question: {
+              id: 39,
+              subject: "Oldest unanswered question",
+              bodyText: "This question predates the first communication page.",
+              channel: "email",
+              createdAt: "2026-08-20T10:00:00.000Z",
+              aiAssisted: false,
+            },
+            reply: null,
+          },
         ],
         unresolved: {
           question: {
@@ -185,24 +262,29 @@ describe("Admin Next canonical customer record projection", () => {
 
     expect(projected.customerRecord).toMatchObject({
       questions: {
-        total: 1,
+        total: 2,
         unresolved: true,
-        active: {
-          id: "message-41",
-          subject: "Re: Quote",
-          bodyText: "Is scaffolding included?",
-          channel: "email",
-          receivedAt: "2026-09-04T10:00:00.000Z",
-          documentReferences: ["T-13-V2", "K-13-V2"],
-          replyStage: "review",
-          reply: {
-            id: "message-42",
-            subject: "Re: Quote",
-            bodyText: "Yes, scaffolding is included.",
-            status: "draft",
-            at: "2026-09-04T10:05:00.000Z",
+        outstanding: [
+          {
+            id: "message-39",
+            replyStage: "prepare",
+            subject: "Oldest unanswered question",
           },
-          fallbackHref: "/admin-v2/cases/13#message-42",
+          {
+            id: "message-41",
+            replyStage: "review",
+            subject: "Re: Quote",
+          },
+        ],
+        active: {
+          id: "message-39",
+          subject: "Oldest unanswered question",
+          bodyText: "This question predates the first communication page.",
+          channel: "email",
+          receivedAt: "2026-08-20T10:00:00.000Z",
+          documentReferences: [],
+          replyStage: "prepare",
+          fallbackHref: "/admin-v2/cases/13#message-39",
         },
       },
       communications: [

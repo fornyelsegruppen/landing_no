@@ -21,6 +21,7 @@ import type {
   AdminNextCaseCommunicationPage,
   AdminNextCaseStageId,
   AdminNextCaseStageState,
+  AdminNextCustomerQuestion,
   AdminNextCaseWorkspaceAdapter,
   AdminNextCaseWorkspaceView,
   AdminNextTimelineKind,
@@ -36,6 +37,7 @@ import { projectStoredNextActionBlocker } from "@/lib/admin-next/stored-next-act
 import {
   customerQuestionDocumentReferences,
   customerQuestionReplyStage,
+  type CustomerQuestionContextThread,
 } from "@/lib/messages/customer-question-state";
 import {
   roofFusionCaseIdForLeadV1,
@@ -83,6 +85,37 @@ function artifactHref(value?: string | null) {
   return value && artifactHrefPattern.test(value) ? value : null;
 }
 
+function projectCustomerQuestion(
+  thread: CustomerQuestionContextThread,
+  caseHref: string,
+): AdminNextCustomerQuestion {
+  const question = thread.question;
+  const reply = thread.reply;
+  return {
+    id: `message-${question.id}`,
+    subject: question.subject || `#${question.id}`,
+    bodyText: question.bodyText || "",
+    channel: question.channel || "—",
+    receivedAt: question.createdAt || question.updatedAt || "—",
+    documentReferences: customerQuestionDocumentReferences(question),
+    replyStage: customerQuestionReplyStage(reply),
+    ...(reply
+      ? {
+          reply: {
+            id: `message-${reply.id}`,
+            subject: reply.subject || `#${reply.id}`,
+            bodyText: reply.bodyText || "",
+            status: reply.status || "—",
+            at: reply.deliveredAt || reply.updatedAt || reply.createdAt || "—",
+          },
+        }
+      : {}),
+    fallbackHref: reply
+      ? `${caseHref}#message-${reply.id}`
+      : `${caseHref}#message-${question.id}`,
+  };
+}
+
 function caseRecordHref(caseHref: string, value?: string | null) {
   if (value?.startsWith("#")) return `${caseHref}${value}`;
   return operatorHref(value);
@@ -93,6 +126,12 @@ function newestFirst(left: { at: string }, right: { at: string }) {
   const rightTime = Date.parse(right.at);
   if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) return 0;
   return rightTime - leftTime;
+}
+
+function analysisRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 type AuditPayloadPage = {
@@ -414,7 +453,10 @@ const auditEventCopy = {
 
 function auditActionLabel(action: string, locale: CaseNextActionLocale) {
   const copy = auditEventCopy[locale];
-  if (action === "case.address_corrected" || action === "case.address-corrected") {
+  if (
+    action === "case.address_corrected" ||
+    action === "case.address-corrected"
+  ) {
     return copy.addressCorrected;
   }
   if (action === "roof-fusion.offer-draft-created") {
@@ -432,7 +474,8 @@ function timelineReference(
   return (
     value.timeline.find(
       (item) =>
-        item.sourceCollection === sourceCollection && item.sourceId === sourceId,
+        item.sourceCollection === sourceCollection &&
+        item.sourceId === sourceId,
     )?.title || `${fallback} #${sourceId}`
   );
 }
@@ -634,9 +677,20 @@ export function projectAdminCaseWorkspace(
     threads: [],
     unresolved: null,
   };
-  const activeQuestionThread = customerQuestionContext.unresolved;
-  const activeQuestion = activeQuestionThread?.question;
-  const activeReply = activeQuestionThread?.reply;
+  const outstandingQuestionThreads = customerQuestionContext.threads
+    .filter(
+      (thread) => customerQuestionReplyStage(thread.reply) !== "delivered",
+    )
+    .sort((left, right) => {
+      const byTime = String(left.question.createdAt || "").localeCompare(
+        String(right.question.createdAt || ""),
+      );
+      return byTime || left.question.id - right.question.id;
+    });
+  const activeQuestionThread = outstandingQuestionThreads[0] || null;
+  const outstandingQuestions = outstandingQuestionThreads.map((thread) =>
+    projectCustomerQuestion(thread, caseHref),
+  );
   const projectedCommunications = messages
     .map((message) => ({
       id: `message-${message.id}`,
@@ -676,6 +730,46 @@ export function projectAdminCaseWorkspace(
     .sort(newestFirst);
   const communications =
     options.communicationPage?.items || projectedCommunications;
+  const activeQuestionReplyDraft =
+    activeQuestionThread?.reply?.direction === "outbound" &&
+    activeQuestionThread.reply.status === "draft"
+      ? activeQuestionThread.reply
+      : undefined;
+  const activeReplyDraftMessage =
+    activeQuestionReplyDraft ||
+    (!activeQuestionThread
+      ? [...messages]
+          .filter(
+            (message) =>
+              message.direction === "outbound" &&
+              message.status === "draft" &&
+              ["ai_reply", "follow_up", "information_request"].includes(
+                message.category,
+              ) &&
+              !message.replyToMessageId,
+          )
+          .sort((left, right) => {
+            const leftTime = Date.parse(left.updatedAt || left.createdAt || "");
+            const rightTime = Date.parse(
+              right.updatedAt || right.createdAt || "",
+            );
+            return (
+              (Number.isNaN(rightTime) ? 0 : rightTime) -
+              (Number.isNaN(leftTime) ? 0 : leftTime)
+            );
+          })[0]
+      : undefined);
+  const activeReplyDraftAnalysis = analysisRecord(
+    activeReplyDraftMessage?.aiAnalysis,
+  );
+  const activeReplyTarget = activeReplyDraftMessage?.replyToMessageId
+    ? activeQuestionThread?.question.id ===
+      activeReplyDraftMessage.replyToMessageId
+      ? activeQuestionThread.question
+      : messages.find(
+          (message) => message.id === activeReplyDraftMessage.replyToMessageId,
+        )
+    : undefined;
   const commercialVersions = [
     ...(commercial.quoteVersions || []),
     ...(commercial.contractVersions || []),
@@ -720,8 +814,19 @@ export function projectAdminCaseWorkspace(
     at: item.at,
     href: caseRecordHref(caseHref, item.href) || caseHref,
   }));
+  const addressVerificationStatus = [
+    "manual",
+    "unverified",
+    "verification_failed",
+    "verified",
+  ].includes(value.lead.addressVerificationStatus || "")
+    ? (value.lead.addressVerificationStatus as
+        "manual" | "unverified" | "verification_failed" | "verified")
+    : "unverified";
 
   return {
+    leadId: value.lead.id,
+    caseRevision: value.lead.revision,
     reference: `TF-${value.lead.id}`,
     customer: value.lead.name,
     address: [
@@ -731,6 +836,13 @@ export function projectAdminCaseWorkspace(
     ]
       .filter(Boolean)
       .join(", "),
+    addressVerification: {
+      status: addressVerificationStatus,
+      verifiedAt:
+        addressVerificationStatus === "verified"
+          ? value.lead.addressVerifiedAt || null
+          : null,
+    },
     service:
       value.quote?.serviceDescription ||
       value.lead.inquiryType ||
@@ -774,40 +886,67 @@ export function projectAdminCaseWorkspace(
     },
     stages: projectAdminNextCaseStages(value),
     customerRecord: {
+      ...(activeReplyDraftMessage
+        ? {
+            activeReplyDraft: {
+              id: activeReplyDraftMessage.id,
+              aiAssisted: Boolean(activeReplyDraftMessage.aiAssisted),
+              bodyText: activeReplyDraftMessage.bodyText,
+              manualReplyRequiresEditing:
+                activeReplyDraftAnalysis.manualReplyRequiresEditing === true,
+              ...(activeReplyTarget
+                ? {
+                    replyTarget: {
+                      id: activeReplyTarget.id,
+                      subject:
+                        activeReplyTarget.subject ||
+                        ("reference" in activeReplyTarget
+                          ? activeReplyTarget.reference
+                          : "") ||
+                        "—",
+                      bodyText: activeReplyTarget.bodyText,
+                    },
+                  }
+                : {}),
+              subject:
+                activeReplyDraftMessage.subject ||
+                ("reference" in activeReplyDraftMessage
+                  ? activeReplyDraftMessage.reference
+                  : "") ||
+                "—",
+              updatedAt:
+                activeReplyDraftMessage.updatedAt ||
+                activeReplyDraftMessage.createdAt ||
+                "—",
+            },
+          }
+        : {}),
+      originalInquiry: {
+        receivedAt: value.lead.createdAt || null,
+        inquiryType: value.lead.inquiryType || null,
+        message: value.lead.message || null,
+        approximateAreaSquareMeters: value.lead.approxSqm || null,
+        ...(value.lead.approxSqm
+          ? { areaProvenance: "customer_reported_unverified" as const }
+          : {}),
+        contact: {
+          email: value.lead.email || value.lead.communicationEmail || null,
+          phone: value.lead.phone || null,
+        },
+        address: {
+          streetAddress: value.lead.streetAddress || value.lead.address || null,
+          postalCode: value.lead.postal || null,
+          city: value.lead.city || null,
+        },
+        photoCount: value.lead.photoCount,
+      },
       questions: {
         total: customerQuestionContext.threads.length,
-        unresolved: Boolean(customerQuestionContext.unresolved),
-        ...(activeQuestion
+        unresolved: outstandingQuestions.length > 0,
+        outstanding: outstandingQuestions,
+        ...(activeQuestionThread
           ? {
-              active: {
-                id: `message-${activeQuestion.id}`,
-                subject: activeQuestion.subject || `#${activeQuestion.id}`,
-                bodyText: activeQuestion.bodyText || "",
-                channel: activeQuestion.channel || "—",
-                receivedAt:
-                  activeQuestion.createdAt || activeQuestion.updatedAt || "—",
-                documentReferences:
-                  customerQuestionDocumentReferences(activeQuestion),
-                replyStage: customerQuestionReplyStage(activeReply),
-                ...(activeReply
-                  ? {
-                      reply: {
-                        id: `message-${activeReply.id}`,
-                        subject: activeReply.subject || `#${activeReply.id}`,
-                        bodyText: activeReply.bodyText || "",
-                        status: activeReply.status || "—",
-                        at:
-                          activeReply.deliveredAt ||
-                          activeReply.updatedAt ||
-                          activeReply.createdAt ||
-                          "—",
-                      },
-                    }
-                  : {}),
-                fallbackHref: activeReply
-                  ? `${caseHref}#message-${activeReply.id}`
-                  : caseHref,
-              },
+              active: projectCustomerQuestion(activeQuestionThread, caseHref),
             }
           : {}),
       },

@@ -37,6 +37,12 @@ import {
   getOrCreateUploadTicket,
 } from "@/lib/leads/upload-ticket-coordinator";
 import { appendUniquePhotoFiles } from "@/lib/leads/photo-selection";
+import { isReasonablePhone } from "@/lib/lead-contact-validation";
+import {
+  hasAddressPostalConflict,
+  NorwegianAddressAutocomplete,
+  type NorwegianAddressSelection,
+} from "./norwegian-address-autocomplete";
 
 const MAX_PHOTOS = 15;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -70,7 +76,7 @@ const step1Schema = z.object({
   phone: z
     .string()
     .trim()
-    .refine((value) => !value || value.length >= 5),
+    .refine((value) => !value || isReasonablePhone(value)),
   postal: z.string().trim().min(3),
   type: z.enum(inquiryTypes),
 });
@@ -251,6 +257,9 @@ export function ContactSection() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState<FormState>(initial);
+  const [addressSelection, setAddressSelection] =
+    useState<NorwegianAddressSelection | null>(null);
+  const [manualAddress, setManualAddress] = useState(false);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photosLimitNotice, setPhotosLimitNotice] = useState<string | null>(
     null,
@@ -536,6 +545,20 @@ export function ContactSection() {
       return;
     }
 
+    if (hasAddressPostalConflict(addressSelection, step1.data.postal)) {
+      trackLeadFormEvent("lead_form_validation_error", {
+        step: 2,
+        inquiryType: step1.data.type,
+        errorType: "address_postal_conflict",
+      });
+      toast.error(
+        locale === "no"
+          ? "Postnummeret må samsvare med valgt adresse, eller adressen må brukes manuelt."
+          : "The postal code must match the selected address, or the address must be entered manually.",
+      );
+      return;
+    }
+
     submittingRef.current = true;
     setLoading(true);
     try {
@@ -586,7 +609,12 @@ export function ContactSection() {
           type: step1.data.type,
           locale,
           email: step2.data.email || undefined,
-          address: step2.data.address || undefined,
+          address:
+            addressSelection && !manualAddress
+              ? addressSelection.streetAddress
+              : step2.data.address || undefined,
+          addressSelection:
+            addressSelection && !manualAddress ? addressSelection : undefined,
           roofSize: step2.data.roofSize || undefined,
           message: step2.data.message || undefined,
           photoUrls: photoUrls.length ? photoUrls : undefined,
@@ -620,6 +648,8 @@ export function ContactSection() {
         toast.message(copy.contact.form.partialUpload);
       }
       setForm(initial);
+      setAddressSelection(null);
+      setManualAddress(false);
       current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       setPhotos([]);
       photosRef.current = [];
@@ -817,16 +847,17 @@ export function ContactSection() {
                       ? "Adresse (valgfritt)"
                       : "Address (optional)"}
                   </Label>
-                  <Input
+                  <NorwegianAddressAutocomplete
                     id="address"
+                    locale={locale}
                     value={form.address}
-                    onChange={(e) => update("address", e.target.value)}
-                    autoComplete="street-address"
-                    placeholder={
-                      locale === "no"
-                        ? "Gateadresse og husnummer"
-                        : "Street address and house number"
-                    }
+                    postalCode={form.postal}
+                    selection={addressSelection}
+                    manualMode={manualAddress}
+                    onValueChange={(value) => update("address", value)}
+                    onPostalCodeChange={(value) => update("postal", value)}
+                    onSelectionChange={setAddressSelection}
+                    onManualModeChange={setManualAddress}
                   />
                   <p className="text-muted-foreground text-xs">
                     {locale === "no"

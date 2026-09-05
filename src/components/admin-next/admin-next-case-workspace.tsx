@@ -36,6 +36,8 @@ import {
   AdminNextCaseWorkspacePanelSwitcher,
 } from "./admin-next-case-workspace-navigation";
 import { AdminNextCaseCommunications } from "./admin-next-case-communications";
+import { AdminNextReplyWorkbench } from "./admin-next-reply-workbench";
+import type { AdminNextReplyDraftingReadiness } from "@/lib/admin-next/reply-drafting-readiness";
 import {
   BlockerSummary,
   DueIndicator,
@@ -96,14 +98,41 @@ const copy = {
     customerRecord: "Kundedialog og avtalehistorikk",
     customerRecordIntro:
       "Meldinger, spørsmål, tilbud, kontrakter og dokumentversjoner i samme saksbilde.",
+    originalInquiry: "Opprinnelig henvendelse",
+    originalInquiryIntro:
+      "Kundens innsendte opplysninger før oppfølging eller utgående meldinger.",
+    originalInquiryMessage: "Kundens beskrivelse",
+    originalInquiryMessageEmpty: "Ingen beskrivelse ble sendt inn.",
+    approximateArea: "Oppgitt takareal",
+    customerReportedUnverified: "Kundens anslag · ikke verifisert",
+    inquiryType: "Tjeneste",
+    contact: "Kontakt",
+    photos: "Bilder",
+    noPhotos: "Ingen",
+    questionsNone: "Ingen oppfølgingsspørsmål er registrert",
     communications: "Meldinger",
     communicationsEmpty: "Ingen kundemeldinger er registrert.",
+    communicationAllCategories: "Alle meldingstyper",
     communicationAllLoaded: "Hele meldingshistorikken vises",
+    communicationAllStatuses: "Alle statuser",
+    communicationDocumentsView: "Dokumenter",
+    communicationFilters: "Søk og filtre",
+    communicationFullHistoryView: "Full meldingshistorikk",
+    communicationHistoryViews: "Visning av kundedialog",
     communicationLoadFailed: "Eldre meldinger kunne ikke lastes. Prøv igjen.",
     communicationLoadingOlder: "Laster eldre meldinger",
+    communicationNoMatches: "Ingen lastede meldinger samsvarer med filtrene.",
+    communicationQuoteContractView: "Tilbud og kontrakter",
+    communicationRecentHistoryView: "Siste meldinger",
+    communicationSearch: "Søk i lastede meldinger",
+    communicationSearchPlaceholder: "Emne, innhold eller filnavn",
     communicationShowOlder: "Vis eldre meldinger",
+    communicationStatusFilter: "Status",
+    communicationTypeFilter: "Meldingstype",
     questions: "Kundespørsmål",
     unresolvedQuestion: "Ett eller flere spørsmål venter på svar",
+    reviewOutstandingQuestions: "Se ubesvarte spørsmål",
+    otherOutstandingQuestions: "Andre ubesvarte spørsmål",
     questionsResolved: "Alle registrerte spørsmål er besvart",
     activeQuestion: "Kundespørsmål som krever handling",
     questionReceived: "Mottatt",
@@ -222,12 +251,18 @@ const copy = {
     tamperStatuses: { not_assessable: "Kan ikke vurderes" },
     fallbackTitle: "Flere saksverktøy",
     fallbackIntro:
-      "Eksisterende dokument- og arbeidsruter beholdes som trygg reserve.",
+      "Åpne dokumentene eller arbeidsplanen når du trenger mer detaljert oppfølging.",
     technicalDetails: "Tekniske detaljer",
     technicalIntro: "Rå systemverdier for feilsøking",
     sourceMode: "Datakildemodus",
     storedService: "Lagret tjenesteverdi",
     originalAddress: "Opprinnelig adresseverdi",
+    addressVerification: {
+      verified: "Serververifisert adresse",
+      manual: "Manuelt oppgitt adresse – RF er blokkert",
+      unverified: "Adresse ikke verifisert – RF er blokkert",
+      verification_failed: "Adresseverifisering mislyktes – RF er blokkert",
+    },
     nextActionKind: "Handlingstype",
     requiredCapability: "Påkrevd tilgang",
     reviewMode: "Kontrollmodus",
@@ -240,7 +275,12 @@ const copy = {
     recordId: "Oppførings-ID",
     services: {
       Takfornyelse: "Takfornyelse",
+      takvask: "Takvask",
       takvask_impregnering: "Takvask og impregnering",
+      impregnering: "Takimpregnering",
+      takmaling: "Takmaling",
+      nytt_tak: "Nytt tak",
+      usikker: "Usikker / trenger veiledning",
     },
     otherService: "Annen takjeneste",
     messageChannels: { email: "E-post", phone: "Telefon", sms: "SMS" },
@@ -350,15 +390,43 @@ const copy = {
     customerRecord: "Kliento dialogas ir sutarčių istorija",
     customerRecordIntro:
       "Žinutės, klausimai, pasiūlymai, sutartys ir dokumentų versijos vienoje byloje.",
+    originalInquiry: "Pradinė užklausa",
+    originalInquiryIntro:
+      "Kliento pateikti duomenys iki tolesnio bendravimo ar siunčiamų žinučių.",
+    originalInquiryMessage: "Kliento aprašymas",
+    originalInquiryMessageEmpty: "Aprašymas nebuvo pateiktas.",
+    approximateArea: "Nurodytas stogo plotas",
+    customerReportedUnverified: "Kliento apytikslis dydis · nepatikrinta",
+    inquiryType: "Paslauga",
+    contact: "Kontaktai",
+    photos: "Nuotraukos",
+    noPhotos: "Nėra",
+    questionsNone: "Tolesnių klausimų neužregistruota",
     communications: "Žinutės",
     communicationsEmpty: "Kliento žinučių neužregistruota.",
+    communicationAllCategories: "Visos žinučių rūšys",
     communicationAllLoaded: "Rodoma visa žinučių istorija",
+    communicationAllStatuses: "Visos būsenos",
+    communicationDocumentsView: "Dokumentai",
+    communicationFilters: "Paieška ir filtrai",
+    communicationFullHistoryView: "Visa žinučių istorija",
+    communicationHistoryViews: "Kliento dialogo vaizdai",
     communicationLoadFailed:
       "Senesnių žinučių įkelti nepavyko. Bandykite dar kartą.",
     communicationLoadingOlder: "Įkeliamos senesnės žinutės",
+    communicationNoMatches:
+      "Nė viena įkelta žinutė neatitinka pasirinktų filtrų.",
+    communicationQuoteContractView: "Pasiūlymai ir sutartys",
+    communicationRecentHistoryView: "Naujausios žinutės",
+    communicationSearch: "Ieškoti įkeltose žinutėse",
+    communicationSearchPlaceholder: "Tema, turinys arba failo pavadinimas",
     communicationShowOlder: "Rodyti ankstesnes žinutes",
+    communicationStatusFilter: "Būsena",
+    communicationTypeFilter: "Žinutės rūšis",
     questions: "Kliento klausimai",
     unresolvedQuestion: "Vienas ar daugiau klausimų laukia atsakymo",
+    reviewOutstandingQuestions: "Peržiūrėti neatsakytus klausimus",
+    otherOutstandingQuestions: "Kiti neatsakyti klausimai",
     questionsResolved: "Į visus užregistruotus klausimus atsakyta",
     activeQuestion: "Kliento klausimas, kuriam reikia veiksmo",
     questionReceived: "Gauta",
@@ -477,12 +545,18 @@ const copy = {
     tamperStatuses: { not_assessable: "Neįmanoma įvertinti" },
     fallbackTitle: "Papildomi bylos įrankiai",
     fallbackIntro:
-      "Esami dokumentų ir darbų maršrutai palikti saugiam grįžimui.",
+      "Prireikus išsamesnio darbo, atverkite dokumentus arba darbų planą.",
     technicalDetails: "Techninės detalės",
     technicalIntro: "Neapdorotos sistemos reikšmės diagnostikai",
     sourceMode: "Duomenų šaltinio režimas",
     storedService: "Išsaugota paslaugos reikšmė",
     originalAddress: "Pradinė adreso reikšmė",
+    addressVerification: {
+      verified: "Adresas patikrintas serveryje",
+      manual: "Adresas įvestas ranka – RF užblokuotas",
+      unverified: "Adresas nepatikrintas – RF užblokuotas",
+      verification_failed: "Adreso patikra nepavyko – RF užblokuotas",
+    },
     nextActionKind: "Veiksmo tipas",
     requiredCapability: "Reikalinga prieiga",
     reviewMode: "Peržiūros režimas",
@@ -495,7 +569,12 @@ const copy = {
     recordId: "Įrašo ID",
     services: {
       Takfornyelse: "Stogo atnaujinimas",
+      takvask: "Stogo plovimas",
       takvask_impregnering: "Stogo plovimas ir impregnavimas",
+      impregnering: "Stogo impregnavimas",
+      takmaling: "Stogo dažymas",
+      nytt_tak: "Naujas stogas",
+      usikker: "Nežinau / reikia konsultacijos",
     },
     otherService: "Kita stogo paslauga",
     messageChannels: { email: "El. paštas", phone: "Telefonas", sms: "SMS" },
@@ -605,14 +684,41 @@ const copy = {
     customerRecord: "Customer dialogue and agreement history",
     customerRecordIntro:
       "Messages, questions, quotes, contracts and document versions in one case record.",
+    originalInquiry: "Original inquiry",
+    originalInquiryIntro:
+      "The details submitted by the customer before follow-up or outbound messages.",
+    originalInquiryMessage: "Customer description",
+    originalInquiryMessageEmpty: "No description was submitted.",
+    approximateArea: "Reported roof area",
+    customerReportedUnverified: "Customer estimate · unverified",
+    inquiryType: "Service",
+    contact: "Contact",
+    photos: "Photos",
+    noPhotos: "None",
+    questionsNone: "No follow-up questions tracked",
     communications: "Messages",
     communicationsEmpty: "No customer messages are recorded.",
+    communicationAllCategories: "All message types",
     communicationAllLoaded: "The full message history is shown",
+    communicationAllStatuses: "All statuses",
+    communicationDocumentsView: "Documents",
+    communicationFilters: "Search and filters",
+    communicationFullHistoryView: "Full message history",
+    communicationHistoryViews: "Customer dialogue views",
     communicationLoadFailed: "Older messages could not be loaded. Try again.",
     communicationLoadingOlder: "Loading older messages",
+    communicationNoMatches: "No loaded messages match the selected filters.",
+    communicationQuoteContractView: "Quotes and contracts",
+    communicationRecentHistoryView: "Recent messages",
+    communicationSearch: "Search loaded messages",
+    communicationSearchPlaceholder: "Subject, content or filename",
     communicationShowOlder: "Show older messages",
+    communicationStatusFilter: "Status",
+    communicationTypeFilter: "Message type",
     questions: "Customer questions",
     unresolvedQuestion: "One or more questions are awaiting a reply",
+    reviewOutstandingQuestions: "Review unanswered questions",
+    otherOutstandingQuestions: "Other unanswered questions",
     questionsResolved: "All recorded questions have been answered",
     activeQuestion: "Customer question requiring action",
     questionReceived: "Received",
@@ -731,12 +837,18 @@ const copy = {
     tamperStatuses: { not_assessable: "Cannot be assessed" },
     fallbackTitle: "Additional case tools",
     fallbackIntro:
-      "Existing document and work routes remain available as a safe fallback.",
+      "Open documents or the work plan when more detailed follow-up is needed.",
     technicalDetails: "Technical details",
     technicalIntro: "Raw system values for diagnostics",
     sourceMode: "Data source mode",
     storedService: "Stored service value",
     originalAddress: "Original address value",
+    addressVerification: {
+      verified: "Server-verified address",
+      manual: "Manually entered address — RF is blocked",
+      unverified: "Address is not verified — RF is blocked",
+      verification_failed: "Address verification failed — RF is blocked",
+    },
     nextActionKind: "Action kind",
     requiredCapability: "Required capability",
     reviewMode: "Review mode",
@@ -749,7 +861,12 @@ const copy = {
     recordId: "Record ID",
     services: {
       Takfornyelse: "Roof renewal",
+      takvask: "Roof cleaning",
       takvask_impregnering: "Roof cleaning and impregnation",
+      impregnering: "Roof impregnation",
+      takmaling: "Roof painting",
+      nytt_tak: "New roof",
+      usikker: "Unsure / needs guidance",
     },
     otherService: "Other roof service",
     messageChannels: { email: "Email", phone: "Phone", sms: "SMS" },
@@ -975,11 +1092,19 @@ function explicitTestDataCue(
 
 export function AdminNextCaseWorkspace({
   locale,
+  replyDrafting,
+  replyPermissions,
   returnTo = adminNextPreviewWorkQueueEntry,
   source = "fixture",
   value,
 }: {
   locale: PanelLocale;
+  replyDrafting?: AdminNextReplyDraftingReadiness;
+  replyPermissions?: {
+    approveSend: boolean;
+    prepareGeneral: boolean;
+    prepareQuestion: boolean;
+  };
   returnTo?: string;
   source?: "canonical" | "fixture";
   value: AdminNextCaseWorkspaceView;
@@ -1004,6 +1129,10 @@ export function AdminNextCaseWorkspace({
         : "empty"
       : value.timelineState.status;
   const commercialVersions = value.customerRecord?.commercialVersions || [];
+  const additionalOutstandingQuestions =
+    value.customerRecord?.questions.outstanding.filter(
+      ({ id }) => id !== value.customerRecord?.questions.active?.id,
+    ) || [];
   const nonHistoricalCommercialVersions = commercialVersions.filter(
     ({ role }) => role !== "historical",
   );
@@ -1014,8 +1143,41 @@ export function AdminNextCaseWorkspace({
   ).slice(0, 3);
   const testDataCue = explicitTestDataCue(source, value);
   const visibleAddress = displayCaseAddress(value.address);
+  const addressVerification = value.addressVerification || {
+    status: "unverified" as const,
+    verifiedAt: null,
+  };
   const visibleService = humanLabel(t.services, value.service, t.otherService);
   const deadlineLabel = formatCaseSlaDeadline(value.sla.deadline, locale);
+  const originalInquiry = value.customerRecord?.originalInquiry;
+  const originalInquiryService = originalInquiry?.inquiryType
+    ? humanLabel(t.services, originalInquiry.inquiryType, t.otherService)
+    : t.otherService;
+  const originalInquiryAddress = originalInquiry
+    ? [
+        originalInquiry.address.streetAddress,
+        originalInquiry.address.postalCode,
+        originalInquiry.address.city,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "";
+  const questionState = value.customerRecord?.questions.unresolved
+    ? "unresolved"
+    : value.customerRecord?.questions.total
+      ? "resolved"
+      : "none";
+  const replyPrepareAllowed = value.customerRecord?.questions.active
+    ? replyPermissions?.prepareQuestion === true
+    : replyPermissions?.prepareGeneral === true;
+  const replyWorkbenchReady = Boolean(
+    replyDrafting &&
+    value.leadId &&
+    value.caseRevision &&
+    (replyPrepareAllowed ||
+      (value.customerRecord?.activeReplyDraft &&
+        replyPermissions?.approveSend === true)),
+  );
 
   return (
     <div
@@ -1037,7 +1199,7 @@ export function AdminNextCaseWorkspace({
         id="case-summary"
         tabIndex={-1}
       >
-        <div className="grid gap-5 p-5 sm:p-6 lg:p-7 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge
@@ -1060,18 +1222,39 @@ export function AdminNextCaseWorkspace({
                 </span>
               ) : null}
             </div>
-            <p className="mt-5 text-xs font-bold tracking-[.18em] text-[var(--an-amber)] uppercase">
+            <p className="mt-3 text-xs font-bold tracking-[.18em] text-[var(--an-amber)] uppercase">
               {t.case} {value.reference}
             </p>
-            <h1 className="mt-2 truncate text-2xl font-bold tracking-[-.025em] text-[var(--an-text)] sm:text-3xl">
+            <h1 className="mt-1 truncate text-2xl font-bold tracking-[-.025em] text-[var(--an-text)] sm:text-3xl">
               {value.customer}
             </h1>
             <p className="mt-2 flex items-start gap-2 text-sm text-[var(--an-muted)]">
               <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               {visibleAddress} · {visibleService}
             </p>
+            <p
+              className="mt-2 flex items-center gap-2 text-xs font-semibold text-[var(--an-text-muted)]"
+              data-case-address-verification={addressVerification.status}
+            >
+              {addressVerification.status === "verified" ? (
+                <ShieldCheck
+                  aria-hidden="true"
+                  className="size-4 text-[var(--an-success)]"
+                />
+              ) : (
+                <CircleAlert
+                  aria-hidden="true"
+                  className="size-4 text-[var(--an-warning)]"
+                />
+              )}
+              {t.addressVerification[addressVerification.status]}
+              {addressVerification.status === "verified" &&
+              addressVerification.verifiedAt
+                ? ` · ${auditTimestamp(locale, addressVerification.verifiedAt)}`
+                : ""}
+            </p>
             <details
-              className="group mt-4 max-w-3xl rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] px-3 py-2 text-xs text-[var(--an-text-muted)]"
+              className="group mt-4 hidden max-w-3xl rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] px-3 py-2 text-xs text-[var(--an-text-muted)]"
               data-case-technical-diagnostics
             >
               <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-3 font-bold text-[var(--an-text-primary)]">
@@ -1132,8 +1315,8 @@ export function AdminNextCaseWorkspace({
               </dl>
             </details>
           </div>
-          <dl className="grid grid-cols-2 gap-3 lg:min-w-[350px]">
-            <div className="an-elevated rounded-2xl border p-4">
+          <dl className="grid grid-cols-2 gap-2 xl:min-w-[310px]">
+            <div className="an-elevated rounded-2xl border p-3">
               <dt className="flex items-center gap-2 text-xs font-bold text-[var(--an-muted)]">
                 <UserRound aria-hidden="true" className="size-4" />
                 {t.owner}
@@ -1146,7 +1329,7 @@ export function AdminNextCaseWorkspace({
               </dd>
             </div>
             <div
-              className={`rounded-2xl border p-4 ${value.sla.state === "overdue" ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)]" : value.sla.state === "due_soon" ? "border-[var(--an-info)] bg-[var(--an-info-soft)]" : "border-[var(--an-border)] bg-[var(--an-surface-soft)]"}`}
+              className={`rounded-2xl border p-3 ${value.sla.state === "overdue" ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)]" : value.sla.state === "due_soon" ? "border-[var(--an-info)] bg-[var(--an-info-soft)]" : "border-[var(--an-border)] bg-[var(--an-surface-soft)]"}`}
             >
               <dt className="text-xs font-bold text-[var(--an-text-muted)]">
                 {t.sla}
@@ -1170,7 +1353,7 @@ export function AdminNextCaseWorkspace({
         </div>
 
         <section
-          className="border-t border-[var(--an-border)] bg-[var(--an-elevated)] p-5 sm:p-6 lg:flex lg:items-center lg:justify-between lg:gap-6"
+          className="border-t border-[var(--an-border)] bg-[var(--an-elevated)] p-4 sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-5"
           aria-labelledby="case-next-action-title"
           data-case-action-mode={value.nextAction.interaction.mode}
         >
@@ -1215,7 +1398,7 @@ export function AdminNextCaseWorkspace({
       </header>
 
       <section
-        className="an-surface rounded-3xl border p-5 sm:p-6"
+        className="an-surface rounded-3xl border p-4 sm:p-5"
         aria-labelledby="case-progress-title"
       >
         <h2
@@ -1274,7 +1457,7 @@ export function AdminNextCaseWorkspace({
           {value.stages.map((stage, index) => (
             <li
               aria-current={stage.state === "current" ? "step" : undefined}
-              className={`min-w-0 rounded-2xl border p-3 ${stageStyles[stage.state]}`}
+              className={`min-w-0 rounded-2xl border p-2.5 ${stageStyles[stage.state]}`}
               data-case-stage-card
               key={stage.id}
             >
@@ -1315,7 +1498,7 @@ export function AdminNextCaseWorkspace({
               id="case-customer-record"
               tabIndex={-1}
             >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                 <div>
                   <h2
                     className="text-lg font-bold text-[var(--an-text)]"
@@ -1328,31 +1511,143 @@ export function AdminNextCaseWorkspace({
                   </p>
                 </div>
                 <div
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-bold ${value.customerRecord.questions.unresolved ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" : "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]"}`}
-                  data-customer-question-state={
-                    value.customerRecord.questions.unresolved
-                      ? "unresolved"
-                      : "resolved"
-                  }
+                  className={`inline-flex min-h-11 w-full flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold lg:w-auto ${questionState === "unresolved" ? "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]" : questionState === "resolved" ? "border-[color:rgba(103,217,170,.3)] bg-[var(--an-success-soft)] text-[var(--an-success)]" : "border-[var(--an-border)] bg-[var(--an-elevated)] text-[var(--an-muted)]"}`}
+                  data-customer-question-state={questionState}
                 >
                   <MessageCircleQuestion
                     aria-hidden="true"
                     className="size-4"
                   />
                   <span>
-                    {t.questions}: {value.customerRecord.questions.total} ·{" "}
+                    {t.questions}:{" "}
                     {value.customerRecord.questions.unresolved
+                      ? value.customerRecord.questions.outstanding.length
+                      : value.customerRecord.questions.total}{" "}
+                    ·{" "}
+                    {questionState === "unresolved"
                       ? t.unresolvedQuestion
-                      : t.questionsResolved}
+                      : questionState === "resolved"
+                        ? t.questionsResolved
+                        : t.questionsNone}
                   </span>
+                  {value.customerRecord.questions.unresolved ? (
+                    <a
+                      className="ml-auto underline underline-offset-2"
+                      href="#case-outstanding-questions"
+                    >
+                      {t.reviewOutstandingQuestions}
+                    </a>
+                  ) : null}
                 </div>
               </div>
+
+              {originalInquiry ? (
+                <details
+                  className="group mt-5 rounded-2xl border border-[var(--an-amber)] bg-[var(--an-amber-soft)]"
+                  data-original-inquiry
+                  open
+                >
+                  <summary className="flex min-h-14 cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 text-sm font-bold text-[var(--an-text)]">
+                        <Mail
+                          aria-hidden="true"
+                          className="size-4 shrink-0 text-[var(--an-amber)]"
+                        />
+                        {t.originalInquiry}
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-[var(--an-muted)]">
+                        {t.originalInquiryIntro}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-[var(--an-muted)]">
+                      {originalInquiry.receivedAt
+                        ? auditTimestamp(locale, originalInquiry.receivedAt)
+                        : "—"}
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="size-4 transition-transform group-open:rotate-180"
+                      />
+                    </span>
+                  </summary>
+                  <div className="border-t border-[var(--an-border)] px-4 py-4">
+                    <dl className="grid gap-x-5 gap-y-3 text-xs sm:grid-cols-2 xl:grid-cols-5">
+                      <div>
+                        <dt className="font-bold text-[var(--an-subtle)]">
+                          {t.inquiryType}
+                        </dt>
+                        <dd className="mt-1 text-[var(--an-text)]">
+                          {originalInquiryService}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-bold text-[var(--an-subtle)]">
+                          {t.contact}
+                        </dt>
+                        <dd className="mt-1 break-words text-[var(--an-text)]">
+                          {[
+                            originalInquiry.contact.email,
+                            originalInquiry.contact.phone,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-bold text-[var(--an-subtle)]">
+                          {t.originalAddress}
+                        </dt>
+                        <dd className="mt-1 break-words text-[var(--an-text)]">
+                          {originalInquiryAddress || "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-bold text-[var(--an-subtle)]">
+                          {t.photos}
+                        </dt>
+                        <dd className="mt-1 text-[var(--an-text)]">
+                          {originalInquiry.photoCount || t.noPhotos}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-bold text-[var(--an-subtle)]">
+                          {t.approximateArea}
+                        </dt>
+                        <dd className="mt-1 text-[var(--an-text)]">
+                          {originalInquiry.approximateAreaSquareMeters
+                            ? `${originalInquiry.approximateAreaSquareMeters} m²`
+                            : "—"}
+                        </dd>
+                        {originalInquiry.areaProvenance ===
+                        "customer_reported_unverified" ? (
+                          <dd className="mt-1 text-[10px] font-semibold text-[var(--an-warning)]">
+                            {t.customerReportedUnverified}
+                          </dd>
+                        ) : null}
+                      </div>
+                    </dl>
+                    <div className="mt-4 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3">
+                      <strong className="text-xs text-[var(--an-subtle)]">
+                        {t.originalInquiryMessage}
+                      </strong>
+                      <p
+                        className="mt-2 text-sm leading-6 whitespace-pre-wrap text-[var(--an-text)]"
+                        data-original-inquiry-message
+                      >
+                        {originalInquiry.message ||
+                          t.originalInquiryMessageEmpty}
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              ) : null}
 
               {value.customerRecord.questions.active ? (
                 <section
                   aria-labelledby="case-active-question-title"
-                  className="mt-5 rounded-2xl border border-[var(--an-danger)] bg-[var(--an-danger-soft)] p-4 sm:p-5"
+                  className="mt-5 scroll-mt-36 rounded-2xl border border-[var(--an-danger)] bg-[var(--an-danger-soft)] p-4 sm:p-5"
                   data-customer-question-focus
+                  id="case-outstanding-questions"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
@@ -1449,7 +1744,11 @@ export function AdminNextCaseWorkspace({
 
                   <Link
                     className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--an-action)] bg-[var(--an-surface-base)] px-4 text-sm font-bold text-[var(--an-action)] hover:bg-[var(--an-action-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]"
-                    href={value.customerRecord.questions.active.fallbackHref}
+                    href={
+                      replyWorkbenchReady
+                        ? "#case-reply-workbench"
+                        : value.customerRecord.questions.active.fallbackHref
+                    }
                   >
                     {t.openReplyWorkspace}
                     <ArrowRight aria-hidden="true" className="size-4" />
@@ -1457,16 +1756,98 @@ export function AdminNextCaseWorkspace({
                 </section>
               ) : null}
 
+              {replyWorkbenchReady && replyDrafting ? (
+                <AdminNextReplyWorkbench
+                  activeDraft={value.customerRecord.activeReplyDraft}
+                  activeQuestionId={value.customerRecord.questions.active?.id}
+                  canApproveSend={replyPermissions?.approveSend === true}
+                  canPrepare={replyPrepareAllowed}
+                  caseRevision={value.caseRevision!}
+                  leadId={value.leadId!}
+                  locale={locale}
+                  originalBody={value.customerRecord.originalInquiry?.message}
+                  readiness={replyDrafting}
+                />
+              ) : null}
+
+              {additionalOutstandingQuestions.length ? (
+                <section
+                  aria-labelledby="case-other-outstanding-questions-title"
+                  className="mt-4 scroll-mt-36 rounded-2xl border border-[var(--an-border)] bg-[var(--an-elevated)] p-4"
+                  data-outstanding-question-list
+                  id={
+                    value.customerRecord.questions.active
+                      ? undefined
+                      : "case-outstanding-questions"
+                  }
+                >
+                  <h3
+                    className="text-sm font-bold text-[var(--an-text)]"
+                    id="case-other-outstanding-questions-title"
+                  >
+                    {t.otherOutstandingQuestions} ·{" "}
+                    {additionalOutstandingQuestions.length}
+                  </h3>
+                  <ol className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {additionalOutstandingQuestions.map((question) => (
+                      <li key={question.id}>
+                        <details
+                          className="group rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)]"
+                          id={`case-outstanding-${question.id}`}
+                        >
+                          <summary className="flex min-h-14 cursor-pointer list-none items-start justify-between gap-3 p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
+                            <span className="min-w-0">
+                              <strong className="block break-words text-[var(--an-text)]">
+                                {question.subject}
+                              </strong>
+                              <small className="mt-1 block text-[var(--an-subtle)]">
+                                {auditTimestamp(locale, question.receivedAt)} ·{" "}
+                                {t.questionReplyStages[question.replyStage]}
+                              </small>
+                            </span>
+                            <ChevronDown
+                              aria-hidden="true"
+                              className="mt-1 size-4 shrink-0 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
+                            />
+                          </summary>
+                          <div className="border-t border-[var(--an-border)] p-3">
+                            <p className="text-sm leading-6 whitespace-pre-wrap text-[var(--an-muted)]">
+                              {question.bodyText || "—"}
+                            </p>
+                            <a
+                              className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                              href="#case-communications-history"
+                            >
+                              {t.communicationFullHistoryView}
+                              <ArrowRight
+                                aria-hidden="true"
+                                className="size-3.5"
+                              />
+                            </a>
+                          </div>
+                        </details>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : null}
+
               <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.85fr)]">
                 <AdminNextCaseCommunications
                   copy={{
+                    allCategories: t.communicationAllCategories,
                     allLoaded: t.communicationAllLoaded,
+                    allStatuses: t.communicationAllStatuses,
                     attachments: t.attachments,
                     categoryLabels: t.messageCategories,
                     channelLabels: t.messageChannels,
                     customerPortal: t.customerPortal,
                     deliveredAt: t.deliveredAt,
+                    documentsView: t.communicationDocumentsView,
                     empty: t.communicationsEmpty,
+                    filters: t.communicationFilters,
+                    fullHistoryView: t.communicationFullHistoryView,
+                    historyViews: t.communicationHistoryViews,
                     inbound: t.inbound,
                     loadFailed: t.communicationLoadFailed,
                     loadingOlder: t.communicationLoadingOlder,
@@ -1476,17 +1857,24 @@ export function AdminNextCaseWorkspace({
                     otherChannel: t.otherMessageChannel,
                     otherStatus: t.otherMessageStatus,
                     outbound: t.outbound,
+                    quoteContractView: t.communicationQuoteContractView,
                     rawCategory: t.rawCategory,
                     rawChannel: t.rawChannel,
                     rawDirection: t.rawDirection,
                     rawStatus: t.rawStatus,
                     recordId: t.recordId,
                     replyTo: t.replyTo,
+                    recentHistoryView: t.communicationRecentHistoryView,
+                    search: t.communicationSearch,
+                    searchPlaceholder: t.communicationSearchPlaceholder,
                     sentAt: t.sentAt,
                     showOlder: t.communicationShowOlder,
+                    statusFilter: t.communicationStatusFilter,
                     statusLabels: t.messageStatuses,
                     technicalDetails: t.technicalDetails,
                     title: t.communications,
+                    typeFilter: t.communicationTypeFilter,
+                    noMatches: t.communicationNoMatches,
                   }}
                   initialItems={value.customerRecord.communications}
                   initialPageInfo={value.customerRecord.communicationPage}
@@ -1534,10 +1922,7 @@ export function AdminNextCaseWorkspace({
                     </summary>
                     <div className="px-3 pb-3">
                       {value.customerRecord.commercialVersions.length ? (
-                        <ol
-                          className="mt-3 space-y-2 sm:max-h-[24rem] sm:overflow-auto sm:pr-1"
-                          data-commercial-versions
-                        >
+                        <ol className="mt-3 space-y-2" data-commercial-versions>
                           {value.customerRecord.commercialVersions.map(
                             (item) => (
                               <li
@@ -1666,10 +2051,7 @@ export function AdminNextCaseWorkspace({
                     </summary>
                     <div className="px-3 pb-3">
                       {value.customerRecord.documents.length ? (
-                        <ul
-                          className="mt-3 space-y-2 sm:max-h-64 sm:overflow-auto sm:pr-1"
-                          data-document-register
-                        >
+                        <ul className="mt-3 space-y-2" data-document-register>
                           {value.customerRecord.documents.map((document) => (
                             <li key={document.id}>
                               <Link
@@ -1730,7 +2112,7 @@ export function AdminNextCaseWorkspace({
                 <div className="px-4 pb-4">
                   {value.customerRecord.history.length ? (
                     <ol
-                      className="mt-3 grid gap-2 sm:max-h-80 sm:grid-cols-2 sm:overflow-auto sm:pr-1 xl:grid-cols-3"
+                      className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3"
                       data-business-history
                     >
                       {value.customerRecord.history.map((item) => (

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFArray,
   PDFDocument,
@@ -30,14 +31,22 @@ export function pdfSafe(value: string) {
     .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, "?");
 }
 
+function unicodePdfSafe(value: string) {
+  return value.replace(
+    /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
+    "",
+  );
+}
+
 export function wrapPdfText(
   text: string,
   font: PDFFont,
   size: number,
   maxWidth: number,
+  sanitize: (value: string) => string = pdfSafe,
 ) {
   const lines: string[] = [];
-  for (const paragraph of pdfSafe(text).split(/\r?\n/)) {
+  for (const paragraph of sanitize(text).split(/\r?\n/)) {
     if (!paragraph) {
       lines.push("");
       continue;
@@ -45,6 +54,27 @@ export function wrapPdfText(
     const words = paragraph.split(/\s+/);
     let line = "";
     for (const word of words) {
+      if (font.widthOfTextAtSize(word, size) > maxWidth) {
+        if (line) {
+          lines.push(line);
+          line = "";
+        }
+        let chunk = "";
+        for (const character of Array.from(word)) {
+          const candidate = `${chunk}${character}`;
+          if (
+            chunk &&
+            font.widthOfTextAtSize(candidate, size) > maxWidth
+          ) {
+            lines.push(chunk);
+            chunk = character;
+          } else {
+            chunk = candidate;
+          }
+        }
+        line = chunk;
+        continue;
+      }
       const candidate = line ? `${line} ${word}` : word;
       if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
         line = candidate;
@@ -89,10 +119,50 @@ async function embedLogo(document: PDFDocument): Promise<PDFImage | null> {
   }
 }
 
+async function embedDocumentFonts(
+  document: PDFDocument,
+  input: { fontDirectory?: string; requireUnicodeFonts?: boolean },
+) {
+  try {
+    const fontDirectory =
+      input.fontDirectory ??
+      path.join(
+        process.cwd(),
+        "node_modules",
+        "pdfjs-dist",
+        "standard_fonts",
+      );
+    const [regularBytes, boldBytes] = await Promise.all([
+      readFile(path.join(fontDirectory, "LiberationSans-Regular.ttf")),
+      readFile(path.join(fontDirectory, "LiberationSans-Bold.ttf")),
+    ]);
+    document.registerFontkit(fontkit);
+    return {
+      bold: await document.embedFont(boldBytes, { subset: true }),
+      regular: await document.embedFont(regularBytes, { subset: true }),
+      sanitize: unicodePdfSafe,
+    };
+  } catch (error) {
+    if (input.requireUnicodeFonts) {
+      throw new Error(
+        "Required Unicode PDF fonts could not be embedded; PDF generation was stopped.",
+        { cause: error },
+      );
+    }
+    return {
+      bold: await document.embedFont(StandardFonts.HelveticaBold),
+      regular: await document.embedFont(StandardFonts.Helvetica),
+      sanitize: pdfSafe,
+    };
+  }
+}
+
 export type BrandedPdf = Awaited<ReturnType<typeof createBrandedPdf>>;
 
 export async function createBrandedPdf(input: {
   documentMarker?: string;
+  fontDirectory?: string;
+  requireUnicodeFonts?: boolean;
   title: string;
   subject: string;
 }) {
@@ -101,8 +171,7 @@ export async function createBrandedPdf(input: {
   document.setAuthor(siteConfig.parentOrg);
   document.setSubject(input.subject);
   document.setCreator("Takfornyelse dokumentplattform");
-  const regular = await document.embedFont(StandardFonts.Helvetica);
-  const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const { bold, regular, sanitize } = await embedDocumentFonts(document, input);
   const logo = await embedLogo(document);
   const pages: PDFPage[] = [];
   let page!: PDFPage;
@@ -141,7 +210,7 @@ export async function createBrandedPdf(input: {
       });
     }
     if (input.documentMarker) {
-      const marker = pdfSafe(input.documentMarker);
+      const marker = sanitize(input.documentMarker);
       const markerSize = 7.4;
       const markerPadding = 10;
       const markerWidth =
@@ -197,7 +266,7 @@ export async function createBrandedPdf(input: {
     const font = options.strong ? bold : regular;
     const x = PDF_MARGIN + (options.indent ?? 0);
     const maxWidth = options.maxWidth ?? contentWidth - (options.indent ?? 0);
-    const lines = wrapPdfText(value, font, size, maxWidth);
+    const lines = wrapPdfText(value, font, size, maxWidth, sanitize);
     for (const line of lines) {
       ensure(size * 1.55);
       if (line)
@@ -239,7 +308,7 @@ export async function createBrandedPdf(input: {
 
   const link = (label: string, uri: string) => {
     const size = 10;
-    const safeLabel = pdfSafe(label);
+    const safeLabel = sanitize(label);
     const w = Math.min(
       contentWidth,
       bold.widthOfTextAtSize(safeLabel, size) + 22,
@@ -280,11 +349,11 @@ export async function createBrandedPdf(input: {
         color: rgb(0.055, 0.07, 0.1),
       });
       target.drawText(
-        pdfSafe(`Takfornyelse - en del av ${siteConfig.parentOrg}`),
+        sanitize(`Takfornyelse - en del av ${siteConfig.parentOrg}`),
         { x: PDF_MARGIN, y: 36, size: 8.5, font: bold, color: rgb(1, 1, 1) },
       );
       target.drawText(
-        pdfSafe(
+        sanitize(
           `${siteConfig.phone}  |  ${siteConfig.email}  |  Org.nr. ${siteConfig.orgNr}`,
         ),
         {
@@ -296,7 +365,7 @@ export async function createBrandedPdf(input: {
         },
       );
       target.drawText(
-        pdfSafe(
+        sanitize(
           `${siteConfig.address.street}, ${siteConfig.address.postal} ${siteConfig.address.city}`,
         ),
         {

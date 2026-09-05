@@ -102,6 +102,8 @@ const copy = {
     caseLabel: "Sak",
     customerLabel: "Kunde",
     addressLabel: "Adresse",
+    receivedLabel: "Mottatt",
+    receivedUnavailable: "Mottakstid er ikke registrert i køgrunnlaget",
     customerUnavailable: "Kundenavn finnes ikke i køgrunnlaget",
     addressUnavailable: "Adresse finnes ikke i køgrunnlaget",
     currentStep: "Nåværende steg",
@@ -264,6 +266,8 @@ const copy = {
     caseLabel: "Byla",
     customerLabel: "Klientas",
     addressLabel: "Adresas",
+    receivedLabel: "Gauta",
+    receivedUnavailable: "Gavimo laikas į eilės duomenis nepatenka",
     customerUnavailable: "Kliento vardas į eilės duomenis nepatenka",
     addressUnavailable: "Adresas į eilės duomenis nepatenka",
     currentStep: "Dabartinis etapas",
@@ -422,6 +426,8 @@ const copy = {
     caseLabel: "Case",
     customerLabel: "Customer",
     addressLabel: "Address",
+    receivedLabel: "Received",
+    receivedUnavailable: "Received time is not included in the queue payload",
     customerUnavailable: "Customer name is not included in the queue payload",
     addressUnavailable: "Address is not included in the queue payload",
     currentStep: "Current step",
@@ -1084,7 +1090,29 @@ export function AdminNextWorkQueue({
                           {t.stages[item.action.presentation.processStage]}
                         </span>
                       </div>
-                      <h3 className="mt-3 text-base font-bold text-[var(--an-text-primary)]">
+                      <div
+                        className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-[var(--an-text-muted)]"
+                        data-work-queue-case-identity
+                      >
+                        <strong className="max-w-[32%] truncate text-[var(--an-text-primary)]">
+                          {item.case.customerName || t.customerUnavailable}
+                        </strong>
+                        <span aria-hidden="true">·</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {item.case.postalAddress || t.addressUnavailable}
+                        </span>
+                        <time
+                          className="shrink-0 text-[var(--an-text-subtle)]"
+                          dateTime={item.case.receivedAt || undefined}
+                        >
+                          {formatDate(
+                            item.case.receivedAt,
+                            locale,
+                            t.receivedUnavailable,
+                          )}
+                        </time>
+                      </div>
+                      <h3 className="mt-2 text-base font-bold text-[var(--an-text-primary)]">
                         {item.action.presentation.copy.label}
                       </h3>
                       <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--an-text-muted)]">
@@ -1218,7 +1246,7 @@ export function AdminNextWorkQueue({
               {item.case.reference}
             </strong>
           </div>
-          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-[11px] font-bold text-[var(--an-text-subtle)]">
                 {t.caseLabel}
@@ -1235,7 +1263,21 @@ export function AdminNextWorkQueue({
                 {item.case.customerName || t.customerUnavailable}
               </dd>
             </div>
-            <div className="sm:col-span-2">
+            <div>
+              <dt className="text-[11px] font-bold text-[var(--an-text-subtle)]">
+                {t.receivedLabel}
+              </dt>
+              <dd className="text-[var(--an-text-muted)]">
+                <time dateTime={item.case.receivedAt || undefined}>
+                  {formatDate(
+                    item.case.receivedAt,
+                    locale,
+                    t.receivedUnavailable,
+                  )}
+                </time>
+              </dd>
+            </div>
+            <div className="sm:col-span-3">
               <dt className="text-[11px] font-bold text-[var(--an-text-subtle)]">
                 {t.addressLabel}
               </dt>

@@ -1,5 +1,4 @@
 import { headers } from "next/headers";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayload } from "@/lib/payload";
 import {
@@ -13,7 +12,6 @@ import {
 } from "@/lib/panel-i18n";
 import { adminAccessDecision } from "@/lib/admin-v2/access";
 import { adminNextPreviewWorkQueueEntry } from "@/lib/admin-next/work-queue-navigation";
-import { panelLanguagePreferenceCookie } from "@/lib/panel-language-preference";
 
 export type InternalUser = {
   active: true;
@@ -33,11 +31,6 @@ export async function getInternalUser(): Promise<InternalUser | null> {
 
   if (!user || !role || !userIsActive(user)) return null;
 
-  const cookieStore = await cookies();
-  const savedInterfaceLanguage =
-    cookieStore.get(panelLanguagePreferenceCookie)?.value ??
-    cookieStore.get("tf_panel_language")?.value;
-
   return {
     active: true,
     displayName:
@@ -47,8 +40,7 @@ export async function getInternalUser(): Promise<InternalUser | null> {
     email: typeof user.email === "string" ? user.email : "",
     id: Number(user.id),
     interfaceLanguage: normalizePanelLocale(
-      savedInterfaceLanguage ??
-        ("interfaceLanguage" in user ? user.interfaceLanguage : null),
+      "interfaceLanguage" in user ? user.interfaceLanguage : null,
     ),
     role,
   };

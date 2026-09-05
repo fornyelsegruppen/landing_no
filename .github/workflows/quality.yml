@@ -85,6 +85,9 @@ jobs:
       - name: Migration up/down tests
         run: npm run test:ci:migrations
 
+      - name: Preview database isolation guard
+        run: npm run test:ci:release-guard
+
       - name: Bootstrap empty PostgreSQL schema
         run: node scripts/push-schema-jiti.mjs --baseline-current-migrations
 

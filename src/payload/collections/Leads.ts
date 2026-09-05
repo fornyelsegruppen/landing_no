@@ -21,7 +21,18 @@ const caseStateFields = new Set([
   "nextActionBlocker",
   "caseRevision",
 ]);
-const caseAddressFields = new Set(["address", "houseNumber", "postal", "city"]);
+const caseAddressFields = new Set([
+  "address",
+  "houseNumber",
+  "postal",
+  "city",
+  "addressVerificationStatus",
+  "addressVerificationProvider",
+  "addressVerificationProviderId",
+  "addressLatitude",
+  "addressLongitude",
+  "addressVerifiedAt",
+]);
 
 export const protectPreviewCaseAddressWrites: CollectionBeforeChangeHook = ({
   context,
@@ -303,6 +314,51 @@ export const Leads: CollectionConfig = {
     { name: "houseNumber", type: "text", access: adminManagedField },
     { name: "postal", type: "text", required: true, access: adminManagedField },
     { name: "city", type: "text", access: adminManagedField },
+    {
+      name: "addressVerificationStatus",
+      type: "select",
+      label: "Adresseverifisering",
+      access: adminManagedField,
+      index: true,
+      options: [
+        { label: "Ikke verifisert", value: "unverified" },
+        { label: "Manuelt oppgitt", value: "manual" },
+        { label: "Verifisering mislyktes", value: "verification_failed" },
+        { label: "Serververifisert", value: "verified" },
+      ],
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressVerificationProvider",
+      type: "text",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressVerificationProviderId",
+      type: "text",
+      access: adminManagedField,
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressLatitude",
+      type: "number",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressLongitude",
+      type: "number",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressVerifiedAt",
+      type: "date",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
     { name: "approxSqm", type: "number", access: adminManagedField },
     {
       name: "photoUrls",

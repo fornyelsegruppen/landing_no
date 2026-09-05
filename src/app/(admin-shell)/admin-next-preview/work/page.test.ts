@@ -222,6 +222,8 @@ describe("Admin Next Preview Work Queue route", () => {
         currentUserId: "user:7",
         grantedCapabilities: [
           "case.read",
+          "case.reply.prepare",
+          "case.question.reply.prepare",
           "commercial.package.prepare",
           "price.calculate",
           "quote.create",
@@ -276,11 +278,13 @@ describe("Admin Next Preview Work Queue route", () => {
         }),
       });
       const html = renderToStaticMarkup(element);
-      const grantedCapabilities = mocks.createCanonical.mock.calls[0]?.[2]
-        ?.grantedCapabilities;
+      const grantedCapabilities =
+        mocks.createCanonical.mock.calls[0]?.[2]?.grantedCapabilities;
 
       expect(grantedCapabilities).toEqual(
         expect.arrayContaining([
+          "case.reply.prepare",
+          "case.question.reply.prepare",
           "message.approve_send",
           "message.retry_send",
           "commercial.package.approve_send",

@@ -18,6 +18,7 @@ function workspace(
   return {
     lead: {
       id: 13,
+      addressVerificationStatus: "verified",
       name: "Canonical customer",
       recordState: "active",
       revision: 7,
@@ -59,6 +60,23 @@ function withLifecycle(
 }
 
 describe("Admin Next Case to RF entry projection", () => {
+  it("blocks every RF entry for a manual or unverified case address", () => {
+    const current = workspace();
+    const value = workspace({
+      lead: {
+        ...current.lead,
+        addressVerificationStatus: "manual",
+      },
+    });
+
+    expect(projectAdminNextRfCaseEntry(value, null)).toEqual({
+      state: "blocked",
+      mode: null,
+      href: null,
+      reason: "address_unverified",
+    });
+  });
+
   it("projects a canonical draft as a pinned resume route", async () => {
     const plan = await buildRoofFusionPreviewUatGoldenPlanV1(13);
     const draft = withLifecycle(plan.snapshots[0], "draft");

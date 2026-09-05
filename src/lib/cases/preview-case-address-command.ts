@@ -162,10 +162,7 @@ type PostgresRowLockTransaction = {
 
 type PostgresRowLockAdapter = {
   packageName?: string;
-  sessions?: Record<
-    string,
-    { db?: PostgresRowLockTransaction } | undefined
-  >;
+  sessions?: Record<string, { db?: PostgresRowLockTransaction } | undefined>;
   tables?: Record<string, { id: unknown } | undefined>;
 };
 
@@ -382,10 +379,7 @@ async function invalidateCommercialDrafts(
     pagination: false,
     overrideAccess: true,
     where: {
-      and: [
-        { lead: { equals: leadId } },
-        { status: { equals: "draft" } },
-      ],
+      and: [{ lead: { equals: leadId } }, { status: { equals: "draft" } }],
     },
     req: req as PayloadRequest,
   });
@@ -412,10 +406,7 @@ async function invalidateCommercialDrafts(
       pagination: false,
       overrideAccess: true,
       where: {
-        and: [
-          { quote: { equals: quoteId } },
-          { status: { equals: "draft" } },
-        ],
+        and: [{ quote: { equals: quoteId } }, { status: { equals: "draft" } }],
       },
       req: req as PayloadRequest,
     });
@@ -602,6 +593,12 @@ export async function executePreviewCaseAddressCommand(input: {
         houseNumber: after.houseNumber,
         postal: after.postalCode,
         city: after.city,
+        addressVerificationStatus: "unverified",
+        addressVerificationProvider: null,
+        addressVerificationProviderId: null,
+        addressLatitude: null,
+        addressLongitude: null,
+        addressVerifiedAt: null,
         caseRevision: nextCaseRevision,
         addressRevision: nextAddressRevision,
       },
@@ -684,6 +681,12 @@ export async function executePreviewCaseAddressCommand(input: {
           "houseNumber",
           "postal",
           "city",
+          "addressVerificationStatus",
+          "addressVerificationProvider",
+          "addressVerificationProviderId",
+          "addressLatitude",
+          "addressLongitude",
+          "addressVerifiedAt",
           "caseRevision",
           "addressRevision",
         ],
@@ -695,8 +698,7 @@ export async function executePreviewCaseAddressCommand(input: {
             command.idempotencyKey,
           ),
           rfInvalidated: rfInvalidation.status === "invalidated",
-          quoteDraftsInvalidated:
-            commercialDraftInvalidation.quoteIds.length,
+          quoteDraftsInvalidated: commercialDraftInvalidation.quoteIds.length,
           contractDraftsInvalidated:
             commercialDraftInvalidation.contractIds.length,
         },

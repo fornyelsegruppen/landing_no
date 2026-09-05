@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
-import { buildPlatformHealth, loadOperationalHealth } from "@/lib/platform/health";
+import {
+  buildPlatformHealth,
+  loadOperationalHealth,
+} from "@/lib/platform/health";
+import { previewDatabaseTarget } from "@/lib/platform/database-target";
 import { buildReleaseGate } from "@/lib/platform/release-gate";
 import { userIsAdmin } from "@/payload/access/roles";
 
@@ -20,13 +24,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json({
-      ...buildPlatformHealth(),
-      operational: await loadOperationalHealth(payload),
-      releaseGate: buildReleaseGate(),
-    }, {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      {
+        ...buildPlatformHealth(),
+        operational: await loadOperationalHealth(payload),
+        releaseGate: buildReleaseGate(),
+        previewDatabaseTarget: previewDatabaseTarget(),
+      },
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (error) {
     captureException(error, { route: "GET /api/admin/platform-health" });
     return NextResponse.json({ error: "Server error" }, { status: 500 });

@@ -1124,22 +1124,22 @@ const copy = {
   },
   prepare_package: {
     nb: {
-      label: "Tilbudspakken er ikke forberedt",
+      label: "Grunnlaget må kontrolleres før tilbudspakken",
       reason:
-        "Saken mangler måling eller de kommersielle utkastene som følger den.",
-      cta: "Forbered måling, pris, tilbud og kontrakt",
+        "Bekreft adresse og målegrunnlag først. Pris, tilbud og kontrakt kan bare forberedes når forutsetningene er kontrollert.",
+      cta: "Kontroller grunnlaget og fortsett",
     },
     lt: {
-      label: "Pasiūlymo paketas dar neparengtas",
+      label: "Prieš pasiūlymo paketą būtina patikrinti pagrindą",
       reason:
-        "Bylai trūksta matavimo arba iš jo kuriamų komercinių juodraščių.",
-      cta: "Parengti matavimą, kainą, pasiūlymą ir sutartį",
+        "Pirmiausia patvirtinkite adresą ir matavimo pagrindą. Kainą, pasiūlymą ir sutartį galima rengti tik patikrinus prielaidas.",
+      cta: "Patikrinti pagrindą ir tęsti",
     },
     en: {
-      label: "Quote package is not prepared",
+      label: "Verify the basis before preparing the quote package",
       reason:
-        "The case lacks a measurement or the commercial drafts derived from it.",
-      cta: "Prepare measurement, price, quote and contract",
+        "Confirm the address and measurement basis first. Price, quote and contract may only be prepared after the prerequisites are verified.",
+      cta: "Review prerequisites and continue",
     },
   },
   prepare_question_reply: {

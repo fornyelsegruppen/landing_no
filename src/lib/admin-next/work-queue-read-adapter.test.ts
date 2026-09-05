@@ -155,6 +155,27 @@ describe("AdminCaseList Work Queue read adapter", () => {
     });
   });
 
+  it("projects a compact TF-2-style identity and canonical received timestamp", () => {
+    const result = projectAdminCaseListWorkQueue(
+      projectionInput([
+        row(2, {
+          item: caseItem(2, {
+            createdAt: "2026-09-05T06:47:59.000Z",
+            customer: "TEST – pilnas kelias",
+            postalAddress: "lyngveien, 28 1182",
+          }),
+        }),
+      ]),
+    );
+
+    expect(result.items[0].case).toMatchObject({
+      customerName: "TEST – pilnas kelias",
+      postalAddress: "lyngveien, 28 1182",
+      receivedAt: "2026-09-05T06:47:59.000Z",
+      reference: "TF-2",
+    });
+  });
+
   it("never projects an inline mutation from case-list data", () => {
     const result = projectAdminCaseListWorkQueue(
       projectionInput([row(1), row(2), row(3)]),

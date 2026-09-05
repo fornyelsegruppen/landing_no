@@ -55,6 +55,12 @@ const baseLead = {
   houseNumber: "28A",
   postal: "1182",
   city: "OSLO",
+  addressVerificationStatus: "verified",
+  addressVerificationProvider: "kartverket-address-rest-v1",
+  addressVerificationProviderId: "0301-149-181",
+  addressLatitude: 59.9,
+  addressLongitude: 10.8,
+  addressVerifiedAt: "2026-09-05T08:00:00.000Z",
 };
 
 const baseMedia = {
@@ -223,11 +229,11 @@ describe("POST /api/admin/measurements/propose", () => {
     expect(mocks.blobGet).not.toHaveBeenCalled();
   });
 
-  it("resolves coordinates from lead address via Kartverket and runs proposal with them", async () => {
+  it("uses only stored server-verified Lead coordinates for the proposal", async () => {
     const response = await POST(request(requestBody));
 
     expect(response.status).toBe(200);
-    expect(mocks.searchAddress).toHaveBeenCalledWith("Lyngveien 28A 1182 OSLO");
+    expect(mocks.searchAddress).not.toHaveBeenCalled();
     expect(mocks.assertUsage).toHaveBeenCalledOnce();
     expect(mocks.blobGet).toHaveBeenCalledOnce();
     expect(mocks.generateRoofProposal).toHaveBeenCalledWith(

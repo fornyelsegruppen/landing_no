@@ -17,10 +17,10 @@ const requirements: Readonly<
 > = {
   "case.read": { features: ["caseStateEngineV2"] },
   "case.reply.prepare": {
-    features: ["caseStateEngineV2", "aiDrafts"],
+    features: ["caseStateEngineV2"],
   },
   "case.question.reply.prepare": {
-    features: ["caseStateEngineV2", "aiDrafts"],
+    features: ["caseStateEngineV2"],
   },
   "message.approve_send": {
     features: ["caseStateEngineV2"],
@@ -46,18 +46,10 @@ const requirements: Readonly<
     requiresPreviewRecipientPolicy: true,
   },
   "measurement.review_approve": {
-    features: [
-      "caseStateEngineV2",
-      "roofMeasurement",
-      "measurementEvidenceV2",
-    ],
+    features: ["caseStateEngineV2", "roofMeasurement", "measurementEvidenceV2"],
   },
   "measurement.resolve": {
-    features: [
-      "caseStateEngineV2",
-      "roofMeasurement",
-      "measurementEvidenceV2",
-    ],
+    features: ["caseStateEngineV2", "roofMeasurement", "measurementEvidenceV2"],
   },
   "price.calculate": {
     features: ["caseStateEngineV2", "roofMeasurement", "customerQuotes"],
@@ -103,11 +95,7 @@ const requirements: Readonly<
     features: ["caseStateEngineV2", "workerPortal"],
   },
   "work_order.completion.review": {
-    features: [
-      "caseStateEngineV2",
-      "workerPortal",
-      "measurementEvidenceV2",
-    ],
+    features: ["caseStateEngineV2", "workerPortal", "measurementEvidenceV2"],
   },
 };
 
