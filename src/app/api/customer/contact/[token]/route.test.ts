@@ -111,7 +111,7 @@ describe("customer manual contact recovery", () => {
           subject: "Vi har mottatt henvendelsen din",
           bodyText: "Takk for henvendelsen.",
           bodyHtml: expect.stringContaining(
-            'src="https://www.takfornyelse.as/brand/logo.png"',
+            'src="https://takfornyelsenorge.no/brand/logo.png"',
           ),
           aiAnalysis: expect.not.objectContaining({
             manualRecovery: expect.anything(),

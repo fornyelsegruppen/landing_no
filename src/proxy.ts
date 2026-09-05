@@ -2,18 +2,35 @@ import createMiddleware from "next-intl/middleware";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
-import { evaluateMutationOrigin, isBrowserMutationApi } from "./lib/security/request-origin";
+import {
+  evaluateMutationOrigin,
+  isBrowserMutationApi,
+} from "./lib/security/request-origin";
+import {
+  migrationRedirectsEnabled,
+  publicHostRedirectTarget,
+} from "./lib/public-host-migration";
 
 const handleI18nRouting = createMiddleware(routing);
 
 export function proxy(request: NextRequest) {
+  const redirectTarget = publicHostRedirectTarget({
+    url: request.url,
+    method: request.method,
+    enabled: migrationRedirectsEnabled(),
+  });
+  if (redirectTarget) return NextResponse.redirect(redirectTarget, 308);
+
   if (request.nextUrl.pathname.startsWith("/api/")) {
     if (isBrowserMutationApi(request.nextUrl.pathname)) {
       const decision = evaluateMutationOrigin(request);
       if (!decision.allowed) {
         return NextResponse.json(
           { error: "Cross-site request blocked" },
-          { status: 403, headers: { "Cache-Control": "no-store", Vary: "Origin" } },
+          {
+            status: 403,
+            headers: { "Cache-Control": "no-store", Vary: "Origin" },
+          },
         );
       }
     }

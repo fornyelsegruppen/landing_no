@@ -11,6 +11,9 @@ describe("public guide navigation", () => {
     expect(isGuideNavigationHref("https://www.takfornyelse.as/en/blogg")).toBe(
       true,
     );
+    expect(isGuideNavigationHref("https://takfornyelsenorge.no/no/blogg")).toBe(
+      true,
+    );
     expect(isGuideNavigationHref("https://example.com/blogg")).toBe(false);
     expect(isGuideNavigationHref("/blogg/annen-artikkel")).toBe(false);
   });

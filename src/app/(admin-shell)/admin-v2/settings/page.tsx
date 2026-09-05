@@ -38,7 +38,7 @@ export default async function SettingsPage() {
   const values = {
     brandName: settings.brandName || "Takfornyelse",
     phone: settings.phone || "+47 47 73 58 88",
-    email: settings.email || "post@takfornyelse.as",
+    email: settings.email || "post@takfornyelsenorge.no",
     street: settings.street || "Lyngveien 28",
     postal: settings.postal || "1182",
     city: settings.city || "Oslo",

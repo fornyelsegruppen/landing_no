@@ -37,6 +37,8 @@ function secureActionButton(url: string, label?: string) {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
     const isTakfornyelseHost =
+      hostname === "takfornyelsenorge.no" ||
+      hostname === "www.takfornyelsenorge.no" ||
       hostname === "takfornyelse.as" ||
       hostname === "www.takfornyelse.as" ||
       hostname.endsWith(".vercel.app");
@@ -97,7 +99,7 @@ export function buildBrandedEmailHtml(input: BrandedEmailInput) {
   // branded email assets on the public production domain even when a message
   // is generated from a protected Preview deployment.
   const emailAssetBaseUrl = (
-    process.env.EMAIL_ASSET_BASE_URL || "https://www.takfornyelse.as"
+    process.env.EMAIL_ASSET_BASE_URL || "https://takfornyelsenorge.no"
   ).replace(/\/$/, "");
   const logoUrl = `${emailAssetBaseUrl}/brand/logo.png`;
   const preheader = escapeHtml(input.preheader || input.subject);

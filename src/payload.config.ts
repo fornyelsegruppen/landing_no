@@ -72,6 +72,8 @@ const trustedOrigins = Array.from(
   new Set(
     [
       serverURL,
+      "https://takfornyelsenorge.no",
+      "https://www.takfornyelsenorge.no",
       "https://www.takfornyelse.as",
       "https://takfornyelse.as",
       "https://landing-no.vercel.app",

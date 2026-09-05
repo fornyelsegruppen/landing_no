@@ -737,7 +737,7 @@ async function deliverMessageUnlocked(
           ? caseReplyAddress(lead.id)
           : null) ||
         process.env.LEAD_TO_EMAIL ||
-        "post@takfornyelse.as",
+        "post@takfornyelsenorge.no",
       idempotencyKey: providerDeliveryIdempotencyKey(message),
       correlationId,
       ...(attachments.length ? { attachments } : {}),

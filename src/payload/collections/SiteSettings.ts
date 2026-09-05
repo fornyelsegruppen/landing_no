@@ -31,7 +31,7 @@ export const SiteSettings: GlobalConfig = {
             {
               name: "email",
               type: "email",
-              defaultValue: "post@takfornyelse.as",
+              defaultValue: "post@takfornyelsenorge.no",
             },
             { name: "street", type: "text", defaultValue: "Lyngveien 28" },
             { name: "postal", type: "text", defaultValue: "1182" },

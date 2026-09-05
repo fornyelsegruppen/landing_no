@@ -273,7 +273,7 @@ export async function POST(
         { purpose: "signed-contract-customer-portal", contractId: contract.id },
       );
       const siteUrl = (
-        process.env.NEXT_PUBLIC_SITE_URL || "https://www.takfornyelse.as"
+        process.env.NEXT_PUBLIC_SITE_URL || "https://takfornyelsenorge.no"
       ).replace(/\/$/, "");
       const customerPortalUrl = `${siteUrl}/tilbud/${encodeURIComponent(access.token)}`;
       const message = await payload.create({

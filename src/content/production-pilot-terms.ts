@@ -2,10 +2,10 @@ export const PRODUCTION_PILOT_TERMS = {
   version: "PRODUCTION-PILOT-V1",
   title: "Håndverkerkontrakt for takarbeid – kontrollert produksjonspilot",
   ownerApprovalReference: "OWNER-APPROVED-CONTROLLED-PILOT-2026-08-26",
-  withdrawalFormUrl: "https://www.takfornyelse.as/no/angreskjema",
+  withdrawalFormUrl: "https://takfornyelsenorge.no/no/angreskjema",
   contractText: `1. PARTENE OG AVTALEGRUNNLAGET
 
-Tjenesteyter er Fornyelse Gruppen AS, org.nr. 916 693 168 MVA, registrert i Foretaksregisteret, Lyngveien 28, 1182 Oslo, som driver Takfornyelse. Kontakt: post@takfornyelse.as og +47 47 73 58 88.
+Tjenesteyter er Fornyelse Gruppen AS, org.nr. 916 693 168 MVA, registrert i Foretaksregisteret, Lyngveien 28, 1182 Oslo, som driver Takfornyelse. Kontakt: post@takfornyelsenorge.no og +47 47 73 58 88.
 
 Kunden, arbeidsstedet, tjenesten, tilbudsreferansen, måleversjonen, prisberegningen og eventuelle vedlegg fremgår av tilbudet. Tilbudet, disse vilkårene, godkjente endringsavtaler og den endelig signerte PDF-en utgjør samlet avtale. Ved motstrid går en senere skriftlig og signert endringsavtale foran den opprinnelige avtalen. Ufravikelige forbrukerrettigheter gjelder alltid.
 
@@ -61,7 +61,7 @@ Ved gyldig bruk av angreretten tilbakebetales mottatt forskudd uten unødig opph
 
 Ved forsinkelse eller mangel har kunden de rettighetene som følger av håndverkertjenesteloven, blant annet rett til å holde tilbake betaling, kreve retting, prisavslag, heving eller erstatning når vilkårene er oppfylt. Kunden skal reklamere innen rimelig tid etter at forholdet ble eller burde blitt oppdaget. Ved arbeid på fast eiendom er den absolutte reklamasjonsfristen normalt fem år, uten at dette begrenser en eventuell lengre uttrykkelig garanti.
 
-Reklamasjon sendes skriftlig til post@takfornyelse.as og bør inneholde oppdragsreferanse, beskrivelse og relevante bilder. Takfornyelse skal få rimelig mulighet til å undersøke og rette en mangel.
+Reklamasjon sendes skriftlig til post@takfornyelsenorge.no og bør inneholde oppdragsreferanse, beskrivelse og relevante bilder. Takfornyelse skal få rimelig mulighet til å undersøke og rette en mangel.
 
 11. GARANTI OG FERDIGDOKUMENTASJON
 
@@ -78,7 +78,7 @@ Personopplysninger behandles for å håndtere henvendelsen, inngå og oppfylle a
 14. KLAGER OG TVISTER
 
 Partene skal først forsøke å løse saken skriftlig. Dersom partene ikke blir enige, kan forbrukeren be Forbrukertilsynet om mekling og eventuelt bringe saken videre til Forbrukerklageutvalget når vilkårene er oppfylt. Norsk rett gjelder. Avtalen begrenser ikke forbrukerens rett til å bruke lovlig verneting eller andre ufravikelige klageordninger.`,
-  withdrawalInstructions: `Du har normalt rett til å gå fra denne fjernsalgsavtalen uten å oppgi noen grunn innen 14 dager fra dagen avtalen ble inngått. For å bruke angreretten må du før fristens utløp sende en tydelig melding til Fornyelse Gruppen AS / Takfornyelse, Lyngveien 28, 1182 Oslo, post@takfornyelse.as, +47 47 73 58 88. Du kan bruke standard angreskjema, men det er ikke obligatorisk.
+  withdrawalInstructions: `Du har normalt rett til å gå fra denne fjernsalgsavtalen uten å oppgi noen grunn innen 14 dager fra dagen avtalen ble inngått. For å bruke angreretten må du før fristens utløp sende en tydelig melding til Fornyelse Gruppen AS / Takfornyelse, Lyngveien 28, 1182 Oslo, post@takfornyelsenorge.no, +47 47 73 58 88. Du kan bruke standard angreskjema, men det er ikke obligatorisk.
 
 Hvis du sender angremeldingen elektronisk gjennom løsningen, skal du få en bekreftelse på varig medium. Det er tilstrekkelig at meldingen er sendt før fristen utløper.
 

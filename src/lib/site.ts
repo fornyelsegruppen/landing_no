@@ -1,14 +1,10 @@
 export const siteConfig = {
   name: "Takfornyelse",
-  domain: "takfornyelse.as",
-  url:
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "https://www.takfornyelse.as"),
+  domain: "takfornyelsenorge.no",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://takfornyelsenorge.no",
   phone: "+47 47 73 58 88",
   phoneHref: "tel:+4747735888",
-  email: "post@takfornyelse.as",
+  email: "post@takfornyelsenorge.no",
   address: {
     street: "Lyngveien 28",
     postal: "1182",

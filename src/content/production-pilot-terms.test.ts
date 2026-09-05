@@ -12,7 +12,7 @@ describe("owner-approved production pilot terms", () => {
       PRODUCTION_PILOT_TERMS.withdrawalInstructions.length,
     ).toBeGreaterThan(500);
     expect(PRODUCTION_PILOT_TERMS.withdrawalFormUrl).toBe(
-      "https://www.takfornyelse.as/no/angreskjema",
+      "https://takfornyelsenorge.no/no/angreskjema",
     );
     expect(
       `${PRODUCTION_PILOT_TERMS.contractText}\n${PRODUCTION_PILOT_TERMS.withdrawalInstructions}\n${PRODUCTION_PILOT_TERMS.withdrawalFormUrl}`,

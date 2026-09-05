@@ -1,3 +1,5 @@
+import { canonicalLegacyDestination } from "./public-host-migration";
+
 const permanent = true;
 
 export type LegacyRedirect = {
@@ -7,7 +9,11 @@ export type LegacyRedirect = {
 };
 
 function redirect(source: string, destination: string): LegacyRedirect {
-  return { source, destination, permanent };
+  return {
+    source,
+    destination: canonicalLegacyDestination(destination),
+    permanent,
+  };
 }
 
 const norwegianServiceRedirects: LegacyRedirect[] = [

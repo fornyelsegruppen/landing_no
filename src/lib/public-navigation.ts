@@ -11,8 +11,11 @@ export const guideLabels = {
 function normalizedInternalPath(href: string): string | null {
   try {
     const absolute = /^[a-z][a-z\d+.-]*:/i.test(href);
-    const url = new URL(href, "https://www.takfornyelse.as");
-    if (absolute && !/(^|\.)takfornyelse\.as$/i.test(url.hostname)) return null;
+    const url = new URL(href, "https://takfornyelsenorge.no");
+    const managedHost =
+      /(^|\.)takfornyelse\.as$/i.test(url.hostname) ||
+      /(^|\.)takfornyelsenorge\.no$/i.test(url.hostname);
+    if (absolute && !managedHost) return null;
 
     const withoutLocale = url.pathname.replace(/^\/(?:no|en)(?=\/|$)/, "");
     return (withoutLocale.replace(/\/+$/, "") || "/").toLowerCase();
@@ -27,7 +30,7 @@ export function isGuideNavigationHref(href: string): boolean {
 
 function isContactNavigationHref(href: string): boolean {
   try {
-    const url = new URL(href, "https://www.takfornyelse.as");
+    const url = new URL(href, "https://takfornyelsenorge.no");
     const path = normalizedInternalPath(href);
     return url.hash.toLowerCase() === "#kontakt" || path === "/kontakt";
   } catch {

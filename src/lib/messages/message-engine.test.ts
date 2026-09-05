@@ -436,7 +436,7 @@ describe("message engine", () => {
     expect(state.messages).toHaveLength(1);
     expect(state.jobs).toHaveLength(1);
     expect(state.messages[0]?.bodyHtml).toContain(
-      'src="https://www.takfornyelse.as/brand/logo.png"',
+      'src="https://takfornyelsenorge.no/brand/logo.png"',
     );
 
     const provider = new LogEmailProvider();

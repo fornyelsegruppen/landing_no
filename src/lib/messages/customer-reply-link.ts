@@ -26,6 +26,8 @@ function quoteTokenFromUrl(value: string) {
     const parsed = new URL(raw);
     const hostname = parsed.hostname.toLowerCase();
     const trustedHost =
+      hostname === "takfornyelsenorge.no" ||
+      hostname === "www.takfornyelsenorge.no" ||
       hostname === "takfornyelse.as" ||
       hostname === "www.takfornyelse.as" ||
       hostname.endsWith(".vercel.app");

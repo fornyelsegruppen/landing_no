@@ -47,6 +47,23 @@ describe("customer question reply secure link", () => {
     expect(find).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts a current secure quote URL on the new canonical host", async () => {
+    const payload = {
+      find: vi.fn().mockResolvedValue({
+        docs: [
+          {
+            bodyText:
+              "Åpne tilbudet:\nhttps://takfornyelsenorge.no/tilbud/current-token",
+          },
+        ],
+      }),
+    } as unknown as Payload;
+
+    await expect(
+      findCurrentSecureQuoteUrl(payload, { leadId: 17, sources: sources() }),
+    ).resolves.toBe("https://takfornyelsenorge.no/tilbud/current-token");
+  });
+
   it("blocks sending when no valid link exists for the bound quote version", async () => {
     const payload = {
       find: vi.fn().mockResolvedValue({

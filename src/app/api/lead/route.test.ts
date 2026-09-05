@@ -6,6 +6,17 @@ const mocks = vi.hoisted(() => ({
   deliver: vi.fn(),
   enqueueAi: vi.fn(),
   verifyTurnstile: vi.fn(),
+  resendSend: vi.fn(),
+}));
+
+vi.mock("resend", () => ({
+  Resend: class {
+    emails = { send: mocks.resendSend };
+  },
+}));
+vi.mock("@/lib/lead-pdf", () => ({
+  buildLeadPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])),
+  leadPdfFilename: vi.fn(() => "henvendelse-test.pdf"),
 }));
 
 vi.mock("@/lib/payload", () => ({
@@ -48,6 +59,8 @@ describe("public lead durability", () => {
   beforeEach(() => {
     process.env.PAYLOAD_SECRET = "test-secret-at-least-32-characters-long";
     delete process.env.RESEND_API_KEY;
+    delete process.env.LEAD_TO_EMAIL;
+    delete process.env.LEAD_ADMIN_COPY_EMAIL;
     delete process.env.FEATURE_AI_DRAFTS;
     mocks.create.mockReset().mockResolvedValue({ id: 55 });
     mocks.receipt
@@ -59,10 +72,17 @@ describe("public lead durability", () => {
       ok: true,
       skipped: true,
     });
+    mocks.resendSend.mockReset().mockResolvedValue({
+      data: { id: "admin-email-1" },
+      error: null,
+    });
   });
 
   afterEach(() => {
     delete process.env.FEATURE_AI_DRAFTS;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.LEAD_TO_EMAIL;
+    delete process.env.LEAD_ADMIN_COPY_EMAIL;
   });
 
   it("returns success after the lead is saved even when receipt creation fails", async () => {
@@ -109,5 +129,24 @@ describe("public lead durability", () => {
     expect(mocks.receipt).not.toHaveBeenCalled();
     expect(mocks.deliver).not.toHaveBeenCalled();
     expect(mocks.enqueueAi).not.toHaveBeenCalled();
+  });
+
+  it("sends one idempotent admin notification to the new inbox and old safety copy", async () => {
+    process.env.RESEND_API_KEY = "test-resend-key";
+    process.env.LEAD_TO_EMAIL = "post@takfornyelsenorge.no";
+    process.env.LEAD_ADMIN_COPY_EMAIL = "post@takfornyelse.as";
+
+    const response = await POST(request("kunde@example.test"));
+
+    expect(response.status).toBe(200);
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.resendSend).toHaveBeenCalledTimes(1);
+    expect(mocks.resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ["post@takfornyelsenorge.no", "post@takfornyelse.as"],
+        replyTo: "kunde@example.test",
+      }),
+      { idempotencyKey: "lead-admin-intake-55" },
+    );
   });
 });

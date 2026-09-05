@@ -11,7 +11,7 @@ describe("branded customer email", () => {
       text: "Hei!\n\nSe tilbudet: https://takfornyelse.as/tilbud/test",
     });
 
-    expect(html).toContain('src="https://www.takfornyelse.as/brand/logo.png"');
+    expect(html).toContain('src="https://takfornyelsenorge.no/brand/logo.png"');
     expect(html).toContain("Fornyelse Gruppen AS");
     expect(html).toContain('href="https://takfornyelse.as/tilbud/test"');
     expect(html).toContain(">Åpne ditt sikre tilbud</a>");
@@ -19,6 +19,18 @@ describe("branded customer email", () => {
     expect(html).toContain("background:#f0a914");
     expect(html).toContain('<br><a href="https://takfornyelse.as/tilbud/test"');
     expect(html).toContain("Org.nr. 916 693 168");
+  });
+
+  it("renders a new-domain secure offer URL as the primary branded button", () => {
+    const html = buildBrandedEmailHtml({
+      subject: "Nytt tilbud",
+      text: "Se tilbudet: https://takfornyelsenorge.no/tilbud/new-token",
+      secureLinkLabel: "Åpne tilbudet",
+    });
+
+    expect(html).toContain(
+      '<br><a href="https://takfornyelsenorge.no/tilbud/new-token"',
+    );
   });
 
   it("keeps unrelated web links as readable text links", () => {

@@ -47,7 +47,7 @@ export default async function ManualContactPage({
             </p>
             <ManualContactEmailForm token={token} />
             <footer className="mt-6 border-t border-white/10 pt-5 text-sm text-white/60">
-              <p>Takfornyelse · +47 47 73 58 88 · post@takfornyelse.as</p>
+              <p>Takfornyelse · +47 47 73 58 88 · post@takfornyelsenorge.no</p>
             </footer>
           </section>
         </main>

@@ -23,6 +23,7 @@ import {
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { readFeatureFlags } from "@/lib/platform/features";
 import { processOperationalJobs } from "@/lib/jobs/operational-job-processor";
+import { leadAdminRecipients } from "@/lib/lead-admin-recipients";
 
 const optionalAttributionText = (max: number) =>
   z.string().trim().max(max).optional();
@@ -384,15 +385,22 @@ export async function POST(request: Request) {
           });
         }
 
-        await resend.emails.send({
-          from: process.env.LEAD_FROM_EMAIL || "leads@takfornyelse.as",
-          to: process.env.LEAD_TO_EMAIL || siteConfig.email,
-          ...(email ? { replyTo: email } : {}),
-          subject: buildLeadEmailSubject(emailPayload),
-          text: buildLeadEmailText(emailPayload),
-          html: buildLeadEmailHtml(emailPayload),
-          ...(attachments ? { attachments } : {}),
+        const adminRecipients = leadAdminRecipients({
+          primary: process.env.LEAD_TO_EMAIL || siteConfig.email,
+          copy: process.env.LEAD_ADMIN_COPY_EMAIL,
         });
+        await resend.emails.send(
+          {
+            from: process.env.LEAD_FROM_EMAIL || "leads@takfornyelse.as",
+            to: adminRecipients,
+            ...(email ? { replyTo: email } : {}),
+            subject: buildLeadEmailSubject(emailPayload),
+            text: buildLeadEmailText(emailPayload),
+            html: buildLeadEmailHtml(emailPayload),
+            ...(attachments ? { attachments } : {}),
+          },
+          { idempotencyKey: `lead-admin-intake-${created.id}` },
+        );
       } catch (err) {
         captureException(err, {
           route: "POST /api/lead",
