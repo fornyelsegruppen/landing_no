@@ -61,3 +61,18 @@ These screenshots are owner-supplied observations of the frozen Preview. They ar
 - HubSpot: open the record by its human identity, keep context and activity together, and collapse secondary/technical cards.
 
 The implementation adapts these information-architecture principles to Takfornyelse's existing canonical state engine and permission model; it does not copy another product or create unsupported stages.
+
+## Candidate resolution and authenticated smoke test
+
+Candidate code: `74fb68768708949619c31acdf8532f92b0e93326`  
+Candidate deployment: `dpl_HZ5C9TWbAsg3rPmxtGd81NmPbHjs`  
+Protected Preview: `https://landing-hdl10bjlj-darbasnorvegija4-8212s-projects.vercel.app`
+
+- The frozen deployment's authenticated 504 was reproduced and diagnosed from Vercel runtime logs. `/admin/login` and `/admin-next-preview/cases/1` stopped on Payload's interactive prompt about a development schema push, then timed out after 60 or 300 seconds.
+- The isolated candidate database contained all 44 filesystem migrations plus one `payload_migrations` row named `dev` with batch `-1`. The candidate build logged `Cleared drizzle-push marker(s): dev`, followed by `Migrations complete.` No Production database or deployment was changed.
+- In the owner's Vercel-authenticated Chrome session, the candidate `/admin/login` rendered in 8.122 seconds on the cold check. Synthetic administrator login succeeded. The canonical work queue and TF-1 case workspace rendered in about 1.3 seconds during the authenticated navigation, and the work queue survived a full reload in 2.503 seconds.
+- Vercel request logs record HTTP 200 for `/admin/login`, `/admin-next-preview/work`, `/admin-next-preview/cases/TF-1`, `/api/users/me` and the communications pagination request. No candidate 5xx response was observed during this smoke test.
+- The real TF-1 workspace displayed the customer-question focus, the message register at 25 of 27, commercial/document sections and the business timeline. The single older-message request loaded 27 of 27 and moved focus to the completion status.
+- The public `/no` form was opened read-only and visibly contained the two-step contact form. It was not submitted. No customer email was sent.
+- Preview outbound delivery remains protected by the application-level exact-recipient allowlist and `[PREVIEW TEST]` subject prefix. The inherited Preview Resend account is encrypted/opaque, so separate provider-account isolation is not claimed.
+- Read-only ONE UI navigation is ready for owner use. Yellow command actions, fresh intake submission and outbound email remain separate, explicit UAT steps.
