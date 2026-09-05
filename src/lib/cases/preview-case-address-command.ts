@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { sql } from "@payloadcms/db-postgres";
 import {
   commitTransaction,
   initTransaction,
@@ -148,6 +149,60 @@ export type PreviewCaseAddressCommandResult = {
 };
 
 type TransactionRequest = Partial<PayloadRequest> & { payload: Payload };
+
+type PostgresRowLockTransaction = {
+  select(fields: { id: unknown }): {
+    from(table: unknown): {
+      where(condition: ReturnType<typeof sql>): {
+        for(strength: "update"): Promise<Array<{ id: unknown }>>;
+      };
+    };
+  };
+};
+
+type PostgresRowLockAdapter = {
+  packageName?: string;
+  sessions?: Record<
+    string,
+    { db?: PostgresRowLockTransaction } | undefined
+  >;
+  tables?: Record<string, { id: unknown } | undefined>;
+};
+
+async function lockLeadAddressRow(
+  payload: Payload,
+  req: TransactionRequest,
+  leadId: number,
+) {
+  const transactionId = await req.transactionID;
+  const adapter = payload.db as unknown as PostgresRowLockAdapter;
+  const transaction = transactionId
+    ? adapter.sessions?.[String(transactionId)]?.db
+    : undefined;
+  const table = adapter.tables?.leads;
+  if (
+    adapter.packageName !== "@payloadcms/db-postgres" ||
+    !transaction ||
+    !table
+  ) {
+    throw new PreviewCaseAddressCommandError(
+      "TRANSACTION_REQUIRED",
+      "Address correction requires an active PostgreSQL row-lock transaction",
+    );
+  }
+
+  const rows = await transaction
+    .select({ id: table.id })
+    .from(table)
+    .where(sql`${table.id} = ${leadId}`)
+    .for("update");
+  if (rows.length !== 1) {
+    throw new PreviewCaseAddressCommandError(
+      "CASE_NOT_FOUND",
+      "Case was not found",
+    );
+  }
+}
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -446,6 +501,23 @@ export async function executePreviewCaseAddressCommand(input: {
       return replay;
     }
 
+    await lockLeadAddressRow(input.payload, request, command.leadId);
+
+    // A matching command may have committed while this transaction waited for
+    // the row lock. Re-read the append-only ledger after acquiring the lock so
+    // an identical retry is replayed without attempting another write.
+    const duplicateAfterLock = await findHistory(
+      input.payload,
+      { ledgerKey: { equals: key } },
+      request,
+    );
+    if (duplicateAfterLock) {
+      const replay = parseStoredResult(duplicateAfterLock, hash);
+      await commitTransaction(request);
+      committed = true;
+      return replay;
+    }
+
     let lead: Record<string, unknown>;
     try {
       lead = (await input.payload.findByID({
@@ -486,28 +558,6 @@ export async function executePreviewCaseAddressCommand(input: {
     } as const;
     request.context = context;
     request.payloadAPI = "local";
-    const lock = await input.payload.update({
-      collection: "leads",
-      depth: 0,
-      overrideAccess: true,
-      context,
-      req: request as PayloadRequest,
-      where: {
-        and: [
-          { id: { equals: command.leadId } },
-          { caseRevision: { equals: actualCaseRevision } },
-          { addressRevision: { equals: actualAddressRevision } },
-        ],
-      },
-      data: { caseRevision: actualCaseRevision },
-    });
-    if (!Array.isArray(lock.docs) || lock.docs.length !== 1) {
-      throw revisionConflict(
-        "CASE_REVISION_CONFLICT",
-        command.expectedCaseRevision,
-        actualCaseRevision + 1,
-      );
-    }
 
     const before = storedAddress(lead);
     const beforeHash = digest("preview-case-address.v1", before);
@@ -538,17 +588,6 @@ export async function executePreviewCaseAddressCommand(input: {
       }
     }
 
-    const rfInvalidation = await latestRfInvalidation(
-      input.payload,
-      caseId,
-      request,
-    );
-    const commercialDraftInvalidation = await invalidateCommercialDrafts(
-      input.payload,
-      command.leadId,
-      rfInvalidation,
-      request,
-    );
     const nextCaseRevision = actualCaseRevision + 1;
     const nextAddressRevision = actualAddressRevision + 1;
     await input.payload.update({
@@ -567,6 +606,18 @@ export async function executePreviewCaseAddressCommand(input: {
         addressRevision: nextAddressRevision,
       },
     });
+
+    const rfInvalidation = await latestRfInvalidation(
+      input.payload,
+      caseId,
+      request,
+    );
+    const commercialDraftInvalidation = await invalidateCommercialDrafts(
+      input.payload,
+      command.leadId,
+      rfInvalidation,
+      request,
+    );
 
     const result: PreviewCaseAddressCommandResult = {
       schemaVersion: PREVIEW_CASE_ADDRESS_COMMAND_RESULT_VERSION,

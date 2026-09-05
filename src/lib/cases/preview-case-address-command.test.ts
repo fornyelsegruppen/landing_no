@@ -37,10 +37,22 @@ function equalsWhere(row: Row, where: Record<string, unknown>): boolean {
 class FakeTransactionalPayload {
   committed: Store;
   private readonly transactions = new Map<string, Store>();
+  private readonly sessions: Record<
+    string,
+    { db: ReturnType<FakeTransactionalPayload["rowLockDatabase"]> }
+  > = {};
+  private readonly leadLocks = new Map<
+    number,
+    {
+      owner: string;
+      released: Promise<void>;
+      release: () => void;
+    }
+  >();
   private nextTransaction = 1;
   failAuditCreate = false;
   disableTransactions = false;
-  concurrentHistoryOnLockMiss: Row | null = null;
+  leadBulkUpdateCalls = 0;
 
   constructor(rfRows: Row[] = []) {
     this.committed = {
@@ -64,20 +76,78 @@ class FakeTransactionalPayload {
   }
 
   db = {
+    packageName: "@payloadcms/db-postgres",
+    sessions: this.sessions,
+    tables: { leads: { id: {} } },
     beginTransaction: async () => {
       if (this.disableTransactions) return "";
       const id = `address-tx-${this.nextTransaction++}`;
       this.transactions.set(id, cloneStore(this.committed));
+      this.sessions[id] = { db: this.rowLockDatabase(id) };
       return id;
     },
     commitTransaction: async (id: string) => {
       this.committed = cloneStore(this.storeFor(id));
       this.transactions.delete(id);
+      delete this.sessions[id];
+      this.releaseLeadLocks(id);
     },
     rollbackTransaction: async (id: string) => {
       this.transactions.delete(id);
+      delete this.sessions[id];
+      this.releaseLeadLocks(id);
     },
   };
+
+  private rowLockDatabase(transactionId: string) {
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            for: async (strength: "update") => {
+              if (strength !== "update") throw new Error("invalid lock");
+              return this.acquireLeadLock(transactionId, 13);
+            },
+          }),
+        }),
+      }),
+    };
+  }
+
+  private async acquireLeadLock(transactionId: string, leadId: number) {
+    while (true) {
+      const existing = this.leadLocks.get(leadId);
+      if (!existing || existing.owner === transactionId) break;
+      await existing.released;
+    }
+    if (!this.leadLocks.has(leadId)) {
+      let release: () => void = () => {};
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      this.leadLocks.set(leadId, {
+        owner: transactionId,
+        released,
+        release,
+      });
+    }
+
+    // PostgreSQL READ COMMITTED takes a fresh snapshot after a competing row
+    // lock is released. The fake mirrors that boundary for concurrency tests.
+    this.transactions.set(transactionId, cloneStore(this.committed));
+    const row = this.storeFor(transactionId).leads.find(
+      ({ id }) => id === leadId,
+    );
+    return row ? [{ id: row.id }] : [];
+  }
+
+  private releaseLeadLocks(transactionId: string) {
+    for (const [leadId, lock] of this.leadLocks) {
+      if (lock.owner !== transactionId) continue;
+      this.leadLocks.delete(leadId);
+      lock.release();
+    }
+  }
 
   private storeFor(id?: string) {
     if (!id) return this.committed;
@@ -131,21 +201,23 @@ class FakeTransactionalPayload {
   }) => {
     const store = this.storeFor(this.transactionId(input));
     if (input.where) {
-      if (
-        input.collection === "leads" &&
-        this.concurrentHistoryOnLockMiss
-      ) {
-        this.committed["case-address-revisions"].push(
-          structuredClone(this.concurrentHistoryOnLockMiss),
-        );
-        this.concurrentHistoryOnLockMiss = null;
-        return { docs: [] };
+      if (input.collection === "leads") {
+        this.leadBulkUpdateCalls += 1;
+        return {
+          docs: [],
+          errors: [
+            {
+              id: 13,
+              message: "Case address revisions must advance exactly once",
+            },
+          ],
+        };
       }
       const rows = store[input.collection].filter((row) =>
         equalsWhere(row, input.where!),
       );
       rows.forEach((row) => Object.assign(row, structuredClone(input.data)));
-      return { docs: structuredClone(rows) };
+      return { docs: structuredClone(rows), errors: [] };
     }
     const row = store[input.collection].find(({ id }) => id === input.id);
     if (!row) throw new Error("not found");
@@ -338,6 +410,10 @@ describe("Preview case address command", () => {
     expect(JSON.stringify(payload.committed["audit-events"])).not.toMatch(
       /Old gate|New gate|2A/u,
     );
+    // The former pseudo-lock used a Payload bulk update with the unchanged
+    // caseRevision. Payload captured the hook failure in `errors` and returned
+    // `docs: []`. A real row lock must never invoke that bulk path.
+    expect(payload.leadBulkUpdateCalls).toBe(0);
   });
 
   it("supersedes only draft documents bound to the invalidated exact RF snapshot", async () => {
@@ -423,53 +499,72 @@ describe("Preview case address command", () => {
     expect(payload.committed["case-address-revisions"]).toHaveLength(1);
   });
 
-  it("replays an exact command that lost the case row lock to a concurrent winner", async () => {
-    const winner = new FakeTransactionalPayload();
-    const applied = await executePreviewCaseAddressCommand({
-      payload: winner.asPayload(),
-      command: command(),
-      environment: previewEnvironment,
-    });
-    const loser = new FakeTransactionalPayload();
-    loser.concurrentHistoryOnLockMiss = structuredClone(
-      winner.committed["case-address-revisions"][0],
-    );
-
-    await expect(
+  it("replays an identical command that waited behind a concurrent winner", async () => {
+    const payload = new FakeTransactionalPayload();
+    const results = await Promise.all([
       executePreviewCaseAddressCommand({
-        payload: loser.asPayload(),
+        payload: payload.asPayload(),
+        command: command(),
+        environment: previewEnvironment,
+      }),
+      executePreviewCaseAddressCommand({
+        payload: payload.asPayload(),
         command: command({ correlationId: "corr-concurrent-retry" }),
         environment: previewEnvironment,
       }),
-    ).resolves.toEqual({ ...applied, status: "replayed" });
-    expect(loser.committed["case-address-revisions"]).toHaveLength(1);
-    expect(loser.committed["audit-events"]).toEqual([]);
+    ]);
+
+    expect(results.map(({ status }) => status).sort()).toEqual([
+      "applied",
+      "replayed",
+    ]);
+    expect(payload.committed["case-address-revisions"]).toHaveLength(1);
+    expect(payload.committed["audit-events"]).toHaveLength(1);
+    expect(payload.committed.leads[0]).toMatchObject({
+      caseRevision: 8,
+      addressRevision: 2,
+    });
   });
 
-  it("rejects a different command that reused the concurrent winner's idempotency key", async () => {
-    const winner = new FakeTransactionalPayload();
-    await executePreviewCaseAddressCommand({
-      payload: winner.asPayload(),
-      command: command(),
-      environment: previewEnvironment,
-    });
-    const loser = new FakeTransactionalPayload();
-    loser.concurrentHistoryOnLockMiss = structuredClone(
-      winner.committed["case-address-revisions"][0],
-    );
-
-    await expectCode(
+  it("allows only one of two competing address revisions to commit", async () => {
+    const payload = new FakeTransactionalPayload();
+    const results = await Promise.allSettled([
       executePreviewCaseAddressCommand({
-        payload: loser.asPayload(),
+        payload: payload.asPayload(),
+        command: command(),
+        environment: previewEnvironment,
+      }),
+      executePreviewCaseAddressCommand({
+        payload: payload.asPayload(),
         command: command({
-          address: { ...command().address, street: "Conflicting gate" },
+          idempotencyKey: "address-correction-13-competing",
+          correlationId: "corr-address-13-competing",
+          address: { ...command().address, street: "Competing gate" },
         }),
         environment: previewEnvironment,
       }),
-      "IDEMPOTENCY_CONFLICT",
+    ]);
+
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(
+      1,
     );
-    expect(loser.committed["case-address-revisions"]).toHaveLength(1);
-    expect(loser.committed["audit-events"]).toEqual([]);
+    const rejected = results.find(({ status }) => status === "rejected");
+    expect(rejected).toMatchObject({
+      reason: expect.objectContaining({
+        code: "CASE_REVISION_CONFLICT",
+        expectedRevision: 7,
+        actualRevision: 8,
+      }),
+    });
+    expect(payload.committed["case-address-revisions"]).toHaveLength(1);
+    expect(payload.committed["audit-events"]).toHaveLength(1);
+    expect(payload.committed.leads[0]).toMatchObject({
+      caseRevision: 8,
+      addressRevision: 2,
+    });
+    expect(["New gate", "Competing gate"]).toContain(
+      payload.committed.leads[0].address,
+    );
   });
 
   it.each([
@@ -491,8 +586,37 @@ describe("Preview case address command", () => {
     });
   });
 
-  it("rolls the lead and history back when audit append fails", async () => {
-    const payload = new FakeTransactionalPayload();
+  it("rolls the lead, RF-bound drafts and history back when audit append fails", async () => {
+    const snapshot = (await buildRoofFusionPreviewUatGoldenPlanV1(13))
+      .finalSnapshot;
+    const payload = new FakeTransactionalPayload([
+      {
+        snapshotId: snapshot.snapshotId,
+        caseId: snapshot.subject.caseId,
+        revision: snapshot.revision,
+        snapshotHash: snapshot.snapshotHash,
+        snapshot,
+      },
+    ]);
+    payload.committed.quotes.push({
+      id: 41,
+      lead: 13,
+      status: "draft",
+      snapshot: {
+        measurement: {
+          rfBinding: {
+            snapshotId: snapshot.snapshotId,
+            snapshotRevision: snapshot.revision,
+            snapshotHash: snapshot.snapshotHash,
+          },
+        },
+      },
+    });
+    payload.committed.contracts.push({
+      id: 51,
+      quote: 41,
+      status: "draft",
+    });
     payload.failAuditCreate = true;
 
     await expectCode(
@@ -509,6 +633,9 @@ describe("Preview case address command", () => {
       addressRevision: 1,
     });
     expect(payload.committed["case-address-revisions"]).toEqual([]);
+    expect(payload.committed.quotes[0]).toMatchObject({ status: "draft" });
+    expect(payload.committed.contracts[0]).toMatchObject({ status: "draft" });
+    expect(payload.committed["audit-events"]).toEqual([]);
   });
 
   it("refuses to degrade to split writes without a transaction", async () => {
