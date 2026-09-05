@@ -123,7 +123,9 @@ export type WorkQueueInteraction =
 export type WorkQueueItem = {
   contractVersion: typeof workQueueContractVersion;
   case: {
+    customerName: string | null;
     id: string;
+    postalAddress: string | null;
     revision: number;
     reference: string;
     href: string;
@@ -154,7 +156,9 @@ export type WorkQueueItem = {
 
 export type CreateWorkQueueItemInput = {
   case: {
+    customerName?: string | null;
     id: string;
+    postalAddress?: string | null;
     revision: number;
     reference: string;
     href: string;
@@ -561,7 +565,11 @@ export function createWorkQueueItem(
 
   return {
     contractVersion: workQueueContractVersion,
-    case: { ...input.case },
+    case: {
+      ...input.case,
+      customerName: input.case.customerName?.trim() || null,
+      postalAddress: input.case.postalAddress?.trim() || null,
+    },
     locale: input.locale,
     action: { kind: input.actionKind, presentation },
     owner: { ...input.owner },

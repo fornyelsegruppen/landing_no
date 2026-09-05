@@ -36,6 +36,7 @@ import {
   MessageDeliveryClassRequiredError,
   type MessageDeliveryClass,
 } from "./automation-recipient-policy";
+import { previewEmailSubject } from "./preview-email-recipient-policy";
 
 export const manualQuestionReplyPlaceholder =
   "Skriv et kontrollert svar til kunden her før utsending.";
@@ -709,8 +710,9 @@ async function deliverMessageUnlocked(
     if (deliveryClass === "automation") {
       assertControlledPilotAutomationRecipientAllowed(deliveryEmail);
     }
+    let messageForFinalUpdate = message;
     if (paymentInvoiceId !== null) {
-      await assertAndClaimPaymentReminderSend(
+      messageForFinalUpdate = await assertAndClaimPaymentReminderSend(
         payload,
         message,
         paymentInvoiceId,
@@ -720,15 +722,16 @@ async function deliverMessageUnlocked(
     if (deliveryClass === "automation") {
       assertControlledPilotAutomationRecipientAllowed(deliveryEmail);
     }
+    const deliveredSubject = previewEmailSubject(message.subject);
     const result = await provider.send({
       template: message.category,
       to: deliveryEmail,
-      subject: message.subject,
+      subject: deliveredSubject,
       text: message.bodyText,
       html:
         message.bodyHtml ||
         buildBrandedEmailHtml({
-          subject: message.subject,
+          subject: deliveredSubject,
           text: message.bodyText,
           secureLinkLabel: secureCustomerLinkLabel(message.category),
         }),
@@ -743,10 +746,10 @@ async function deliverMessageUnlocked(
       ...(attachments.length ? { attachments } : {}),
     });
     const analysis =
-      message.aiAnalysis &&
-      typeof message.aiAnalysis === "object" &&
-      !Array.isArray(message.aiAnalysis)
-        ? (message.aiAnalysis as Record<string, unknown> & {
+      messageForFinalUpdate.aiAnalysis &&
+      typeof messageForFinalUpdate.aiAnalysis === "object" &&
+      !Array.isArray(messageForFinalUpdate.aiAnalysis)
+        ? (messageForFinalUpdate.aiAnalysis as Record<string, unknown> & {
             alternativeQuoteId?: number;
             cancellationDecision?: string;
             recommendedNextAction?: string;
@@ -754,7 +757,9 @@ async function deliverMessageUnlocked(
             officialInvoiceId?: number;
           })
         : {};
-    const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
+    const replyContext = customerReplyContextFromAnalysis(
+      messageForFinalUpdate.aiAnalysis,
+    );
     const isCustomerQuestionReply =
       replyContext?.purpose === "question" ||
       analysis.manualQuestionReply === true;
@@ -763,11 +768,8 @@ async function deliverMessageUnlocked(
       id: message.id,
       overrideAccess: true,
       data: {
-        ...(isCustomerQuestionReply
-          ? {
-              aiAnalysis: { ...analysis, deliveryRecipient: deliveryEmail },
-            }
-          : {}),
+        aiAnalysis: { ...analysis, deliveryRecipient: deliveryEmail },
+        subject: deliveredSubject,
         status: "sent",
         sentAt: result.acceptedAt,
         provider: result.provider,

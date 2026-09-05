@@ -384,7 +384,7 @@ export function PlatformHealthPanel({
         }
       >
         <header className="max-w-3xl">
-          <p className="text-xs font-bold tracking-[.18em] text-[var(--an-warning)] uppercase">
+          <p className="text-xs font-bold tracking-[.18em] text-[var(--an-amber)] uppercase">
             {t.productionEyebrow}
           </p>
           <h2 className="mt-2 text-2xl font-bold" id="production-release-title">

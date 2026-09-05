@@ -12,6 +12,7 @@ import {
   type PanelLocale,
 } from "@/lib/panel-i18n";
 import { adminAccessDecision } from "@/lib/admin-v2/access";
+import { adminNextPreviewWorkQueueEntry } from "@/lib/admin-next/work-queue-navigation";
 import { panelLanguagePreferenceCookie } from "@/lib/panel-language-preference";
 
 export type InternalUser = {
@@ -59,10 +60,27 @@ export async function requireInternalUser() {
   return user;
 }
 
-export async function requireAdminUser() {
+export function adminLoginHref(
+  input: {
+    environment?: Pick<NodeJS.ProcessEnv, "VERCEL_ENV">;
+    returnTo?: string;
+  } = {},
+) {
+  const environment = input.environment ?? process.env;
+  const returnTo =
+    environment.VERCEL_ENV === "preview" &&
+    input.returnTo === adminNextPreviewWorkQueueEntry
+      ? adminNextPreviewWorkQueueEntry
+      : "/admin-v2";
+  return `/admin/login?redirect=${encodeURIComponent(returnTo)}`;
+}
+
+export async function requireAdminUser(options?: { loginReturnTo?: string }) {
   const user = await getInternalUser();
   const decision = adminAccessDecision(user);
-  if (decision === "login") redirect("/admin/login?redirect=%2Fadmin-v2");
+  if (decision === "login") {
+    redirect(adminLoginHref({ returnTo: options?.loginReturnTo }));
+  }
   if (decision === "worker-portal") redirect("/user");
   if (!user) throw new Error("Unreachable admin access state");
   return user;

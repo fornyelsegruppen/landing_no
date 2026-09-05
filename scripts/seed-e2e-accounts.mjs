@@ -1,10 +1,13 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { assertE2EAccountSeedEnvironment } from "./seed-e2e-accounts-safety.mjs";
 
-if (process.env.E2E_SEED_ALLOWED !== "true") {
-  throw new Error("Refusing to seed browser-test accounts without E2E_SEED_ALLOWED=true");
-}
+assertE2EAccountSeedEnvironment(process.env);
+
+// One-shot Preview account setup must never invoke the development schema-push
+// path. The target schema is migrated separately before this script runs.
+process.env.NODE_ENV = "production";
 
 const accounts = [
   {

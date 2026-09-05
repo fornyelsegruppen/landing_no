@@ -1,6 +1,10 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { Resend } from "resend";
+import {
+  assertPreviewEmailRecipientsAllowed,
+  previewEmailSubject,
+} from "@/lib/messages/preview-email-recipient-policy";
 import { getPayload } from "@/lib/payload";
 import { siteConfig } from "@/lib/site";
 import { makeLeadPhotoToken } from "@/lib/lead-photo-token";
@@ -385,11 +389,14 @@ export async function POST(request: Request) {
           });
         }
 
+        const notificationRecipient =
+          process.env.LEAD_TO_EMAIL || siteConfig.email;
+        assertPreviewEmailRecipientsAllowed({ to: notificationRecipient });
         await resend.emails.send({
           from: process.env.LEAD_FROM_EMAIL || "leads@takfornyelse.as",
-          to: process.env.LEAD_TO_EMAIL || siteConfig.email,
+          to: notificationRecipient,
           ...(email ? { replyTo: email } : {}),
-          subject: buildLeadEmailSubject(emailPayload),
+          subject: previewEmailSubject(buildLeadEmailSubject(emailPayload)),
           text: buildLeadEmailText(emailPayload),
           html: buildLeadEmailHtml(emailPayload),
           ...(attachments ? { attachments } : {}),

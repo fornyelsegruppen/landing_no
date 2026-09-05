@@ -93,6 +93,11 @@ function stableCaseId(item: AdminCaseListItem) {
   return `case:${item.id}`;
 }
 
+function canonicalCustomerName(item: AdminCaseListItem) {
+  const value = item.customer.trim();
+  return value && value !== `#${item.id}` ? value : null;
+}
+
 function exactTarget(
   row: AdminCaseListWorkQueueRow,
   caseId: string,
@@ -206,7 +211,9 @@ function projectRow(
   return createWorkQueueItem(
     {
       case: {
+        customerName: canonicalCustomerName(row.item),
         id: caseId,
+        postalAddress: row.item.postalAddress,
         revision: row.caseRevision,
         reference: `TF-${row.item.id}`,
         href: row.item.href,
@@ -233,7 +240,11 @@ function projectRow(
 
 function itemFingerprint(item: WorkQueueItem) {
   return JSON.stringify({
-    revision: item.case.revision,
+    case: {
+      customerName: item.case.customerName,
+      postalAddress: item.case.postalAddress,
+      revision: item.case.revision,
+    },
     kind: item.action.kind,
     owner: item.owner,
     timing: item.timing,

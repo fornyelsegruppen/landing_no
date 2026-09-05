@@ -5,6 +5,7 @@ import { deliverMessage } from "@/lib/messages/message-engine";
 import { assertControlledPilotAutomationRecipientAllowed } from "@/lib/messages/automation-recipient-policy";
 import { createEmailProvider } from "@/lib/providers/email-provider";
 import { siteConfig } from "@/lib/site";
+import { brandPreviewNonbindingEmail } from "@/lib/platform/preview-nonbinding-documents";
 import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import {
   issueQuoteAccessToken,
@@ -127,6 +128,10 @@ export async function processQuoteFollowUpJob(
     ),
   );
   const text = `Hei ${lead.name},\n\nDette er en vennlig påminnelse om tilbud ${quote.reference}. Tilbudet er fortsatt gyldig i ${days} dag${days === 1 ? "" : "er"}.\n\nÅpne den aktuelle versjonen her:\n${url}\n\nDu kan godta, stille spørsmål eller avslå direkte på siden. Vi sender ikke flere enn to automatiske påminnelser.\n\nVennlig hilsen\nTakfornyelse\n${siteConfig.phone}`;
+  const email = brandPreviewNonbindingEmail({
+    subject: `Påminnelse om tilbud ${quote.reference}`,
+    bodyText: text,
+  });
   const message =
     existing.docs[0] ||
     (await payload.create({
@@ -137,8 +142,8 @@ export async function processQuoteFollowUpJob(
         direction: "outbound",
         category: "reminder",
         channel: "email",
-        subject: `Påminnelse om tilbud ${quote.reference}`,
-        bodyText: text,
+        subject: email.subject,
+        bodyText: email.bodyText,
         status: "approved",
         idempotencyKey,
         aiAssisted: false,

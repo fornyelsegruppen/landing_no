@@ -3,13 +3,14 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  ChevronDown,
   FileCheck2,
   Inbox,
   LoaderCircle,
   MessageSquareText,
   Send,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AdminNextCaseCommunication,
   AdminNextCaseCommunicationPage,
@@ -19,6 +20,9 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 type CommunicationCopy = {
   allLoaded: string;
   attachments: string;
+  categoryLabels: Readonly<Record<string, string>>;
+  channelLabels: Readonly<Record<string, string>>;
+  customerPortal: string;
   deliveredAt: string;
   empty: string;
   inbound: string;
@@ -26,10 +30,20 @@ type CommunicationCopy = {
   loadingOlder: string;
   of: string;
   openThread: string;
+  otherCategory: string;
+  otherChannel: string;
+  otherStatus: string;
   outbound: string;
+  rawCategory: string;
+  rawChannel: string;
+  rawDirection: string;
+  rawStatus: string;
+  recordId: string;
   replyTo: string;
   sentAt: string;
   showOlder: string;
+  statusLabels: Readonly<Record<string, string>>;
+  technicalDetails: string;
   title: string;
 };
 
@@ -146,10 +160,33 @@ function deliveryStatusLabel(
   return fallback;
 }
 
+function communicationStatusLabel(copy: CommunicationCopy, status: string) {
+  return copy.statusLabels[status] || copy.otherStatus;
+}
+
+function communicationCategoryLabel(copy: CommunicationCopy, category: string) {
+  return copy.categoryLabels[category] || copy.otherCategory;
+}
+
+function communicationChannelLabel(
+  copy: CommunicationCopy,
+  message: AdminNextCaseCommunication,
+) {
+  if (
+    message.direction === "inbound" &&
+    message.category === "customer_question"
+  ) {
+    return copy.customerPortal;
+  }
+  return copy.channelLabels[message.channel] || copy.otherChannel;
+}
+
 function DeliveryJourney({
+  copy,
   locale,
   message,
 }: {
+  copy: CommunicationCopy;
   locale: PanelLocale;
   message: AdminNextCaseCommunication;
 }) {
@@ -189,7 +226,11 @@ function DeliveryJourney({
         >
           <span className="group-open:hidden">{labels.show} · </span>
           <span className="hidden group-open:inline">{labels.hide} · </span>
-          {deliveryStatusLabel(locale, message.status, message.status)}
+          {deliveryStatusLabel(
+            locale,
+            message.status,
+            communicationStatusLabel(copy, message.status),
+          )}
         </span>
       </summary>
       <div className="border-t border-[var(--an-border)] p-3">
@@ -249,8 +290,12 @@ function DeliveryJourney({
           <div className="mt-3 rounded-lg border border-[var(--an-border)] bg-[var(--an-elevated)] p-3 text-xs text-[var(--an-muted)]">
             <strong className="text-[var(--an-text)]">
               {labels.manualRecovery}
-              {recovery.status ? ` · ${recovery.status}` : ""}
-              {recovery.channel ? ` · ${recovery.channel}` : ""}
+              {recovery.status
+                ? ` · ${communicationStatusLabel(copy, recovery.status)}`
+                : ""}
+              {recovery.channel
+                ? ` · ${copy.channelLabels[recovery.channel] || copy.otherChannel}`
+                : ""}
             </strong>
             <ul className="mt-2 space-y-1">
               {recovery.preparedAt ? (
@@ -298,6 +343,20 @@ export function AdminNextCaseCommunications({
     },
   );
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const focusCompletion = useRef(false);
+  const completionStatus = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (
+      state !== "idle" ||
+      pageInfo.remainingCount !== 0 ||
+      !focusCompletion.current
+    ) {
+      return;
+    }
+    focusCompletion.current = false;
+    completionStatus.current?.focus();
+  }, [pageInfo.remainingCount, state]);
 
   async function loadOlder() {
     if (state === "loading" || !pageInfo.loadMoreHref || !pageInfo.nextCursor) {
@@ -320,6 +379,7 @@ export function AdminNextCaseCommunications({
           ...body.items.filter((item) => !known.has(item.id)),
         ];
       });
+      focusCompletion.current = body.pageInfo.remainingCount === 0;
       setPageInfo(body.pageInfo);
       setState("idle");
     } catch {
@@ -340,19 +400,19 @@ export function AdminNextCaseCommunications({
         {copy.title} · {items.length} {copy.of} {pageInfo.totalCount}
       </h3>
       {items.length ? (
-        <ol
-          className="mt-3 max-h-[42rem] space-y-3 overflow-auto pr-1"
-          data-customer-communications
-        >
+        <ol className="mt-3 space-y-3" data-customer-communications>
           {items.map((message) => {
             const DirectionIcon =
               message.direction === "inbound" ? Inbox : Send;
             return (
               <li key={message.id}>
-                <article className="an-elevated rounded-2xl border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-xs font-bold text-[var(--an-amber)]">
+                <details
+                  className="an-elevated group rounded-2xl border"
+                  data-customer-message
+                >
+                  <summary className="flex min-h-16 cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 text-xs font-bold text-[var(--an-amber)]">
                         <DirectionIcon
                           aria-hidden="true"
                           className="size-4 shrink-0"
@@ -360,85 +420,142 @@ export function AdminNextCaseCommunications({
                         {message.direction === "inbound"
                           ? copy.inbound
                           : copy.outbound}
-                      </p>
-                      <h4 className="mt-2 text-sm font-bold break-words text-[var(--an-text)]">
+                      </span>
+                      <strong className="mt-1.5 block text-sm break-words text-[var(--an-text)]">
                         {message.subject}
-                      </h4>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
-                      {message.status}
+                      </strong>
+                      <small className="mt-1 block text-[11px] text-[var(--an-subtle)]">
+                        {communicationChannelLabel(copy, message)} ·{" "}
+                        {communicationCategoryLabel(copy, message.category)} ·{" "}
+                        {timestamp(locale, message.at)}
+                      </small>
                     </span>
-                  </div>
-                  <p className="mt-2 text-[11px] text-[var(--an-subtle)]">
-                    {message.channel} · {message.category} ·{" "}
-                    {timestamp(locale, message.at)}
-                  </p>
-                  <p className="mt-3 max-h-40 overflow-auto rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
-                    {message.bodyText || "—"}
-                  </p>
-                  {message.attachments.length ? (
-                    <div className="mt-3">
-                      <p className="text-[10px] font-bold tracking-wider text-[var(--an-subtle)] uppercase">
-                        {copy.attachments} · {message.attachments.length}
-                      </p>
-                      <ul className="mt-2 flex flex-wrap gap-2">
-                        {message.attachments.map((item) => (
-                          <li key={item.id}>
-                            <Link
-                              className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-[var(--an-border)] bg-[var(--an-surface)] px-2 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)] hover:text-[var(--an-amber)]"
-                              href={item.href}
-                              target="_blank"
-                            >
-                              <FileCheck2
-                                aria-hidden="true"
-                                className="size-3.5 shrink-0"
-                              />
-                              <span className="truncate">{item.filename}</span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  <DeliveryJourney locale={locale} message={message} />
-                  <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-                    <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
-                      {message.sentAt ? (
-                        <div>
-                          <dt className="inline font-bold">{copy.sentAt}: </dt>
-                          <dd className="inline">
-                            {timestamp(locale, message.sentAt)}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {message.deliveredAt ? (
+                    <span className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--an-border)] bg-[var(--an-surface)] px-2 py-1 text-[10px] font-bold text-[var(--an-muted)]">
+                      {communicationStatusLabel(copy, message.status)}
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="size-3.5 transition-transform group-open:rotate-180"
+                      />
+                    </span>
+                  </summary>
+                  <div className="border-t border-[var(--an-border)] p-4">
+                    <p className="rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-3 text-sm leading-6 break-words whitespace-pre-wrap text-[var(--an-muted)]">
+                      {message.bodyText || "—"}
+                    </p>
+                    {message.attachments.length ? (
+                      <div className="mt-3">
+                        <p className="text-[10px] font-bold tracking-wider text-[var(--an-subtle)] uppercase">
+                          {copy.attachments} · {message.attachments.length}
+                        </p>
+                        <ul className="mt-2 flex flex-wrap gap-2">
+                          {message.attachments.map((item) => (
+                            <li key={item.id}>
+                              <Link
+                                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-lg border border-[var(--an-border)] bg-[var(--an-surface)] px-2 text-xs font-bold text-[var(--an-text)] hover:border-[var(--an-amber)] hover:text-[var(--an-amber)]"
+                                href={item.href}
+                                target="_blank"
+                              >
+                                <FileCheck2
+                                  aria-hidden="true"
+                                  className="size-3.5 shrink-0"
+                                />
+                                <span className="truncate">
+                                  {item.filename}
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <DeliveryJourney
+                      copy={copy}
+                      locale={locale}
+                      message={message}
+                    />
+                    <details
+                      className="mt-3 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] px-3 py-2 text-[11px] text-[var(--an-subtle)]"
+                      data-message-technical-diagnostics
+                    >
+                      <summary className="min-h-8 cursor-pointer font-bold text-[var(--an-text)]">
+                        {copy.technicalDetails}
+                      </summary>
+                      <dl className="mt-2 grid gap-1 sm:grid-cols-2">
                         <div>
                           <dt className="inline font-bold">
-                            {copy.deliveredAt}:{" "}
+                            {copy.recordId}:{" "}
                           </dt>
-                          <dd className="inline">
-                            {timestamp(locale, message.deliveredAt)}
-                          </dd>
+                          <dd className="inline break-all">{message.id}</dd>
                         </div>
-                      ) : null}
-                      {message.replyToMessageId ? (
                         <div>
-                          <dt className="inline font-bold">{copy.replyTo}: </dt>
-                          <dd className="inline">
-                            #{message.replyToMessageId}
-                          </dd>
+                          <dt className="inline font-bold">
+                            {copy.rawDirection}:{" "}
+                          </dt>
+                          <dd className="inline">{message.direction}</dd>
                         </div>
-                      ) : null}
-                    </dl>
-                    <Link
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
-                      href={message.fallbackHref}
-                    >
-                      {copy.openThread}
-                      <ArrowRight aria-hidden="true" className="size-3.5" />
-                    </Link>
+                        <div>
+                          <dt className="inline font-bold">
+                            {copy.rawChannel}:{" "}
+                          </dt>
+                          <dd className="inline">{message.channel}</dd>
+                        </div>
+                        <div>
+                          <dt className="inline font-bold">
+                            {copy.rawCategory}:{" "}
+                          </dt>
+                          <dd className="inline">{message.category}</dd>
+                        </div>
+                        <div>
+                          <dt className="inline font-bold">
+                            {copy.rawStatus}:{" "}
+                          </dt>
+                          <dd className="inline">{message.status}</dd>
+                        </div>
+                        {message.replyToMessageId ? (
+                          <div>
+                            <dt className="inline font-bold">
+                              {copy.replyTo}:{" "}
+                            </dt>
+                            <dd className="inline">
+                              #{message.replyToMessageId}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </details>
+                    <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                      <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--an-subtle)]">
+                        {message.sentAt ? (
+                          <div>
+                            <dt className="inline font-bold">
+                              {copy.sentAt}:{" "}
+                            </dt>
+                            <dd className="inline">
+                              {timestamp(locale, message.sentAt)}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {message.deliveredAt ? (
+                          <div>
+                            <dt className="inline font-bold">
+                              {copy.deliveredAt}:{" "}
+                            </dt>
+                            <dd className="inline">
+                              {timestamp(locale, message.deliveredAt)}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                      <Link
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-bold text-[var(--an-amber)] hover:bg-[var(--an-amber-soft)]"
+                        href={message.fallbackHref}
+                      >
+                        {copy.openThread}
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </Link>
+                    </div>
                   </div>
-                </article>
+                </details>
               </li>
             );
           })}
@@ -480,8 +597,12 @@ export function AdminNextCaseCommunications({
         </div>
       ) : items.length ? (
         <p
+          aria-live="polite"
           className="mt-3 text-center text-xs text-[var(--an-subtle)]"
           data-communication-history-complete
+          ref={completionStatus}
+          role="status"
+          tabIndex={-1}
         >
           {copy.allLoaded} · {items.length} {copy.of} {pageInfo.totalCount}
         </p>

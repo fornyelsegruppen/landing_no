@@ -1,3 +1,5 @@
+import { resolveContractTermsApproval } from "./contract-terms-approval";
+
 export const featureFlagNames = [
   "aiDrafts",
   "roofMeasurement",
@@ -106,6 +108,7 @@ export function readIntegrationStatus(
     configured(environment, "GOOGLE_SEARCH_CONSOLE_CREDENTIALS") ||
     configured(environment, "SEO_IMPORT_BUCKET");
   const cronReady = configured(environment, "CRON_SECRET");
+  const termsApproval = resolveContractTermsApproval(environment);
 
   return {
     ai: {
@@ -178,13 +181,9 @@ export function readIntegrationStatus(
     },
     legal: {
       name: "legal",
-      readiness: configured(environment, "LEGAL_REVIEW_REFERENCE")
-        ? "ready"
-        : "configuration_required",
-      provider: "approved-contract-terms",
-      missing: configured(environment, "LEGAL_REVIEW_REFERENCE")
-        ? []
-        : ["LEGAL_REVIEW_REFERENCE"],
+      readiness: termsApproval ? "ready" : "configuration_required",
+      provider: termsApproval?.provider || "approved-contract-terms",
+      missing: termsApproval ? [] : ["LEGAL_REVIEW_REFERENCE"],
     },
     searchData: {
       name: "searchData",

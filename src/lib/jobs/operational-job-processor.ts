@@ -19,6 +19,7 @@ import {
   messageDeliveryClass,
   MessageDeliveryClassRequiredError,
 } from "@/lib/messages/automation-recipient-policy";
+import { PreviewEmailRecipientBlockedError } from "@/lib/messages/preview-email-recipient-policy";
 import { featureReadiness } from "@/lib/platform/features";
 import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
@@ -467,6 +468,7 @@ export async function processOperationalJobs(
       const exhausted =
         error instanceof ChannelUnavailableError ||
         error instanceof AutomaticRecipientBlockedError ||
+        error instanceof PreviewEmailRecipientBlockedError ||
         error instanceof MessageDeliveryClassRequiredError ||
         attempts >= (job.maxAttempts || 3) ||
         /requires configuration|daily request limit/i.test(

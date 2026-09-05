@@ -115,6 +115,7 @@ describe("Admin Next canonical Case route", () => {
       mocks.authorization,
     );
     expect(mocks.createCanonical).toHaveBeenCalledWith(mocks.payload, "lt", {
+      grantedCapabilities: ["case.read"],
       viewerRole: "admin",
       rfReview: { reader: mocks.adminRfReader, user: admin },
     });
@@ -129,6 +130,57 @@ describe("Admin Next canonical Case route", () => {
     expect(html).not.toMatch(/Demo ·|TF-1042/u);
   });
 
+  it("passes only ready Preview E2E action capabilities to the Case adapter", async () => {
+    vi.stubEnv("PREVIEW_E2E_OPERATOR_ACCESS", "true");
+    vi.stubEnv("FEATURE_AI_DRAFTS", "true");
+    vi.stubEnv("GEMINI_API_KEY", "preview-gemini");
+
+    await AdminNextCaseWorkspacePage({
+      params: Promise.resolve({ caseId: "TF-13" }),
+    });
+
+    expect(mocks.createCanonical).toHaveBeenCalledWith(mocks.payload, "lt", {
+      grantedCapabilities: [
+        "case.read",
+        "case.reply.prepare",
+        "case.question.reply.prepare",
+      ],
+      viewerRole: "admin",
+      rfReview: { reader: mocks.adminRfReader, user: admin },
+    });
+  });
+
+  it("preserves an allowlisted queue return path for the same selected case", async () => {
+    const returnTo =
+      "/admin-next-preview/work?view=today&queue=mine&stage=evidence&action=prepare_package&ownerId=user%3A7&limit=10&selected=case%3A13#work-queue-detail";
+    const element = await AdminNextCaseWorkspacePage({
+      params: Promise.resolve({ caseId: "TF-13" }),
+      searchParams: Promise.resolve({ returnTo }),
+    });
+
+    expect(element.props.returnTo).toBe(returnTo);
+    expect(renderToStaticMarkup(element)).toContain(
+      'href="/admin-next-preview/work?view=today&amp;queue=mine&amp;stage=evidence&amp;action=prepare_package&amp;ownerId=user%3A7&amp;limit=10&amp;selected=case%3A13#work-queue-detail"',
+    );
+  });
+
+  it.each([
+    ["external", "https://evil.example/admin-next-preview/work"],
+    [
+      "another case",
+      "/admin-next-preview/work?view=today&queue=all&limit=25&selected=case%3A14#work-queue-detail",
+    ],
+  ])("fails closed to the ONE UI entry for an %s return path", async (_label, returnTo) => {
+    const element = await AdminNextCaseWorkspacePage({
+      params: Promise.resolve({ caseId: "TF-13" }),
+      searchParams: Promise.resolve({ returnTo }),
+    });
+
+    expect(element.props.returnTo).toBe(
+      "/admin-next-preview/work?view=today&queue=all&limit=25",
+    );
+  });
+
   it("does not call a canonical adapter when the server read role gate denies access", async () => {
     mocks.requireAdminUser.mockResolvedValue({ ...admin, role: "worker" });
 
@@ -139,6 +191,7 @@ describe("Admin Next canonical Case route", () => {
     ).rejects.toThrow("redirect:/admin-v2/cases");
 
     expect(mocks.createCanonical).toHaveBeenCalledWith(mocks.payload, "lt", {
+      grantedCapabilities: [],
       viewerRole: "worker",
       rfReview: undefined,
     });
@@ -154,6 +207,7 @@ describe("Admin Next canonical Case route", () => {
     });
 
     expect(mocks.createCanonical).toHaveBeenCalledWith(mocks.payload, "lt", {
+      grantedCapabilities: ["case.read"],
       viewerRole: "admin",
       rfReview: undefined,
     });
@@ -199,7 +253,9 @@ describe("Admin Next canonical Case route", () => {
       );
       expect(html).toContain(message);
       expect(html).toContain(recovery);
-      expect(html).toContain('href="/admin-v2/cases"');
+      expect(html).toContain(
+        'href="/admin-next-preview/work?view=today&amp;queue=all&amp;limit=25"',
+      );
       expect(html).not.toMatch(
         /Kari Nordmann|kari@example\.invalid|Demo ·|TF-1042/u,
       );

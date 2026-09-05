@@ -481,6 +481,41 @@ describe("message engine", () => {
       "customer_initiated",
     );
     expect(recipients).toEqual(["confirmed@example.no"]);
+    expect(state.messages[0]).toMatchObject({
+      aiAnalysis: { deliveryRecipient: "confirmed@example.no" },
+    });
+  });
+
+  it("persists the exact Preview subject that the provider receives", async () => {
+    const previousVercelEnvironment = process.env.VERCEL_ENV;
+    process.env.VERCEL_ENV = "preview";
+    try {
+      const state = repository();
+      await createReceiptMessage(state.payload, 1, "preview-subject");
+      const subjects: string[] = [];
+      await deliverMessage(
+        state.payload,
+        {
+          health: () => ({ status: "ready", provider: "test" }),
+          send: async (message) => {
+            subjects.push(message.subject);
+            return {
+              acceptedAt: new Date().toISOString(),
+              provider: "test",
+              providerMessageId: "delivery-preview",
+            };
+          },
+        },
+        1,
+        "preview-subject",
+        "customer_initiated",
+      );
+      expect(subjects[0]).toMatch(/^\[PREVIEW TEST\] /u);
+      expect(state.messages[0]?.subject).toBe(subjects[0]);
+    } finally {
+      if (previousVercelEnvironment === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = previousVercelEnvironment;
+    }
   });
 
   it("rechecks the current automation recipient immediately before provider send", async () => {

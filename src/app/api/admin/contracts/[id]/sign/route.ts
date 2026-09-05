@@ -9,6 +9,7 @@ import {
 import { captureException } from "@/lib/monitoring";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { getPayload } from "@/lib/payload";
+import { siteConfig } from "@/lib/site";
 import { resolvePayloadSecret } from "@/lib/payload-secret";
 import {
   createPrivateMedia,
@@ -17,6 +18,7 @@ import {
 import { readPrivateMediaContent } from "@/lib/private-media-content";
 import { extractSignaturePngFromPdf } from "@/lib/pdf/extract-signature";
 import { createEmailProvider } from "@/lib/providers/email-provider";
+import { brandPreviewNonbindingEmail } from "@/lib/platform/preview-nonbinding-documents";
 import { clientIp } from "@/lib/rate-limit";
 import {
   createCompanySignatureEvidence,
@@ -272,10 +274,12 @@ export async function POST(
         new Date(Date.now() + 180 * 24 * 60 * 60_000).toISOString(),
         { purpose: "signed-contract-customer-portal", contractId: contract.id },
       );
-      const siteUrl = (
-        process.env.NEXT_PUBLIC_SITE_URL || "https://www.takfornyelse.as"
-      ).replace(/\/$/, "");
+      const siteUrl = siteConfig.url.replace(/\/$/u, "");
       const customerPortalUrl = `${siteUrl}/tilbud/${encodeURIComponent(access.token)}`;
+      const finalContractEmail = brandPreviewNonbindingEmail({
+        subject: `Endelig signert kontrakt ${contract.reference}`,
+        bodyText: `Hei ${snapshot.customer.name},\n\nKontrakten ${contract.reference} er nå signert av både deg og Takfornyelse. Den endelige kontrakten er vedlagt. Vi følger opp med avtalt eller planlagt oppstart.\n\nAdministrer avtalen, still spørsmål eller send en angre-/endringsmelding via din sikre kundelenke:\n${customerPortalUrl}\n\nVennlig hilsen\nTakfornyelse\n${snapshot.supplier.phone}`,
+      });
       const message = await payload.create({
         collection: "messages",
         overrideAccess: true,
@@ -284,8 +288,8 @@ export async function POST(
           direction: "outbound",
           category: "contract",
           channel: "email",
-          subject: `Endelig signert kontrakt ${contract.reference}`,
-          bodyText: `Hei ${snapshot.customer.name},\n\nKontrakten ${contract.reference} er nå signert av både deg og Takfornyelse. Den endelige kontrakten er vedlagt. Vi følger opp med avtalt eller planlagt oppstart.\n\nAdministrer avtalen, still spørsmål eller send en angre-/endringsmelding via din sikre kundelenke:\n${customerPortalUrl}\n\nVennlig hilsen\nTakfornyelse\n${snapshot.supplier.phone}`,
+          subject: finalContractEmail.subject,
+          bodyText: finalContractEmail.bodyText,
           attachments: [finalDocumentMedia.id],
           status: "queued",
           idempotencyKey: key,

@@ -92,6 +92,7 @@ async function embedLogo(document: PDFDocument): Promise<PDFImage | null> {
 export type BrandedPdf = Awaited<ReturnType<typeof createBrandedPdf>>;
 
 export async function createBrandedPdf(input: {
+  documentMarker?: string;
   title: string;
   subject: string;
 }) {
@@ -137,6 +138,30 @@ export async function createBrandedPdf(input: {
         size: 16,
         font: bold,
         color: rgb(0.94, 0.66, 0.08),
+      });
+    }
+    if (input.documentMarker) {
+      const marker = pdfSafe(input.documentMarker);
+      const markerSize = 7.4;
+      const markerPadding = 10;
+      const markerWidth =
+        bold.widthOfTextAtSize(marker, markerSize) + markerPadding * 2;
+      const markerX = A4.width - PDF_MARGIN - markerWidth;
+      target.drawRectangle({
+        x: markerX,
+        y: A4.height - 58,
+        width: markerWidth,
+        height: 25,
+        color: rgb(0.42, 0.08, 0.08),
+        borderColor: rgb(1, 0.72, 0.26),
+        borderWidth: 1.2,
+      });
+      target.drawText(marker, {
+        x: markerX + markerPadding,
+        y: A4.height - 49.5,
+        size: markerSize,
+        font: bold,
+        color: rgb(1, 0.91, 0.72),
       });
     }
   };

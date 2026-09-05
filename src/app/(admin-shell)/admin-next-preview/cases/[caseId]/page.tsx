@@ -3,12 +3,18 @@ import { notFound, redirect } from "next/navigation";
 import { AdminAsyncFeedback } from "@/components/admin-next/admin-async-feedback";
 import type { PayloadRequest } from "payload";
 import { AdminNextCaseWorkspace } from "@/components/admin-next/admin-next-case-workspace";
+import type { CaseNextActionCapability } from "@/lib/admin-v2/case-next-action-presentation";
 import { adminNextRoleHasReadCapability } from "@/lib/admin-next/capability-registry";
 import { loadAdminNextCaseWorkspace } from "@/lib/admin-next/case-workspace-contract";
 import { adminNextFixtureCaseWorkspaceAdapter } from "@/lib/admin-next/case-workspace-fixture";
 import { createAdminNextCanonicalCaseWorkspaceAdapter } from "@/lib/admin-next/case-read-adapter";
+import {
+  adminNextPreviewWorkQueueEntry,
+  safeAdminNextWorkQueueReturnTo,
+} from "@/lib/admin-next/work-queue-navigation";
 import { resolveAdminNextServerRead } from "@/lib/admin-next/server-read-resolver";
 import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
+import { resolvePreviewE2eOperatorCapabilities } from "@/lib/admin-next/preview-e2e-operator-capabilities";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
@@ -19,6 +25,9 @@ import {
 } from "@/lib/roof-fusion/preview-read-adapters-v1";
 
 type Params = Promise<{ caseId: string }>;
+type SearchParams = Promise<{
+  returnTo?: string | string[];
+}>;
 
 const loadErrorCopy = {
   nb: {
@@ -43,8 +52,10 @@ const loadErrorCopy = {
 
 function CaseWorkspaceLoadError({
   locale,
+  recoveryHref,
 }: {
   locale: keyof typeof loadErrorCopy;
+  recoveryHref: string;
 }) {
   const copy = loadErrorCopy[locale];
   return (
@@ -60,7 +71,7 @@ function CaseWorkspaceLoadError({
       />
       <Link
         className="inline-flex min-h-11 items-center rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface-base)] px-4 text-sm font-bold text-[var(--an-text-primary)]"
-        href="/admin-v2/cases"
+        href={recoveryHref}
       >
         {copy.recovery}
       </Link>
@@ -70,8 +81,10 @@ function CaseWorkspaceLoadError({
 
 export default async function AdminNextCaseWorkspacePage({
   params,
+  searchParams,
 }: {
   params: Params;
+  searchParams?: SearchParams;
 }) {
   const user = await requireAdminUser();
   const rollout = buildAdminNextRolloutView();
@@ -81,15 +94,34 @@ export default async function AdminNextCaseWorkspacePage({
     rollout,
     "roofWorkbench",
   );
+  const canReadCases = adminNextRoleHasReadCapability(user.role, "case.read");
+  const grantedCapabilities = canReadCases
+    ? [
+        ...new Set<CaseNextActionCapability>([
+          "case.read",
+          ...resolvePreviewE2eOperatorCapabilities({ role: user.role }),
+        ]),
+      ]
+    : [];
 
   const { caseId } = await params;
+  const rawReturnTo = (await searchParams)?.returnTo;
+  const expectedCaseReference = /^TF-[1-9]\d*$/u.test(caseId)
+    ? caseId
+    : /^[1-9]\d*$/u.test(caseId)
+      ? `TF-${caseId}`
+      : undefined;
+  const returnTo =
+    (typeof rawReturnTo === "string" && expectedCaseReference
+      ? safeAdminNextWorkQueueReturnTo(rawReturnTo, expectedCaseReference)
+      : null) ?? adminNextPreviewWorkQueueEntry;
   let canonical;
   if (process.env.VERCEL_ENV === "preview") {
     try {
       const payload = await getPayload();
       const rfReview =
         roofWorkbenchAccess.kind === "legacy_fallback" ||
-        !adminNextRoleHasReadCapability(user.role, "case.read")
+        !canReadCases
           ? undefined
           : {
               reader: new AdminRoofFusionPreviewReadAdapterV1(
@@ -101,10 +133,15 @@ export default async function AdminNextCaseWorkspacePage({
       canonical = createAdminNextCanonicalCaseWorkspaceAdapter(
         payload,
         user.interfaceLanguage,
-        { viewerRole: user.role, rfReview },
+        { viewerRole: user.role, grantedCapabilities, rfReview },
       );
     } catch {
-      return <CaseWorkspaceLoadError locale={user.interfaceLanguage} />;
+      return (
+        <CaseWorkspaceLoadError
+          locale={user.interfaceLanguage}
+          recoveryHref={returnTo}
+        />
+      );
     }
   }
   const selection = resolveAdminNextServerRead({
@@ -119,7 +156,12 @@ export default async function AdminNextCaseWorkspacePage({
   try {
     result = await loadAdminNextCaseWorkspace(selection.adapter, caseId);
   } catch {
-    return <CaseWorkspaceLoadError locale={user.interfaceLanguage} />;
+    return (
+      <CaseWorkspaceLoadError
+        locale={user.interfaceLanguage}
+        recoveryHref={returnTo}
+      />
+    );
   }
 
   if (result.status === "not_found") notFound();
@@ -127,12 +169,18 @@ export default async function AdminNextCaseWorkspacePage({
     (selection.kind === "canonical_read" && result.source !== "canonical") ||
     (selection.kind === "fixture_fallback" && result.source !== "fixture")
   ) {
-    return <CaseWorkspaceLoadError locale={user.interfaceLanguage} />;
+    return (
+      <CaseWorkspaceLoadError
+        locale={user.interfaceLanguage}
+        recoveryHref={returnTo}
+      />
+    );
   }
 
   return (
     <AdminNextCaseWorkspace
       locale={user.interfaceLanguage}
+      returnTo={returnTo}
       source={result.source}
       value={result.value}
     />

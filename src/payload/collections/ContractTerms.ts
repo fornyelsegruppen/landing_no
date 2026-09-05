@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
+import { resolveContractTermsApproval } from "@/lib/platform/contract-terms-approval";
 import { adminOnly, userIsAdmin } from "../access/roles";
 
 export const protectContractTerms: CollectionBeforeChangeHook = ({ data, originalDoc, operation, req }) => {
@@ -10,8 +11,9 @@ export const protectContractTerms: CollectionBeforeChangeHook = ({ data, origina
   }
   if (data.status === "approved" && originalDoc?.status !== "approved") {
     if (!userIsAdmin(req.user)) throw new Error("Only an active administrator may approve contract terms");
-    if (!process.env.LEGAL_REVIEW_REFERENCE?.trim()) throw new Error("LEGAL_REVIEW_REFERENCE is required before terms approval");
-    data.legalReviewReference = process.env.LEGAL_REVIEW_REFERENCE;
+    const approval = resolveContractTermsApproval(process.env);
+    if (!approval) throw new Error("LEGAL_REVIEW_REFERENCE is required before terms approval");
+    data.legalReviewReference = approval.reference;
     data.approvedBy = req.user?.id;
     data.approvedAt = new Date().toISOString();
   }

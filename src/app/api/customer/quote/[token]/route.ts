@@ -34,6 +34,7 @@ import {
   deletePrivateMedia,
 } from "@/lib/private-media-storage";
 import { createEmailProvider } from "@/lib/providers/email-provider";
+import { brandPreviewNonbindingEmail } from "@/lib/platform/preview-nonbinding-documents";
 import { updateCaseState } from "@/lib/cases/case-command";
 import {
   customerContractRequestSchema,
@@ -684,6 +685,10 @@ export async function POST(
       where: { idempotencyKey: { equals: key } },
     });
     if (!prior.docs[0]) {
+      const confirmationEmail = brandPreviewNonbindingEmail({
+        subject: `Vi har mottatt signaturen din – ${view.contractReference}`,
+        bodyText: `Takk. Vi har mottatt signaturen din på kontrakt ${view.contractReference}. Kundesignert kopi og angrerettskjema er vedlagt. Takfornyelse kontrollerer og medsignerer nå avtalen. Når det er gjort, sender vi deg den endelige kontrakten signert av begge parter og følger opp planlagt oppstart.`,
+      });
       const message = await payload.create({
         collection: "messages",
         overrideAccess: true,
@@ -692,8 +697,8 @@ export async function POST(
           direction: "outbound",
           category: "contract",
           channel: "email",
-          subject: `Vi har mottatt signaturen din – ${view.contractReference}`,
-          bodyText: `Takk. Vi har mottatt signaturen din på kontrakt ${view.contractReference}. Kundesignert kopi og angrerettskjema er vedlagt. Takfornyelse kontrollerer og medsignerer nå avtalen. Når det er gjort, sender vi deg den endelige kontrakten signert av begge parter og følger opp planlagt oppstart.`,
+          subject: confirmationEmail.subject,
+          bodyText: confirmationEmail.bodyText,
           attachments: [media.id],
           status: "queued",
           idempotencyKey: key,

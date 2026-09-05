@@ -58,19 +58,41 @@ function query(value = "view=today&queue=all&limit=25") {
 function canonicalPage(
   currentQuery: CanonicalWorkQueueQuery,
   nextCursor: WorkQueueCursor | null = null,
+  actionKind:
+    | "approve_package"
+    | "approve_message"
+    | "company_sign_contract"
+    | "generate_reply"
+    | "prepare_package"
+    | "retry_message" = "generate_reply",
+  capabilityGranted = false,
 ) {
   const item = createWorkQueueItem(
     {
-      actionKind: "generate_reply",
-      blockers: [],
-      capabilityGranted: false,
+      actionKind,
+      blockers:
+        actionKind === "retry_message"
+          ? [
+              {
+                code: "MESSAGE_DELIVERY_FAILED",
+                owner: { id: "user:7", party: "administrator" },
+                resolution: "Retry the reviewed Preview message.",
+                source: { id: "message:13", type: "message" },
+              },
+            ]
+          : [],
+      capabilityGranted,
       case: {
+        customerName: "Kari Nordmann",
         href: "/admin-v2/cases/13",
         id: "case:13",
+        postalAddress: "Testveien 13, 0001 Oslo",
         reference: "TF-13",
         revision: 4,
       },
-      interaction: { mode: "read_only", reason: "capability_denied" },
+      interaction: capabilityGranted
+        ? { mode: "executable", activation: { kind: "open_workbench" } }
+        : { mode: "read_only", reason: "capability_denied" },
       locale: "lt",
       owner: { id: "user:7", party: "administrator" },
       sourceTruth: {
@@ -80,9 +102,23 @@ function canonicalPage(
         resolver: "deriveCaseNextAction",
       },
       target: {
-        entity: "case",
+        entity:
+          actionKind === "approve_package"
+            ? "commercial_package"
+            : actionKind === "approve_message" || actionKind === "retry_message"
+              ? "message"
+              : actionKind === "company_sign_contract"
+                ? "contract"
+                : "case",
         href: "/admin-v2/cases/13",
-        id: "case:13",
+        id:
+          actionKind === "approve_package"
+            ? "package:13"
+            : actionKind === "approve_message" || actionKind === "retry_message"
+              ? "message:13"
+              : actionKind === "company_sign_contract"
+                ? "contract:13"
+                : "case:13",
         version: "r4",
       },
       timing: { dueAt: "2026-09-04T12:00:00.000Z", wakeAt: null },
@@ -146,11 +182,154 @@ describe("Admin Next Preview Work Queue route", () => {
     );
     expect(mocks.adapterLoad).toHaveBeenCalledWith(query());
     expect(element.props).toMatchObject({
-      filterOwners: [{ id: "user:7", label: "Administratorius · user:7" }],
+      filterOwners: [{ id: "user:7", label: "Administratorius" }],
       source: "canonical",
     });
-    expect(html).toContain("Apsaugota Preview · canonical duomenys");
+    expect(html).toContain(
+      "Apsaugota Preview · tiesioginiai bylų duomenys · eilė tik skaito",
+    );
     expect(html).not.toMatch(/Demo ·|sintetiniai duomenys|Kari Nilsen|Marius/u);
+    expect(html).not.toContain('data-work-queue-action="exact-deep-link"');
+  });
+
+  it("projects ready Preview E2E capabilities without bypassing the target route", async () => {
+    vi.stubEnv("PREVIEW_E2E_OPERATOR_ACCESS", "true");
+    vi.stubEnv("FEATURE_CUSTOMER_QUOTES", "true");
+    vi.stubEnv("FEATURE_ROOF_MEASUREMENT", "true");
+    vi.stubEnv("LEGAL_REVIEW_REFERENCE", "LEGAL-PREVIEW-1");
+    vi.stubEnv("RESEND_API_KEY", "preview-resend");
+    mocks.adapterLoad.mockImplementationOnce(async (currentQuery) => ({
+      source: "canonical",
+      status: "ready",
+      value: [],
+      workQueue: canonicalPage(currentQuery, null, "prepare_package", true),
+    }));
+
+    const element = await AdminNextPreviewWorkQueuePage({
+      searchParams: Promise.resolve({
+        limit: "25",
+        queue: "all",
+        selected: "case:13",
+        view: "today",
+      }),
+    });
+    const html = renderToStaticMarkup(element);
+
+    expect(mocks.createCanonical).toHaveBeenCalledWith(
+      mocks.payload,
+      "Canonical operator",
+      {
+        currentUserId: "user:7",
+        grantedCapabilities: [
+          "case.read",
+          "commercial.package.prepare",
+          "price.calculate",
+          "quote.create",
+          "quote.approve",
+          "quote.issue",
+          "quote.read",
+        ],
+        locale: "lt",
+      },
+    );
+    expect(element.props.page.items[0]).toMatchObject({
+      interaction: { mode: "executable" },
+      target: { href: "/admin-v2/cases/13" },
+    });
+    expect(html).toContain('data-work-queue-action="exact-deep-link"');
+  });
+
+  it.each([
+    ["package approval", "approve_package"],
+    ["message approval", "approve_message"],
+    ["message retry", "retry_message"],
+    ["company signature", "company_sign_contract"],
+  ] as const)(
+    "renders the route-exact %s candidate CTA while inbound and security rollout flags stay off",
+    async (_label, actionKind) => {
+      vi.stubEnv("PREVIEW_E2E_OPERATOR_ACCESS", "true");
+      vi.stubEnv("FEATURE_COMMUNICATION_ROUTING_V2", "false");
+      vi.stubEnv("FEATURE_CONTRACT_SIGNING", "true");
+      vi.stubEnv("FEATURE_CUSTOMER_QUOTES", "true");
+      vi.stubEnv("FEATURE_ROOF_MEASUREMENT", "false");
+      vi.stubEnv("FEATURE_SECURITY_HARDENING_V2", "false");
+      vi.stubEnv("LEGAL_REVIEW_REFERENCE", "LEGAL-PREVIEW-1");
+      vi.stubEnv("PAYLOAD_SECRET", "preview-signature-secret");
+      vi.stubEnv(
+        "PREVIEW_EMAIL_RECIPIENT_ALLOWLIST",
+        "fornyelsegruppen@gmail.com",
+      );
+      vi.stubEnv("RESEND_API_KEY", "preview-resend");
+      mocks.adapterLoad.mockImplementationOnce(async (currentQuery) => ({
+        source: "canonical",
+        status: "ready",
+        value: [],
+        workQueue: canonicalPage(currentQuery, null, actionKind, true),
+      }));
+
+      const element = await AdminNextPreviewWorkQueuePage({
+        searchParams: Promise.resolve({
+          limit: "25",
+          queue: "all",
+          selected: "case:13",
+          view: "today",
+        }),
+      });
+      const html = renderToStaticMarkup(element);
+      const grantedCapabilities = mocks.createCanonical.mock.calls[0]?.[2]
+        ?.grantedCapabilities;
+
+      expect(grantedCapabilities).toEqual(
+        expect.arrayContaining([
+          "message.approve_send",
+          "message.retry_send",
+          "commercial.package.approve_send",
+          "contract.company_sign",
+        ]),
+      );
+      expect(grantedCapabilities).not.toContain("commercial.package.prepare");
+      expect(html).toContain('data-work-queue-action="exact-deep-link"');
+    },
+  );
+
+  it("projects a server-authorized case read link while the requested mutation stays denied", async () => {
+    mocks.adapterLoad.mockImplementationOnce(async (currentQuery) => ({
+      source: "canonical",
+      status: "ready",
+      value: [],
+      workQueue: canonicalPage(currentQuery, null, "prepare_package"),
+    }));
+
+    const element = await AdminNextPreviewWorkQueuePage({
+      searchParams: Promise.resolve({
+        action: "prepare_package",
+        limit: "10",
+        ownerId: "user:7",
+        queue: "mine",
+        selected: "case:13",
+        stage: "evidence",
+        view: "today",
+      }),
+    });
+    const item = element.props.page.items[0];
+    const html = renderToStaticMarkup(element);
+
+    expect(item).toMatchObject({
+      authorization: {
+        requiredCapability: "commercial.package.prepare",
+        granted: false,
+      },
+      interaction: { mode: "read_only", reason: "capability_denied" },
+      target: { href: "/admin-v2/cases/13" },
+    });
+    const href = new URL(item.case.href, "https://preview.invalid");
+    expect(href.pathname).toBe("/admin-next-preview/cases/TF-13");
+    expect(href.searchParams.get("returnTo")).toBe(
+      "/admin-next-preview/work?view=today&queue=mine&stage=evidence&action=prepare_package&ownerId=user%3A7&limit=10&selected=case%3A13#work-queue-detail",
+    );
+    expect(html).toContain("Kari Nordmann");
+    expect(html).toContain("Testveien 13, 0001 Oslo");
+    expect(html).toContain('data-work-queue-action="case-read"');
     expect(html).not.toContain('data-work-queue-action="exact-deep-link"');
   });
 
@@ -200,7 +379,7 @@ describe("Admin Next Preview Work Queue route", () => {
     expect(element.props.processStages).toEqual(["evidence", "inquiry"]);
     expect(element.props.filterOwners).toContainEqual({
       id: "user:9",
-      label: "Administratorius · user:9",
+      label: "Administratorius 2",
     });
     expect(html).toContain('<option value="prepare_package">');
     expect(html).toContain(
@@ -223,8 +402,10 @@ describe("Admin Next Preview Work Queue route", () => {
     expect(mocks.getPayload).not.toHaveBeenCalled();
     expect(mocks.createCanonical).not.toHaveBeenCalled();
     expect(element.props.source).toBe("fixture");
-    expect(html).toContain("Apsaugota Preview · sintetiniai duomenys");
-    expect(html).not.toContain("data-work-queue-action");
+    expect(html).toContain(
+      "Vietinis UI pavyzdys · sintetiniai duomenys · be klientų duomenų",
+    );
+    expect(html).not.toContain('data-work-queue-action="exact-deep-link"');
     expect(html).not.toMatch(/[?&](?:focus|target)=/u);
   });
 

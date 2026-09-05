@@ -100,7 +100,13 @@ describe("AdminCaseList Work Queue read adapter", () => {
       "case:2",
     ]);
     expect(result.items[0]).toMatchObject({
-      case: { id: "case:20", revision: 2, href: "/admin-v2/cases/20" },
+      case: {
+        customerName: "Customer 20",
+        id: "case:20",
+        postalAddress: null,
+        revision: 2,
+        href: "/admin-v2/cases/20",
+      },
       locale: "lt",
       action: {
         kind: "generate_reply",
@@ -116,6 +122,36 @@ describe("AdminCaseList Work Queue read adapter", () => {
         mode: "executable",
         activation: { kind: "open_workbench" },
       },
+    });
+  });
+
+  it("projects only canonical customer and postal address values", () => {
+    const result = projectAdminCaseListWorkQueue(
+      projectionInput([
+        row(13, {
+          item: caseItem(13, {
+            customer: "  Kari Nordmann  ",
+            postalAddress: "  Testveien 13, 0001 Oslo  ",
+          }),
+        }),
+      ]),
+    );
+
+    expect(result.items[0].case).toMatchObject({
+      customerName: "Kari Nordmann",
+      postalAddress: "Testveien 13, 0001 Oslo",
+    });
+
+    const unknown = projectAdminCaseListWorkQueue(
+      projectionInput([
+        row(14, {
+          item: caseItem(14, { customer: "#14", postalAddress: "" }),
+        }),
+      ]),
+    );
+    expect(unknown.items[0].case).toMatchObject({
+      customerName: null,
+      postalAddress: null,
     });
   });
 

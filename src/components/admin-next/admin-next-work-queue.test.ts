@@ -6,6 +6,7 @@ import {
   adminNextWorkQueueNextPageHref,
   AdminNextWorkQueue,
   parseAdminNextWorkQueueRouteState,
+  workQueueDecisionKind,
   workQueueExactActionHref,
   workQueueFilterOptionsFromFacets,
 } from "./admin-next-work-queue";
@@ -13,6 +14,7 @@ import {
   createWorkQueuePage,
   parseCanonicalWorkQueueQuery,
   parseWorkQueueCursor,
+  type WorkQueueItem,
   type WorkQueuePage,
 } from "@/lib/admin-next/work-queue-contract";
 import { createAdminNextWorkQueueFixture } from "@/lib/admin-next/work-queue-fixture";
@@ -33,6 +35,7 @@ function renderPage(
   locale: PanelLocale,
   page: WorkQueuePage,
   selectedCaseId?: string,
+  source: "canonical" | "fixture" = "fixture",
 ) {
   const filterOptions = workQueueFilterOptionsFromFacets(page, locale);
   return renderToStaticMarkup(
@@ -44,7 +47,21 @@ function renderPage(
       page,
       processStages: filterOptions.processStages,
       selectedCaseId,
+      source,
     }),
+  );
+}
+
+function renderSingleItem(locale: PanelLocale, item: WorkQueueItem) {
+  const base = createAdminNextWorkQueueFixture(locale, query());
+  return renderPage(
+    locale,
+    {
+      ...base,
+      items: [item],
+      totalItems: 1,
+    },
+    item.case.id,
   );
 }
 
@@ -60,8 +77,26 @@ describe("Admin Next Work Queue", () => {
     const html = renderQueue("en", "case:1042");
 
     expect(html).toContain('data-work-queue-interaction="read_only"');
-    expect(html).not.toContain("data-work-queue-action");
+    expect(html).toContain('data-work-queue-action="case-read"');
+    expect(html).not.toContain('data-work-queue-action="exact-deep-link"');
     expect(html).not.toMatch(/[?&](?:focus|target)=/u);
+  });
+
+  it("labels live Preview and local synthetic data without conflating them", () => {
+    const page = createAdminNextWorkQueueFixture("lt", query());
+    const fixture = renderPage("lt", page, "case:1042");
+    const canonical = renderPage("lt", page, "case:1042", "canonical");
+
+    expect(fixture).toContain(
+      "Vietinis UI pavyzdys · sintetiniai duomenys · be klientų duomenų",
+    );
+    expect(fixture).toContain(
+      "Šis vietinis UI pavyzdys naudoja tik sintetinius duomenis ir nieko neišsaugo.",
+    );
+    expect(canonical).toContain(
+      "Apsaugota Preview · tiesioginiai bylų duomenys · eilė tik skaito",
+    );
+    expect(canonical).not.toContain("sintetiniai duomenys");
   });
 
   it("keeps every synthetic fixture item non-executable", () => {
@@ -85,12 +120,140 @@ describe("Admin Next Work Queue", () => {
 
     expect(waiting).toContain('data-work-queue-interaction="waiting"');
     expect(waiting).toContain("Kitas žingsnis priklauso kitai šaliai");
-    expect(waiting).not.toContain("data-work-queue-action");
+    expect(waiting).toContain('data-work-queue-action="case-read"');
+    expect(waiting).not.toContain('data-work-queue-action="exact-deep-link"');
     expect(readOnly).toContain('data-work-queue-interaction="read_only"');
     expect(readOnly).toContain(
-      "Šaltinis yra kontroliuojamas šešėlinis skaitymas",
+      "Patikrinkite matavimo pagrindą prieš atverdami kainos skaičiavimą",
     );
-    expect(readOnly).not.toContain("data-work-queue-action");
+    expect(readOnly).toContain("Kito žingsnio būsena");
+    expect(readOnly).not.toContain("Vienas leidžiamas kitas veiksmas");
+    expect(readOnly).toContain('data-work-queue-action="case-read"');
+    expect(readOnly).not.toContain('data-work-queue-action="exact-deep-link"');
+  });
+
+  it("always offers the authorized case read route but keeps the mutation target capability-gated", () => {
+    const base = createAdminNextWorkQueueFixture("lt", query()).items[0];
+    const denied = {
+      ...base,
+      authorization: { ...base.authorization, granted: false },
+      case: {
+        ...base.case,
+        href: "/admin-next-preview/cases/TF-1042?returnTo=queue",
+      },
+      interaction: {
+        mode: "read_only",
+        reason: "capability_denied",
+      },
+      sourceTruth: { ...base.sourceTruth, kind: "canonical" },
+    } satisfies WorkQueueItem;
+    const html = renderSingleItem("lt", denied);
+
+    expect(html).toContain('data-work-queue-action="case-read"');
+    expect(html).toContain(
+      'href="/admin-next-preview/cases/TF-1042?returnTo=queue"',
+    );
+    expect(html).toContain(
+      'data-work-queue-decision-kind="missing_capability"',
+    );
+    expect(html).not.toContain('data-work-queue-action="exact-deep-link"');
+  });
+
+  it.each([
+    ["nb", "Åpne sak"],
+    ["lt", "Atverti bylą"],
+    ["en", "Open case"],
+  ] as const)("uses a human case-read label in %s", (locale, label) => {
+    const html = renderQueue(locale, "case:1042");
+
+    expect(html).toMatch(
+      new RegExp(
+        `<a[^>]*data-work-queue-action="case-read"[^>]*>[^<]*${label}`,
+        "u",
+      ),
+    );
+  });
+
+  it("shows one executable next-action CTA alongside the non-mutating case link", () => {
+    const base = createAdminNextWorkQueueFixture("en", query()).items[0];
+    const executable = {
+      ...base,
+      authorization: { ...base.authorization, granted: true },
+      interaction: {
+        activation: { kind: "open_workbench" },
+        mode: "executable",
+      },
+      sourceTruth: { ...base.sourceTruth, kind: "canonical" },
+      target: {
+        ...base.target,
+        availability: "exact",
+        href: "/admin-next-preview/cases/TF-1042?focus=communication",
+      },
+    } satisfies WorkQueueItem;
+    const html = renderSingleItem("en", executable);
+
+    expect(html.match(/data-work-queue-action="case-read"/gu)).toHaveLength(1);
+    expect(
+      html.match(/data-work-queue-action="exact-deep-link"/gu),
+    ).toHaveLength(1);
+    expect(html).toContain('data-work-queue-decision-kind="allowed"');
+    expect(html).toContain("One allowed next action");
+    expect(html).toContain(base.action.presentation.copy.reason);
+  });
+
+  it("renders canonical completed, current, and pending process steps without inventing extra stages", () => {
+    const html = renderQueue("lt", "case:1031");
+
+    expect(html.match(/data-work-queue-process-step=/gu)).toHaveLength(6);
+    expect(
+      html.match(/data-work-queue-process-step="completed"/gu),
+    ).toHaveLength(2);
+    expect(html.match(/data-work-queue-process-step="current"/gu)).toHaveLength(
+      1,
+    );
+    expect(html.match(/data-work-queue-process-step="pending"/gu)).toHaveLength(
+      3,
+    );
+    expect(html).toContain('aria-current="step"');
+    expect(html).toContain(
+      "Rodoma pagal sistemoje užregistruotą kito veiksmo etapą",
+    );
+  });
+
+  it("distinguishes data, capability, environment, waiting, allowed, and no-action decisions", () => {
+    const items = createAdminNextWorkQueueFixture("en", query()).items;
+    const base = items[0];
+    const waiting = items.find((item) => item.interaction.mode === "waiting");
+    const blocked = items.find((item) => item.blockers.length > 0);
+    if (!waiting || !blocked)
+      throw new Error("Fixture decision states missing");
+
+    expect(workQueueDecisionKind(blocked)).toBe("data_prerequisite");
+    expect(workQueueDecisionKind(waiting)).toBe("waiting");
+    expect(workQueueDecisionKind(base)).toBe("environment_restriction");
+    expect(
+      workQueueDecisionKind({
+        ...base,
+        interaction: { mode: "read_only", reason: "capability_denied" },
+      }),
+    ).toBe("missing_capability");
+    expect(
+      workQueueDecisionKind({
+        ...base,
+        interaction: { mode: "read_only", reason: "no_action" },
+        sourceTruth: { ...base.sourceTruth, kind: "canonical" },
+      }),
+    ).toBe("no_blockers");
+    expect(
+      workQueueDecisionKind({
+        ...base,
+        interaction: {
+          activation: { kind: "open_workbench" },
+          mode: "executable",
+        },
+        sourceTruth: { ...base.sourceTruth, kind: "canonical" },
+      }),
+    ).toBe("allowed");
   });
 
   it("fails closed when selected is unknown or hidden by the current page", () => {
@@ -100,7 +263,8 @@ describe("Admin Next Work Queue", () => {
     expect(html).toContain("data-work-queue-empty-detail");
     expect(html).toContain("No detail or action is shown");
     expect(html).not.toContain("data-work-queue-detail-content");
-    expect(html).not.toContain("data-work-queue-action");
+    expect(html).not.toContain('data-work-queue-action="case-read"');
+    expect(html).not.toContain('data-work-queue-action="exact-deep-link"');
   });
 
   it("resets cursor and selected when a queue filter changes", () => {
@@ -252,6 +416,71 @@ describe("Admin Next Work Queue", () => {
     }
   });
 
+  it("keeps quick filters visible and advanced filters collapsed until they are active", () => {
+    const defaultHtml = renderQueue("lt");
+    const activePage = createAdminNextWorkQueueFixture(
+      "lt",
+      query("view=today&queue=all&stage=commercial&limit=25"),
+    );
+    const activeHtml = renderPage("lt", activePage);
+    const defaultTag = defaultHtml.match(
+      /<details[^>]*data-work-queue-advanced-filters[^>]*>/u,
+    )?.[0];
+    const activeTag = activeHtml.match(
+      /<details[^>]*data-work-queue-advanced-filters[^>]*>/u,
+    )?.[0];
+
+    expect(defaultHtml).toContain("data-work-queue-view-filter");
+    expect(defaultTag).not.toContain(" open");
+    expect(activeTag).toContain(" open");
+    expect(activeHtml).toContain("1 aktyvūs išplėstiniai filtrai");
+  });
+
+  it("keeps unavailable identity fields and technical identifiers honest", () => {
+    const base = createAdminNextWorkQueueFixture("lt", query()).items.find(
+      (item) => item.case.id === "case:1027",
+    );
+    if (!base) throw new Error("Expected fixture case:1027");
+    const html = renderSingleItem("lt", {
+      ...base,
+      case: { ...base.case, customerName: null, postalAddress: null },
+    });
+    const technicalStart = html.indexOf("Techninės detalės");
+    const blockerCode = html.indexOf("MEASUREMENT_EVIDENCE_INCOMPLETE");
+
+    expect(html).toContain("Kliento vardas į eilės duomenis nepatenka");
+    expect(html).toContain("Adresas į eilės duomenis nepatenka");
+    expect(html).toContain('data-work-queue-decision-kind="data_prerequisite"');
+    expect(technicalStart).toBeGreaterThan(-1);
+    expect(blockerCode).toBeGreaterThan(technicalStart);
+  });
+
+  it("shows canonical customer and address fields without technical identity", () => {
+    const html = renderQueue("lt", "case:1042");
+
+    expect(html).toContain("Kari Nilsen");
+    expect(html).toContain("Testveien 12, Oslo");
+    expect(html).not.toContain("Kliento vardas į eilės duomenis nepatenka");
+    expect(html).not.toContain("Adresas į eilės duomenis nepatenka");
+  });
+
+  it("describes an absent deadline from canonical priority evidence", () => {
+    const base = createAdminNextWorkQueueFixture("en", query()).items[0];
+    const noDeadline = {
+      ...base,
+      priority: {
+        ...base.priority,
+        reasonCode: "NO_DUE_DATE",
+        slaBand: "none",
+      },
+      timing: { dueAt: null, wakeAt: null },
+    } satisfies WorkQueueItem;
+    const html = renderSingleItem("en", noDeadline);
+
+    expect(html).toContain("No deadline is defined in the work queue data");
+    expect(html).toContain("Deadline basis: The action has no deadline.");
+  });
+
   it.each([
     ["nb", "Hvorfor nå", "Fristen er passert."],
     ["lt", "Kodėl dabar", "Terminas jau praėjo."],
@@ -293,8 +522,9 @@ describe("Admin Next Work Queue", () => {
     expect(options.processStages).toContain("work");
     expect(options.filterOwners).toContainEqual({
       id: "customer:1031",
-      label: "Customer · customer:1031",
+      label: "Customer",
     });
+    expect(html).not.toContain(">Customer · customer:1031</option>");
     expect(html).toContain('<option value="calculate_price">');
   });
 

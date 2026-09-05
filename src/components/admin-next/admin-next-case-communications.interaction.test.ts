@@ -24,17 +24,34 @@ function communication(id: number): AdminNextCaseCommunication {
 const copy = {
   allLoaded: "Rodoma visa žinučių istorija",
   attachments: "Priedai",
+  categoryLabels: { customer_question: "Kliento klausimas" },
+  channelLabels: { email: "El. paštas", phone: "Telefonas" },
+  customerPortal: "Klientų portalas",
   deliveredAt: "Pristatyta",
   empty: "Žinučių nėra",
   inbound: "Nuo kliento",
   loadFailed: "Įkelti nepavyko",
   loadingOlder: "Įkeliamos senesnės žinutės",
   of: "iš",
-  openThread: "Atidaryti Admin V2",
+  openThread: "Atverti susijusį įrašą",
+  otherCategory: "Kita žinutės rūšis",
+  otherChannel: "Kitas kanalas",
+  otherStatus: "Kita žinutės būsena",
   outbound: "Klientui",
+  rawCategory: "Neapdorota žinutės kategorija",
+  rawChannel: "Neapdorotas kanalas",
+  rawDirection: "Neapdorota kryptis",
+  rawStatus: "Neapdorota būsena",
+  recordId: "Įrašo ID",
   replyTo: "Atsakymas į žinutę",
   sentAt: "Išsiųsta",
   showOlder: "Rodyti ankstesnes žinutes",
+  statusLabels: {
+    contacted: "Susisiekta",
+    delivered: "Pristatyta",
+    failed: "Nepavyko",
+  },
+  technicalDetails: "Techninės detalės",
   title: "Žinutės",
 };
 
@@ -110,7 +127,20 @@ describe("Admin Next paginated customer communications", () => {
     expect(container.textContent).toContain("Rodyti ankstesnes žinutes (2)");
     expect(
       container.querySelector("[data-customer-communications]")?.className,
-    ).toContain("max-h-[42rem]");
+    ).not.toMatch(/max-h|overflow/u);
+    expect(container.querySelectorAll("[data-customer-message]")).toHaveLength(
+      1,
+    );
+    expect(
+      container.querySelector("[data-customer-message]")?.hasAttribute("open"),
+    ).toBe(false);
+    expect(
+      container
+        .querySelector("[data-message-technical-diagnostics]")
+        ?.hasAttribute("open"),
+    ).toBe(false);
+    expect(container.textContent).toContain("Klientų portalas");
+    expect(container.textContent).toContain("Kliento klausimas");
 
     await act(async () => {
       (
@@ -150,9 +180,47 @@ describe("Admin Next paginated customer communications", () => {
     expect(
       container.querySelector("[data-load-older-communications]"),
     ).toBeNull();
+    const completion = container.querySelector(
+      "[data-communication-history-complete]",
+    );
+    expect(completion?.getAttribute("aria-live")).toBe("polite");
+    expect(completion?.getAttribute("role")).toBe("status");
+    expect(document.activeElement).toBe(completion);
     expect(container.textContent).toContain("Message 3");
     expect(container.textContent).toContain("Message 2");
     expect(container.textContent).toContain("Message 1");
+  });
+
+  it("keeps the frozen 25 of 27 history bounded behind one explicit load control", async () => {
+    await act(async () => {
+      root.render(
+        createElement(AdminNextCaseCommunications, {
+          copy,
+          initialItems: Array.from({ length: 25 }, (_, index) =>
+            communication(index + 1),
+          ),
+          initialPageInfo: {
+            totalCount: 27,
+            remainingCount: 2,
+            nextCursor: "cursor-25",
+            loadMoreHref: "/api/admin-next/cases/13/communications",
+          },
+          locale: "lt",
+        }),
+      );
+    });
+
+    expect(container.textContent).toContain("Žinutės · 25 iš 27");
+    expect(container.textContent).toContain("Rodyti ankstesnes žinutes (2)");
+    expect(container.querySelectorAll("[data-customer-message]")).toHaveLength(
+      25,
+    );
+    expect(
+      container.querySelector("[data-customer-communications]")?.className,
+    ).not.toMatch(/max-h|overflow/u);
+    expect(
+      container.querySelectorAll("[data-load-older-communications]"),
+    ).toHaveLength(1);
   });
 
   it("shows the exact historical recipient, delivery failure and manual recovery", async () => {

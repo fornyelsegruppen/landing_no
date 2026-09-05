@@ -5,7 +5,6 @@ import {
   Bot,
   Camera,
   Check,
-  CheckCircle2,
   ChevronDown,
   CircleAlert,
   FileCheck2,
@@ -31,6 +30,7 @@ import type {
   AdminNextEvidenceState,
   AdminNextTimelineKind,
 } from "@/lib/admin-next/case-workspace-contract";
+import { adminNextPreviewWorkQueueEntry } from "@/lib/admin-next/work-queue-navigation";
 import {
   AdminNextCaseWorkspaceHistoryRail,
   AdminNextCaseWorkspacePanelSwitcher,
@@ -44,28 +44,33 @@ import {
 
 const copy = {
   nb: {
-    back: "Tilbake til I dag",
+    back: "Tilbake til arbeidskøen",
     case: "Sak",
-    synthetic: "Syntetiske Preview-data",
-    canonical: "Canonical Preview-data",
+    synthetic: "Syntetiske testdata i Preview",
+    canonical: "Direkte saksdata i Preview",
+    regressionTestData: "Regresjonstestdata",
     attention: "Krever oppmerksomhet",
     on_track: "På plan",
     waiting: "Venter",
     owner: "Ansvarlig",
     sla: "SLA-frist",
     today: "I dag",
+    yesterday: "I går",
+    tomorrow: "I morgen",
     overdue: "Forsinket",
+    hours: "t",
     minutes: "min",
     due_soon: "Forfaller snart",
     slaUnknown: "Ingen frist registrert",
     next: "Neste nødvendige handling",
-    currentFallback: "Åpne fungerende sak",
+    currentFallback: "Tilbake til arbeidskøen",
     interactionReasons: {
       capability_denied:
         "Handlingen er skrivebeskyttet uten bekreftet tilgang.",
       no_action: "Saken krever ingen handling nå.",
       target_unavailable: "Et eksakt operatørmål er ikke tilgjengelig.",
     },
+    dataPrerequisite: "En registrert forutsetning må avklares.",
     process: "Saksforløp",
     processIntro: "Ett felles bilde av fremdrift og blokkeringer.",
     contextNavigation: "Navigasjon i saken",
@@ -120,7 +125,7 @@ const copy = {
     deliveredAt: "Levert",
     replyTo: "Svar på melding",
     attachments: "Vedlegg",
-    openThread: "Åpne i Admin V2",
+    openThread: "Åpne tilknyttet oppføring",
     commercialVersions: "Tilbud og kontrakter",
     commercialVersionsEmpty: "Ingen tilbuds- eller kontraktsversjoner.",
     activeCommercialVersions: "Aktive versjoner",
@@ -155,9 +160,38 @@ const copy = {
     businessHistory: "Full saksrekkefølge",
     businessHistoryIntro:
       "Forretningshendelser fra forespørsel til siste dokument- eller avtaleendring.",
+    historyKinds: {
+      change: "Endring",
+      contract: "Avtale",
+      contract_request: "Avtaleforespørsel",
+      document: "Dokument",
+      invoice: "Faktura",
+      lead: "Forespørsel",
+      measurement: "Måling",
+      message: "Melding",
+      price: "Prisberegning",
+      quote: "Tilbud",
+      warranty: "Garanti",
+      work: "Arbeid",
+    },
+    historyStatuses: {
+      accepted: "Akseptert",
+      approved: "Godkjent",
+      attention: "Må følges opp",
+      delivered: "Levert",
+      draft: "Utkast",
+      failed: "Mislykket",
+      new: "Ny",
+      pending: "Venter",
+      received: "Mottatt",
+      sent: "Sendt",
+      signed: "Signert",
+    },
+    otherHistoryKind: "Annen hendelse",
+    otherHistoryStatus: "Annen status",
     openSource: "Åpne kilde",
     timeline: "Tidslinje",
-    timelineIntro: "Teknisk revisjonsspor med kilde og tidspunkt.",
+    timelineIntro: "Registrerte sakshendelser med tidspunkt.",
     timelineEmpty: "Ingen revisjonshendelser er registrert for denne saken.",
     timelineUnavailable: "Revisjonshistorikken er midlertidig utilgjengelig.",
     timelineDenied: "Du har ikke tilgang til revisjonshistorikken.",
@@ -186,9 +220,62 @@ const copy = {
       invalid: "Ugyldig",
     },
     tamperStatuses: { not_assessable: "Kan ikke vurderes" },
-    fallbackTitle: "Fungerende Admin V2 er fortsatt tilgjengelig",
+    fallbackTitle: "Flere saksverktøy",
     fallbackIntro:
-      "Preview endrer ingen kundedata og utfører ingen utsendelser.",
+      "Eksisterende dokument- og arbeidsruter beholdes som trygg reserve.",
+    technicalDetails: "Tekniske detaljer",
+    technicalIntro: "Rå systemverdier for feilsøking",
+    sourceMode: "Datakildemodus",
+    storedService: "Lagret tjenesteverdi",
+    originalAddress: "Opprinnelig adresseverdi",
+    nextActionKind: "Handlingstype",
+    requiredCapability: "Påkrevd tilgang",
+    reviewMode: "Kontrollmodus",
+    blockerCode: "Blokkeringskode",
+    rawKind: "Rå type",
+    rawStatus: "Rå status",
+    rawDirection: "Rå retning",
+    rawChannel: "Rå kanal",
+    rawCategory: "Rå meldingskategori",
+    recordId: "Oppførings-ID",
+    services: {
+      Takfornyelse: "Takfornyelse",
+      takvask_impregnering: "Takvask og impregnering",
+    },
+    otherService: "Annen takjeneste",
+    messageChannels: { email: "E-post", phone: "Telefon", sms: "SMS" },
+    customerPortal: "Kundeportal",
+    messageCategories: {
+      ai_reply: "Svarutkast",
+      change_confirmation: "Endringsbekreftelse",
+      completion: "Ferdigmelding",
+      contract: "Avtale",
+      customer_question: "Kundespørsmål",
+      customer_reply: "Kundesvar",
+      follow_up: "Oppfølging",
+      information_request: "Forespørsel om informasjon",
+      invoice: "Faktura",
+      quote: "Tilbud",
+      receipt: "Mottaksbekreftelse",
+      reminder: "Påminnelse",
+      schedule_confirmation: "Avtalebekreftelse",
+    },
+    messageStatuses: {
+      approved: "Godkjent",
+      attention: "Må følges opp",
+      cancelled: "Forkastet",
+      contacted: "Kontaktet",
+      delivered: "Levert",
+      draft: "Utkast",
+      failed: "Mislykket",
+      pending: "Venter",
+      queued: "I kø",
+      received: "Mottatt",
+      sent: "Sendt",
+    },
+    otherMessageChannel: "Annen kanal",
+    otherMessageCategory: "Annen meldingstype",
+    otherMessageStatus: "Annen meldingsstatus",
     openDocuments: "Dokumenter",
     openWork: "Arbeidsplan",
     stages: {
@@ -212,27 +299,32 @@ const copy = {
     },
   },
   lt: {
-    back: "Grįžti į „Šiandien“",
+    back: "Grįžti į darbų eilę",
     case: "Byla",
-    synthetic: "Sintetiniai Preview duomenys",
-    canonical: "Canonical Preview duomenys",
+    synthetic: "Sintetiniai Preview bandymo duomenys",
+    canonical: "Tiesioginiai Preview bylos duomenys",
+    regressionTestData: "Regresijos bandymo duomenys",
     attention: "Reikia dėmesio",
     on_track: "Pagal planą",
     waiting: "Laukia",
     owner: "Atsakingas",
     sla: "SLA terminas",
     today: "Šiandien",
+    yesterday: "Vakar",
+    tomorrow: "Rytoj",
     overdue: "Vėluoja",
+    hours: "val.",
     minutes: "min.",
     due_soon: "Terminas netrukus",
     slaUnknown: "Terminas neužregistruotas",
     next: "Kitas būtinas veiksmas",
-    currentFallback: "Atidaryti veikiančią bylą",
+    currentFallback: "Grįžti į darbų eilę",
     interactionReasons: {
       capability_denied: "Veiksmas tik skaitomas, kol nepatvirtinta prieiga.",
       no_action: "Šiuo metu bylai veiksmo nereikia.",
       target_unavailable: "Tikslinė operatoriaus darbo vieta nepasiekiama.",
     },
+    dataPrerequisite: "Reikia išspręsti užregistruotą sąlygą.",
     process: "Bylos eiga",
     processIntro: "Vienas bendras eigos ir blokavimų vaizdas.",
     contextNavigation: "Navigacija byloje",
@@ -288,7 +380,7 @@ const copy = {
     deliveredAt: "Pristatyta",
     replyTo: "Atsakymas į žinutę",
     attachments: "Priedai",
-    openThread: "Atidaryti Admin V2",
+    openThread: "Atverti susijusį įrašą",
     commercialVersions: "Pasiūlymai ir sutartys",
     commercialVersionsEmpty: "Pasiūlymų ar sutarčių versijų nėra.",
     activeCommercialVersions: "Aktyvios versijos",
@@ -323,9 +415,38 @@ const copy = {
     businessHistory: "Visa bylos chronologija",
     businessHistoryIntro:
       "Veiklos įvykiai nuo užklausos iki paskutinio dokumento ar sutarties pakeitimo.",
+    historyKinds: {
+      change: "Pakeitimas",
+      contract: "Sutartis",
+      contract_request: "Sutarties užklausa",
+      document: "Dokumentas",
+      invoice: "Sąskaita",
+      lead: "Užklausa",
+      measurement: "Matavimas",
+      message: "Žinutė",
+      price: "Kainos skaičiavimas",
+      quote: "Pasiūlymas",
+      warranty: "Garantija",
+      work: "Darbai",
+    },
+    historyStatuses: {
+      accepted: "Priimta",
+      approved: "Patvirtinta",
+      attention: "Reikia dėmesio",
+      delivered: "Pristatyta",
+      draft: "Juodraštis",
+      failed: "Nepavyko",
+      new: "Nauja",
+      pending: "Laukiama",
+      received: "Gauta",
+      sent: "Išsiųsta",
+      signed: "Pasirašyta",
+    },
+    otherHistoryKind: "Kitas įvykis",
+    otherHistoryStatus: "Kita būsena",
     openSource: "Atidaryti šaltinį",
     timeline: "Įvykių seka",
-    timelineIntro: "Techninis audito pėdsakas su šaltiniu ir laiku.",
+    timelineIntro: "Užregistruoti bylos įvykiai ir jų laikas.",
     timelineEmpty: "Šiai bylai audito įvykių neužregistruota.",
     timelineUnavailable: "Audito istorija laikinai nepasiekiama.",
     timelineDenied: "Neturite teisės peržiūrėti audito istorijos.",
@@ -354,9 +475,62 @@ const copy = {
       invalid: "Netinkama",
     },
     tamperStatuses: { not_assessable: "Neįmanoma įvertinti" },
-    fallbackTitle: "Veikiantis Admin V2 lieka pasiekiamas",
+    fallbackTitle: "Papildomi bylos įrankiai",
     fallbackIntro:
-      "Preview nekeičia klientų duomenų ir neatlieka jokių siuntimų.",
+      "Esami dokumentų ir darbų maršrutai palikti saugiam grįžimui.",
+    technicalDetails: "Techninės detalės",
+    technicalIntro: "Neapdorotos sistemos reikšmės diagnostikai",
+    sourceMode: "Duomenų šaltinio režimas",
+    storedService: "Išsaugota paslaugos reikšmė",
+    originalAddress: "Pradinė adreso reikšmė",
+    nextActionKind: "Veiksmo tipas",
+    requiredCapability: "Reikalinga prieiga",
+    reviewMode: "Peržiūros režimas",
+    blockerCode: "Blokavimo kodas",
+    rawKind: "Neapdorotas tipas",
+    rawStatus: "Neapdorota būsena",
+    rawDirection: "Neapdorota kryptis",
+    rawChannel: "Neapdorotas kanalas",
+    rawCategory: "Neapdorota žinutės kategorija",
+    recordId: "Įrašo ID",
+    services: {
+      Takfornyelse: "Stogo atnaujinimas",
+      takvask_impregnering: "Stogo plovimas ir impregnavimas",
+    },
+    otherService: "Kita stogo paslauga",
+    messageChannels: { email: "El. paštas", phone: "Telefonas", sms: "SMS" },
+    customerPortal: "Klientų portalas",
+    messageCategories: {
+      ai_reply: "Atsakymo juodraštis",
+      change_confirmation: "Pakeitimo patvirtinimas",
+      completion: "Darbų užbaigimas",
+      contract: "Sutartis",
+      customer_question: "Kliento klausimas",
+      customer_reply: "Kliento atsakymas",
+      follow_up: "Tolesnis susisiekimas",
+      information_request: "Informacijos užklausa",
+      invoice: "Sąskaita",
+      quote: "Pasiūlymas",
+      receipt: "Gavimo patvirtinimas",
+      reminder: "Priminimas",
+      schedule_confirmation: "Laiko patvirtinimas",
+    },
+    messageStatuses: {
+      approved: "Patvirtinta",
+      attention: "Reikia dėmesio",
+      cancelled: "Atšaukta",
+      contacted: "Susisiekta",
+      delivered: "Pristatyta",
+      draft: "Juodraštis",
+      failed: "Nepavyko",
+      pending: "Laukiama",
+      queued: "Eilėje",
+      received: "Gauta",
+      sent: "Išsiųsta",
+    },
+    otherMessageChannel: "Kitas kanalas",
+    otherMessageCategory: "Kita žinutės rūšis",
+    otherMessageStatus: "Kita žinutės būsena",
     openDocuments: "Dokumentai",
     openWork: "Darbų planas",
     stages: {
@@ -380,27 +554,32 @@ const copy = {
     },
   },
   en: {
-    back: "Back to Today",
+    back: "Back to Work Queue",
     case: "Case",
-    synthetic: "Synthetic Preview data",
-    canonical: "Canonical Preview data",
+    synthetic: "Synthetic Preview test data",
+    canonical: "Live Preview case data",
+    regressionTestData: "Regression test data",
     attention: "Needs attention",
     on_track: "On track",
     waiting: "Waiting",
     owner: "Owner",
     sla: "SLA deadline",
     today: "Today",
+    yesterday: "Yesterday",
+    tomorrow: "Tomorrow",
     overdue: "Overdue",
+    hours: "h",
     minutes: "min",
     due_soon: "Due soon",
     slaUnknown: "No deadline recorded",
     next: "Next required action",
-    currentFallback: "Open working case",
+    currentFallback: "Back to Work Queue",
     interactionReasons: {
       capability_denied: "The action is read-only without confirmed access.",
       no_action: "The case requires no action now.",
       target_unavailable: "An exact operator target is unavailable.",
     },
+    dataPrerequisite: "A recorded prerequisite must be resolved.",
     process: "Case progress",
     processIntro: "One shared view of progress and blockers.",
     contextNavigation: "Case navigation",
@@ -455,7 +634,7 @@ const copy = {
     deliveredAt: "Delivered",
     replyTo: "Reply to message",
     attachments: "Attachments",
-    openThread: "Open in Admin V2",
+    openThread: "Open related record",
     commercialVersions: "Quotes and contracts",
     commercialVersionsEmpty: "No quote or contract versions.",
     activeCommercialVersions: "Active versions",
@@ -490,9 +669,38 @@ const copy = {
     businessHistory: "Full case sequence",
     businessHistoryIntro:
       "Business events from inquiry to the latest document or agreement change.",
+    historyKinds: {
+      change: "Change",
+      contract: "Contract",
+      contract_request: "Contract request",
+      document: "Document",
+      invoice: "Invoice",
+      lead: "Inquiry",
+      measurement: "Measurement",
+      message: "Message",
+      price: "Price calculation",
+      quote: "Quote",
+      warranty: "Warranty",
+      work: "Work",
+    },
+    historyStatuses: {
+      accepted: "Accepted",
+      approved: "Approved",
+      attention: "Needs attention",
+      delivered: "Delivered",
+      draft: "Draft",
+      failed: "Failed",
+      new: "New",
+      pending: "Pending",
+      received: "Received",
+      sent: "Sent",
+      signed: "Signed",
+    },
+    otherHistoryKind: "Other event",
+    otherHistoryStatus: "Other status",
     openSource: "Open source",
     timeline: "Timeline",
-    timelineIntro: "Technical audit trail with source and time.",
+    timelineIntro: "Recorded case events with their timestamps.",
     timelineEmpty: "No audit events are recorded for this case.",
     timelineUnavailable: "Audit history is temporarily unavailable.",
     timelineDenied: "You do not have access to audit history.",
@@ -521,8 +729,62 @@ const copy = {
       invalid: "Invalid",
     },
     tamperStatuses: { not_assessable: "Cannot be assessed" },
-    fallbackTitle: "Working Admin V2 remains available",
-    fallbackIntro: "Preview does not change customer data or perform sends.",
+    fallbackTitle: "Additional case tools",
+    fallbackIntro:
+      "Existing document and work routes remain available as a safe fallback.",
+    technicalDetails: "Technical details",
+    technicalIntro: "Raw system values for diagnostics",
+    sourceMode: "Data source mode",
+    storedService: "Stored service value",
+    originalAddress: "Original address value",
+    nextActionKind: "Action kind",
+    requiredCapability: "Required capability",
+    reviewMode: "Review mode",
+    blockerCode: "Blocker code",
+    rawKind: "Raw kind",
+    rawStatus: "Raw status",
+    rawDirection: "Raw direction",
+    rawChannel: "Raw channel",
+    rawCategory: "Raw message category",
+    recordId: "Record ID",
+    services: {
+      Takfornyelse: "Roof renewal",
+      takvask_impregnering: "Roof cleaning and impregnation",
+    },
+    otherService: "Other roof service",
+    messageChannels: { email: "Email", phone: "Phone", sms: "SMS" },
+    customerPortal: "Customer portal",
+    messageCategories: {
+      ai_reply: "Reply draft",
+      change_confirmation: "Change confirmation",
+      completion: "Completion",
+      contract: "Contract",
+      customer_question: "Customer question",
+      customer_reply: "Customer reply",
+      follow_up: "Follow-up",
+      information_request: "Information request",
+      invoice: "Invoice",
+      quote: "Quote",
+      receipt: "Receipt",
+      reminder: "Reminder",
+      schedule_confirmation: "Schedule confirmation",
+    },
+    messageStatuses: {
+      approved: "Approved",
+      attention: "Needs attention",
+      cancelled: "Cancelled",
+      contacted: "Contacted",
+      delivered: "Delivered",
+      draft: "Draft",
+      failed: "Failed",
+      pending: "Pending",
+      queued: "Queued",
+      received: "Received",
+      sent: "Sent",
+    },
+    otherMessageChannel: "Other channel",
+    otherMessageCategory: "Other message type",
+    otherMessageStatus: "Other message status",
     openDocuments: "Documents",
     openWork: "Work schedule",
     stages: {
@@ -588,28 +850,75 @@ function statusLabel(
   return t[status];
 }
 
+function localeTag(locale: PanelLocale) {
+  return locale === "nb" ? "nb-NO" : locale === "lt" ? "lt-LT" : "en-GB";
+}
+
+function zonedDayOrdinal(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((entry) => entry.type === type)?.value);
+  return Math.trunc(
+    Date.UTC(part("year"), part("month") - 1, part("day")) / 86_400_000,
+  );
+}
+
+export function formatCaseSlaDeadline(
+  deadline: string,
+  locale: PanelLocale,
+  now = new Date(),
+) {
+  const t = copy[locale];
+  if (/^\d{1,2}:\d{2}$/u.test(deadline)) return deadline;
+  const value = new Date(deadline);
+  if (Number.isNaN(value.getTime())) return null;
+  const relativeDay = zonedDayOrdinal(value) - zonedDayOrdinal(now);
+  const time = new Intl.DateTimeFormat(localeTag(locale), {
+    timeStyle: "short",
+    timeZone: "Europe/Oslo",
+  }).format(value);
+  const day =
+    relativeDay === 0
+      ? t.today
+      : relativeDay === -1
+        ? t.yesterday
+        : relativeDay === 1
+          ? t.tomorrow
+          : new Intl.DateTimeFormat(localeTag(locale), {
+              dateStyle: "medium",
+              timeZone: "Europe/Oslo",
+            }).format(value);
+  return `${day} · ${time}`;
+}
+
 function slaLabel(
   sla: AdminNextCaseWorkspaceView["sla"],
   t: (typeof copy)[PanelLocale],
 ) {
-  if (sla.state === "overdue")
-    return `${Math.abs(sla.remainingMinutes || 0)} ${t.minutes}`;
-  if (sla.state === "due_soon") return t.due_soon;
   if (sla.state === "unknown") return t.slaUnknown;
-  return t.on_track;
+  const minutes = Math.abs(sla.remainingMinutes || 0);
+  const duration =
+    minutes >= 60
+      ? `${Math.floor(minutes / 60)} ${t.hours}${minutes % 60 ? ` ${minutes % 60} ${t.minutes}` : ""}`
+      : `${minutes} ${t.minutes}`;
+  if (sla.state === "overdue") return duration;
+  if (sla.state === "due_soon") return `${t.due_soon} · ${duration}`;
+  return `${t.on_track} · ${duration}`;
 }
 
 function auditTimestamp(locale: PanelLocale, value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(
-    locale === "nb" ? "nb-NO" : locale === "lt" ? "lt-LT" : "en-GB",
-    {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Europe/Oslo",
-    },
-  ).format(date);
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Oslo",
+  }).format(date);
 }
 
 function auditActor(
@@ -622,15 +931,56 @@ function auditActor(
 
 function commercialStatusLabel(locale: PanelLocale, status: string) {
   const labels = copy[locale].commercialStatuses as Record<string, string>;
-  return labels[status] || status;
+  return labels[status] || copy[locale].otherHistoryStatus;
+}
+
+function humanLabel(
+  values: Readonly<Record<string, string>>,
+  raw: string,
+  fallback: string,
+) {
+  return values[raw] || fallback;
+}
+
+function displayCaseAddress(value: string) {
+  return value.match(/^CAS\s+\S+\s+(.+)$/iu)?.[1] || value;
+}
+
+function explicitTestDataCue(
+  source: "canonical" | "fixture",
+  value: AdminNextCaseWorkspaceView,
+) {
+  if (source === "fixture") return "fixture" as const;
+  const identityCue =
+    /(?:\bdemo\b|\bpreview\b|synthetic|syntetisk|sintetin)/iu.test(
+      value.customer,
+    );
+  const content = [
+    value.customerRecord?.questions.active?.subject,
+    value.customerRecord?.questions.active?.bodyText,
+    ...(value.customerRecord?.communications.flatMap((message) => [
+      message.subject,
+      message.bodyText,
+    ]) || []),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const contentCue =
+    /(?:synthetic|syntetisk|sintetin|regression|testdata)/iu.test(content) ||
+    /(?:not a real (?:delivery|send)|tai nėra realus siuntimas|ikke en reell (?:levering|sending))/iu.test(
+      content,
+    );
+  return identityCue && contentCue ? ("explicit_content" as const) : null;
 }
 
 export function AdminNextCaseWorkspace({
   locale,
+  returnTo = adminNextPreviewWorkQueueEntry,
   source = "fixture",
   value,
 }: {
   locale: PanelLocale;
+  returnTo?: string;
   source?: "canonical" | "fixture";
   value: AdminNextCaseWorkspaceView;
 }) {
@@ -662,22 +1012,27 @@ export function AdminNextCaseWorkspace({
       ? nonHistoricalCommercialVersions
       : commercialVersions
   ).slice(0, 3);
+  const testDataCue = explicitTestDataCue(source, value);
+  const visibleAddress = displayCaseAddress(value.address);
+  const visibleService = humanLabel(t.services, value.service, t.otherService);
+  const deadlineLabel = formatCaseSlaDeadline(value.sla.deadline, locale);
 
   return (
     <div
       className="mx-auto max-w-[1500px] space-y-5"
       data-admin-next-section="cases"
+      data-case-test-data-cue={testDataCue || undefined}
     >
       <Link
         className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-[var(--an-muted)] hover:bg-[var(--an-soft)] hover:text-[var(--an-amber)]"
-        href="/admin-next-preview/today"
+        href={returnTo}
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         {t.back}
       </Link>
 
       <header
-        className="an-surface scroll-mt-28 overflow-hidden rounded-3xl border focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)]"
+        className="an-surface scroll-mt-36 overflow-hidden rounded-3xl border focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)]"
         data-case-context-target
         id="case-summary"
         tabIndex={-1}
@@ -699,6 +1054,11 @@ export function AdminNextCaseWorkspace({
               <span className="rounded-full border border-[color:rgba(244,182,63,.32)] bg-[var(--an-amber-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--an-amber)]">
                 {source === "canonical" ? t.canonical : t.synthetic}
               </span>
+              {testDataCue === "explicit_content" ? (
+                <span className="rounded-full border border-[var(--an-info)] bg-[var(--an-info-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--an-info)]">
+                  {t.regressionTestData}
+                </span>
+              ) : null}
             </div>
             <p className="mt-5 text-xs font-bold tracking-[.18em] text-[var(--an-amber)] uppercase">
               {t.case} {value.reference}
@@ -708,8 +1068,69 @@ export function AdminNextCaseWorkspace({
             </h1>
             <p className="mt-2 flex items-start gap-2 text-sm text-[var(--an-muted)]">
               <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              {value.address} · {value.service}
+              {visibleAddress} · {visibleService}
             </p>
+            <details
+              className="group mt-4 max-w-3xl rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] px-3 py-2 text-xs text-[var(--an-text-muted)]"
+              data-case-technical-diagnostics
+            >
+              <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-3 font-bold text-[var(--an-text-primary)]">
+                <span>{t.technicalDetails}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="size-4 transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <p className="mt-2">{t.technicalIntro}</p>
+              <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <dt>{t.sourceMode}</dt>
+                  <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                    {source}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.storedService}</dt>
+                  <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                    {value.service}
+                  </dd>
+                </div>
+                {visibleAddress !== value.address ? (
+                  <div className="sm:col-span-2">
+                    <dt>{t.originalAddress}</dt>
+                    <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                      {value.address}
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt>{t.nextActionKind}</dt>
+                  <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                    {value.nextAction.kind}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.requiredCapability}</dt>
+                  <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                    {value.nextAction.requiredCapability}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t.reviewMode}</dt>
+                  <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                    {value.nextAction.reviewMode}
+                  </dd>
+                </div>
+                {value.nextAction.diagnosticBlocker ? (
+                  <div>
+                    <dt>{t.blockerCode}</dt>
+                    <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                      {value.nextAction.diagnosticBlocker.code}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </details>
           </div>
           <dl className="grid grid-cols-2 gap-3 lg:min-w-[350px]">
             <div className="an-elevated rounded-2xl border p-4">
@@ -733,7 +1154,7 @@ export function AdminNextCaseWorkspace({
               <dd className="mt-2 text-sm font-bold">
                 {value.sla.state === "unknown"
                   ? t.slaUnknown
-                  : `${t.today} ${value.sla.deadline}`}
+                  : deadlineLabel || t.slaUnknown}
               </dd>
               <dd className="mt-1">
                 <DueIndicator
@@ -778,14 +1199,14 @@ export function AdminNextCaseWorkspace({
                   locale={locale}
                   recovery={value.nextAction.diagnosticBlocker.recovery}
                 >
-                  {value.nextAction.diagnosticBlocker.code}
+                  {t.dataPrerequisite}
                 </BlockerSummary>
               </div>
             ) : null}
           </div>
           <Link
             className={`${value.nextAction.href && value.nextAction.label ? "an-cta" : "border border-[var(--an-border-strong)] bg-[var(--an-surface-base)] text-[var(--an-text-muted)]"} mt-4 inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold sm:w-auto lg:mt-0`}
-            href={value.nextAction.href || value.fallback.caseHref}
+            href={value.nextAction.href || returnTo}
           >
             {value.nextAction.label || t.currentFallback}
             <ArrowRight aria-hidden="true" className="size-4" />
@@ -888,7 +1309,7 @@ export function AdminNextCaseWorkspace({
         <div>
           {value.customerRecord ? (
             <section
-              className="an-surface scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
+              className="an-surface scroll-mt-36 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
               aria-labelledby="case-customer-record-title"
               data-customer-record
               id="case-customer-record"
@@ -954,7 +1375,7 @@ export function AdminNextCaseWorkspace({
                           locale,
                           value.customerRecord.questions.active.receivedAt,
                         )}{" "}
-                        · {value.customerRecord.questions.active.channel}
+                        · {t.customerPortal}
                       </p>
                     </div>
                     <span className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-[var(--an-danger)] px-3 text-xs font-bold text-[var(--an-danger)]">
@@ -994,7 +1415,11 @@ export function AdminNextCaseWorkspace({
                       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)]">
                         <span>{t.replyPreview}</span>
                         <span className="flex items-center gap-2 text-[var(--an-muted)]">
-                          {value.customerRecord.questions.active.reply.status}
+                          {humanLabel(
+                            t.messageStatuses,
+                            value.customerRecord.questions.active.reply.status,
+                            t.otherMessageStatus,
+                          )}
                           <ChevronDown
                             aria-hidden="true"
                             className="size-4 transition-transform group-open:rotate-180"
@@ -1037,6 +1462,9 @@ export function AdminNextCaseWorkspace({
                   copy={{
                     allLoaded: t.communicationAllLoaded,
                     attachments: t.attachments,
+                    categoryLabels: t.messageCategories,
+                    channelLabels: t.messageChannels,
+                    customerPortal: t.customerPortal,
                     deliveredAt: t.deliveredAt,
                     empty: t.communicationsEmpty,
                     inbound: t.inbound,
@@ -1044,10 +1472,20 @@ export function AdminNextCaseWorkspace({
                     loadingOlder: t.communicationLoadingOlder,
                     of: t.of,
                     openThread: t.openThread,
+                    otherCategory: t.otherMessageCategory,
+                    otherChannel: t.otherMessageChannel,
+                    otherStatus: t.otherMessageStatus,
                     outbound: t.outbound,
+                    rawCategory: t.rawCategory,
+                    rawChannel: t.rawChannel,
+                    rawDirection: t.rawDirection,
+                    rawStatus: t.rawStatus,
+                    recordId: t.recordId,
                     replyTo: t.replyTo,
                     sentAt: t.sentAt,
                     showOlder: t.communicationShowOlder,
+                    statusLabels: t.messageStatuses,
+                    technicalDetails: t.technicalDetails,
                     title: t.communications,
                   }}
                   initialItems={value.customerRecord.communications}
@@ -1097,7 +1535,7 @@ export function AdminNextCaseWorkspace({
                     <div className="px-3 pb-3">
                       {value.customerRecord.commercialVersions.length ? (
                         <ol
-                          className="mt-3 max-h-[24rem] space-y-2 overflow-auto pr-1"
+                          className="mt-3 space-y-2 sm:max-h-[24rem] sm:overflow-auto sm:pr-1"
                           data-commercial-versions
                         >
                           {value.customerRecord.commercialVersions.map(
@@ -1229,7 +1667,7 @@ export function AdminNextCaseWorkspace({
                     <div className="px-3 pb-3">
                       {value.customerRecord.documents.length ? (
                         <ul
-                          className="mt-3 max-h-64 space-y-2 overflow-auto pr-1"
+                          className="mt-3 space-y-2 sm:max-h-64 sm:overflow-auto sm:pr-1"
                           data-document-register
                         >
                           {value.customerRecord.documents.map((document) => (
@@ -1292,7 +1730,7 @@ export function AdminNextCaseWorkspace({
                 <div className="px-4 pb-4">
                   {value.customerRecord.history.length ? (
                     <ol
-                      className="mt-3 grid max-h-80 gap-2 overflow-auto pr-1 sm:grid-cols-2 xl:grid-cols-3"
+                      className="mt-3 grid gap-2 sm:max-h-80 sm:grid-cols-2 sm:overflow-auto sm:pr-1 xl:grid-cols-3"
                       data-business-history
                     >
                       {value.customerRecord.history.map((item) => (
@@ -1305,9 +1743,31 @@ export function AdminNextCaseWorkspace({
                               {item.title}
                             </p>
                             <p className="mt-1 text-[10px] text-[var(--an-subtle)]">
-                              {item.kind} · {item.status} ·{" "}
-                              {auditTimestamp(locale, item.at)}
+                              {humanLabel(
+                                t.historyKinds,
+                                item.kind,
+                                t.otherHistoryKind,
+                              )}{" "}
+                              ·{" "}
+                              {humanLabel(
+                                t.historyStatuses,
+                                item.status,
+                                t.otherHistoryStatus,
+                              )}{" "}
+                              · {auditTimestamp(locale, item.at)}
                             </p>
+                            <details
+                              className="mt-2 text-[10px] text-[var(--an-subtle)]"
+                              data-business-history-diagnostics
+                            >
+                              <summary className="min-h-8 cursor-pointer font-bold">
+                                {t.technicalDetails}
+                              </summary>
+                              <p className="break-all">
+                                {t.recordId}: {item.id} · {t.rawKind}:{" "}
+                                {item.kind} · {t.rawStatus}: {item.status}
+                              </p>
+                            </details>
                           </div>
                           {item.href ? (
                             <Link
@@ -1349,7 +1809,7 @@ export function AdminNextCaseWorkspace({
 
         <div>
           <section
-            className="an-surface min-w-0 rounded-3xl border p-5 sm:p-6"
+            className="an-surface min-w-0 scroll-mt-36 rounded-3xl border p-5 sm:p-6"
             aria-labelledby="case-evidence-title"
             id="case-evidence"
             tabIndex={-1}
@@ -1435,7 +1895,7 @@ export function AdminNextCaseWorkspace({
 
         <div>
           <aside
-            className="an-surface min-w-0 scroll-mt-28 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
+            className="an-surface min-w-0 scroll-mt-36 rounded-3xl border p-5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--an-focus-ring)] sm:p-6"
             aria-labelledby="case-timeline-title"
             id="case-history"
             tabIndex={-1}
@@ -1478,7 +1938,10 @@ export function AdminNextCaseWorkspace({
                         <div className="min-w-0 pt-0.5">
                           <div className="flex items-start justify-between gap-3">
                             <strong className="text-sm text-[var(--an-text)]">
-                              {audit?.label || audit?.action || item.title}
+                              {audit?.label ||
+                                (/[_\.]/u.test(item.title)
+                                  ? t.otherHistoryKind
+                                  : item.title)}
                             </strong>
                             <small className="shrink-0 text-[var(--an-subtle)]">
                               {audit
@@ -1487,66 +1950,83 @@ export function AdminNextCaseWorkspace({
                             </small>
                           </div>
                           {audit ? (
-                            <div className="mt-2 space-y-2 text-xs leading-5 text-[var(--an-muted)]">
-                              <p>
-                                <strong className="text-[var(--an-text)]">
-                                  {t.changedFields}:
-                                </strong>{" "}
-                                {audit.changedFields.length
-                                  ? audit.changedFields.join(", ")
-                                  : t.changedFieldsStatuses[
-                                      audit.changedFieldsStatus
-                                    ]}
-                              </p>
-                              <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--an-subtle)]">
-                                {audit.result ? (
-                                  <div>
-                                    <dt className="inline font-bold">
-                                      {t.result}:{" "}
-                                    </dt>
-                                    <dd className="inline">{audit.result}</dd>
-                                  </div>
-                                ) : null}
-                                {audit.reason ? (
-                                  <div>
-                                    <dt className="inline font-bold">
-                                      {t.reason}:{" "}
-                                    </dt>
-                                    <dd className="inline">{audit.reason}</dd>
-                                  </div>
-                                ) : null}
-                                {audit.version !== null ? (
-                                  <div>
-                                    <dt className="inline font-bold">
-                                      {t.version}:{" "}
-                                    </dt>
-                                    <dd className="inline">{audit.version}</dd>
-                                  </div>
-                                ) : null}
-                                {audit.source ? (
-                                  <div>
-                                    <dt className="inline font-bold">
-                                      {t.sourceLabel}:{" "}
-                                    </dt>
-                                    <dd className="inline">{audit.source}</dd>
-                                  </div>
-                                ) : null}
-                              </dl>
-                              {audit.trace?.length ? (
-                                <p
-                                  className="text-[11px] text-[var(--an-subtle)]"
-                                  data-audit-event-trace
-                                >
-                                  {audit.trace.join(" · ")}
+                            <details
+                              className="mt-2 rounded-xl border border-[var(--an-border)] bg-[var(--an-elevated)] px-3 py-2 text-xs leading-5 text-[var(--an-muted)]"
+                              data-audit-event-diagnostics
+                            >
+                              <summary className="min-h-8 cursor-pointer font-bold text-[var(--an-text)]">
+                                {t.technicalDetails}
+                              </summary>
+                              <div className="mt-2 space-y-2">
+                                <p className="break-all">
+                                  {t.rawKind}: {audit.action}
                                 </p>
-                              ) : null}
-                              <p className="text-[10px] break-all text-[var(--an-subtle)]">
-                                {t.correlation}: {audit.correlationId} ·{" "}
-                                {t.hashStatus}:{" "}
-                                {t.hashStatuses[audit.integrity.hashStatus]} ·{" "}
-                                {t.tamperStatuses[audit.integrity.tamperStatus]}
-                              </p>
-                            </div>
+                                <p>
+                                  <strong className="text-[var(--an-text)]">
+                                    {t.changedFields}:
+                                  </strong>{" "}
+                                  {audit.changedFields.length
+                                    ? audit.changedFields.join(", ")
+                                    : t.changedFieldsStatuses[
+                                        audit.changedFieldsStatus
+                                      ]}
+                                </p>
+                                <dl className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--an-subtle)]">
+                                  {audit.result ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.result}:{" "}
+                                      </dt>
+                                      <dd className="inline">{audit.result}</dd>
+                                    </div>
+                                  ) : null}
+                                  {audit.reason ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.reason}:{" "}
+                                      </dt>
+                                      <dd className="inline">{audit.reason}</dd>
+                                    </div>
+                                  ) : null}
+                                  {audit.version !== null ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.version}:{" "}
+                                      </dt>
+                                      <dd className="inline">
+                                        {audit.version}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {audit.source ? (
+                                    <div>
+                                      <dt className="inline font-bold">
+                                        {t.sourceLabel}:{" "}
+                                      </dt>
+                                      <dd className="inline">{audit.source}</dd>
+                                    </div>
+                                  ) : null}
+                                </dl>
+                                {audit.trace?.length ? (
+                                  <p
+                                    className="text-[11px] text-[var(--an-subtle)]"
+                                    data-audit-event-trace
+                                  >
+                                    {audit.trace.join(" · ")}
+                                  </p>
+                                ) : null}
+                                <p className="text-[10px] break-all text-[var(--an-subtle)]">
+                                  {t.correlation}: {audit.correlationId} ·{" "}
+                                  {t.hashStatus}:{" "}
+                                  {t.hashStatuses[audit.integrity.hashStatus]} ·{" "}
+                                  {
+                                    t.tamperStatuses[
+                                      audit.integrity.tamperStatus
+                                    ]
+                                  }
+                                </p>
+                              </div>
+                            </details>
                           ) : (
                             <p className="mt-1 text-xs leading-5 text-[var(--an-muted)]">
                               {item.summary}
@@ -1588,41 +2068,37 @@ export function AdminNextCaseWorkspace({
         </div>
       </AdminNextCaseWorkspacePanelSwitcher>
 
-      <section
-        className="an-success flex flex-col gap-4 rounded-3xl border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
-        aria-label={t.fallbackTitle}
+      <details
+        className="an-surface group rounded-3xl border"
+        data-case-fallback-tools
       >
-        <div className="flex items-start gap-3">
-          <CheckCircle2
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-sm font-bold text-[var(--an-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)] sm:px-6">
+          <span>{t.fallbackTitle}</span>
+          <ChevronDown
             aria-hidden="true"
-            className="mt-0.5 size-5 shrink-0 text-[var(--an-success)]"
+            className="size-4 text-[var(--an-subtle)] transition-transform group-open:rotate-180"
           />
-          <div>
-            <h2 className="font-bold text-[var(--an-text)]">
-              {t.fallbackTitle}
-            </h2>
-            <p className="mt-1 text-sm text-[var(--an-muted)]">
-              {t.fallbackIntro}
-            </p>
+        </summary>
+        <div className="border-t border-[var(--an-border)] px-5 py-4 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+          <p className="text-sm text-[var(--an-muted)]">{t.fallbackIntro}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-0 sm:flex">
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface)] px-3 text-xs font-bold text-[var(--an-text)] hover:bg-[var(--an-soft)]"
+              href={value.fallback.documentsHref}
+            >
+              <FolderOpen aria-hidden="true" className="size-4" />
+              {t.openDocuments}
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface)] px-3 text-xs font-bold text-[var(--an-text)] hover:bg-[var(--an-soft)]"
+              href={value.fallback.workHref}
+            >
+              <ImageIcon aria-hidden="true" className="size-4" />
+              {t.openWork}
+            </Link>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
-          <Link
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface)] px-3 text-xs font-bold text-[var(--an-success)] hover:bg-[var(--an-soft)]"
-            href={value.fallback.documentsHref}
-          >
-            <FolderOpen aria-hidden="true" className="size-4" />
-            {t.openDocuments}
-          </Link>
-          <Link
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--an-border-strong)] bg-[var(--an-surface)] px-3 text-xs font-bold text-[var(--an-success)] hover:bg-[var(--an-soft)]"
-            href={value.fallback.workHref}
-          >
-            <ImageIcon aria-hidden="true" className="size-4" />
-            {t.openWork}
-          </Link>
-        </div>
-      </section>
+      </details>
     </div>
   );
 }

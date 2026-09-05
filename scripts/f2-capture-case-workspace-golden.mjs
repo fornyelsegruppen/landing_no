@@ -401,7 +401,11 @@ async function inspectWorkspace(page, capture) {
       `expected ${expectsAction ? "primary" : "neutral fallback"}`,
     );
   }
-  if (!expectsAction && result.primaryHref !== "/admin-v2/cases") {
+  if (
+    !expectsAction &&
+    result.primaryHref !==
+      "/admin-next-preview/work?view=today&queue=all&limit=25"
+  ) {
     failGate(capture, "neutral-fallback-target", result.primaryHref || "none");
   }
   const expectedBlockers = capture.stateId === "blocked_work_recovery" ? 1 : 0;

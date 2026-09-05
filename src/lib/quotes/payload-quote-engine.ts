@@ -1,4 +1,5 @@
 import type { Payload, PayloadRequest } from "payload";
+import { resolveContractTermsApproval } from "@/lib/platform/contract-terms-approval";
 import { buildContractSnapshot, buildQuoteSnapshot, documentHash, quoteSnapshotSchema, type ContractSnapshot, type QuoteSnapshot } from "./document";
 
 function idOf(value: unknown) {
@@ -66,8 +67,11 @@ export async function createQuoteDraft(
   }
   if (rule.status !== "approved") throw new Error("Price rule must be approved");
   const terms = termsResult.docs[0];
-  if (!terms || !terms.legalReviewReference || terms.legalReviewReference !== process.env.LEGAL_REVIEW_REFERENCE) {
-    throw new Error("Approved legally reviewed contract terms are required");
+  const termsApproval = resolveContractTermsApproval(process.env);
+  if (!terms || !termsApproval || terms.legalReviewReference !== termsApproval.reference) {
+    throw new Error(
+      "Approved contract terms matching the configured approval source are required",
+    );
   }
   const previous = existing.docs[0];
   const controlledChange = Boolean(

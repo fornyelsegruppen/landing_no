@@ -15,11 +15,27 @@ const panelIds = [
 ] as const;
 type PanelId = (typeof panelIds)[number];
 
-function panelFromHash(hash: string): PanelId {
+const panelByAnchor: Readonly<Record<string, PanelId>> = {
+  "case-customer-record-title": "case-customer-record",
+  "case-evidence-title": "case-evidence",
+  "case-timeline-title": "case-history",
+};
+
+const panelByTab: Readonly<Record<string, PanelId>> = {
+  customer: "case-customer-record",
+  evidence: "case-evidence",
+  history: "case-history",
+};
+
+function panelFromLocation({
+  hash,
+  search,
+}: Pick<Location, "hash" | "search">) {
   const value = hash.startsWith("#") ? hash.slice(1) : hash;
-  return panelIds.includes(value as PanelId)
-    ? (value as PanelId)
-    : "case-customer-record";
+  if (panelIds.includes(value as PanelId)) return value as PanelId;
+  if (panelByAnchor[value]) return panelByAnchor[value];
+  const tab = new URLSearchParams(search).get("tab");
+  return (tab && panelByTab[tab]) || "case-customer-record";
 }
 
 export function AdminNextCaseWorkspacePanelSwitcher({
@@ -37,11 +53,25 @@ export function AdminNextCaseWorkspacePanelSwitcher({
   );
 
   useEffect(() => {
-    const syncHash = () => setActivePanel(panelFromHash(window.location.hash));
-    syncHash();
-    window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
+    const syncLocation = () =>
+      setActivePanel(panelFromLocation(window.location));
+    syncLocation();
+    window.addEventListener("hashchange", syncLocation);
+    window.addEventListener("popstate", syncLocation);
+    return () => {
+      window.removeEventListener("hashchange", syncLocation);
+      window.removeEventListener("popstate", syncLocation);
+    };
   }, []);
+
+  useEffect(() => {
+    const anchor = window.location.hash.slice(1);
+    if (!anchor || panelFromLocation(window.location) !== activePanel) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(anchor)?.scrollIntoView?.({ block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activePanel]);
 
   function activate(panelId: PanelId) {
     setActivePanel(panelId);
@@ -68,27 +98,32 @@ export function AdminNextCaseWorkspacePanelSwitcher({
   return (
     <section className="space-y-4" data-case-panel-switcher>
       <div
-        aria-label={navigationLabel}
-        className="an-surface sticky top-[4.5rem] z-20 grid grid-cols-3 gap-1 rounded-2xl border p-1.5 shadow-xl shadow-black/20 sm:w-fit"
-        role="tablist"
+        className="sticky top-16 z-20 -mx-1 bg-[var(--an-canvas)] px-1 py-2"
+        data-case-sticky-navigation
       >
-        {panelIds.map((panelId, index) => (
-          <button
-            aria-controls={`case-workspace-panel-${panelId}`}
-            aria-selected={activePanel === panelId}
-            className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl px-2 text-center text-xs font-bold text-[var(--an-text-muted)] hover:bg-[var(--an-soft)] hover:text-[var(--an-amber)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)] aria-selected:bg-[var(--an-amber-soft)] aria-selected:text-[var(--an-amber)] sm:px-4 sm:text-sm"
-            data-case-context-link={panelId}
-            id={`case-workspace-tab-${panelId}`}
-            key={panelId}
-            onClick={() => activate(panelId)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
-            role="tab"
-            tabIndex={activePanel === panelId ? 0 : -1}
-            type="button"
-          >
-            {labels[panelId]}
-          </button>
-        ))}
+        <div
+          aria-label={navigationLabel}
+          className="an-surface grid grid-cols-3 gap-1 rounded-2xl border p-1.5 shadow-xl shadow-black/20 sm:w-fit"
+          role="tablist"
+        >
+          {panelIds.map((panelId, index) => (
+            <button
+              aria-controls={`case-workspace-panel-${panelId}`}
+              aria-selected={activePanel === panelId}
+              className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl px-2 text-center text-xs font-bold text-[var(--an-text-muted)] hover:bg-[var(--an-soft)] hover:text-[var(--an-amber)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--an-focus-ring)] aria-selected:bg-[var(--an-amber-soft)] aria-selected:text-[var(--an-amber)] sm:px-4 sm:text-sm"
+              data-case-context-link={panelId}
+              id={`case-workspace-tab-${panelId}`}
+              key={panelId}
+              onClick={() => activate(panelId)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+              role="tab"
+              tabIndex={activePanel === panelId ? 0 : -1}
+              type="button"
+            >
+              {labels[panelId]}
+            </button>
+          ))}
+        </div>
       </div>
       {panelIds.map((panelId, index) => (
         <div

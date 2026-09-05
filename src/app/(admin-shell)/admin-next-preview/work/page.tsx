@@ -9,19 +9,22 @@ import {
 import { AdminAsyncFeedback } from "@/components/admin-next/admin-async-feedback";
 import { adminNextRoleHasReadCapability } from "@/lib/admin-next/capability-registry";
 import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
+import { resolvePreviewE2eOperatorCapabilities } from "@/lib/admin-next/preview-e2e-operator-capabilities";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { resolveAdminNextServerRead } from "@/lib/admin-next/server-read-resolver";
 import type { AdminNextTodayAdapter } from "@/lib/admin-next/today-contract";
 import { createAdminNextCanonicalTodayAdapter } from "@/lib/admin-next/today-read-adapter";
 import { createAdminNextWorkQueueFixture } from "@/lib/admin-next/work-queue-fixture";
+import {
+  adminNextPreviewCaseWorkspaceHref,
+  adminNextPreviewWorkQueueEntry,
+} from "@/lib/admin-next/work-queue-navigation";
 import type { CaseNextActionCapability } from "@/lib/admin-v2/case-next-action-presentation";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-const defaultHref = "/admin-next-preview/work?view=today&queue=all&limit=25";
 
 const loadErrorCopy = {
   nb: {
@@ -93,7 +96,7 @@ export default async function AdminNextPreviewWorkQueuePage({
   if (access.kind === "legacy_fallback") redirect(access.href);
 
   const state = parseAdminNextWorkQueueRouteState(await searchParams);
-  if (!state.parsed.ok) redirect(defaultHref);
+  if (!state.parsed.ok) redirect(adminNextPreviewWorkQueueEntry);
   if (state.needsCanonicalRedirect) {
     redirect(
       adminNextWorkQueueHref({
@@ -103,13 +106,19 @@ export default async function AdminNextPreviewWorkQueuePage({
       }),
     );
   }
+  const canReadCases = adminNextRoleHasReadCapability(user.role, "case.read");
   const localFixture = fixtureAdapter(user.interfaceLanguage);
   let canonical: AdminNextTodayAdapter | undefined;
   if (process.env.VERCEL_ENV === "preview") {
     try {
       const grantedCapabilities: readonly CaseNextActionCapability[] =
-        adminNextRoleHasReadCapability(user.role, "case.read")
-          ? ["case.read"]
+        canReadCases
+          ? [
+              ...new Set<CaseNextActionCapability>([
+                "case.read",
+                ...resolvePreviewE2eOperatorCapabilities({ role: user.role }),
+              ]),
+            ]
           : [];
       canonical = createAdminNextCanonicalTodayAdapter(
         await getPayload(),
@@ -152,14 +161,34 @@ export default async function AdminNextPreviewWorkQueuePage({
     result.workQueue,
     user.interfaceLanguage,
   );
+  const workQueueQuery = result.workQueue.query;
   const source = result.source;
+  const workQueue = canReadCases
+    ? {
+        ...result.workQueue,
+        items: result.workQueue.items.map((item) => ({
+          ...item,
+          case: {
+            ...item.case,
+            href: adminNextPreviewCaseWorkspaceHref({
+              caseReference: item.case.reference,
+              returnTo: adminNextWorkQueueHref({
+                basePath: "/admin-next-preview/work",
+                query: workQueueQuery,
+                selectedCaseId: item.case.id,
+              }),
+            }),
+          },
+        })),
+      }
+    : result.workQueue;
 
   return (
     <AdminNextWorkQueue
       actionKinds={filterOptions.actionKinds}
       filterOwners={filterOptions.filterOwners}
       locale={user.interfaceLanguage}
-      page={result.workQueue}
+      page={workQueue}
       processStages={filterOptions.processStages}
       selectedCaseId={state.selectedCaseId}
       source={source}

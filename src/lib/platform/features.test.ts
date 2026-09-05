@@ -151,6 +151,33 @@ describe("platform feature configuration", () => {
     ).toBe("configuration_required");
   });
 
+  it("labels nonbinding Preview test terms without fabricating legal approval", () => {
+    const status = readIntegrationStatus({
+      VERCEL_ENV: "preview",
+      PREVIEW_E2E_NONBINDING_DOCUMENTS: "true",
+      PREVIEW_E2E_EXPECTED_DB_HOST:
+        "ep-ancient-band-aujp1u5u-pooler.example.test",
+      DATABASE_URL:
+        "postgresql://redacted@ep-ancient-band-aujp1u5u-pooler.example.test/redacted",
+    });
+    expect(status.legal).toEqual({
+      name: "legal",
+      readiness: "ready",
+      provider: "preview-nonbinding-test-terms",
+      missing: [],
+    });
+    expect(
+      readIntegrationStatus({
+        VERCEL_ENV: "production",
+        PREVIEW_E2E_NONBINDING_DOCUMENTS: "true",
+        PREVIEW_E2E_EXPECTED_DB_HOST:
+          "ep-ancient-band-aujp1u5u-pooler.example.test",
+        DATABASE_URL:
+          "postgresql://redacted@ep-ancient-band-aujp1u5u-pooler.example.test/redacted",
+      }).legal.readiness,
+    ).toBe("configuration_required");
+  });
+
   it("keeps every remediation capability independently reversible", () => {
     const flags = readFeatureFlags({
       FEATURE_CASE_STATE_ENGINE_V2: "true",

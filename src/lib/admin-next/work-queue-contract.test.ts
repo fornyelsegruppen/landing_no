@@ -16,7 +16,9 @@ function executableInput(
 ): CreateWorkQueueItemInput {
   return {
     case: {
+      customerName: "  Ada Nordmann  ",
       id: "case:42",
+      postalAddress: "  Testveien 42, 0001 Oslo  ",
       revision: 7,
       reference: "TF-42",
       href: "/admin-v2/cases/42",
@@ -104,7 +106,13 @@ describe("Admin Next work queue contract", () => {
 
     expect(item).toMatchObject({
       contractVersion: "f2-v1",
-      case: { id: "case:42", revision: 7, reference: "TF-42" },
+      case: {
+        customerName: "Ada Nordmann",
+        id: "case:42",
+        postalAddress: "Testveien 42, 0001 Oslo",
+        revision: 7,
+        reference: "TF-42",
+      },
       locale: "lt",
       action: {
         kind: "generate_reply",
@@ -135,6 +143,17 @@ describe("Admin Next work queue contract", () => {
       dueAt: "2026-09-04T10:00:00.000Z",
       reasonCode: "OVERDUE",
       slaBand: "overdue",
+    });
+  });
+
+  it("represents unavailable customer identity fields as explicit unknowns", () => {
+    const input = executableInput();
+    input.case.customerName = "  ";
+    input.case.postalAddress = undefined;
+
+    expect(createWorkQueueItem(input, now).case).toMatchObject({
+      customerName: null,
+      postalAddress: null,
     });
   });
 

@@ -27,7 +27,8 @@
     "db:ensure-copy": "node --env-file=.env scripts/ensure-page-copy-schema.mjs",
     "db:migrate": "node --env-file=.env scripts/run-migrate.mjs",
     "db:migrate:status": "node --env-file=.env scripts/run-migrate-status.mjs",
-    "db:migrate:baseline": "node --env-file=.env scripts/create-baseline-migration.mjs"
+    "db:migrate:baseline": "node --env-file=.env scripts/create-baseline-migration.mjs",
+    "preview:e2e:commercial": "node scripts/bootstrap-preview-e2e-commercial.mjs"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.88.0",

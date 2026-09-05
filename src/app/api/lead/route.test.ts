@@ -5,7 +5,14 @@ const mocks = vi.hoisted(() => ({
   receipt: vi.fn(),
   deliver: vi.fn(),
   enqueueAi: vi.fn(),
+  resendSend: vi.fn(),
   verifyTurnstile: vi.fn(),
+}));
+
+vi.mock("resend", () => ({
+  Resend: class {
+    emails = { send: mocks.resendSend };
+  },
 }));
 
 vi.mock("@/lib/payload", () => ({
@@ -49,12 +56,17 @@ describe("public lead durability", () => {
     process.env.PAYLOAD_SECRET = "test-secret-at-least-32-characters-long";
     delete process.env.RESEND_API_KEY;
     delete process.env.FEATURE_AI_DRAFTS;
+    delete process.env.PREVIEW_EMAIL_RECIPIENT_ALLOWLIST;
+    delete process.env.LEAD_TO_EMAIL;
     mocks.create.mockReset().mockResolvedValue({ id: 55 });
     mocks.receipt
       .mockReset()
       .mockResolvedValue({ skipped: true, reason: "no_email" });
     mocks.deliver.mockReset();
     mocks.enqueueAi.mockReset();
+    mocks.resendSend
+      .mockReset()
+      .mockResolvedValue({ data: { id: "preview-intake-1" }, error: null });
     mocks.verifyTurnstile.mockReset().mockResolvedValue({
       ok: true,
       skipped: true,
@@ -62,7 +74,11 @@ describe("public lead durability", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     delete process.env.FEATURE_AI_DRAFTS;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.PREVIEW_EMAIL_RECIPIENT_ALLOWLIST;
+    delete process.env.LEAD_TO_EMAIL;
   });
 
   it("returns success after the lead is saved even when receipt creation fails", async () => {
@@ -109,5 +125,28 @@ describe("public lead durability", () => {
     expect(mocks.receipt).not.toHaveBeenCalled();
     expect(mocks.deliver).not.toHaveBeenCalled();
     expect(mocks.enqueueAi).not.toHaveBeenCalled();
+  });
+
+  it("restricts and brands the Preview intake notification", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    process.env.RESEND_API_KEY = "preview-resend-key";
+    process.env.PREVIEW_EMAIL_RECIPIENT_ALLOWLIST =
+      "fornyelsegruppen@gmail.com";
+    process.env.LEAD_TO_EMAIL = "fornyelsegruppen@gmail.com";
+
+    const allowed = await POST(request("fornyelsegruppen@gmail.com"));
+    expect(allowed.status).toBe(200);
+    expect(mocks.resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "fornyelsegruppen@gmail.com",
+        subject: expect.stringMatching(/^\[PREVIEW TEST\] /u),
+      }),
+    );
+
+    mocks.resendSend.mockClear();
+    process.env.LEAD_TO_EMAIL = "other@example.no";
+    const blocked = await POST(request("fornyelsegruppen@gmail.com"));
+    expect(blocked.status).toBe(200);
+    expect(mocks.resendSend).not.toHaveBeenCalled();
   });
 });

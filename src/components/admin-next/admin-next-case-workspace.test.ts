@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AdminNextCaseWorkspace } from "@/components/admin-next/admin-next-case-workspace";
+import {
+  AdminNextCaseWorkspace,
+  formatCaseSlaDeadline,
+} from "@/components/admin-next/admin-next-case-workspace";
 import type { AdminNextCaseWorkspaceView } from "@/lib/admin-next/case-workspace-contract";
 import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-fixture";
 import { parseAdminNextRfRoute } from "@/lib/admin-next/rf-route-contract";
@@ -28,6 +31,10 @@ describe("Admin Next Case Workspace preview", () => {
       expect(html.match(/role="tab"/gu)).toHaveLength(3);
       expect(html.match(/role="tabpanel"/gu)).toHaveLength(3);
       expect(html.match(/ hidden=""/gu)).toHaveLength(2);
+      expect(html).toContain("data-case-sticky-navigation");
+      expect(html).toContain("sticky top-16");
+      expect(html).toContain("bg-[var(--an-canvas)]");
+      expect(html.match(/scroll-mt-36/gu)?.length).toBeGreaterThanOrEqual(4);
       for (const [index, target] of [
         "case-customer-record",
         "case-evidence",
@@ -41,6 +48,54 @@ describe("Admin Next Case Workspace preview", () => {
       }
     },
   );
+
+  it("uses the server-validated Work Queue return path for the back link", () => {
+    const returnTo =
+      "/admin-next-preview/work?view=today&queue=mine&limit=10&selected=case%3A1042#work-queue-detail";
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "lt",
+        returnTo,
+        value: adminNextCaseWorkspaceFixture,
+      }),
+    );
+
+    expect(html).toContain("Grįžti į darbų eilę");
+    expect(html).toContain(
+      'href="/admin-next-preview/work?view=today&amp;queue=mine&amp;limit=10&amp;selected=case%3A1042#work-queue-detail"',
+    );
+  });
+
+  it("keeps the no-action fallback inside the new Work Queue", () => {
+    const returnTo =
+      "/admin-next-preview/work?view=today&queue=mine&limit=10&selected=case%3A1042#work-queue-detail";
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "lt",
+        returnTo,
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          nextAction: {
+            ...adminNextCaseWorkspaceFixture.nextAction,
+            kind: "none",
+            href: null,
+            interaction: { mode: "read_only", reason: "no_action" },
+            label: null,
+            reviewMode: "none",
+          },
+        },
+      }),
+    );
+
+    expect(html.match(/>Grįžti į darbų eilę</gu)).toHaveLength(2);
+    expect(
+      html.match(
+        /href="\/admin-next-preview\/work\?view=today&amp;queue=mine&amp;limit=10&amp;selected=case%3A1042#work-queue-detail"/gu,
+      ),
+    ).toHaveLength(2);
+    expect(html).toContain('data-case-action-mode="read_only"');
+    expect(html).toContain("Šiuo metu bylai veiksmo nereikia.");
+  });
 
   it("renders the customer conversation, commercial version chain and document register", () => {
     const html = renderToStaticMarkup(
@@ -82,6 +137,11 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("Kundespørsmål mottatt");
     expect(html.match(/<details/gu)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain("group-open:rotate-180");
+    expect(html).not.toMatch(/\smax-h-(?:\[24rem\]|64|80)\b/u);
+    expect(html).not.toMatch(/\soverflow-auto\b/u);
+    expect(html).toContain("sm:max-h-[24rem]");
+    expect(html).toContain("sm:max-h-64");
+    expect(html).toContain("sm:max-h-80");
   });
 
   it("keeps the effective signed contract visible in the collapsed commercial summary", () => {
@@ -171,6 +231,24 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain("Įvykių seka");
   });
 
+  it.each([
+    ["lt", "Rytoj · 10:30"],
+    ["nb", "I morgen · 10:30"],
+    ["en", "Tomorrow · 10:30"],
+  ] as const)(
+    "formats the SLA relative day and clock in Europe/Oslo for %s",
+    (locale, expected) => {
+      expect(
+        formatCaseSlaDeadline(
+          "2026-09-06T08:30:00.000Z",
+          locale,
+          new Date("2026-09-05T10:00:00.000Z"),
+        ),
+      ).toBe(expected);
+      expect(formatCaseSlaDeadline("09:30", locale)).toBe("09:30");
+    },
+  );
+
   it("labels canonical data accurately instead of calling it synthetic", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextCaseWorkspace, {
@@ -179,9 +257,93 @@ describe("Admin Next Case Workspace preview", () => {
         value: adminNextCaseWorkspaceFixture,
       }),
     );
-    expect(html).toContain("Canonical Preview data");
-    expect(html).not.toContain("Synthetic Preview data");
+    expect(html).toContain("Live Preview case data");
+    expect(html).not.toContain("Synthetic Preview test data");
+    expect(html).not.toContain("Regression test data");
+    expect(html).toContain("data-case-technical-diagnostics");
+    expect(html.indexOf("canonical")).toBeGreaterThan(
+      html.indexOf("data-case-technical-diagnostics"),
+    );
   });
+
+  it("marks only explicit frozen regression content as test data without changing recorded delivery state", () => {
+    const customerRecord = adminNextCaseWorkspaceFixture.customerRecord;
+    if (!customerRecord) throw new Error("Expected fixture customer record");
+    const html = renderToStaticMarkup(
+      createElement(AdminNextCaseWorkspace, {
+        locale: "lt",
+        source: "canonical",
+        value: {
+          ...adminNextCaseWorkspaceFixture,
+          customer: "Preview klientas",
+          address: "CAS cas-mtnu7go1 left 12, 0184 Oslo",
+          service: "takvask_impregnering",
+          customerRecord: {
+            ...customerRecord,
+            questions: {
+              ...customerRecord.questions,
+              active: customerRecord.questions.active
+                ? {
+                    ...customerRecord.questions.active,
+                    bodyText: "Sintetinis regresijos bandymas.",
+                  }
+                : undefined,
+            },
+            communications: customerRecord.communications.map(
+              (message, index) =>
+                index === 0
+                  ? {
+                      ...message,
+                      bodyText: "Tai nėra realus siuntimas.",
+                    }
+                  : message,
+            ),
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain('data-case-test-data-cue="explicit_content"');
+    expect(html).toContain("Tiesioginiai Preview bylos duomenys");
+    expect(html).toContain("Regresijos bandymo duomenys");
+    expect(html).toContain(
+      "left 12, 0184 Oslo · Stogo plovimas ir impregnavimas",
+    );
+    expect(html).toContain("Klientų portalas");
+    expect(html).toContain("Kliento klausimas");
+    expect(html).toContain("Pristatyta");
+    expect(html.indexOf("takvask_impregnering")).toBeGreaterThan(
+      html.indexOf("data-case-technical-diagnostics"),
+    );
+    expect(html.indexOf("CAS cas-mtnu7go1 left 12, 0184 Oslo")).toBeGreaterThan(
+      html.indexOf("data-case-technical-diagnostics"),
+    );
+  });
+
+  it.each([
+    ["lt", "Klientų portalas", "Kliento klausimas", "Gauta"],
+    ["nb", "Kundeportal", "Kundespørsmål", "Mottatt"],
+    ["en", "Customer portal", "Customer question", "Received"],
+  ] as const)(
+    "shows localized customer-message labels and confines the raw category to diagnostics for %s",
+    (locale, portal, category, status) => {
+      const html = renderToStaticMarkup(
+        createElement(AdminNextCaseWorkspace, {
+          locale,
+          value: adminNextCaseWorkspaceFixture,
+        }),
+      );
+
+      expect(html).toContain(portal);
+      expect(html).toContain(category);
+      expect(html).toContain(status);
+      expect(html).toContain("data-message-technical-diagnostics");
+      expect(html.indexOf("customer_question")).toBeGreaterThan(
+        html.indexOf("data-message-technical-diagnostics"),
+      );
+      expect(html).not.toMatch(/Atidaryti Admin V2|veikiančią bylą/iu);
+    },
+  );
 
   it("renders one diagnostic blocker and no fake evidence link when an operator target is unavailable", () => {
     const evidence = adminNextCaseWorkspaceFixture.evidence[0];
@@ -236,7 +398,12 @@ describe("Admin Next Case Workspace preview", () => {
     expect(html).toContain(
       'href="/admin-next-preview/cases/TF-1042/documents/preflight"',
     );
-    expect(html).toContain("Preview nekeičia klientų duomenų");
+    expect(html).toContain("data-case-fallback-tools");
+    expect(html).toContain("Papildomi bylos įrankiai");
+    expect(html).toContain(
+      "Esami dokumentų ir darbų maršrutai palikti saugiam grįžimui.",
+    );
+    expect(html).not.toMatch(/Atidaryti Admin V2|veikiančią bylą/iu);
   });
 
   it("renders only RF links that round-trip through the canonical route contract", () => {
@@ -339,7 +506,10 @@ describe("Admin Next Case Workspace preview", () => {
 
     expect(html).toContain('data-audit-history-state="ready"');
     expect(html).toContain("Bylos adresas pataisytas");
-    expect(html).not.toContain("case.address_corrected");
+    expect(html).toContain("data-audit-event-diagnostics");
+    expect(html.indexOf("case.address_corrected")).toBeGreaterThan(
+      html.indexOf("data-audit-event-diagnostics"),
+    );
     expect(html).toContain("data-audit-event-trace");
     expect(html).toContain("Pasiūlymas: T-13-V3");
     expect(html).toContain("Sutartis: K-13-V3");

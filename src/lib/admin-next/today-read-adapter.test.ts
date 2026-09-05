@@ -70,7 +70,12 @@ describe("canonical Today Work Queue read", () => {
 
     expect(result.workQueue?.items).toHaveLength(1);
     expect(result.workQueue?.items[0]).toMatchObject({
-      case: { id: "case:7", revision: 3 },
+      case: {
+        customerName: "Customer 7",
+        id: "case:7",
+        postalAddress: "Testveien 7 Oslo",
+        revision: 3,
+      },
       priority: { slaBand: "future" },
     });
     expect(result.value[0].workQueueItem).toBe(result.workQueue?.items[0]);
@@ -414,6 +419,33 @@ describe("canonical Today Work Queue read", () => {
     await expect(
       createAdminNextCanonicalTodayAdapter(
         payloadFor(revisedData).payload,
+        "",
+        { now: () => new Date("2026-09-04T10:00:00.000Z") },
+      ).load(query(`view=today&queue=all&limit=2&cursor=${cursor}`)),
+    ).rejects.toMatchObject({ code: "INVALID_CURSOR_PAYLOAD" });
+  });
+
+  it("rejects a cursor when visible customer identity changes", async () => {
+    const firstData = {
+      leads: [lead(1), lead(2), lead(3)],
+    } satisfies CollectionData;
+    const first = await createAdminNextCanonicalTodayAdapter(
+      payloadFor(firstData).payload,
+      "",
+      { now: () => new Date("2026-09-04T10:00:00.000Z") },
+    ).load(query("view=today&queue=all&limit=2"));
+    const cursor = first.workQueue?.pageInfo.nextCursor;
+
+    const changedData = {
+      leads: [
+        lead(1),
+        lead(2, { name: "Changed Customer", postal: "0002" }),
+        lead(3),
+      ],
+    } satisfies CollectionData;
+    await expect(
+      createAdminNextCanonicalTodayAdapter(
+        payloadFor(changedData).payload,
         "",
         { now: () => new Date("2026-09-04T10:00:00.000Z") },
       ).load(query(`view=today&queue=all&limit=2&cursor=${cursor}`)),

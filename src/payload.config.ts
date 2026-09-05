@@ -50,6 +50,8 @@ import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 import { resolveAdminNextPreviewTrustedOrigin } from "./lib/auth/preview-trusted-origin";
 import { isPreviewCaseAddressCommandEnabled } from "./lib/cases/preview-case-address-feature";
+import { withPreviewEmailPolicy } from "./lib/messages/preview-payload-email-adapter";
+import { resolveSiteUrl } from "./lib/site";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -73,10 +75,12 @@ function payloadFromAddress() {
 }
 
 const serverURL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000");
+  process.env.VERCEL_ENV === "preview"
+    ? resolveSiteUrl(process.env)
+    : process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : "http://localhost:3000");
 
 /** Origins allowed to use the auth cookie (CSRF). Must include every host where /admin is opened. */
 const trustedOrigins = Array.from(
@@ -134,11 +138,13 @@ const databaseAdapter = usePostgres
 export default buildConfig({
   serverURL,
   email: resendApiKey
-    ? resendAdapter({
-        apiKey: resendApiKey,
-        defaultFromAddress: payloadFromAddress(),
-        defaultFromName: "Takfornyelse",
-      })
+    ? withPreviewEmailPolicy(
+        resendAdapter({
+          apiKey: resendApiKey,
+          defaultFromAddress: payloadFromAddress(),
+          defaultFromName: "Takfornyelse",
+        }),
+      )
     : undefined,
   csrf: trustedOrigins,
   cors: trustedOrigins,

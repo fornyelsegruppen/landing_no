@@ -31,8 +31,8 @@ const copy = {
     intro:
       "Velg én sak, forstå hvorfor den ligger her, og åpne bare det eksakte arbeidsområdet.",
     preview: {
-      canonical: "Beskyttet Preview · canonical data",
-      fixture: "Beskyttet Preview · syntetiske data",
+      canonical: "Beskyttet Preview · direkte saksdata · køen leser bare",
+      fixture: "Lokal UI-demo · syntetiske data · ingen kundedata",
     },
     queueLabel: "Køvisning",
     queues: {
@@ -44,9 +44,12 @@ const copy = {
       unassigned: "Ufordelt",
     },
     filters: "Avgrens arbeidskøen",
+    advancedFilters: "Avanserte filtre",
+    activeAdvancedFilters: "aktive avanserte filtre",
     stage: "Prosessfase",
     action: "Neste handling",
     owner: "Ansvarlig",
+    selectedOwnerUnavailable: "Valgt ansvarlig er ikke i dette køgrunnlaget",
     any: "Alle",
     apply: "Bruk filtre",
     reset: "Nullstill",
@@ -96,6 +99,23 @@ const copy = {
     },
     select: "Vis detaljer",
     detailTitle: "Saksdetalj",
+    caseLabel: "Sak",
+    customerLabel: "Kunde",
+    addressLabel: "Adresse",
+    customerUnavailable: "Kundenavn finnes ikke i køgrunnlaget",
+    addressUnavailable: "Adresse finnes ikke i køgrunnlaget",
+    currentStep: "Nåværende steg",
+    processProgress: "Saksforløp",
+    processBasis: "Vises fra systemets registrerte neste prosessfase",
+    stepStates: {
+      completed: "Fullført",
+      current: "Nå",
+      pending: "Senere",
+    },
+    nextAllowedAction: "Én tillatt neste handling",
+    nextStepDecision: "Avgjørelse for neste steg",
+    noAllowedAction: "Ingen handling tilbys her",
+    openCase: "Åpne sak",
     choose: "Velg en synlig sak fra listen for å se neste handling.",
     unavailable:
       "Det valgte saks-ID-et finnes ikke i denne filtrerte visningen. Ingen detalj eller handling vises.",
@@ -119,16 +139,33 @@ const copy = {
     due: "Frist",
     wake: "Vekk køelementet",
     noDate: "Ingen dato",
+    deadlineUnknown: "Fristen er ikke definert i køgrunnlaget",
+    deadlineReason: "Fristgrunnlag",
     blockers: "Blokkeringer",
     noBlockers: "Ingen registrerte blokkeringer",
-    sourcePolicy:
-      "Preview-køen sender ingen kommandoer og gjør ingen endringer.",
+    decisionLabels: {
+      allowed: "Handling er tillatt",
+      waiting: "Venter på en annen part",
+      data_prerequisite: "Datagrunnlag mangler",
+      missing_capability: "Tilgang mangler",
+      environment_restriction: "Begrenset av dette miljøet",
+      no_blockers: "Ingen blokkeringer, ingen handling nødvendig",
+    },
+    technical: "Tekniske detaljer",
+    selectionDiagnostics: "Mål, versjon og utvalgsdiagnostikk",
+    sourcePolicy: {
+      canonical:
+        "Denne Preview-køen sender ingen kommandoer og gjør ingen endringer.",
+      fixture:
+        "Denne lokale UI-demoen bruker bare syntetiske data og lagrer ingenting.",
+    },
     readOnlyReasons: {
       capability_denied: "Tilgangen tillater ikke denne handlingen.",
       diagnostic_blocker:
         "En lagret blokkering mangler en trygg canonical måltilordning.",
       no_action: "Saken krever ingen handling nå.",
-      source_not_canonical: "Kilden er en kontrollert skyggeavlesning.",
+      source_not_canonical:
+        "Denne miljømodusen tillater bare lesing; handlinger er slått av.",
       target_unavailable: "Et eksakt arbeidsmål er ikke tilgjengelig.",
     },
     parties: {
@@ -154,8 +191,10 @@ const copy = {
     intro:
       "Pasirinkite vieną bylą, supraskite jos prioritetą ir atverkite tik tikslinę darbo vietą.",
     preview: {
-      canonical: "Apsaugota Preview · canonical duomenys",
-      fixture: "Apsaugota Preview · sintetiniai duomenys",
+      canonical:
+        "Apsaugota Preview · tiesioginiai bylų duomenys · eilė tik skaito",
+      fixture:
+        "Vietinis UI pavyzdys · sintetiniai duomenys · be klientų duomenų",
     },
     queueLabel: "Eilės vaizdas",
     queues: {
@@ -167,9 +206,12 @@ const copy = {
       unassigned: "Nepriskirta",
     },
     filters: "Susiaurinti darbo eilę",
+    advancedFilters: "Išplėstiniai filtrai",
+    activeAdvancedFilters: "aktyvūs išplėstiniai filtrai",
     stage: "Proceso etapas",
     action: "Kitas veiksmas",
     owner: "Atsakingas",
+    selectedOwnerUnavailable: "Pasirinkto atsakingo šiame eilės rinkinyje nėra",
     any: "Visi",
     apply: "Taikyti filtrus",
     reset: "Atstatyti",
@@ -219,6 +261,23 @@ const copy = {
     },
     select: "Rodyti detales",
     detailTitle: "Bylos detalė",
+    caseLabel: "Byla",
+    customerLabel: "Klientas",
+    addressLabel: "Adresas",
+    customerUnavailable: "Kliento vardas į eilės duomenis nepatenka",
+    addressUnavailable: "Adresas į eilės duomenis nepatenka",
+    currentStep: "Dabartinis etapas",
+    processProgress: "Bylos eiga",
+    processBasis: "Rodoma pagal sistemoje užregistruotą kito veiksmo etapą",
+    stepStates: {
+      completed: "Baigta",
+      current: "Dabar",
+      pending: "Vėliau",
+    },
+    nextAllowedAction: "Vienas leidžiamas kitas veiksmas",
+    nextStepDecision: "Kito žingsnio būsena",
+    noAllowedAction: "Šiame vaizde veiksmas nesiūlomas",
+    openCase: "Atverti bylą",
     choose: "Pasirinkite matomą bylą iš sąrašo, kad matytumėte kitą veiksmą.",
     unavailable:
       "Pasirinkto bylos ID šiame filtruotame vaizde nėra. Detalė ir veiksmas nerodomi.",
@@ -242,15 +301,32 @@ const copy = {
     due: "Terminas",
     wake: "Grąžinti į eilę",
     noDate: "Datos nėra",
+    deadlineUnknown: "Terminas darbo eilės duomenyse nenustatytas",
+    deadlineReason: "Termino pagrindimas",
     blockers: "Blokavimai",
     noBlockers: "Registruotų blokavimų nėra",
-    sourcePolicy: "Preview eilė nesiunčia komandų ir nekeičia duomenų.",
+    decisionLabels: {
+      allowed: "Veiksmas leidžiamas",
+      waiting: "Laukiama kitos šalies",
+      data_prerequisite: "Trūksta duomenų pagrindo",
+      missing_capability: "Trūksta prieigos teisės",
+      environment_restriction: "Riboja ši aplinka",
+      no_blockers: "Blokavimų nėra, veiksmo nereikia",
+    },
+    technical: "Techninės detalės",
+    selectionDiagnostics: "Tikslas, versija ir pasirinkimo diagnostika",
+    sourcePolicy: {
+      canonical: "Ši Preview eilė nesiunčia komandų ir nekeičia duomenų.",
+      fixture:
+        "Šis vietinis UI pavyzdys naudoja tik sintetinius duomenis ir nieko neišsaugo.",
+    },
     readOnlyReasons: {
       capability_denied: "Turima prieiga neleidžia atlikti šio veiksmo.",
       diagnostic_blocker:
         "Išsaugotam blokavimui nėra saugiai susieto canonical tikslo.",
       no_action: "Šiuo metu bylai veiksmo nereikia.",
-      source_not_canonical: "Šaltinis yra kontroliuojamas šešėlinis skaitymas.",
+      source_not_canonical:
+        "Šis aplinkos režimas leidžia tik peržiūrą; veiksmai išjungti.",
       target_unavailable: "Tikslinė darbo vieta nepasiekiama.",
     },
     parties: {
@@ -276,8 +352,8 @@ const copy = {
     intro:
       "Select one case, understand its priority, and open only the exact workbench.",
     preview: {
-      canonical: "Protected Preview · canonical data",
-      fixture: "Protected Preview · synthetic data",
+      canonical: "Protected Preview · live case data · the queue is read-only",
+      fixture: "Local UI example · synthetic data · no customer data",
     },
     queueLabel: "Queue view",
     queues: {
@@ -289,9 +365,12 @@ const copy = {
       unassigned: "Unassigned",
     },
     filters: "Narrow the work queue",
+    advancedFilters: "Advanced filters",
+    activeAdvancedFilters: "active advanced filters",
     stage: "Process stage",
     action: "Next action",
     owner: "Owner",
+    selectedOwnerUnavailable: "Selected owner is not in this queue data",
     any: "All",
     apply: "Apply filters",
     reset: "Reset",
@@ -340,6 +419,23 @@ const copy = {
     },
     select: "Show details",
     detailTitle: "Case detail",
+    caseLabel: "Case",
+    customerLabel: "Customer",
+    addressLabel: "Address",
+    customerUnavailable: "Customer name is not included in the queue payload",
+    addressUnavailable: "Address is not included in the queue payload",
+    currentStep: "Current step",
+    processProgress: "Case progress",
+    processBasis: "Shown from the system's recorded next-action stage",
+    stepStates: {
+      completed: "Completed",
+      current: "Current",
+      pending: "Pending",
+    },
+    nextAllowedAction: "One allowed next action",
+    nextStepDecision: "Next-step decision",
+    noAllowedAction: "No action is offered here",
+    openCase: "Open case",
     choose: "Select a visible case from the list to inspect its next action.",
     unavailable:
       "The selected case ID is not present in this filtered view. No detail or action is shown.",
@@ -363,15 +459,32 @@ const copy = {
     due: "Due",
     wake: "Return to queue",
     noDate: "No date",
+    deadlineUnknown: "No deadline is defined in the work queue data",
+    deadlineReason: "Deadline basis",
     blockers: "Blockers",
     noBlockers: "No recorded blockers",
-    sourcePolicy: "The Preview queue sends no commands and changes no data.",
+    decisionLabels: {
+      allowed: "Action is allowed",
+      waiting: "Waiting for another party",
+      data_prerequisite: "Data prerequisite is missing",
+      missing_capability: "Capability is missing",
+      environment_restriction: "Restricted by this environment",
+      no_blockers: "No blockers and no action is needed",
+    },
+    technical: "Technical details",
+    selectionDiagnostics: "Target, version, and selection diagnostics",
+    sourcePolicy: {
+      canonical: "This Preview queue sends no commands and changes no data.",
+      fixture:
+        "This local UI example uses synthetic data only and stores nothing.",
+    },
     readOnlyReasons: {
       capability_denied: "Your access does not allow this action.",
       diagnostic_blocker:
         "The stored blocker has no safely mapped canonical target.",
       no_action: "The case requires no action now.",
-      source_not_canonical: "The source is a controlled shadow read.",
+      source_not_canonical:
+        "This environment mode is view-only; actions are switched off.",
       target_unavailable: "An exact work target is unavailable.",
     },
     parties: {
@@ -410,6 +523,60 @@ const stateStyle = {
   read_only:
     "border-[var(--an-border-strong)] bg-[var(--an-surface-soft)] text-[var(--an-text-muted)]",
 } as const;
+
+const processStageOrder = [
+  "inquiry",
+  "evidence",
+  "commercial",
+  "agreement",
+  "work",
+  "completion",
+] as const satisfies readonly WorkQueueItem["action"]["presentation"]["processStage"][];
+
+type WorkQueueDecisionKind =
+  | "allowed"
+  | "waiting"
+  | "data_prerequisite"
+  | "missing_capability"
+  | "environment_restriction"
+  | "no_blockers";
+
+const decisionStyle: Record<WorkQueueDecisionKind, string> = {
+  allowed:
+    "border-[var(--an-action)] bg-[var(--an-action-soft)] text-[var(--an-action)]",
+  waiting:
+    "border-[var(--an-info)] bg-[var(--an-info-soft)] text-[var(--an-info)]",
+  data_prerequisite:
+    "border-[var(--an-danger)] bg-[var(--an-danger-soft)] text-[var(--an-danger)]",
+  missing_capability:
+    "border-[var(--an-amber)] bg-[var(--an-amber-soft)] text-[var(--an-amber)]",
+  environment_restriction:
+    "border-[var(--an-border-strong)] bg-[var(--an-surface-soft)] text-[var(--an-text-muted)]",
+  no_blockers:
+    "border-[var(--an-success)] bg-[var(--an-success-soft)] text-[var(--an-success)]",
+};
+
+export function workQueueDecisionKind(
+  item: WorkQueueItem,
+): WorkQueueDecisionKind {
+  if (
+    item.blockers.length > 0 ||
+    (item.interaction.mode === "read_only" &&
+      (item.interaction.reason === "diagnostic_blocker" ||
+        item.interaction.reason === "target_unavailable"))
+  ) {
+    return "data_prerequisite";
+  }
+  if (item.interaction.mode === "executable") return "allowed";
+  if (item.interaction.mode === "waiting") return "waiting";
+  if (item.interaction.reason === "capability_denied") {
+    return "missing_capability";
+  }
+  if (item.interaction.reason === "source_not_canonical") {
+    return "environment_restriction";
+  }
+  return "no_blockers";
+}
 
 function queryParams(query: CanonicalWorkQueueQuery) {
   const params = new URLSearchParams();
@@ -531,14 +698,26 @@ export function workQueueFilterOptionsFromFacets(
   if (page.query.actionKind) actionKinds.add(page.query.actionKind);
   if (page.query.processStage) processStages.add(page.query.processStage);
 
+  type OwnerFacetParty = WorkQueuePage["facets"]["owners"][number]["party"];
+  const ownerPartyTotals = new Map<OwnerFacetParty, number>();
+  for (const owner of page.facets.owners) {
+    ownerPartyTotals.set(
+      owner.party,
+      (ownerPartyTotals.get(owner.party) || 0) + 1,
+    );
+  }
+  const ownerPartyPositions = new Map<OwnerFacetParty, number>();
   const owners = new Map(
-    page.facets.owners.map(({ id, party }) => [
-      id,
-      `${copy[locale].parties[party]} · ${id}`,
-    ]),
+    page.facets.owners.map(({ id, party }) => {
+      const position = (ownerPartyPositions.get(party) || 0) + 1;
+      ownerPartyPositions.set(party, position);
+      const suffix =
+        (ownerPartyTotals.get(party) || 0) > 1 ? ` ${position}` : "";
+      return [id, `${copy[locale].parties[party]}${suffix}`];
+    }),
   );
   if (page.query.ownerId && !owners.has(page.query.ownerId)) {
-    owners.set(page.query.ownerId, page.query.ownerId);
+    owners.set(page.query.ownerId, copy[locale].selectedOwnerUnavailable);
   }
   return {
     actionKinds: [...actionKinds].sort(),
@@ -601,7 +780,7 @@ function PriorityWhyNow({
   return (
     <section
       aria-label={`${t.whyNow}: ${t.reasons[item.priority.reasonCode]}`}
-      className="mt-3 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-3"
+      className="mt-2"
       data-work-queue-priority={item.priority.reasonCode}
     >
       <p className="text-xs leading-relaxed text-[var(--an-text-muted)]">
@@ -610,18 +789,76 @@ function PriorityWhyNow({
           {t.reasons[item.priority.reasonCode]}
         </span>
       </p>
-      <dl
-        aria-label={t.dimensions}
-        className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--an-text-subtle)]"
-        data-work-queue-priority-dimensions
-      >
-        {dimensions.map(({ label, value }) => (
-          <div className="inline-flex gap-1" key={label}>
-            <dt>{label}:</dt>
-            <dd className="font-bold text-[var(--an-text-muted)]">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <details className="mt-1 text-[11px] text-[var(--an-text-subtle)]">
+        <summary className="cursor-pointer font-semibold">
+          {t.dimensions}
+        </summary>
+        <dl
+          aria-label={t.dimensions}
+          className="mt-1 flex flex-wrap gap-x-3 gap-y-1"
+          data-work-queue-priority-dimensions
+        >
+          {dimensions.map(({ label, value }) => (
+            <div className="inline-flex gap-1" key={label}>
+              <dt>{label}:</dt>
+              <dd className="font-bold text-[var(--an-text-muted)]">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+    </section>
+  );
+}
+
+function ProcessProgress({
+  item,
+  locale,
+}: {
+  item: WorkQueueItem;
+  locale: PanelLocale;
+}) {
+  const t = copy[locale];
+  const currentIndex = processStageOrder.indexOf(
+    item.action.presentation.processStage,
+  );
+
+  return (
+    <section className="mt-4" aria-labelledby="work-queue-process-title">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs font-bold" id="work-queue-process-title">
+          {t.processProgress}
+        </h3>
+        <span className="text-[11px] text-[var(--an-text-subtle)]">
+          {t.processBasis}
+        </span>
+      </div>
+      <ol className="mt-2 grid grid-cols-3 gap-x-1 gap-y-2 sm:grid-cols-6">
+        {processStageOrder.map((stage, index) => {
+          const state =
+            index < currentIndex
+              ? "completed"
+              : index === currentIndex
+                ? "current"
+                : "pending";
+          return (
+            <li
+              aria-current={state === "current" ? "step" : undefined}
+              className={`border-t-2 px-1 pt-1.5 text-center text-[10px] font-bold ${
+                state === "completed"
+                  ? "border-[var(--an-success)] text-[var(--an-success)]"
+                  : state === "current"
+                    ? "border-[var(--an-action)] text-[var(--an-action)]"
+                    : "border-[var(--an-border-strong)] text-[var(--an-text-subtle)]"
+              }`}
+              data-work-queue-process-step={state}
+              key={stage}
+            >
+              <span className="block">{t.stages[stage]}</span>
+              <span className="sr-only"> · {t.stepStates[state]}</span>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -652,6 +889,11 @@ export function AdminNextWorkQueue({
   const invalidSelection = Boolean(selectedCaseId && !selectedItem);
   const nextPageHref = adminNextWorkQueueNextPageHref({ basePath, page });
   const showPagination = Boolean(page.query.cursor || nextPageHref);
+  const advancedFilterCount = [
+    page.query.processStage,
+    page.query.actionKind,
+    page.query.ownerId,
+  ].filter(Boolean).length;
 
   return (
     <div
@@ -710,75 +952,87 @@ export function AdminNextWorkQueue({
             </Link>
           ))}
         </nav>
-        <form
-          action={basePath}
-          className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto] xl:items-end"
-          method="get"
+        <details
+          className="mt-3 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-3"
+          data-work-queue-advanced-filters
+          open={advancedFilterCount > 0 || undefined}
         >
-          <input name="view" type="hidden" value="today" />
-          <input name="queue" type="hidden" value={page.query.queue} />
-          <input name="limit" type="hidden" value={page.query.limit} />
-          <label className="grid gap-1.5 text-xs font-bold text-[var(--an-text-muted)]">
-            {t.stage}
-            <select
-              className="min-h-11 min-w-0 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-raised)] px-3 text-sm text-[var(--an-text-primary)]"
-              defaultValue={page.query.processStage || ""}
-              name="stage"
-            >
-              <option value="">{t.any}</option>
-              {processStages.map((stage) => (
-                <option key={stage} value={stage}>
-                  {t.stages[stage]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-xs font-bold text-[var(--an-text-muted)]">
-            {t.action}
-            <select
-              className="min-h-11 min-w-0 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-raised)] px-3 text-sm text-[var(--an-text-primary)]"
-              defaultValue={page.query.actionKind || ""}
-              name="action"
-            >
-              <option value="">{t.any}</option>
-              {actionKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {getCaseNextActionPresentation(kind, locale).copy.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-xs font-bold text-[var(--an-text-muted)]">
-            {t.owner}
-            <select
-              className="min-h-11 min-w-0 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-raised)] px-3 text-sm text-[var(--an-text-primary)]"
-              defaultValue={page.query.ownerId || ""}
-              name="ownerId"
-            >
-              <option value="">{t.any}</option>
-              {filterOwners.map((owner) => (
-                <option key={owner.id} value={owner.id}>
-                  {owner.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-1 xl:flex-nowrap">
-            <button
-              className="min-h-11 flex-1 rounded-xl bg-[var(--an-action)] px-4 text-sm font-bold text-[var(--an-action-ink)] xl:flex-none"
-              type="submit"
-            >
-              {t.apply}
-            </button>
-            <Link
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--an-border)] px-4 text-sm font-bold text-[var(--an-text-muted)] hover:text-[var(--an-text-primary)] xl:flex-none"
-              href={`${basePath}?view=today&queue=all&limit=${page.query.limit}`}
-            >
-              <RotateCcw aria-hidden="true" className="size-4" />
-              {t.reset}
-            </Link>
-          </div>
-        </form>
+          <summary className="cursor-pointer text-xs font-bold text-[var(--an-text-muted)]">
+            {t.advancedFilters}
+            {advancedFilterCount
+              ? ` · ${advancedFilterCount} ${t.activeAdvancedFilters}`
+              : ""}
+          </summary>
+          <form
+            action={basePath}
+            className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto] xl:items-end"
+            method="get"
+          >
+            <input name="view" type="hidden" value="today" />
+            <input name="queue" type="hidden" value={page.query.queue} />
+            <input name="limit" type="hidden" value={page.query.limit} />
+            <label className="grid gap-1.5 text-xs font-bold text-[var(--an-text-muted)]">
+              {t.stage}
+              <select
+                className="min-h-11 min-w-0 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-raised)] px-3 text-sm text-[var(--an-text-primary)]"
+                defaultValue={page.query.processStage || ""}
+                name="stage"
+              >
+                <option value="">{t.any}</option>
+                {processStages.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {t.stages[stage]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-bold text-[var(--an-text-muted)]">
+              {t.action}
+              <select
+                className="min-h-11 min-w-0 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-raised)] px-3 text-sm text-[var(--an-text-primary)]"
+                defaultValue={page.query.actionKind || ""}
+                name="action"
+              >
+                <option value="">{t.any}</option>
+                {actionKinds.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {getCaseNextActionPresentation(kind, locale).copy.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-bold text-[var(--an-text-muted)]">
+              {t.owner}
+              <select
+                className="min-h-11 min-w-0 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-raised)] px-3 text-sm text-[var(--an-text-primary)]"
+                defaultValue={page.query.ownerId || ""}
+                name="ownerId"
+              >
+                <option value="">{t.any}</option>
+                {filterOwners.map((owner) => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-1 xl:flex-nowrap">
+              <button
+                className="min-h-11 flex-1 rounded-xl bg-[var(--an-action)] px-4 text-sm font-bold text-[var(--an-action-ink)] xl:flex-none"
+                type="submit"
+              >
+                {t.apply}
+              </button>
+              <Link
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--an-border)] px-4 text-sm font-bold text-[var(--an-text-muted)] hover:text-[var(--an-text-primary)] xl:flex-none"
+                href={`${basePath}?view=today&queue=all&limit=${page.query.limit}`}
+              >
+                <RotateCcw aria-hidden="true" className="size-4" />
+                {t.reset}
+              </Link>
+            </div>
+          </form>
+        </details>
       </section>
 
       <p aria-live="polite" className="text-sm text-[var(--an-text-muted)]">
@@ -942,65 +1196,116 @@ export function AdminNextWorkQueue({
   }) {
     const mode = item.interaction.mode;
     const actionHref = workQueueExactActionHref(item);
+    const decisionKind = workQueueDecisionKind(item);
     const relevantDate =
       mode === "waiting" ? item.timing.wakeAt : item.timing.dueAt;
+    const decisionExplanation = item.blockers[0]?.resolution
+      ? item.blockers[0].resolution
+      : mode === "read_only"
+        ? t.readOnlyReasons[item.interaction.reason]
+        : t.stateDescriptions[mode];
     return (
       <div className="mt-4" data-work-queue-detail-content>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${stateStyle[mode]}`}
-          >
-            <StateIcon mode={mode} />
-            {t.states[mode]}
-          </span>
-          <strong className="text-sm text-[var(--an-text-subtle)]">
-            {item.case.reference}
-          </strong>
-        </div>
-        <h3 className="mt-4 text-xl font-bold text-[var(--an-text-primary)] sm:text-2xl">
-          {item.action.presentation.copy.label}
-        </h3>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--an-text-muted)] sm:text-base">
-          {item.action.presentation.copy.reason}
-        </p>
+        <header data-work-queue-case-context>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${stateStyle[mode]}`}
+            >
+              <StateIcon mode={mode} />
+              {t.states[mode]}
+            </span>
+            <strong className="text-sm text-[var(--an-text-subtle)]">
+              {item.case.reference}
+            </strong>
+          </div>
+          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-[11px] font-bold text-[var(--an-text-subtle)]">
+                {t.caseLabel}
+              </dt>
+              <dd className="font-bold text-[var(--an-text-primary)]">
+                {item.case.reference}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-bold text-[var(--an-text-subtle)]">
+                {t.customerLabel}
+              </dt>
+              <dd className="text-[var(--an-text-muted)]">
+                {item.case.customerName || t.customerUnavailable}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-[11px] font-bold text-[var(--an-text-subtle)]">
+                {t.addressLabel}
+              </dt>
+              <dd className="text-[var(--an-text-muted)]">
+                {item.case.postalAddress || t.addressUnavailable}
+              </dd>
+            </div>
+          </dl>
+        </header>
 
-        <div
-          className={`mt-5 rounded-2xl border p-4 ${stateStyle[mode]}`}
-          data-work-queue-interaction={mode}
+        <ProcessProgress item={item} locale={locale} />
+
+        <section
+          className="mt-4 rounded-2xl border border-[var(--an-border-strong)] bg-[var(--an-surface-base)] p-4"
+          data-work-queue-next-decision
         >
-          <p className="flex items-center gap-2 font-bold">
-            <StateIcon mode={mode} />
-            {t.states[mode]}
+          <p className="text-xs font-bold tracking-[.12em] text-[var(--an-action)] uppercase">
+            {actionHref ? t.nextAllowedAction : t.nextStepDecision} ·{" "}
+            {t.currentStep}: {t.stages[item.action.presentation.processStage]}
           </p>
-          <p className="mt-2 text-sm leading-relaxed">
-            {t.stateDescriptions[mode]}
+          <h3 className="mt-2 text-xl font-bold text-[var(--an-text-primary)] sm:text-2xl">
+            {item.action.presentation.copy.label}
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--an-text-muted)] sm:text-base">
+            {item.action.presentation.copy.reason}
           </p>
-          {mode === "read_only" ? (
-            <p className="mt-2 text-sm font-semibold">
-              {t.readOnlyReasons[item.interaction.reason]}
-            </p>
-          ) : null}
-        </div>
 
-        <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-          <div className="rounded-xl bg-[var(--an-surface-soft)] p-3">
-            <dt className="text-xs font-bold text-[var(--an-text-subtle)]">
-              {item.target.availability === "case_recovery"
-                ? t.caseRecoveryTarget
-                : t.exactTarget}
-            </dt>
-            <dd className="mt-1 font-semibold break-all text-[var(--an-text-primary)]">
-              {item.target.entity} · {item.target.id}
-            </dd>
+          <div
+            className={`mt-3 rounded-xl border p-3 ${decisionStyle[decisionKind]}`}
+            data-work-queue-decision-kind={decisionKind}
+            data-work-queue-interaction={mode}
+          >
+            <p className="flex items-center gap-2 font-bold">
+              <StateIcon mode={mode} />
+              {t.decisionLabels[decisionKind]}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed">
+              {decisionExplanation}
+            </p>
           </div>
-          <div className="rounded-xl bg-[var(--an-surface-soft)] p-3">
-            <dt className="text-xs font-bold text-[var(--an-text-subtle)]">
-              {t.version}
-            </dt>
-            <dd className="mt-1 font-semibold text-[var(--an-text-primary)]">
-              {item.target.version || "—"}
-            </dd>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              aria-label={`${t.openCase}: ${item.case.reference}`}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--an-border-strong)] px-4 text-sm font-bold text-[var(--an-text-primary)] hover:border-[var(--an-action)] hover:text-[var(--an-action)] sm:flex-none"
+              data-work-queue-action="case-read"
+              href={item.case.href}
+            >
+              {t.openCase}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+            {actionHref ? (
+              <Link
+                aria-label={`${t.openExact}: ${item.action.presentation.copy.label}, ${item.case.reference}`}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--an-action)] px-4 text-sm font-bold text-[var(--an-action-ink)] sm:flex-none"
+                data-work-queue-action="exact-deep-link"
+                href={actionHref}
+              >
+                {t.openExact}
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            ) : (
+              <span className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[var(--an-surface-soft)] px-4 text-center text-xs font-semibold text-[var(--an-text-muted)] sm:flex-none">
+                {t.noAllowedAction}
+              </span>
+            )}
           </div>
+        </section>
+
+        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
           <div className="rounded-xl bg-[var(--an-surface-soft)] p-3">
             <dt className="text-xs font-bold text-[var(--an-text-subtle)]">
               {t.owner}
@@ -1009,22 +1314,17 @@ export function AdminNextWorkQueue({
               {t.parties[item.owner.party]}
             </dd>
           </div>
-          <div className="rounded-xl bg-[var(--an-surface-soft)] p-3">
+          <div className="rounded-xl bg-[var(--an-surface-soft)] p-3 sm:col-span-2">
             <dt className="text-xs font-bold text-[var(--an-text-subtle)]">
               {mode === "waiting" ? t.wake : t.due}
             </dt>
             <dd className="mt-1 font-semibold text-[var(--an-text-primary)]">
               <Clock3 aria-hidden="true" className="mr-1 inline size-4" />
-              {formatDate(relevantDate, locale, t.noDate)}
+              {formatDate(relevantDate, locale, t.deadlineUnknown)}
             </dd>
-          </div>
-          <div className="rounded-xl bg-[var(--an-surface-soft)] p-3 sm:col-span-2">
-            <dt className="text-xs font-bold text-[var(--an-text-subtle)]">
-              {t.caseRevision}
-            </dt>
-            <dd className="mt-1 font-semibold text-[var(--an-text-primary)]">
-              r{item.case.revision}
-            </dd>
+            <p className="mt-1 text-xs text-[var(--an-text-subtle)]">
+              {t.deadlineReason}: {t.priority.reasons[item.priority.reasonCode]}
+            </p>
           </div>
         </dl>
 
@@ -1039,10 +1339,10 @@ export function AdminNextWorkQueue({
                   className="rounded-xl border border-[var(--an-danger)] bg-[var(--an-danger-soft)] p-3 text-sm text-[var(--an-danger)]"
                   key={`${blocker.code}-${blocker.source.id}`}
                 >
-                  <strong className="flex items-center gap-2">
+                  <p className="flex items-center gap-2 font-bold">
                     <AlertTriangle aria-hidden="true" className="size-4" />
-                    {blocker.code}
-                  </strong>
+                    {t.decisionLabels.data_prerequisite}
+                  </p>
                   <p className="mt-1 leading-relaxed">{blocker.resolution}</p>
                 </li>
               ))}
@@ -1054,19 +1354,51 @@ export function AdminNextWorkQueue({
           )}
         </section>
 
-        {actionHref ? (
-          <Link
-            aria-label={`${t.openExact}: ${item.action.presentation.copy.label}, ${item.case.reference}`}
-            className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--an-action)] px-5 text-sm font-bold text-[var(--an-action-ink)] sm:w-auto"
-            data-work-queue-action="exact-deep-link"
-            href={actionHref}
-          >
-            {t.openExact}
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
-        ) : null}
+        <details
+          className="mt-4 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-3 text-xs text-[var(--an-text-muted)]"
+          data-work-queue-technical-details
+        >
+          <summary className="cursor-pointer font-bold text-[var(--an-text-primary)]">
+            {t.technical}
+          </summary>
+          <p className="mt-2 font-semibold">{t.selectionDiagnostics}</p>
+          <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt>{t.exactTarget}</dt>
+              <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                {item.target.entity} · {item.target.id}
+              </dd>
+            </div>
+            <div>
+              <dt>{t.version}</dt>
+              <dd className="font-semibold text-[var(--an-text-primary)]">
+                {item.target.version || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt>{t.caseRevision}</dt>
+              <dd className="font-semibold text-[var(--an-text-primary)]">
+                r{item.case.revision}
+              </dd>
+            </div>
+            <div>
+              <dt>ID</dt>
+              <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                {item.case.id}
+              </dd>
+            </div>
+            {item.blockers.map((blocker) => (
+              <div className="sm:col-span-2" key={blocker.code}>
+                <dt>{t.blockers}</dt>
+                <dd className="font-semibold break-all text-[var(--an-text-primary)]">
+                  {blocker.code} · {blocker.source.type} · {blocker.source.id}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
         <p className="mt-4 text-xs leading-relaxed text-[var(--an-text-subtle)]">
-          {t.sourcePolicy}
+          {t.sourcePolicy[source]}
         </p>
       </div>
     );
