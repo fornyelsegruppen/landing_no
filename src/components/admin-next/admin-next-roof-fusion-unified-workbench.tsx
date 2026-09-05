@@ -2046,9 +2046,17 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       aria-hidden="true"
                       data-roof-fusion-line-hit-target={line.id}
                       key={`${line.id}:hit-target`}
-                      onClick={(event) => event.stopPropagation()}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      pointerEvents="stroke"
+                      onClick={
+                        lineMode
+                          ? undefined
+                          : (event) => event.stopPropagation()
+                      }
+                      onPointerDown={
+                        lineMode
+                          ? undefined
+                          : (event) => event.stopPropagation()
+                      }
+                      pointerEvents={lineMode ? "none" : "stroke"}
                       stroke="transparent"
                       strokeLinecap="round"
                       strokeWidth={ROOF_FUSION_SKELETON_HIT_STROKE}
@@ -2133,7 +2141,11 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                                 : "false"
                             }
                             fill="transparent"
-                            onClick={(event) => event.stopPropagation()}
+                            onClick={
+                              lineMode
+                                ? undefined
+                                : (event) => event.stopPropagation()
+                            }
                             onLostPointerCapture={finishLineEndpointDrag}
                             onPointerCancel={finishLineEndpointDrag}
                             onPointerDown={(event) =>
@@ -2145,7 +2157,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                             }
                             onPointerMove={moveLineEndpoint}
                             onPointerUp={finishLineEndpointDrag}
-                            pointerEvents="all"
+                            pointerEvents={lineMode ? "none" : "all"}
                             rx={lineHitRadii.rx}
                             ry={lineHitRadii.ry}
                           />

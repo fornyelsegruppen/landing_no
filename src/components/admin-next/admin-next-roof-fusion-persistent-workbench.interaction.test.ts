@@ -1768,6 +1768,19 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         toJSON: () => ({}),
       }) satisfies DOMRect;
 
+    expect(
+      container
+        .querySelector("[data-roof-fusion-line-hit-target]")
+        ?.getAttribute("pointer-events"),
+    ).toBe("none");
+    expect(
+      Array.from(
+        container.querySelectorAll(
+          "[data-roof-fusion-line-endpoint-hit-target]",
+        ),
+      ).every((endpoint) => endpoint.getAttribute("pointer-events") === "none"),
+    ).toBe(true);
+
     // The saved ridge is at y=.5. A click 6 CSS px away must become a
     // shared ridge/sąlaja junction before the line is persisted.
     await activateCanvasPoint(500, 256);
@@ -1787,6 +1800,18 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         .querySelector('[data-roof-fusion-line-mode="valley"]')
         ?.getAttribute("aria-pressed"),
     ).toBe("true");
+    expect(
+      Array.from(
+        container.querySelectorAll("[data-roof-fusion-line-hit-target]"),
+      ).every((line) => line.getAttribute("pointer-events") === "none"),
+    ).toBe(true);
+    expect(
+      Array.from(
+        container.querySelectorAll(
+          "[data-roof-fusion-line-endpoint-hit-target]",
+        ),
+      ).every((endpoint) => endpoint.getAttribute("pointer-events") === "none"),
+    ).toBe(true);
 
     await activateCanvasPoint(496, 247);
     expect(
@@ -1865,7 +1890,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(Number(endpointHitTarget?.getAttribute("rx")) * 3).toBeCloseTo(
       0.022,
     );
-    expect(endpointHitTarget?.getAttribute("pointer-events")).toBe("all");
+    expect(endpointHitTarget?.getAttribute("pointer-events")).toBe("none");
     expect(
       container
         .querySelector("[data-roof-fusion-line-hit-target]")
@@ -1882,6 +1907,19 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     ).toBe(true);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
+
+    await click('[data-roof-fusion-line-mode="ridge"]');
+    expect(
+      container
+        .querySelector("[data-roof-fusion-line-endpoint-hit-target]")
+        ?.getAttribute("pointer-events"),
+    ).toBe("all");
+    expect(
+      container
+        .querySelector("[data-roof-fusion-line-hit-target]")
+        ?.getAttribute("pointer-events"),
+    ).toBe("stroke");
+    await click('[data-roof-fusion-line-mode="ridge"]');
 
     scrollIntoViewMock.mockClear();
     await openAdvanced();
