@@ -46,7 +46,7 @@ import {
 import { RoofFusionWorkbenchDrafts } from "./payload/collections/RoofFusionWorkbenchDrafts";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
-import { resolveAdminNextPreviewTrustedOrigin } from "./lib/auth/preview-trusted-origin";
+import { resolveAdminNextPreviewTrustedOrigins } from "./lib/auth/preview-trusted-origin";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -88,7 +88,7 @@ const trustedOrigins = Array.from(
       process.env.VERCEL_BRANCH_URL
         ? `https://${process.env.VERCEL_BRANCH_URL}`
         : "",
-      resolveAdminNextPreviewTrustedOrigin(process.env),
+      ...resolveAdminNextPreviewTrustedOrigins(process.env),
       "http://localhost:3000",
       "http://127.0.0.1:3000",
     ].filter(Boolean),

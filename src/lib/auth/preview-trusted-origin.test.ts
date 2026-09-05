@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   adminNextUatOrigin,
-  resolveAdminNextPreviewTrustedOrigin,
+  resolveAdminNextPreviewTrustedOrigins,
+  roofFusionPreviewOrigin,
 } from "./preview-trusted-origin";
 
 describe("Admin Next Preview trusted origin", () => {
-  it("allows the stable UAT alias only in Vercel Preview", () => {
+  it("allows the stable Admin Next and Roof Fusion aliases only in Vercel Preview", () => {
     expect(
-      resolveAdminNextPreviewTrustedOrigin({ VERCEL_ENV: "preview" }),
-    ).toBe(adminNextUatOrigin);
+      resolveAdminNextPreviewTrustedOrigins({ VERCEL_ENV: "preview" }),
+    ).toEqual([adminNextUatOrigin, roofFusionPreviewOrigin]);
     expect(
-      resolveAdminNextPreviewTrustedOrigin({ VERCEL_ENV: "production" }),
-    ).toBe("");
-    expect(resolveAdminNextPreviewTrustedOrigin({})).toBe("");
+      resolveAdminNextPreviewTrustedOrigins({ VERCEL_ENV: "production" }),
+    ).toEqual([]);
+    expect(resolveAdminNextPreviewTrustedOrigins({})).toEqual([]);
   });
 });
