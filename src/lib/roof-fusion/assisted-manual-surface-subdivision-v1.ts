@@ -116,7 +116,7 @@ function cross(a: Point2, b: Point2, c: Point2) {
 }
 
 function onSegment(point: Point2, a: Point2, b: Point2, includeEnds = true) {
-  if (Math.abs(cross(a, b, point)) > EPS) return false;
+  if (Math.abs(cross(a, b, point)) > EPS * distance(a, b)) return false;
   const within =
     point.xM >= Math.min(a.xM, b.xM) - EPS &&
     point.xM <= Math.max(a.xM, b.xM) + EPS &&
@@ -170,13 +170,21 @@ function properIntersection(a: Point2, b: Point2, c: Point2, d: Point2) {
   const abD = cross(a, b, d);
   const cdA = cross(c, d, a);
   const cdB = cross(c, d, b);
-  const strictlyOpposite = (left: number, right: number) =>
-    (left > EPS && right < -EPS) || (left < -EPS && right > EPS);
-  return strictlyOpposite(abC, abD) && strictlyOpposite(cdA, cdB);
+  const strictlyOpposite = (left: number, right: number, tolerance: number) =>
+    (left > tolerance && right < -tolerance) ||
+    (left < -tolerance && right > tolerance);
+  return (
+    strictlyOpposite(abC, abD, EPS * distance(a, b)) &&
+    strictlyOpposite(cdA, cdB, EPS * distance(c, d))
+  );
 }
 
 function collinearOverlap(a: Point2, b: Point2, c: Point2, d: Point2) {
-  if (Math.abs(cross(a, b, c)) > EPS || Math.abs(cross(a, b, d)) > EPS)
+  const tolerance = EPS * distance(a, b);
+  if (
+    Math.abs(cross(a, b, c)) > tolerance ||
+    Math.abs(cross(a, b, d)) > tolerance
+  )
     return false;
   const useX = Math.abs(a.xM - b.xM) >= Math.abs(a.yM - b.yM);
   const values = useX ? [a.xM, b.xM, c.xM, d.xM] : [a.yM, b.yM, c.yM, d.yM];
@@ -801,7 +809,13 @@ export function subdivideAssistedManualRoofSurfacesV1(
               ...right.sourceIds,
             ),
           );
-        else if (properIntersection(a, b, c, d))
+        else if (
+          properIntersection(a, b, c, d) &&
+          !relevantIds.some((id) => {
+            const point = points.get(id)!;
+            return onSegment(point, a, b) && onSegment(point, c, d);
+          })
+        )
           issues.push(
             issue(
               "SKELETON_EDGE_CROSSES_EDGE",

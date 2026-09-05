@@ -113,6 +113,7 @@ type RoofFusionLineEndpointDrag = Readonly<{
   lineId: string;
   endpoint: "start" | "end";
   originalLine: RoofFusionLine;
+  originalLines: readonly RoofFusionLine[];
   pointerId: number;
   moved: boolean;
 }>;
@@ -142,6 +143,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   resultState?: RoofFusionResultState;
   reviewStatus?: "ready" | "review_required" | "blocked";
   blockers?: readonly string[];
+  /** Last calculation diagnostics; visible without preventing an explicit retry. */
+  calculationProblems?: readonly string[];
   stageBlockers?: Partial<Record<RoofFusionStage, readonly string[]>>;
   guardNotice?: string;
   /** Changes only when the parent explicitly rehydrates persisted geometry. */
@@ -160,6 +163,8 @@ export type RoofFusionUnifiedWorkbenchProps = Readonly<{
   onOutlineChange?: (points: readonly RoofFusionPoint[]) => void;
   onLineCapture?: (line: RoofFusionLine) => void;
   onLineChange?: (line: RoofFusionLine) => void;
+  /** Commit every line affected by one shared-node edit together. */
+  onLinesChange?: (lines: readonly RoofFusionLine[]) => void;
   onLastLineUndo?: (line: RoofFusionLine) => void;
   onLinesClear?: (lines: readonly RoofFusionLine[]) => void;
   onLayerVisibilityChange?: (layer: RoofFusionLayer, visible: boolean) => void;
@@ -393,16 +398,20 @@ function closestPointOnSegment(
   point: RoofFusionPoint,
   start: RoofFusionPoint,
   end: RoofFusionPoint,
+  metric?: WorkbenchEndpointConstraintMetricV1,
 ) {
   const deltaX = end.x - start.x;
   const deltaY = end.y - start.y;
-  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+  const xWeight = (metric?.xPixelsPerImageUnit ?? 1) ** 2;
+  const yWeight = (metric?.yPixelsPerImageUnit ?? 1) ** 2;
+  const lengthSquared = deltaX * deltaX * xWeight + deltaY * deltaY * yWeight;
   if (lengthSquared === 0) return start;
   const position = Math.min(
     1,
     Math.max(
       0,
-      ((point.x - start.x) * deltaX + (point.y - start.y) * deltaY) /
+      ((point.x - start.x) * deltaX * xWeight +
+        (point.y - start.y) * deltaY * yWeight) /
         lengthSquared,
     ),
   );
@@ -415,14 +424,17 @@ function closestPointOnSegment(
 function closestPointOnOutline(
   point: RoofFusionPoint,
   outline: readonly RoofFusionPoint[],
+  metric?: WorkbenchEndpointConstraintMetricV1,
 ) {
   let closest = outline[0] ?? point;
   let closestDistance = Number.POSITIVE_INFINITY;
   outline.forEach((start, index) => {
     const end = outline[(index + 1) % outline.length];
     if (!end) return;
-    const candidate = closestPointOnSegment(point, start, end);
-    const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+    const candidate = closestPointOnSegment(point, start, end, metric);
+    const distance = metric
+      ? distanceInConstraintPixels(candidate, point, metric)
+      : Math.hypot(candidate.x - point.x, candidate.y - point.y);
     if (distance < closestDistance) {
       closest = candidate;
       closestDistance = distance;
@@ -505,12 +517,15 @@ export function roofFusionLineJunctionTargets(
   lines: readonly RoofFusionLine[],
   excludedLineId?: string,
   nearPoint?: RoofFusionPoint,
+  metric?: WorkbenchEndpointConstraintMetricV1,
 ) {
   const candidates = lines.filter((line) => line.id !== excludedLineId);
   const targets = candidates.flatMap((line) => [line.start, line.end]);
   if (nearPoint) {
     candidates.forEach((line) => {
-      targets.push(closestPointOnSegment(nearPoint, line.start, line.end));
+      targets.push(
+        closestPointOnSegment(nearPoint, line.start, line.end, metric),
+      );
     });
   }
   candidates.forEach((line, index) => {
@@ -530,7 +545,7 @@ export function constrainRoofFusionDraggedEndpoint(
 ) {
   const safePoint = clampRoofFusionPoint(point);
   if (outline.length < 3) return safePoint;
-  const boundaryPoint = closestPointOnOutline(safePoint, outline);
+  const boundaryPoint = closestPointOnOutline(safePoint, outline, metric);
   const inside = pointIsInsideOutline(safePoint, outline);
   let constrained = inside ? safePoint : boundaryPoint;
   let closestSnapDistance = inside
@@ -553,6 +568,344 @@ export function constrainRoofFusionDraggedEndpoint(
     }
   });
   return constrained;
+}
+
+type RoofFusionSnap = Readonly<{
+  point: RoofFusionPoint;
+  target: "junction" | "outline" | "line" | null;
+}>;
+
+/** Resolve one screen-space magnet before changing any geometry. Existing nodes
+ * win over a nearby projection so a second branch reuses the exact junction. */
+export function snapRoofFusionSkeletonPoint(
+  point: RoofFusionPoint,
+  outline: readonly RoofFusionPoint[],
+  lines: readonly RoofFusionLine[],
+  metric: WorkbenchEndpointConstraintMetricV1,
+): RoofFusionSnap {
+  const nearest = (candidates: readonly RoofFusionSnap[]) =>
+    candidates
+      .filter((candidate) => pointIsInsideOutline(candidate.point, outline))
+      .map((candidate) => ({
+        candidate,
+        distance: distanceInConstraintPixels(point, candidate.point, metric),
+      }))
+      .filter(({ distance }) => distance <= metric.maxDistancePixels)
+      .sort((first, second) => first.distance - second.distance)[0]?.candidate;
+  const node = nearest([
+    ...roofFusionLineJunctionTargets(lines).map((target) => ({
+      point: target,
+      target: "junction" as const,
+    })),
+    ...outline.map((target) => ({ point: target, target: "outline" as const })),
+  ]);
+  if (node) return node;
+  const edge = nearest([
+    ...lines.map((line) => ({
+      point: closestPointOnSegment(point, line.start, line.end, metric),
+      target: "line" as const,
+    })),
+    { point: closestPointOnOutline(point, outline, metric), target: "outline" },
+  ]);
+  return edge ?? { point, target: null };
+}
+
+function sameRoofFusionPoint(first: RoofFusionPoint, second: RoofFusionPoint) {
+  return Math.hypot(first.x - second.x, first.y - second.y) <= 1e-9;
+}
+
+/** Local guidance only: an endpoint must actually lie on another edge, not
+ * merely be within the much larger interactive magnet radius. */
+export function roofFusionDanglingEndpoints(
+  lines: readonly RoofFusionLine[],
+  outline: readonly RoofFusionPoint[],
+) {
+  const kindCounts = { ridge: 0, valley: 0 };
+  return lines.flatMap((line, lineIndex) => {
+    const kindIndex = ++kindCounts[line.kind];
+    return (["start", "end"] as const).flatMap((endpoint, endpointIndex) => {
+      const point = line[endpoint];
+      const liesOnSegment = (start: RoofFusionPoint, end: RoofFusionPoint) => {
+        const projected = closestPointOnSegment(point, start, end);
+        return Math.hypot(point.x - projected.x, point.y - projected.y) <= 1e-8;
+      };
+      const onBoundary = outline.some((start, index) =>
+        liesOnSegment(start, outline[(index + 1) % outline.length]),
+      );
+      const onAnotherLine = lines.some(
+        (other, index) =>
+          index !== lineIndex && liesOnSegment(other.start, other.end),
+      );
+      if (onBoundary || onAnotherLine) return [];
+      return [
+        {
+          lineId: line.id,
+          endpoint,
+          point,
+          label: `${line.kind === "ridge" ? "Kraigas" : "Sąlaja"} ${kindIndex}, galas ${endpointIndex + 1}`,
+        },
+      ];
+    });
+  });
+}
+
+function roofFusionSegmentStaysInOutline(
+  line: RoofFusionLine,
+  outline: readonly RoofFusionPoint[],
+) {
+  if (
+    !pointIsInsideOutline(line.start, outline) ||
+    !pointIsInsideOutline(line.end, outline)
+  )
+    return false;
+  const dx = line.end.x - line.start.x;
+  const dy = line.end.y - line.start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 1e-18) return false;
+  const positions = [0, 1];
+  outline.forEach((start, index) => {
+    const intersection = lineIntersection(line, {
+      id: "boundary",
+      kind: "ridge",
+      start,
+      end: outline[(index + 1) % outline.length],
+    });
+    if (intersection)
+      positions.push(
+        ((intersection.x - line.start.x) * dx +
+          (intersection.y - line.start.y) * dy) /
+          lengthSquared,
+      );
+  });
+  positions.sort((first, second) => first - second);
+  return positions.slice(1).every((position, index) => {
+    const middle = (position + positions[index]) / 2;
+    return pointIsInsideOutline(
+      { x: line.start.x + middle * dx, y: line.start.y + middle * dy },
+      outline,
+    );
+  });
+}
+
+function roofFusionSegmentsOverlap(
+  first: RoofFusionLine,
+  second: RoofFusionLine,
+) {
+  const dx = first.end.x - first.start.x;
+  const dy = first.end.y - first.start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const length = Math.sqrt(lengthSquared);
+  if (length <= 1e-9) return false;
+  const positions: number[] = [];
+  for (const point of [second.start, second.end]) {
+    if (
+      Math.abs(
+        (point.x - first.start.x) * dy - (point.y - first.start.y) * dx,
+      ) /
+        length >
+      1e-9
+    )
+      return false;
+    positions.push(
+      ((point.x - first.start.x) * dx + (point.y - first.start.y) * dy) /
+        lengthSquared,
+    );
+  }
+  return (
+    (Math.min(1, Math.max(...positions)) -
+      Math.max(0, Math.min(...positions))) *
+      length >
+    1e-9
+  );
+}
+
+/** The same bounded preview is used for hover and commit. Only unattached tips
+ * move; saved connected nodes and boundary anchors never get reinterpreted. */
+export function connectRoofFusionDanglingEndpointsToNewLine(
+  lines: readonly RoofFusionLine[],
+  newLine: RoofFusionLine,
+  outline: readonly RoofFusionPoint[],
+  metric: WorkbenchEndpointConstraintMetricV1,
+) {
+  const attachments: {
+    lineId: string;
+    endpoint: "start" | "end";
+    from: RoofFusionPoint;
+    point: RoofFusionPoint;
+  }[] = [];
+  if (!roofFusionSegmentStaysInOutline(newLine, outline))
+    return { lines: [...lines, newLine], attachments };
+  let updatedLines = [...lines];
+  const newDx = newLine.end.x - newLine.start.x;
+  const newDy = newLine.end.y - newLine.start.y;
+  const lengthSquared = newDx * newDx + newDy * newDy;
+  for (const candidate of roofFusionDanglingEndpoints(lines, outline)) {
+    const projected = closestPointOnSegment(
+      candidate.point,
+      newLine.start,
+      newLine.end,
+      metric,
+    );
+    const position =
+      ((projected.x - newLine.start.x) * newDx +
+        (projected.y - newLine.start.y) * newDy) /
+      lengthSquared;
+    if (
+      position <= 1e-8 ||
+      position >= 1 - 1e-8 ||
+      sameRoofFusionPoint(projected, candidate.point) ||
+      distanceInConstraintPixels(candidate.point, projected, metric) >
+        metric.maxDistancePixels ||
+      !pointIsInsideOutline(projected, outline)
+    )
+      continue;
+    const original = updatedLines.find((line) => line.id === candidate.lineId);
+    if (!original) continue;
+    const changed = { ...original, [candidate.endpoint]: projected };
+    try {
+      assertWorkbenchSkeletonLineLengthV1(changed.start, changed.end);
+    } catch {
+      continue;
+    }
+    if (!roofFusionSegmentStaysInOutline(changed, outline)) continue;
+    if (
+      roofFusionSegmentsOverlap(changed, newLine) ||
+      updatedLines.some(
+        (line) =>
+          line.id !== changed.id && roofFusionSegmentsOverlap(changed, line),
+      )
+    )
+      continue;
+    updatedLines = updatedLines.map((line) =>
+      line.id === changed.id ? changed : line,
+    );
+    attachments.push({
+      lineId: changed.id,
+      endpoint: candidate.endpoint,
+      from: candidate.point,
+      point: projected,
+    });
+  }
+  return { lines: [...updatedLines, newLine], attachments };
+}
+
+/** Move the shared node as one edit and carry existing branches along a changed
+ * supporting line. Only exact pre-existing attachments participate. */
+export function moveRoofFusionConnectedEndpoint(
+  lines: readonly RoofFusionLine[],
+  lineId: string,
+  endpoint: "start" | "end",
+  point: RoofFusionPoint,
+): readonly RoofFusionLine[] {
+  const selected = lines.find((line) => line.id === lineId);
+  if (!selected) return lines;
+  const originalPoint = selected[endpoint];
+  const moved = lines.map((line) => ({
+    ...line,
+    start: sameRoofFusionPoint(line.start, originalPoint) ? point : line.start,
+    end: sameRoofFusionPoint(line.end, originalPoint) ? point : line.end,
+  }));
+  const changedCarriers = lines.flatMap((line, index) =>
+    sameRoofFusionPoint(line.start, originalPoint) ||
+    sameRoofFusionPoint(line.end, originalPoint)
+      ? [{ original: line, moved: moved[index] }]
+      : [],
+  );
+  let lostCarrierConnection = false;
+  const result = moved.map((line, index) => {
+    const carry = (key: "start" | "end") => {
+      const original = lines[index][key];
+      if (sameRoofFusionPoint(original, originalPoint)) return point;
+      for (const carrier of changedCarriers) {
+        if (carrier.original.id === line.id) continue;
+        const projected = closestPointOnSegment(
+          original,
+          carrier.original.start,
+          carrier.original.end,
+        );
+        if (!sameRoofFusionPoint(projected, original)) continue;
+        const otherCarriers = lines.filter(
+          (other) =>
+            !changedCarriers.some(
+              (changed) => changed.original.id === other.id,
+            ) &&
+            !sameRoofFusionPoint(other.start, original) &&
+            !sameRoofFusionPoint(other.end, original) &&
+            sameRoofFusionPoint(
+              original,
+              closestPointOnSegment(original, other.start, other.end),
+            ),
+        );
+        if (otherCarriers.length) {
+          const intersection = otherCarriers
+            .map((other) => lineIntersection(carrier.moved, other))
+            .find(
+              (candidate) =>
+                candidate &&
+                otherCarriers.every((other) =>
+                  sameRoofFusionPoint(
+                    candidate,
+                    closestPointOnSegment(candidate, other.start, other.end),
+                  ),
+                ),
+            );
+          if (intersection) return intersection;
+          lostCarrierConnection = true;
+          return original;
+        }
+        const dx = carrier.original.end.x - carrier.original.start.x;
+        const dy = carrier.original.end.y - carrier.original.start.y;
+        const lengthSquared = dx * dx + dy * dy;
+        if (lengthSquared <= 1e-18) continue;
+        const position =
+          ((original.x - carrier.original.start.x) * dx +
+            (original.y - carrier.original.start.y) * dy) /
+          lengthSquared;
+        return {
+          x:
+            carrier.moved.start.x +
+            position * (carrier.moved.end.x - carrier.moved.start.x),
+          y:
+            carrier.moved.start.y +
+            position * (carrier.moved.end.y - carrier.moved.start.y),
+        };
+      }
+      return line[key];
+    };
+    return { ...line, start: carry("start"), end: carry("end") };
+  });
+  return lostCarrierConnection ? lines : result;
+}
+
+/** Moving branches cannot attract their own supporting carrier: their apparent
+ * target would move again with that carrier and reopen the junction. */
+export function roofFusionStationaryEndpointDragLines(
+  lines: readonly RoofFusionLine[],
+  lineId: string,
+  endpoint: "start" | "end",
+) {
+  const selected = lines.find((line) => line.id === lineId);
+  if (!selected) return [];
+  const originalPoint = selected[endpoint];
+  const movingCarriers = lines.filter(
+    (line) =>
+      sameRoofFusionPoint(line.start, originalPoint) ||
+      sameRoofFusionPoint(line.end, originalPoint),
+  );
+  return lines.filter((line) => {
+    if (movingCarriers.includes(line)) return false;
+    return !movingCarriers.some((carrier) =>
+      [line.start, line.end].some(
+        (point) =>
+          !sameRoofFusionPoint(point, carrier.start) &&
+          !sameRoofFusionPoint(point, carrier.end) &&
+          sameRoofFusionPoint(
+            point,
+            closestPointOnSegment(point, carrier.start, carrier.end),
+          ),
+      ),
+    );
+  });
 }
 
 function polygonLabelAnchor(points: readonly RoofFusionPoint[]) {
@@ -744,6 +1097,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   resultState = resultIdentity ? "current" : "idle",
   reviewStatus,
   blockers = [],
+  calculationProblems = [],
   stageBlockers,
   guardNotice = "Nieko neišsaugo, kol nepatvirtinta",
   geometryHydrationSignal,
@@ -756,6 +1110,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   onOutlineChange,
   onLineCapture,
   onLineChange,
+  onLinesChange,
   onLastLineUndo,
   onLinesClear,
   onLayerVisibilityChange,
@@ -780,6 +1135,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   const [lineMode, setLineMode] = useState<RoofFusionLineKind | null>(null);
   const [pendingLinePoint, setPendingLinePoint] =
     useState<RoofFusionPoint | null>(null);
+  const [hoverLineSnap, setHoverLineSnap] = useState<
+    (RoofFusionSnap & { metric: WorkbenchEndpointConstraintMetricV1 }) | null
+  >(null);
   const [primaryActionPending, setPrimaryActionPending] = useState(false);
   const [lineCaptureProblem, setLineCaptureProblem] = useState<string | null>(
     null,
@@ -803,6 +1161,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     null,
   );
   const draftLinesRef = useRef(draftLines);
+  const lineCaptureUndoRef = useRef(
+    new Map<string, readonly RoofFusionLine[]>(),
+  );
   const lastGeometryHydrationSignalRef = useRef(geometryHydrationSignal);
   const lastRestoredGeometrySignalRef = useRef(restoredGeometrySignal);
   const [viewport, setViewport] = useState<RoofFusionViewport>(
@@ -889,6 +1250,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       ),
     );
     setDraftLines(lines);
+    lineCaptureUndoRef.current.clear();
+    setPendingLinePoint(null);
+    setHoverLineSnap(null);
     if (restoredFromEarlierSession && showRestoredMarkingNotice) {
       setRestoredMarkingNotice(
         restoredMarkingSummary(lines) ?? "atkurtas patvirtintas kontūras",
@@ -913,6 +1277,27 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     () => canvasShellRef.current?.getBoundingClientRect() ?? null,
     [],
   );
+
+  const stopLineDrawing = useCallback(() => {
+    setLineMode(null);
+    setPendingLinePoint(null);
+    setHoverLineSnap(null);
+    setLineCaptureProblem(null);
+    setLineCaptureNotice(
+      "Taškų taisymas: tempkite linijos galą. Sujungti taškai juda kartu.",
+    );
+  }, []);
+
+  useEffect(() => {
+    if (stage !== "skeleton") return;
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || advancedOpen) return;
+      event.preventDefault();
+      stopLineDrawing();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [advancedOpen, stage, stopLineDrawing]);
 
   const updateOutline = useCallback(
     (next: readonly RoofFusionPoint[]) => {
@@ -984,22 +1369,19 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         );
         return;
       }
-      const constrainedPoint = endpointMetric
-        ? constrainRoofFusionDraggedEndpoint(
-            outlineConstrainedPoint,
+      const snap = endpointMetric
+        ? snapRoofFusionSkeletonPoint(
+            point,
             draftOutline,
-            roofFusionLineJunctionTargets(
-              draftLines,
-              undefined,
-              outlineConstrainedPoint,
-            ),
+            draftLines,
             endpointMetric,
           )
-        : outlineConstrainedPoint;
+        : { point: outlineConstrainedPoint, target: null };
+      const constrainedPoint = snap.point;
       const snappedToJunction =
-        constrainedPoint.x !== outlineConstrainedPoint.x ||
-        constrainedPoint.y !== outlineConstrainedPoint.y;
+        snap.target === "junction" || snap.target === "line";
       const snappedToOutline =
+        snap.target === "outline" ||
         outlineConstrainedPoint.x !== point.x ||
         outlineConstrainedPoint.y !== point.y;
       setLineCaptureNotice(
@@ -1025,19 +1407,80 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         );
         return;
       }
+      if (
+        draftLines.some(
+          (line) =>
+            (sameRoofFusionPoint(line.start, pendingLinePoint) &&
+              sameRoofFusionPoint(line.end, constrainedPoint)) ||
+            (sameRoofFusionPoint(line.end, pendingLinePoint) &&
+              sameRoofFusionPoint(line.start, constrainedPoint)),
+        )
+      ) {
+        setLineCaptureProblem(
+          "Ši linija jau pažymėta. Pasirinkite kitą antrą tašką arba spauskite Esc.",
+        );
+        return;
+      }
+      let nextSequence = lineSequence;
+      while (
+        draftLines.some((line) => line.id === `manual-line-${nextSequence}`)
+      )
+        nextSequence += 1;
       const capturedLine: RoofFusionLine = {
-        id: `manual-line-${lineSequence}`,
+        id: `manual-line-${nextSequence}`,
         kind: lineMode,
         start: pendingLinePoint,
         end: constrainedPoint,
       };
-      setDraftLines((current) => [...current, capturedLine]);
+      if (!roofFusionSegmentStaysInOutline(capturedLine, draftOutline)) {
+        setLineCaptureProblem(
+          "Linija kerta vietą už stogo kontūro. Pasirinkite kitą antrą tašką arba dalykite liniją ties jungtimi.",
+        );
+        return;
+      }
+      if (
+        draftLines.some((line) => roofFusionSegmentsOverlap(capturedLine, line))
+      ) {
+        setLineCaptureProblem(
+          "Linija uždengia jau pažymėtą liniją. Junkite prie jos galo arba pasirinkite kitą antrą tašką.",
+        );
+        return;
+      }
+      const connected = endpointMetric
+        ? connectRoofFusionDanglingEndpointsToNewLine(
+            draftLines,
+            capturedLine,
+            draftOutline,
+            endpointMetric,
+          )
+        : { lines: [...draftLines, capturedLine], attachments: [] };
+      if (connected.attachments.length)
+        lineCaptureUndoRef.current.set(capturedLine.id, draftLines);
+      draftLinesRef.current = connected.lines;
+      setDraftLines(connected.lines);
       const completedKindCount =
         draftLines.filter((line) => line.kind === lineMode).length + 1;
-      setLineSequence((current) => current + 1);
+      setLineSequence(nextSequence + 1);
       setPendingLinePoint(null);
-      setLineCaptureNotice(drawnLineSummary(lineMode, completedKindCount));
-      onLineCapture?.(capturedLine);
+      setLineCaptureNotice(
+        connected.attachments.length
+          ? `${drawnLineSummary(lineMode, completedKindCount)} Prie naujos linijos prijungta esamų galų: ${connected.attachments.length}.`
+          : drawnLineSummary(lineMode, completedKindCount),
+      );
+      if (connected.attachments.length && onLinesChange)
+        onLinesChange(connected.lines);
+      else {
+        if (connected.attachments.length) {
+          for (const line of connected.lines) {
+            if (
+              line.id !== capturedLine.id &&
+              connected.attachments.some((item) => item.lineId === line.id)
+            )
+              onLineChange?.(line);
+          }
+        }
+        onLineCapture?.(capturedLine);
+      }
     },
     [
       addingVertex,
@@ -1046,6 +1489,8 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       lineMode,
       lineSequence,
       onLineCapture,
+      onLineChange,
+      onLinesChange,
       pendingLinePoint,
       stage,
       updateOutline,
@@ -1070,16 +1515,37 @@ export function AdminNextRoofFusionUnifiedWorkbench({
   );
 
   const undoLastLine = useCallback(() => {
+    if (pendingLinePoint) {
+      setPendingLinePoint(null);
+      setHoverLineSnap(null);
+      setLineCaptureProblem(null);
+      setLineCaptureNotice("Nebaigtos linijos pirmas taškas atšauktas.");
+      return;
+    }
     const lastLine = draftLines.at(-1);
     if (!lastLine) return;
-    setDraftLines((current) => current.slice(0, -1));
+    const previousLines = lineCaptureUndoRef.current.get(lastLine.id);
+    const remainingLines = previousLines ?? draftLines.slice(0, -1);
+    lineCaptureUndoRef.current.delete(lastLine.id);
+    draftLinesRef.current = remainingLines;
+    setDraftLines(remainingLines);
     if (draftLines.length === 1) setRestoredMarkingNotice(null);
     setClearLinesArmed(false);
     setPendingLinePoint(null);
     setLineCaptureProblem(null);
     setLineCaptureNotice("Paskutinė kraigo arba sąlajos linija pašalinta.");
-    onLastLineUndo?.(lastLine);
-  }, [draftLines, onLastLineUndo]);
+    if (previousLines && onLinesChange) onLinesChange(remainingLines);
+    else {
+      if (previousLines) previousLines.forEach((line) => onLineChange?.(line));
+      onLastLineUndo?.(lastLine);
+    }
+  }, [
+    draftLines,
+    onLastLineUndo,
+    onLineChange,
+    onLinesChange,
+    pendingLinePoint,
+  ]);
 
   const clearDraftLines = useCallback(() => {
     if (draftLines.length === 0 && !redrawRestoredGeometryArmed) return;
@@ -1091,11 +1557,13 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       onOutlineChange?.(resetOutline);
     }
     setDraftLines([]);
+    lineCaptureUndoRef.current.clear();
     setRestoredMarkingNotice(null);
     setClearLinesArmed(false);
     setRedrawRestoredGeometryArmed(false);
     setPendingLinePoint(null);
     setLineMode(null);
+    setHoverLineSnap(null);
     setLineCaptureProblem(null);
     setLineCaptureNotice(
       redrawWholeDraft
@@ -1117,7 +1585,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       lineId: string,
       endpoint: "start" | "end",
     ) => {
-      if (!event.isPrimary || event.button !== 0) return;
+      if (!event.isPrimary || event.button !== 0 || lineMode) return;
       const originalLine = draftLinesRef.current.find(
         (line) => line.id === lineId,
       );
@@ -1134,6 +1602,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
           start: { ...originalLine.start },
           end: { ...originalLine.end },
         },
+        originalLines: draftLinesRef.current,
         pointerId: event.pointerId,
       } as const;
       draggingLineEndpointRef.current = drag;
@@ -1143,7 +1612,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       setLineCaptureProblem(null);
       setLineCaptureNotice(null);
     },
-    [],
+    [lineMode],
   );
 
   const moveLineEndpoint = useCallback(
@@ -1159,12 +1628,68 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       if (!currentLine) return;
       const metric = roofFusionEndpointConstraintMetric(bounds, viewport);
       const pointerPoint = pointFromPointer(event, bounds, viewport);
-      const constrained = constrainRoofFusionDraggedEndpoint(
-        pointerPoint,
+      const originalPoint = drag.originalLine[drag.endpoint];
+      const independentLines = roofFusionStationaryEndpointDragLines(
+        drag.originalLines,
+        drag.lineId,
+        drag.endpoint,
+      );
+      const attachmentCarriers = independentLines.filter((line) =>
+        sameRoofFusionPoint(
+          closestPointOnSegment(originalPoint, line.start, line.end),
+          originalPoint,
+        ),
+      );
+      if (
+        attachmentCarriers.length > 1 &&
+        attachmentCarriers.some((line, index) =>
+          attachmentCarriers
+            .slice(index + 1)
+            .some((other) => lineIntersection(line, other) !== null),
+        )
+      ) {
+        setLineCaptureProblem(
+          "Jungtis priklauso keliems kraigams arba sąlajoms. Jos vietą keiskite taisydami tų linijų galinius taškus.",
+        );
+        return;
+      }
+      // An existing T junction slides on its carrier instead of silently
+      // detaching the branch when the pointer leaves the magnet radius.
+      const pointerOnCarrier = attachmentCarriers.length
+        ? attachmentCarriers
+            .map((line) =>
+              closestPointOnSegment(pointerPoint, line.start, line.end, metric),
+            )
+            .sort(
+              (first, second) =>
+                distanceInConstraintPixels(pointerPoint, first, metric) -
+                distanceInConstraintPixels(pointerPoint, second, metric),
+            )[0]
+        : pointerPoint;
+      const snapped = snapRoofFusionSkeletonPoint(
+        pointerOnCarrier,
         draftOutline,
-        roofFusionLineJunctionTargets(currentLines, drag.lineId, pointerPoint),
+        independentLines,
         metric,
       );
+      const carrierSafePoint =
+        attachmentCarriers.length &&
+        !attachmentCarriers.some((line) =>
+          sameRoofFusionPoint(
+            closestPointOnSegment(snapped.point, line.start, line.end),
+            snapped.point,
+          ),
+        )
+          ? pointerOnCarrier
+          : snapped.point;
+      if (
+        attachmentCarriers.length &&
+        !pointIsInsideOutline(carrierSafePoint, draftOutline)
+      )
+        return;
+      const constrained = pointIsInsideOutline(carrierSafePoint, draftOutline)
+        ? carrierSafePoint
+        : closestPointOnOutline(carrierSafePoint, draftOutline, metric);
       const otherEndpoint =
         drag.endpoint === "start" ? currentLine.end : currentLine.start;
       try {
@@ -1179,11 +1704,49 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       ) {
         return;
       }
-      const nextLines = currentLines.map((line) =>
-        line.id === drag.lineId
-          ? { ...line, [drag.endpoint]: constrained }
-          : line,
+      const nextLines = moveRoofFusionConnectedEndpoint(
+        drag.originalLines,
+        drag.lineId,
+        drag.endpoint,
+        constrained,
       );
+      if (nextLines === drag.originalLines) {
+        setLineCaptureProblem(
+          "Šis perkėlimas nutrauktų jungtį su kitu kraigu arba sąlaja. Pasirinkite artimesnę jungties vietą.",
+        );
+        return;
+      }
+      try {
+        nextLines.forEach((line) => {
+          const original = currentLines.find((item) => item.id === line.id);
+          if (
+            original &&
+            sameRoofFusionPoint(original.start, line.start) &&
+            sameRoofFusionPoint(original.end, line.end)
+          )
+            return;
+          if (
+            !pointIsInsideOutline(line.start, draftOutline) ||
+            !pointIsInsideOutline(line.end, draftOutline) ||
+            !roofFusionSegmentStaysInOutline(line, draftOutline)
+          )
+            throw new Error("outside");
+          assertWorkbenchSkeletonLineLengthV1(line.start, line.end);
+          if (
+            nextLines.some(
+              (other) =>
+                other.id !== line.id && roofFusionSegmentsOverlap(line, other),
+            )
+          )
+            throw new Error("overlap");
+        });
+      } catch {
+        setLineCaptureProblem(
+          "Šis perkėlimas išvestų liniją už stogo kontūro arba uždengtų kitą liniją. Pasirinkite artimesnę jungties vietą.",
+        );
+        return;
+      }
+      setLineCaptureProblem(null);
       const movedDrag = { ...drag, moved: true };
       draggingLineEndpointRef.current = movedDrag;
       setDraggingLineEndpoint(movedDrag);
@@ -1199,9 +1762,14 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       if (!drag || drag.pointerId !== event.pointerId) return;
       event.preventDefault();
       event.stopPropagation();
-      const changedLine = draftLinesRef.current.find(
-        (line) => line.id === drag.lineId,
-      );
+      const changedLines = draftLinesRef.current.filter((line) => {
+        const original = drag.originalLines.find((item) => item.id === line.id);
+        return (
+          original &&
+          (!sameRoofFusionPoint(original.start, line.start) ||
+            !sameRoofFusionPoint(original.end, line.end))
+        );
+      });
       draggingLineEndpointRef.current = null;
       setDraggingLineEndpoint(null);
       if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
@@ -1209,9 +1777,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       }
       if (event.type !== "pointerup") {
         if (drag.moved) {
-          const restoredLines = draftLinesRef.current.map((line) =>
-            line.id === drag.lineId ? drag.originalLine : line,
-          );
+          const restoredLines = drag.originalLines;
           draftLinesRef.current = restoredLines;
           setDraftLines(restoredLines);
           setLineCaptureNotice("Linijos galinio taško keitimas atšauktas.");
@@ -1220,11 +1786,17 @@ export function AdminNextRoofFusionUnifiedWorkbench({
       }
       if (drag.moved) {
         setRestoredMarkingNotice(null);
-        setLineCaptureNotice("Linijos galinis taškas patikslintas.");
-        if (changedLine) onLineChange?.(changedLine);
+        lineCaptureUndoRef.current.clear();
+        setLineCaptureNotice(
+          changedLines.length > 1
+            ? "Jungtis patikslinta. Prijungtos linijos liko sujungtos."
+            : "Linijos galinis taškas patikslintas.",
+        );
+        if (onLinesChange) onLinesChange(draftLinesRef.current);
+        else changedLines.forEach((line) => onLineChange?.(line));
       }
     },
-    [onLineChange],
+    [onLineChange, onLinesChange],
   );
 
   const handlePointerMove = useCallback(
@@ -1256,12 +1828,42 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         );
         return;
       }
+      if (stage === "skeleton" && lineMode) {
+        const bounds = getCanvasBounds();
+        if (!bounds) return;
+        const point = pointFromPointer(event, bounds, viewport);
+        const metric = roofFusionEndpointConstraintMetric(bounds, viewport);
+        try {
+          constrainWorkbenchPointToOutlineV1(point, draftOutline, metric);
+          setHoverLineSnap({
+            ...snapRoofFusionSkeletonPoint(
+              point,
+              draftOutline,
+              draftLinesRef.current,
+              metric,
+            ),
+            metric,
+          });
+        } catch {
+          setHoverLineSnap(null);
+        }
+        return;
+      }
       if (draggingVertex === null || stage !== "outline") return;
       const bounds = getCanvasBounds();
       if (!bounds) return;
       moveVertex(draggingVertex, pointFromPointer(event, bounds, viewport));
     },
-    [draggingVertex, getCanvasBounds, moveVertex, panGesture, stage, viewport],
+    [
+      draggingVertex,
+      draftOutline,
+      getCanvasBounds,
+      lineMode,
+      moveVertex,
+      panGesture,
+      stage,
+      viewport,
+    ],
   );
 
   const handleCanvasPointerDown = useCallback(
@@ -1469,6 +2071,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     () => [...blockers, ...(stageBlockers?.[stage] ?? [])],
     [blockers, stage, stageBlockers],
   );
+  const visibleBlockers = [
+    ...new Set([...activeBlockers, ...calculationProblems]),
+  ];
 
   const handlePrimaryAction = useCallback(async () => {
     if (primaryActionPending) return;
@@ -1602,7 +2207,27 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     [displayRoofPlanes, viewport.scale],
   );
 
-  const displayLines = [
+  const lineConnectionPreview = useMemo(
+    () =>
+      pendingLinePoint && lineMode && hoverLineSnap
+        ? connectRoofFusionDanglingEndpointsToNewLine(
+            draftLines,
+            {
+              id: "pending-line",
+              kind: lineMode,
+              start: pendingLinePoint,
+              end: hoverLineSnap.point,
+            },
+            draftOutline,
+            hoverLineSnap.metric,
+          )
+        : null,
+    [draftLines, draftOutline, pendingLinePoint, lineMode, hoverLineSnap],
+  );
+  const previewExistingLines = lineConnectionPreview
+    ? lineConnectionPreview.lines.filter((line) => line.id !== "pending-line")
+    : draftLines;
+  const displayLines = lineConnectionPreview?.lines ?? [
     ...draftLines,
     ...(pendingLinePoint && lineMode
       ? [
@@ -1610,7 +2235,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
             id: "pending-line",
             kind: lineMode,
             start: pendingLinePoint,
-            end: pendingLinePoint,
+            end: hoverLineSnap?.point ?? pendingLinePoint,
           },
         ]
       : []),
@@ -1658,6 +2283,10 @@ export function AdminNextRoofFusionUnifiedWorkbench({
     0.0035,
     canvasAspectRatio,
     viewport.scale,
+  );
+  const danglingEndpoints = useMemo(
+    () => roofFusionDanglingEndpoints(draftLines, draftOutline),
+    [draftLines, draftOutline],
   );
 
   return (
@@ -1903,6 +2532,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               onPointerUp={finishPointerGesture}
               onPointerLeave={() => {
                 if (!panGesture) setDraggingVertex(null);
+                setHoverLineSnap(null);
               }}
               role="img"
               preserveAspectRatio="none"
@@ -2041,7 +2671,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
               )}
               {layerVisibility.skeleton && (
                 <g data-roof-fusion-layer="skeleton">
-                  {draftLines.map((line) => (
+                  {previewExistingLines.map((line) => (
                     <line
                       aria-hidden="true"
                       data-roof-fusion-line-hit-target={line.id}
@@ -2090,6 +2720,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   {displayLines.map((line) => (
                     <line
                       data-roof-fusion-line-kind={line.kind}
+                      pointerEvents="none"
                       key={line.id}
                       stroke={
                         line.kind === "ridge"
@@ -2114,7 +2745,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                       y2={line.end.y}
                     />
                   ))}
-                  {draftLines.map((line) => (
+                  {previewExistingLines.map((line) => (
                     <g key={`${line.id}:endpoints`}>
                       {([line.start, line.end] as const).map((point, index) => (
                         <g
@@ -2278,6 +2909,58 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   vectorEffect="non-scaling-stroke"
                 />
               )}
+              {stage === "skeleton" &&
+                layerVisibility.skeleton &&
+                danglingEndpoints.map((endpoint) => (
+                  <ellipse
+                    aria-label={`${endpoint.label}: neprijungtas`}
+                    cx={endpoint.point.x}
+                    cy={endpoint.point.y}
+                    data-roof-fusion-dangling-endpoint={`${endpoint.lineId}:${endpoint.endpoint}`}
+                    fill="none"
+                    key={`dangling:${endpoint.lineId}:${endpoint.endpoint}`}
+                    pointerEvents="none"
+                    rx={pendingLinePointRadii.rx * 2.5}
+                    ry={pendingLinePointRadii.ry * 2.5}
+                    stroke="#ffadad"
+                    strokeWidth="2px"
+                    vectorEffect="non-scaling-stroke"
+                  >
+                    <title>{endpoint.label}: neprijungtas</title>
+                  </ellipse>
+                ))}
+              {stage === "skeleton" && lineMode && hoverLineSnap?.target && (
+                <ellipse
+                  aria-hidden="true"
+                  cx={hoverLineSnap.point.x}
+                  cy={hoverLineSnap.point.y}
+                  data-roof-fusion-snap-target={hoverLineSnap.target}
+                  fill="none"
+                  pointerEvents="none"
+                  rx={pendingLinePointRadii.rx * 1.8}
+                  ry={pendingLinePointRadii.ry * 1.8}
+                  stroke="#fffdf7"
+                  strokeWidth="2px"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              {stage === "skeleton" &&
+                lineConnectionPreview?.attachments.map((attachment) => (
+                  <ellipse
+                    aria-hidden="true"
+                    cx={attachment.point.x}
+                    cy={attachment.point.y}
+                    data-roof-fusion-connection-preview={`${attachment.lineId}:${attachment.endpoint}`}
+                    fill="none"
+                    key={`connection-preview:${attachment.lineId}:${attachment.endpoint}`}
+                    pointerEvents="none"
+                    rx={pendingLinePointRadii.rx * 2.5}
+                    ry={pendingLinePointRadii.ry * 2.5}
+                    stroke="#fffdf7"
+                    strokeWidth="2px"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
             </svg>
             {stage === "review" &&
               resultState === "current" &&
@@ -2347,10 +3030,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                     data-roof-fusion-line-mode={kind}
                     key={kind}
                     onClick={() => {
-                      setLineMode((current) =>
-                        current === kind ? null : kind,
-                      );
+                      setLineMode(kind);
                       setPendingLinePoint(null);
+                      setHoverLineSnap(null);
                       setLineCaptureProblem(null);
                       setLineCaptureNotice(null);
                     }}
@@ -2374,7 +3056,7 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   aria-label="Atšaukti paskutinę kraigo arba sąlajos liniją"
                   className="min-h-11 min-w-0 rounded-lg border border-white/15 bg-white/5 px-2 text-xs leading-tight font-semibold text-[#ddd8cd] hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                   data-roof-fusion-undo-last-line
-                  disabled={draftLines.length === 0}
+                  disabled={draftLines.length === 0 && !pendingLinePoint}
                   onClick={undoLastLine}
                   title="Atšaukti paskutinę nubrėžtą liniją"
                   type="button"
@@ -2522,8 +3204,24 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   ? pendingLinePoint
                     ? "Pasirinkite antrą tašką"
                     : "Pasirinkite pirmą tašką"
-                  : ""}
+                  : "Tempdami tašką taisykite liniją arba bendrą jungtį."}
               </span>
+              <button
+                aria-pressed={lineMode === null}
+                className="min-h-11 rounded-lg border border-white/15 px-3 text-xs text-[#ddd8cd] hover:bg-white/10"
+                data-roof-fusion-edit-points
+                data-roof-fusion-edit-lines
+                onClick={stopLineDrawing}
+                type="button"
+              >
+                Taisyti taškus · Esc
+              </button>
+              {lineMode && (
+                <span className="text-xs text-[#aaa69d]">
+                  Baltas žiedas rodo magnetinę jungtį. Įrankis lieka aktyvus
+                  kitai linijai.
+                </span>
+              )}
               {clearLinesArmed ? (
                 <div
                   className="basis-full rounded-xl border border-[#f3c66b]/35 bg-[#e8a317]/10 p-3 text-xs text-[#ddd8cd]"
@@ -2568,6 +3266,26 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   {lineCaptureProblem}
                 </span>
               ) : null}
+              {lineConnectionPreview &&
+                lineConnectionPreview.attachments.length > 0 && (
+                  <span
+                    className="basis-full text-xs text-[#71e6b4]"
+                    data-roof-fusion-connection-preview-notice
+                  >
+                    Prijungiama: {lineConnectionPreview.attachments.length}{" "}
+                    esamų galų prie naujos linijos (
+                    {WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX} px).
+                  </span>
+                )}
+              {danglingEndpoints.length > 0 && (
+                <span
+                  className="basis-full text-xs text-[#ffadad]"
+                  data-roof-fusion-dangling-guidance
+                >
+                  Neprijungtų galų: {danglingEndpoints.length}. Prijunkite
+                  pažymėtus taškus prie kontūro arba kitos linijos.
+                </span>
+              )}
               {lineCaptureNotice ? (
                 <span
                   className="basis-full text-xs text-[#71e6b4]"
@@ -2636,9 +3354,12 @@ export function AdminNextRoofFusionUnifiedWorkbench({
                   <span className="text-xs font-semibold tracking-[0.12em] text-[#aaa69d] uppercase">
                     Blokatoriai
                   </span>
-                  {activeBlockers.length ? (
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#ffadad]">
-                      {activeBlockers.map((blocker) => (
+                  {visibleBlockers.length ? (
+                    <ul
+                      className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#ffadad]"
+                      data-roof-fusion-visible-blockers
+                    >
+                      {visibleBlockers.map((blocker) => (
                         <li key={blocker}>{blocker}</li>
                       ))}
                     </ul>

@@ -160,6 +160,7 @@ export class AssistedManualRoofGeometryValidationError extends Error {
 }
 
 type Point = { xM: number; yM: number };
+const PLAN_POSITION_EPSILON_M = 1e-7;
 
 function uniqueSorted(values: string[]) {
   return uniqueCanonicalStringsV1(values);
@@ -189,12 +190,15 @@ function cross(from: Point, to: Point, point: Point) {
 }
 
 function onSegment(point: Point, from: Point, to: Point) {
+  // A cross product is measured in m². Scale by segment length so the
+  // tolerance is a distance and exact image snaps survive EPSG roundoff.
+  const length = Math.hypot(to.xM - from.xM, to.yM - from.yM);
   return (
-    Math.abs(cross(from, to, point)) <= 1e-8 &&
-    point.xM >= Math.min(from.xM, to.xM) - 1e-8 &&
-    point.xM <= Math.max(from.xM, to.xM) + 1e-8 &&
-    point.yM >= Math.min(from.yM, to.yM) - 1e-8 &&
-    point.yM <= Math.max(from.yM, to.yM) + 1e-8
+    Math.abs(cross(from, to, point)) <= PLAN_POSITION_EPSILON_M * length &&
+    point.xM >= Math.min(from.xM, to.xM) - PLAN_POSITION_EPSILON_M &&
+    point.xM <= Math.max(from.xM, to.xM) + PLAN_POSITION_EPSILON_M &&
+    point.yM >= Math.min(from.yM, to.yM) - PLAN_POSITION_EPSILON_M &&
+    point.yM <= Math.max(from.yM, to.yM) + PLAN_POSITION_EPSILON_M
   );
 }
 
@@ -203,10 +207,12 @@ function segmentsIntersect(firstFrom: Point, firstTo: Point, secondFrom: Point, 
   const secondSide = cross(firstFrom, firstTo, secondTo);
   const thirdSide = cross(secondFrom, secondTo, firstFrom);
   const fourthSide = cross(secondFrom, secondTo, firstTo);
-  if (
-    ((firstSide > 0 && secondSide < 0) || (firstSide < 0 && secondSide > 0)) &&
-    ((thirdSide > 0 && fourthSide < 0) || (thirdSide < 0 && fourthSide > 0))
-  )
+  const firstTolerance = PLAN_POSITION_EPSILON_M * Math.hypot(firstTo.xM - firstFrom.xM, firstTo.yM - firstFrom.yM);
+  const secondTolerance =
+    PLAN_POSITION_EPSILON_M * Math.hypot(secondTo.xM - secondFrom.xM, secondTo.yM - secondFrom.yM);
+  const oppositeSides = (left: number, right: number, tolerance: number) =>
+    (left > tolerance && right < -tolerance) || (left < -tolerance && right > tolerance);
+  if (oppositeSides(firstSide, secondSide, firstTolerance) && oppositeSides(thirdSide, fourthSide, secondTolerance))
     return true;
   return (
     onSegment(secondFrom, firstFrom, firstTo) ||

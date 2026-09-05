@@ -16,21 +16,27 @@ import {
   ROOF_FUSION_SKELETON_HIT_STROKE,
   ROOF_FUSION_SKELETON_LINE_STROKE,
   ROOF_FUSION_STAGES,
+  type RoofFusionLine,
   clampRoofFusionPoint,
   clampRoofFusionViewport,
   constrainRoofFusionDraggedEndpoint,
+  connectRoofFusionDanglingEndpointsToNewLine,
   fitRoofFusionViewportToOutline,
   hasRoofFusionPanGestureMoved,
   localizedRoofFusionTechnicalText,
+  moveRoofFusionConnectedEndpoint,
   panRoofFusionViewport,
   roofFusionEndpointConstraintMetric,
+  roofFusionDanglingEndpoints,
   roofFusionImagePointFromViewportPoint,
   roofFusionLineJunctionTargets,
   roofFusionPlaneDisplayId,
   roofFusionPlaneLabelPlacements,
   roofFusionScreenStableMarkerRadii,
+  roofFusionStationaryEndpointDragLines,
   shouldHandleRoofFusionZoomWheel,
   shouldSuppressRoofFusionCanvasClick,
+  snapRoofFusionSkeletonPoint,
   zoomRoofFusionViewportAt,
 } from "./admin-next-roof-fusion-unified-workbench";
 import {
@@ -46,6 +52,96 @@ const sourceOutline = [
 ] as const;
 
 describe("Admin Next unified Roof Fusion workbench", () => {
+  it("connects the actual Odins vei r25 ridge/valley clicks in drawing order and repairs its old draft with one drag", () => {
+    const outline = [
+      { x: 0.5349501180273156, y: 0.6709705910619288 },
+      { x: 0.56036194370136, y: 0.5030668324509597 },
+      { x: 0.5109408769629995, y: 0.47946692632177124 },
+      { x: 0.5091722795847071, y: 0.4911525311332555 },
+      { x: 0.4660793442743157, y: 0.4705194570100101 },
+      { x: 0.4526751246022685, y: 0.5590839938396398 },
+      { x: 0.4955247696476256, y: 0.5795644983433225 },
+      { x: 0.48528102062778306, y: 0.6473425933781126 },
+    ];
+    const raw: RoofFusionLine[] = [
+      {
+        id: "ridge1",
+        kind: "ridge",
+        start: { x: 0.45894191618119184, y: 0.5176779659514785 },
+        end: { x: 0.5285076215973281, y: 0.5464369444286505 },
+      },
+      {
+        id: "ridge2",
+        kind: "ridge",
+        start: { x: 0.5377396721809237, y: 0.49226408132585137 },
+        end: { x: 0.513678744144037, y: 0.6608516237538664 },
+      },
+      {
+        id: "valley1",
+        kind: "valley",
+        start: { x: 0.5087573204580227, y: 0.4909538470014218 },
+        end: { x: 0.5248951252107841, y: 0.5449435116314864 },
+      },
+      {
+        id: "valley2",
+        kind: "valley",
+        start: { x: 0.5289918599715379, y: 0.5535573182178278 },
+        end: { x: 0.49470353255691285, y: 0.5849982399864578 },
+      },
+    ];
+    const metric = {
+      xPixelsPerImageUnit: 891.987976,
+      yPixelsPerImageUnit: 500.695618,
+      maxDistancePixels: 14,
+    };
+    let drawn: readonly RoofFusionLine[] = [];
+    for (const line of raw) {
+      const captured = {
+        ...line,
+        start: snapRoofFusionSkeletonPoint(line.start, outline, drawn, metric)
+          .point,
+        end: snapRoofFusionSkeletonPoint(line.end, outline, drawn, metric)
+          .point,
+      };
+      drawn = connectRoofFusionDanglingEndpointsToNewLine(
+        drawn,
+        captured,
+        outline,
+        metric,
+      ).lines;
+    }
+    expect(roofFusionDanglingEndpoints(drawn, outline)).toEqual([]);
+    expect(drawn).toHaveLength(4);
+    expect(drawn[0].end).not.toEqual(raw[0].end);
+    expect(drawn[2].end).toEqual(drawn[0].end);
+    expect(drawn[3].start).toEqual(drawn[0].end);
+    expect(
+      roofFusionDanglingEndpoints(raw, outline).map(({ lineId, endpoint }) => ({
+        lineId,
+        endpoint,
+      })),
+    ).toEqual([{ lineId: "ridge1", endpoint: "end" }]);
+    const stationaryTargets = roofFusionStationaryEndpointDragLines(
+      raw,
+      "ridge1",
+      "end",
+    );
+    expect(stationaryTargets.map((line) => line.id)).not.toContain("valley1");
+    const snappedDrag = snapRoofFusionSkeletonPoint(
+      raw[0].end,
+      outline,
+      stationaryTargets,
+      metric,
+    );
+    expect(snappedDrag.point).toEqual(raw[3].start);
+    const repaired = moveRoofFusionConnectedEndpoint(
+      raw,
+      "ridge1",
+      "end",
+      snappedDrag.point,
+    );
+    expect(roofFusionDanglingEndpoints(repaired, outline)).toEqual([]);
+  });
   it("exports the three-step one-card progress and safe normalized-point helper", () => {
     expect(ROOF_FUSION_ONE_CARD_STEPS).toEqual(["object", "refine", "result"]);
     expect(ROOF_FUSION_STAGES).toEqual([
@@ -184,6 +280,322 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
     expect(junctionTargets).toContainEqual({ x: 0.5, y: 0.5 });
     expect(junctionTargets).toContainEqual({ x: 0.5, y: 0.6 });
+  });
+
+  it("reuses the exact ridge junction for two valleys instead of making nearby T junctions", () => {
+    const outline = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const ridges = [
+      {
+        id: "horizontal",
+        kind: "ridge" as const,
+        start: { x: 0.1, y: 0.5 },
+        end: { x: 0.5, y: 0.5 },
+      },
+      {
+        id: "vertical",
+        kind: "ridge" as const,
+        start: { x: 0.5, y: 0.1 },
+        end: { x: 0.5, y: 0.9 },
+      },
+    ];
+    for (const scale of [1, 1.8, 3, 4]) {
+      const metric = roofFusionEndpointConstraintMetric(
+        { width: 480, height: 270 },
+        { scale, offsetX: 0, offsetY: 0 },
+      );
+      const first = snapRoofFusionSkeletonPoint(
+        {
+          x: 0.5 - 5 / metric.xPixelsPerImageUnit,
+          y: 0.5 + 4 / metric.yPixelsPerImageUnit,
+        },
+        outline,
+        ridges,
+        metric,
+      );
+      const second = snapRoofFusionSkeletonPoint(
+        {
+          x: 0.5 + 4 / metric.xPixelsPerImageUnit,
+          y: 0.5 - 5 / metric.yPixelsPerImageUnit,
+        },
+        outline,
+        [
+          ...ridges,
+          {
+            id: "valley-1",
+            kind: "valley",
+            start: first.point,
+            end: { x: 0.25, y: 0.9 },
+          },
+        ],
+        metric,
+      );
+      expect(first).toEqual({ point: { x: 0.5, y: 0.5 }, target: "junction" });
+      expect(second).toEqual(first);
+    }
+  });
+
+  it("projects a diagonal ridge in displayed pixels on a wide canvas", () => {
+    const outline = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const metric = {
+      xPixelsPerImageUnit: 1_000,
+      yPixelsPerImageUnit: 250,
+      maxDistancePixels: 14,
+    };
+    const snap = snapRoofFusionSkeletonPoint(
+      { x: 0.5, y: 0.55 },
+      outline,
+      [
+        {
+          id: "diagonal",
+          kind: "ridge",
+          start: { x: 0.1, y: 0.1 },
+          end: { x: 0.9, y: 0.9 },
+        },
+      ],
+      metric,
+    );
+    expect(snap.target).toBe("line");
+    expect(snap.point.x).toBeCloseTo(0.5029411764705882);
+    expect(snap.point.y).toBeCloseTo(snap.point.x);
+    expect(snap.point.x).not.toBeCloseTo(0.525);
+  });
+
+  it("prioritizes the concave outline vertex over a nearby boundary projection", () => {
+    const outline = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.9, y: 0.9 },
+      { x: 0.5, y: 0.9 },
+      { x: 0.5, y: 0.5 },
+      { x: 0.1, y: 0.5 },
+    ];
+    const snapped = snapRoofFusionSkeletonPoint(
+      { x: 0.504, y: 0.514 },
+      outline,
+      [],
+      {
+        xPixelsPerImageUnit: 1_000,
+        yPixelsPerImageUnit: 500,
+        maxDistancePixels: 14,
+      },
+    );
+    expect(snapped).toEqual({ point: { x: 0.5, y: 0.5 }, target: "outline" });
+  });
+
+  it("moves a shared ridge/valley node together and carries branches on the edited carrier", () => {
+    const lines = [
+      {
+        id: "ridge",
+        kind: "ridge" as const,
+        start: { x: 0.2, y: 0.5 },
+        end: { x: 0.8, y: 0.5 },
+      },
+      {
+        id: "branch",
+        kind: "valley" as const,
+        start: { x: 0.5, y: 0.5 },
+        end: { x: 0.4, y: 0.8 },
+      },
+      {
+        id: "shared",
+        kind: "ridge" as const,
+        start: { x: 0.8, y: 0.5 },
+        end: { x: 0.8, y: 0.9 },
+      },
+      {
+        id: "unconnected",
+        kind: "valley" as const,
+        start: { x: 0.5, y: 0.501 },
+        end: { x: 0.6, y: 0.8 },
+      },
+    ];
+    const moved = moveRoofFusionConnectedEndpoint(lines, "ridge", "end", {
+      x: 0.8,
+      y: 0.3,
+    });
+    expect(moved[0].end).toEqual({ x: 0.8, y: 0.3 });
+    expect(moved[2].start).toEqual(moved[0].end);
+    expect(moved[1].start.x).toBeCloseTo(0.5);
+    expect(moved[1].start.y).toBeCloseTo(0.4);
+    expect(moved[1].end).toEqual(lines[1].end);
+    expect(moved[3]).toEqual(lines[3]);
+    expect(lines[0].end).toEqual({ x: 0.8, y: 0.5 });
+  });
+
+  it("identifies only truly unattached endpoints, accepting exact T junctions and boundary contacts", () => {
+    const outline = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.9, y: 0.9 },
+      { x: 0.1, y: 0.9 },
+    ];
+    const lines = [
+      {
+        id: "ridge",
+        kind: "ridge" as const,
+        start: { x: 0.1, y: 0.5 },
+        end: { x: 0.9, y: 0.5 },
+      },
+      {
+        id: "valley",
+        kind: "valley" as const,
+        start: { x: 0.5, y: 0.5 },
+        end: { x: 0.5, y: 0.9 },
+      },
+      {
+        id: "near",
+        kind: "valley" as const,
+        start: { x: 0.4, y: 0.500001 },
+        end: { x: 0.3, y: 0.7 },
+      },
+    ];
+    expect(roofFusionDanglingEndpoints(lines.slice(0, 2), outline)).toEqual([]);
+    expect(
+      roofFusionDanglingEndpoints(lines, outline).map(
+        ({ lineId, endpoint }) => ({ lineId, endpoint }),
+      ),
+    ).toEqual([
+      { lineId: "near", endpoint: "start" },
+      { lineId: "near", endpoint: "end" },
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        sourceOutline: outline,
+        lines,
+        initialStage: "skeleton",
+        initialLayers: { skeleton: true },
+        orthoImageSrc: "/preview/roof.jpg",
+      }),
+    );
+    expect(html).toContain('data-roof-fusion-dangling-endpoint="near:start"');
+    expect(html).toContain('data-roof-fusion-dangling-endpoint="near:end"');
+    expect(html).not.toContain('data-roof-fusion-dangling-endpoint="ridge:');
+    expect(html).toContain("Neprijungtų galų: 2");
+    expect(html).toContain("Sąlaja 2, galas 1: neprijungtas");
+  });
+
+  it("keeps reverse magnets bounded and never flattens a floating line into a duplicate carrier", () => {
+    const outline = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.9, y: 0.9 },
+      { x: 0.1, y: 0.9 },
+    ];
+    const metric = {
+      xPixelsPerImageUnit: 1_000,
+      yPixelsPerImageUnit: 1_000,
+      maxDistancePixels: 14,
+    };
+    const carrier: RoofFusionLine = {
+      id: "carrier",
+      kind: "ridge",
+      start: { x: 0.1, y: 0.5 },
+      end: { x: 0.9, y: 0.5 },
+    };
+    const floating: RoofFusionLine = {
+      id: "floating",
+      kind: "valley",
+      start: { x: 0.2, y: 0.49 },
+      end: { x: 0.8, y: 0.49 },
+    };
+    const preview = connectRoofFusionDanglingEndpointsToNewLine(
+      [floating],
+      carrier,
+      outline,
+      metric,
+    );
+    expect(preview.attachments).toHaveLength(1);
+    expect(preview.lines[0].end).toEqual(floating.end);
+    expect(floating.start.y).toBe(0.49);
+    const connected: RoofFusionLine = {
+      id: "connected",
+      kind: "ridge",
+      start: { x: 0.2, y: 0.1 },
+      end: floating.start,
+    };
+    expect(
+      connectRoofFusionDanglingEndpointsToNewLine(
+        [floating, connected],
+        carrier,
+        outline,
+        metric,
+      ).attachments.every(
+        (attachment) => !samePointForTest(attachment.from, floating.start),
+      ),
+    ).toBe(true);
+    const far: RoofFusionLine = {
+      ...floating,
+      start: { x: 0.2, y: 0.45 },
+      end: { x: 0.8, y: 0.45 },
+    };
+    expect(
+      connectRoofFusionDanglingEndpointsToNewLine(
+        [far],
+        carrier,
+        outline,
+        metric,
+      ).attachments,
+    ).toEqual([]);
+    function samePointForTest(
+      first: { x: number; y: number },
+      second: { x: number; y: number },
+    ) {
+      return first.x === second.x && first.y === second.y;
+    }
+  });
+
+  it("recomputes branches at the intersection of two carriers when one carrier endpoint moves", () => {
+    const outline = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.9, y: 0.9 },
+      { x: 0.1, y: 0.9 },
+    ];
+    const lines: RoofFusionLine[] = [
+      {
+        id: "horizontal",
+        kind: "ridge",
+        start: { x: 0.1, y: 0.5 },
+        end: { x: 0.9, y: 0.5 },
+      },
+      {
+        id: "vertical",
+        kind: "ridge",
+        start: { x: 0.5, y: 0.1 },
+        end: { x: 0.5, y: 0.9 },
+      },
+      {
+        id: "valley-a",
+        kind: "valley",
+        start: { x: 0.5, y: 0.5 },
+        end: { x: 0.9, y: 0.9 },
+      },
+      {
+        id: "valley-b",
+        kind: "valley",
+        start: { x: 0.5, y: 0.5 },
+        end: { x: 0.1, y: 0.9 },
+      },
+    ];
+    const moved = moveRoofFusionConnectedEndpoint(lines, "horizontal", "end", {
+      x: 0.9,
+      y: 0.3,
+    });
+    expect(moved[2].start.x).toBeCloseTo(0.5);
+    expect(moved[2].start.y).toBeCloseTo(0.4);
+    expect(moved[3].start).toEqual(moved[2].start);
+    expect(moved[1]).toEqual(lines[1]);
+    expect(roofFusionDanglingEndpoints(moved, outline)).toEqual([]);
   });
 
   it("keeps the image point under the zoom anchor and maps panned pointers back exactly", () => {

@@ -331,13 +331,17 @@ export async function buildWorkbenchDraftFromUiV1(input: {
     vertices.push({ vertexId, ...projected });
     return vertexId;
   };
+  // Interactive snapping already chose the operator's exact junction. A
+  // second, normalized-distance snap here can pull a valid interior junction
+  // onto the nearby eave and disconnect it from its ridge after persistence.
+  const preserveOrConstrainEndpoint = (point: NormalizedWorkbenchPointV1) =>
+    workbenchPointInOrOnOutlineV1(point, input.approvedOutline)
+      ? point
+      : constrainWorkbenchPointToOutlineV1(point, input.approvedOutline);
   const constrainedLines = input.lines.map((line) => ({
     ...line,
-    start: constrainWorkbenchPointToOutlineV1(
-      line.start,
-      input.approvedOutline,
-    ),
-    end: constrainWorkbenchPointToOutlineV1(line.end, input.approvedOutline),
+    start: preserveOrConstrainEndpoint(line.start),
+    end: preserveOrConstrainEndpoint(line.end),
   }));
   constrainedLines.forEach((line) =>
     assertWorkbenchSkeletonLineLengthV1(line.start, line.end),

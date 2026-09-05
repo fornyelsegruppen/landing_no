@@ -185,6 +185,10 @@ const blockerCopy: Record<string, string> = {
     "Kraigo arba sąlajos galas nesujungtas su stogo riba ar kitu kraštu. Patikslinkite liniją.",
   SKELETON_EDGE_OUTSIDE_MASS:
     "Kraigo arba sąlajos linija išeina už patvirtinto stogo kontūro. Perkelkite jos galus.",
+  SKELETON_EDGE_CROSSES_EDGE:
+    "Linijos kertasi be bendros jungties. Prijunkite kraigų arba sąlajų galus susikirtimo vietoje.",
+  SKELETON_EDGE_OVERLAP:
+    "Dvi stogo linijos persidengia. Palikite vieną liniją tam pačiam kraštui.",
   SKELETON_DOES_NOT_SUBDIVIDE:
     "Pažymėtos linijos saugiai nepadalija stogo į paviršius. Patikslinkite kraigus ir sąlajas.",
   FACE_TOPOLOGY_INVALID:
@@ -892,6 +896,16 @@ export function AdminNextRoofFusionPersistentWorkbench({
     sourceFootprintIdentityMatches(confirmed, sourceFootprintId),
   );
   const currentHeightResult = heightResultMatchesDraft ? heightResult : null;
+  const currentCalculationProblems =
+    currentHeightResult?.status === "blocked"
+      ? [
+          ...new Set(
+            currentHeightResult.summary.blockers.map(
+              localizedWorkbenchHeightBlocker,
+            ),
+          ),
+        ]
+      : [];
   const roofFusionMetrics = currentHeightResult?.metrics;
   const calculatedRoofPlanes = useMemo(
     () =>
@@ -1004,17 +1018,23 @@ export function AdminNextRoofFusionPersistentWorkbench({
         )}
         Išsaugoti ir patvirtinti reviziją
       </button>
-      {heightResult ? (
+      {currentHeightResult ? (
         <div
-          className={`mt-3 rounded-xl border p-2 text-xs ${heightResult.status === "blocked" ? "border-red-400/35 text-red-200" : "border-amber-300/30 text-amber-100"}`}
-          data-roof-fusion-height-result={heightResult.status}
+          className={`mt-3 rounded-xl border p-2 text-xs ${currentHeightResult.status === "blocked" ? "border-red-400/35 text-red-200" : "border-amber-300/30 text-amber-100"}`}
+          data-roof-fusion-height-result={currentHeightResult.status}
         >
-          <strong>{heightStatusCopy[heightResult.status]}</strong> · kainodarai
-          nenaudojama
-          {heightResult.summary.blockers.length ? (
+          <strong>{heightStatusCopy[currentHeightResult.status]}</strong> ·
+          kainodarai nenaudojama
+          {currentHeightResult.summary.blockers.length ? (
             <ul className="mt-1 list-disc pl-4">
-              {heightResult.summary.blockers.map((item) => (
-                <li key={item}>{localizedWorkbenchHeightBlocker(item)}</li>
+              {[
+                ...new Set(
+                  currentHeightResult.summary.blockers.map(
+                    localizedWorkbenchHeightBlocker,
+                  ),
+                ),
+              ].map((item) => (
+                <li key={item}>{item}</li>
               ))}
             </ul>
           ) : null}
@@ -1157,6 +1177,7 @@ export function AdminNextRoofFusionPersistentWorkbench({
       advancedPanel={advancedPanel}
       averageSlopeDegrees={metrics?.averageSlopeDegrees}
       blockers={blockers}
+      calculationProblems={currentCalculationProblems}
       confidence={
         legacyFallback ||
         currentHeightResult?.status === "blocked" ||
@@ -1173,11 +1194,13 @@ export function AdminNextRoofFusionPersistentWorkbench({
       confidenceReason={
         legacyFallback
           ? "Naudojamas operatoriaus pasirinktas senas rankinis nuolydžio metodas; rezultatas yra preliminarus ir lieka Preview peržiūrai."
-          : currentHeightResult?.detailedResult
-            ? currentHeightResult.detailedResult.snapshot.confidence.rationale
-            : currentHeightResult
-              ? `${heightStatusCopy[currentHeightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
-              : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
+          : currentHeightResult?.status === "blocked"
+            ? "Skaičiavimas sustabdytas. Patikslinkite nurodytas stogo jungtis arba aukščio duomenis."
+            : currentHeightResult?.detailedResult
+              ? currentHeightResult.detailedResult.snapshot.confidence.rationale
+              : currentHeightResult
+                ? `${heightStatusCopy[currentHeightResult.status]}; rezultatas lieka Preview ir nėra perduodamas kainodarai.`
+                : "Patvirtinta revizija ir patikimi šaltiniai bus apskaičiuoti tik aiškiu veiksmu."
       }
       footprintPerimeterMeters={metrics?.footprintPerimeterMeters}
       guardNotice={
@@ -1222,6 +1245,12 @@ export function AdminNextRoofFusionPersistentWorkbench({
             line.id === changedLine.id ? changedLine : line,
           ),
         );
+        setDirty(true);
+        setConfirmed(null);
+        setLegacyFallback(null);
+      }}
+      onLinesChange={(changedLines) => {
+        setLines(changedLines);
         setDirty(true);
         setConfirmed(null);
         setLegacyFallback(null);

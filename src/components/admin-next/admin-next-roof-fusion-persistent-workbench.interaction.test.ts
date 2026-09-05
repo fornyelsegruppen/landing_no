@@ -1340,6 +1340,11 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       "Kraigo arba sąlajos galas nesujungtas",
     );
     expect(container.textContent).not.toContain("Endpoint is not attached");
+    expect(
+      container.querySelector("[data-roof-fusion-visible-blockers]")
+        ?.textContent,
+    ).toContain("SKELETON_DANGLING_ENDPOINT");
+    expect(container.textContent).not.toContain("Nėra — galima tęsti.");
     expect(scrollIntoViewMock).not.toHaveBeenCalled();
     await closeAdvanced();
 
@@ -1908,7 +1913,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("Preview · neišsaugoti pakeitimai");
 
-    await click('[data-roof-fusion-line-mode="ridge"]');
+    await click("[data-roof-fusion-edit-lines]");
     expect(
       container
         .querySelector("[data-roof-fusion-line-endpoint-hit-target]")
@@ -1955,6 +1960,18 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     await captureLine(350, 650);
+    // This chord lies on the just-saved ridge. Keep its first point so the
+    // operator can choose a valid second point without restarting drawing.
+    expect(container.textContent).toContain(
+      "Linija uždengia jau pažymėtą liniją",
+    );
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).not.toBeNull();
+    expect(
+      container.querySelectorAll("[data-roof-fusion-line-hit-target]"),
+    ).toHaveLength(2);
+    await activateCanvasPoint(350, 300);
     expect(renderedLines()).toHaveLength(3);
     expect(
       container.querySelector("[data-roof-fusion-pending-line-point]"),
@@ -1981,10 +1998,14 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     await click('[data-roof-fusion-line-mode="valley"]');
-    await captureLine(400, 600);
+    await activateCanvasPoint(500, 250);
+    await activateCanvasPoint(900, 300);
     expect(
       container.querySelector('[data-roof-fusion-line-kind="valley"]'),
     ).not.toBeNull();
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).toBeNull();
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
 

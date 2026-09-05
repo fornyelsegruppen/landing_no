@@ -240,13 +240,20 @@ function magnitude(vector: Vector3) {
 }
 
 function polygonVectorArea(points: GeometryVertexV1[]): Vector3 {
+  const origin = points[0];
   return points.reduce(
     (sum, point, index) => {
       const next = points[(index + 1) % points.length];
       return {
-        x: sum.x + (point.yM - next.yM) * (point.zM + next.zM),
-        y: sum.y + (point.zM - next.zM) * (point.xM + next.xM),
-        z: sum.z + (point.xM - next.xM) * (point.yM + next.yM),
+        x:
+          sum.x +
+          (point.yM - next.yM) * (point.zM - origin.zM + next.zM - origin.zM),
+        y:
+          sum.y +
+          (point.zM - next.zM) * (point.xM - origin.xM + next.xM - origin.xM),
+        z:
+          sum.z +
+          (point.xM - next.xM) * (point.yM - origin.yM + next.yM - origin.yM),
       };
     },
     { x: 0, y: 0, z: 0 },
@@ -254,11 +261,16 @@ function polygonVectorArea(points: GeometryVertexV1[]): Vector3 {
 }
 
 function polygonHorizontalArea(points: GeometryVertexV1[]) {
+  const origin = points[0];
   return (
     Math.abs(
       points.reduce((sum, point, index) => {
         const next = points[(index + 1) % points.length];
-        return sum + point.xM * next.yM - next.xM * point.yM;
+        return (
+          sum +
+          (point.xM - origin.xM) * (next.yM - origin.yM) -
+          (next.xM - origin.xM) * (point.yM - origin.yM)
+        );
       }, 0),
     ) / 2
   );
@@ -535,6 +547,9 @@ function classifyEdge(
   const edgeMeanZ = (from.zM + to.zM) / 2;
   const edgeSlope = Math.abs(from.zM - to.zM);
   const tolerance = Math.max(0.01, from.uncertaintyM + to.uncertaintyM);
+  const dx = to.xM - from.xM;
+  const dy = to.yM - from.yM;
+  const planLength = Math.hypot(dx, dy);
   const deltas = edge.adjacentSurfaceIds.map((surfaceId) => {
     const surface = surfaces.get(surfaceId)!;
     const other = surface.points.filter(
@@ -542,9 +557,36 @@ function classifyEdge(
         point.vertexId !== edge.fromVertexId &&
         point.vertexId !== edge.toVertexId,
     );
-    const otherMeanZ =
-      other.reduce((sum, point) => sum + point.zM, 0) / other.length;
-    return edgeMeanZ - otherMeanZ;
+    if (edge.adjacentSurfaceIds.length === 1) {
+      const otherMeanZ =
+        other.reduce((sum, point) => sum + point.zM, 0) / other.length;
+      return edgeMeanZ - otherMeanZ;
+    }
+    // On a sloping valley/hip, distant vertices also change height along the
+    // edge. Only the plane's derivative perpendicular to the shared edge
+    // distinguishes an inward valley from an outward ridge/hip.
+    const fromIndex = surface.points.findIndex(
+      (point) => point.vertexId === from.vertexId,
+    );
+    const direction =
+      surface.points[(fromIndex + 1) % surface.points.length].vertexId ===
+      to.vertexId
+        ? 1
+        : -1;
+    const winding = Math.sign(polygonVectorArea(surface.points).z);
+    const inwardX = (-dy / planLength) * direction * winding;
+    const inwardY = (dx / planLength) * direction * winding;
+    const normal = surface.plane.normal;
+    const inwardSlope = -(normal.x * inwardX + normal.y * inwardY) / normal.z;
+    const interiorDistance =
+      other.reduce(
+        (sum, point) =>
+          sum +
+          Math.abs(dx * (point.yM - from.yM) - dy * (point.xM - from.xM)) /
+            planLength,
+        0,
+      ) / other.length;
+    return -inwardSlope * interiorDistance;
   });
 
   if (deltas.length === 1) {

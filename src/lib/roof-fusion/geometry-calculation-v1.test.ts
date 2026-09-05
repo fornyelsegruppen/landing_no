@@ -181,6 +181,44 @@ describe("Roof geometry calculation v1", () => {
     },
   );
 
+  it.each(["hip", "valley"] as const)(
+    "classifies a sloping %s from perpendicular plane slopes despite unequal adjacent faces",
+    (kind) => {
+      const input = foldFixture(kind);
+      input.vertices = input.vertices
+        .filter((point) =>
+          ["fold-a", "fold-b", "fold-c", "fold-e"].includes(point.vertexId),
+        )
+        .map((point) => {
+          if (point.vertexId !== "fold-c" && point.vertexId !== "fold-e")
+            return point;
+          const yM = point.vertexId === "fold-c" ? 100 : -96;
+          return {
+            ...point,
+            yM,
+            zM: 2 + yM * 0.5 + (kind === "valley" ? 4 : -4),
+          };
+        });
+      input.surfaces = input.surfaces.map((surface, index) => ({
+        ...surface,
+        vertexIds:
+          index === 0
+            ? ["fold-a", "fold-b", "fold-c"]
+            : ["fold-b", "fold-a", "fold-e"],
+        edgeIds: [
+          "edge-fold-shared",
+          `triangle-${index}-1`,
+          `triangle-${index}-2`,
+        ],
+      }));
+      const result = calculateRoofGeometryV1(input);
+      expect(
+        result.trace.edges.find((edge) => edge.edgeId === "edge-fold-shared")
+          ?.classification,
+      ).toBe(kind);
+    },
+  );
+
   it("feeds one complete source result into a quality-gated roof snapshot", () => {
     const input = inputFixture();
     const calculation = calculateRoofGeometryV1(input);

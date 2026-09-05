@@ -550,6 +550,17 @@ describe("assisted manual surface subdivision v1", () => {
     expect(result.status).toBe("ready");
     expect(result.surfaces).toHaveLength(4);
     expect(result.edges.filter((edge) => edge.kind !== "eave")).toHaveLength(5);
+    expect(
+      result.surfaces.reduce((sum, item) => sum + item.horizontalAreaM2, 0),
+    ).toBe(80);
+    expect(
+      result.surfaces.reduce(
+        (sum, item) =>
+          sum +
+          item.horizontalAreaM2 * Math.hypot(1, item.plane.a, item.plane.b),
+        0,
+      ),
+    ).toBeCloseTo(56 * Math.sqrt(1.25) + 24 * Math.sqrt(13 / 9), 5);
   });
 
   it("subdivides an L roof along an explicit valley without filling the concavity", () => {

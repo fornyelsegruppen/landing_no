@@ -30,6 +30,7 @@ const outline = [
 
 async function draft(
   lines: Parameters<typeof buildWorkbenchDraftFromUiV1>[0]["lines"] = [],
+  overrides: Partial<Parameters<typeof buildWorkbenchDraftFromUiV1>[0]> = {},
 ) {
   return buildWorkbenchDraftFromUiV1({
     caseId: "lead:13",
@@ -48,6 +49,7 @@ async function draft(
       imageId: 91,
       georeference,
     },
+    ...overrides,
   });
 }
 
@@ -159,6 +161,79 @@ describe("Roof Fusion workbench UI persistence contract", () => {
       code: "SKELETON_ENDPOINT_OUTSIDE_MASS",
     });
   });
+
+  it("preserves a snapped interior junction near the boundary through save and reload", async () => {
+    const junction = { x: 0.103, y: 0.5015 };
+    const value = await draft([
+      {
+        id: "ridge",
+        kind: "ridge",
+        start: { x: 0.1, y: 0.5 },
+        end: { x: 0.9, y: 0.9 },
+      },
+      {
+        id: "valley",
+        kind: "valley",
+        start: { x: 0.1, y: 0.7 },
+        end: junction,
+      },
+    ]);
+    const reloaded = parseRoofFusionWorkbenchDraftV1(
+      JSON.parse(JSON.stringify(value)),
+    );
+    const edge = reloaded.geometry.skeletonEdges.find(
+      (item) => item.type === "valley",
+    )!;
+    const endpoints = reloaded.geometry.vertices.filter((item) =>
+      [edge.fromVertexId, edge.toVertexId].includes(item.vertexId),
+    );
+    expect(endpoints).toContainEqual(
+      expect.objectContaining({
+        xM: georeference.bounds.minEastingM + junction.x * 20,
+        yM: georeference.bounds.maxNorthingM - junction.y * 10,
+      }),
+    );
+  });
+
+  it.each([0.137, 0.419, 0.913, 1.277])(
+    "preserves exact sloping boundary touches after EPSG projection at rotation %s",
+    async (angle) => {
+      const rotate = ({ x, y }: { x: number; y: number }) => ({
+        x: 0.5 + (x - 0.5) * Math.cos(angle) - (y - 0.5) * Math.sin(angle),
+        y: 0.5 + (x - 0.5) * Math.sin(angle) + (y - 0.5) * Math.cos(angle),
+      });
+      const rotated = outline.map(rotate);
+      const value = await draft(
+        [
+          {
+            id: "sloping-ridge",
+            kind: "ridge",
+            start: rotate({ x: 0.1, y: 0.5517441971827 }),
+            end: rotate({ x: 0.9, y: 0.5517441971827 }),
+          },
+        ],
+        {
+          approvedOutline: rotated,
+          sourceOutline: rotated,
+          evidence: {
+            sourceId: "norge-i-bilder:91",
+            sourceContentHash: hash,
+            attribution: "©norgeibilder.no",
+            georeference: {
+              ...georeference,
+              bounds: {
+                minEastingM: 268_620.47215957,
+                minNorthingM: 6_627_032.730210781,
+                maxEastingM: 268_914.920205194,
+                maxNorthingM: 6_627_205.194038557,
+              },
+            },
+          },
+        },
+      );
+      expect(() => parseRoofFusionWorkbenchDraftV1(value)).not.toThrow();
+    },
+  );
 
   it("rejects a zero-length skeleton after endpoint constraints before POST", async () => {
     await expect(
