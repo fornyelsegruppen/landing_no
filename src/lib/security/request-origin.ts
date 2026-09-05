@@ -2,7 +2,12 @@ const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export type RequestOriginDecision = {
   allowed: boolean;
-  reason: "safe-method" | "server-to-server" | "same-origin" | "cross-site" | "origin-mismatch";
+  reason:
+    | "safe-method"
+    | "server-to-server"
+    | "same-origin"
+    | "cross-site"
+    | "origin-mismatch";
 };
 
 function normalizeOrigin(value: string | null | undefined) {
@@ -14,6 +19,22 @@ function normalizeOrigin(value: string | null | undefined) {
   }
 }
 
+function requestHostOrigin(request: Pick<Request, "headers" | "url">) {
+  const host = request.headers.get("host")?.trim() || "";
+  if (!host || host.includes(",")) return null;
+
+  const protocol = (() => {
+    try {
+      return new URL(request.url).protocol;
+    } catch {
+      return "";
+    }
+  })();
+  if (protocol !== "http:" && protocol !== "https:") return null;
+
+  return normalizeOrigin(`${protocol}//${host}`);
+}
+
 /**
  * CSRF boundary for browser-facing custom APIs.
  *
@@ -21,7 +42,9 @@ function normalizeOrigin(value: string | null | undefined) {
  * either header are retained for trusted server-to-server clients and tests;
  * webhook and cron endpoints are deliberately kept outside this boundary.
  */
-export function evaluateMutationOrigin(request: Pick<Request, "headers" | "method" | "url">): RequestOriginDecision {
+export function evaluateMutationOrigin(
+  request: Pick<Request, "headers" | "method" | "url">,
+): RequestOriginDecision {
   if (!MUTATION_METHODS.has(request.method.toUpperCase())) {
     return { allowed: true, reason: "safe-method" };
   }
@@ -37,8 +60,15 @@ export function evaluateMutationOrigin(request: Pick<Request, "headers" | "metho
   }
 
   const origin = normalizeOrigin(suppliedOrigin);
-  const requestOrigin = normalizeOrigin(request.url);
-  if (origin && requestOrigin && origin === requestOrigin && fetchSite !== "cross-site") {
+  const requestOrigin = request.headers.has("host")
+    ? requestHostOrigin(request)
+    : normalizeOrigin(request.url);
+  if (
+    origin &&
+    requestOrigin &&
+    origin === requestOrigin &&
+    fetchSite !== "cross-site"
+  ) {
     return { allowed: true, reason: "same-origin" };
   }
 
