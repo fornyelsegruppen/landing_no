@@ -3,10 +3,37 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   AdminNextRoofFusionUnifiedWorkbench,
+  DEFAULT_ROOF_FUSION_VIEWPORT,
   DEFAULT_ROOF_FUSION_LAYERS,
+  MAX_ROOF_FUSION_ZOOM,
+  MIN_ROOF_FUSION_ZOOM,
+  ROOF_FUSION_APPROVED_OUTLINE_STROKE_PX,
+  ROOF_FUSION_PENDING_LINE_STROKE_PX,
+  ROOF_FUSION_ONE_CARD_STEPS,
+  ROOF_FUSION_SELECTED_VERTEX_RADIUS_PX,
+  ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+  ROOF_FUSION_SKELETON_LINE_STROKE_PX,
+  ROOF_FUSION_SOURCE_OUTLINE_STROKE_PX,
   ROOF_FUSION_STAGES,
+  ROOF_FUSION_VERTEX_HIT_RADIUS_PX,
+  ROOF_FUSION_VERTEX_RADIUS_PX,
   clampRoofFusionPoint,
+  clampRoofFusionViewport,
+  hasRoofFusionPanGestureMoved,
+  panRoofFusionViewport,
+  roofFusionEndpointConstraintMetric,
+  roofFusionImagePointFromViewportPoint,
+  roofFusionScreenStableDashArrayPx,
+  roofFusionScreenStableMarkerRadiiPx,
+  roofFusionScreenStableStrokeWidthPx,
+  shouldHandleRoofFusionZoomWheel,
+  shouldSuppressRoofFusionCanvasClick,
+  zoomRoofFusionViewportAt,
 } from "./admin-next-roof-fusion-unified-workbench";
+import {
+  AdminNextRoofFusionPersistentWorkbench,
+  localizedWorkbenchHeightBlocker,
+} from "./admin-next-roof-fusion-persistent-workbench";
 
 const sourceOutline = [
   { x: 0.16, y: 0.18 },
@@ -16,12 +43,106 @@ const sourceOutline = [
 ] as const;
 
 describe("Admin Next unified Roof Fusion workbench", () => {
-  it("exports a four-stage guided workflow and safe normalized-point helper", () => {
-    expect(ROOF_FUSION_STAGES).toEqual(["outline", "skeleton", "slopes", "review"]);
+  it("exports the three-step one-card progress and safe normalized-point helper", () => {
+    expect(ROOF_FUSION_ONE_CARD_STEPS).toEqual(["object", "refine", "result"]);
+    expect(ROOF_FUSION_STAGES).toEqual([
+      "outline",
+      "skeleton",
+      "slopes",
+      "review",
+    ]);
     expect(clampRoofFusionPoint({ x: -0.2, y: 1.4 })).toEqual({ x: 0, y: 1 });
     expect(DEFAULT_ROOF_FUSION_LAYERS.hoydedata).toBe(false);
     expect(DEFAULT_ROOF_FUSION_LAYERS.roofPlanes).toBe(false);
     expect(DEFAULT_ROOF_FUSION_LAYERS.skeleton).toBe(false);
+  });
+
+  it("bounds zoom and pan, and resets the complete viewport at 1x", () => {
+    expect(
+      clampRoofFusionViewport({ scale: 12, offsetX: -20, offsetY: 5 }),
+    ).toEqual({
+      scale: MAX_ROOF_FUSION_ZOOM,
+      offsetX: 1 - MAX_ROOF_FUSION_ZOOM,
+      offsetY: 0,
+    });
+    expect(
+      zoomRoofFusionViewportAt({ scale: 3, offsetX: -1, offsetY: -0.5 }, 0.5),
+    ).toEqual(DEFAULT_ROOF_FUSION_VIEWPORT);
+    expect(
+      panRoofFusionViewport(DEFAULT_ROOF_FUSION_VIEWPORT, {
+        x: -0.5,
+        y: -0.5,
+      }),
+    ).toEqual(DEFAULT_ROOF_FUSION_VIEWPORT);
+    expect(MIN_ROOF_FUSION_ZOOM).toBe(1);
+    expect(MAX_ROOF_FUSION_ZOOM).toBe(4);
+  });
+
+  it("keeps the image point under the zoom anchor and maps panned pointers back exactly", () => {
+    const anchor = { x: 0.25, y: 0.75 };
+    const zoomed = zoomRoofFusionViewportAt(
+      DEFAULT_ROOF_FUSION_VIEWPORT,
+      2,
+      anchor,
+    );
+
+    expect(zoomed).toEqual({ scale: 2, offsetX: -0.25, offsetY: -0.75 });
+    expect(roofFusionImagePointFromViewportPoint(anchor, zoomed)).toEqual(
+      anchor,
+    );
+    expect(
+      roofFusionImagePointFromViewportPoint(
+        { x: 0.5, y: 0.5 },
+        { scale: 2, offsetX: -0.5, offsetY: -0.25 },
+      ),
+    ).toEqual({ x: 0.5, y: 0.375 });
+  });
+
+  it("derives a pan-independent constant CSS-pixel endpoint tolerance", () => {
+    expect(
+      roofFusionEndpointConstraintMetric(
+        { width: 1_000, height: 500 },
+        DEFAULT_ROOF_FUSION_VIEWPORT,
+      ),
+    ).toEqual({
+      xPixelsPerImageUnit: 1_000,
+      yPixelsPerImageUnit: 500,
+      maxDistancePixels: 14,
+    });
+    expect(
+      roofFusionEndpointConstraintMetric(
+        { width: 1_000, height: 500 },
+        { scale: 3, offsetX: -1.7, offsetY: -0.4 },
+      ),
+    ).toEqual({
+      xPixelsPerImageUnit: 3_000,
+      yPixelsPerImageUnit: 1_500,
+      maxDistancePixels: 14,
+    });
+  });
+
+  it("leaves plain wheel scrolling alone and reserves Ctrl/Cmd-wheel for zoom", () => {
+    expect(
+      shouldHandleRoofFusionZoomWheel({ ctrlKey: false, metaKey: false }),
+    ).toBe(false);
+    expect(
+      shouldHandleRoofFusionZoomWheel({ ctrlKey: true, metaKey: false }),
+    ).toBe(true);
+    expect(
+      shouldHandleRoofFusionZoomWheel({ ctrlKey: false, metaKey: true }),
+    ).toBe(true);
+  });
+
+  it("arbitrates a direct pan only after movement and suppresses its click", () => {
+    const start = { clientX: 100, clientY: 100 };
+    expect(
+      hasRoofFusionPanGestureMoved(start, { clientX: 103, clientY: 103 }),
+    ).toBe(false);
+    expect(
+      hasRoofFusionPanGestureMoved(start, { clientX: 106, clientY: 100 }),
+    ).toBe(true);
+    expect(shouldSuppressRoofFusionCanvasClick({ moved: false })).toBe(false);
+    expect(shouldSuppressRoofFusionCanvasClick({ moved: true })).toBe(true);
   });
 
   it("keeps source geometry visibly immutable while providing one clear image surface", () => {
@@ -38,19 +159,140 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-workbench="unified"');
-    expect(html).toContain('data-roof-fusion-canvas');
+    expect(html).toContain(
+      'data-roof-fusion-geometry-markers="screen-stable-v2"',
+    );
+    expect(html).toContain("data-roof-fusion-canvas");
+    expect(html).toContain("data-roof-fusion-viewport-controls");
+    expect(html).toContain('data-roof-fusion-viewport-scale="1"');
+    expect(html).toContain("Dabartinis vaizdo mastelis");
+    expect(html).toContain("100%");
+    expect(html).not.toContain(">Perstumti vaizdą<");
+    expect(html).toContain("Ctrl/Cmd + ratukas");
+    expect(html).toContain("Talpinti");
     expect(html).toContain('src="/preview/house-ortho.jpg"');
     expect(html).toContain("aspect-ratio:1920 / 1080");
     expect(html).toContain('preserveAspectRatio="none"');
     expect(html).toContain("©norgeibilder.no");
     expect(html).toContain('data-roof-fusion-layer="sourceOutline"');
+    expect(html).toContain('stroke-dasharray="5px 4px"');
+    expect(html).toContain('stroke-width="1px"');
+    expect(html).toContain('stroke-width="1.75px"');
+    expect(html).toContain("data-roof-fusion-approved-outline-opacity-control");
+    expect(html).toContain("Patvirtinto ploto spalvos ryškumas");
+    expect(html).toContain("touch-pan-y");
+    expect(html).toContain('data-roof-fusion-vertex-marker="0"');
+    expect(html).toContain('stroke-opacity=".82"');
     expect(html).toContain("Šaltinio kontūras nekintamas");
     expect(html).toContain("142 m²");
     expect(html).toContain("159,4 m²");
     expect(html).toContain("27°");
+    expect(html).toContain('data-roof-fusion-metric-icon="horizontal-grid"');
+    expect(html).toContain('data-roof-fusion-metric-icon="surface-layers"');
+    expect(html).toContain(
+      'data-roof-fusion-metric-icon="average-pitch-angle"',
+    );
+    expect(html).toContain('data-roof-fusion-metric-icon="perimeter-outline"');
     expect(html).not.toContain('data-roof-fusion-layer="hoydedata"');
     expect(html).not.toContain('data-roof-fusion-layer="roofPlanes"');
     expect(html).not.toContain('data-roof-fusion-layer="skeleton"');
+  });
+
+  it("keeps technical controls out of the normal card until Advanced opens", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        advancedPanel: createElement("button", null, "Atnaujinti šaltinį"),
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        sourceOutline,
+      }),
+    );
+
+    expect(html).toContain("data-roof-fusion-advanced-trigger");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain("data-roof-fusion-advanced-source-actions");
+    expect(html).not.toContain("data-roof-fusion-layer-toggle");
+    expect(html).not.toContain("Atnaujinti šaltinį");
+    expect(html).not.toContain("data-roof-fusion-legacy-fallback-slot");
+  });
+
+  it("localizes adapter blocker prose and never exposes unknown English reasons", () => {
+    expect(
+      localizedWorkbenchHeightBlocker(
+        "[SKELETON_DANGLING_ENDPOINT] Endpoint is not attached.",
+      ),
+    ).toContain("Kraigo arba slėnio galas nesujungtas");
+    expect(
+      localizedWorkbenchHeightBlocker(
+        "Manual ridge, valley, hip, and eave hints were used for explicit plane subdivision.",
+      ),
+    ).toBe(
+      "Rankinės stogo linijos panaudotos paviršiams atskirti. Rezultatą būtina peržiūrėti.",
+    );
+    expect(
+      localizedWorkbenchHeightBlocker("Unknown adapter failure in plane fit"),
+    ).not.toContain("Unknown adapter failure");
+  });
+
+  it("renders Høydedata samples as small aspect-corrected points", () => {
+    const canvas = { width: 1_000, height: 750 };
+    const atOneX = roofFusionScreenStableMarkerRadiiPx(3, canvas, 1);
+    const atFourX = roofFusionScreenStableMarkerRadiiPx(3, canvas, 4);
+    expect(atOneX.rx * canvas.width).toBeCloseTo(3);
+    expect(atOneX.ry * canvas.height).toBeCloseTo(3);
+    expect(atFourX.rx * canvas.width * 4).toBeCloseTo(3);
+    expect(atFourX.ry * canvas.height * 4).toBeCloseTo(3);
+
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionUnifiedWorkbench, {
+        heightPoints: [{ point: { x: 0.5, y: 0.5 }, elevationMeters: 123 }],
+        initialLayers: { hoydedata: true },
+        orthoImageHeight: 750,
+        orthoImageSrc: "/preview/house-ortho.jpg",
+        orthoImageWidth: 1000,
+        sourceOutline,
+      }),
+    );
+
+    expect(html).toContain('data-roof-fusion-height-point="0"');
+    expect(html).toContain('rx="0.003"');
+    expect(html).toContain('ry="0.004"');
+  });
+
+  it("keeps saved skeleton strokes and all marker hit areas screen-stable at 100%, 300%, and max zoom", () => {
+    const canvas = { width: 1_000, height: 562.5 };
+    const atOneX = roofFusionScreenStableMarkerRadiiPx(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+      canvas,
+      1,
+    );
+    const atThreeX = roofFusionScreenStableMarkerRadiiPx(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+      canvas,
+      3,
+    );
+    const atMaxZoom = roofFusionScreenStableMarkerRadiiPx(
+      ROOF_FUSION_SKELETON_ENDPOINT_RADIUS_PX,
+      canvas,
+      MAX_ROOF_FUSION_ZOOM,
+    );
+
+    expect(atOneX.rx * canvas.width).toBe(3);
+    expect(atOneX.ry * canvas.height).toBe(3);
+    expect(atThreeX.rx * canvas.width * 3).toBeCloseTo(3);
+    expect(atThreeX.ry * canvas.height * 3).toBeCloseTo(3);
+    expect(atMaxZoom.rx * canvas.width * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(3);
+    expect(atMaxZoom.ry * canvas.height * MAX_ROOF_FUSION_ZOOM).toBeCloseTo(3);
+    expect(ROOF_FUSION_SOURCE_OUTLINE_STROKE_PX).toBe(1);
+    expect(ROOF_FUSION_APPROVED_OUTLINE_STROKE_PX).toBe(1.75);
+    expect(ROOF_FUSION_SKELETON_LINE_STROKE_PX).toBe(1.5);
+    expect(ROOF_FUSION_PENDING_LINE_STROKE_PX).toBe(1.5);
+    expect(roofFusionScreenStableStrokeWidthPx(1.5, 1)).toBe("1.5px");
+    expect(roofFusionScreenStableStrokeWidthPx(1.5, 3)).toBe("0.5px");
+    expect(roofFusionScreenStableDashArrayPx([5, 4], 1)).toBe("5px 4px");
+    expect(roofFusionScreenStableDashArrayPx([5, 4], 4)).toBe("1.25px 1px");
+    expect(ROOF_FUSION_VERTEX_RADIUS_PX * 2).toBe(7);
+    expect(ROOF_FUSION_SELECTED_VERTEX_RADIUS_PX * 2).toBe(8);
+    expect(ROOF_FUSION_VERTEX_HIT_RADIUS_PX * 2).toBe(26);
   });
 
   it("renders normalized roof planes, skeleton lines, obstacles, and explicit blockers when requested", () => {
@@ -58,6 +300,11 @@ describe("Admin Next unified Roof Fusion workbench", () => {
       createElement(AdminNextRoofFusionUnifiedWorkbench, {
         orthoImageSrc: "/preview/house-ortho.jpg",
         sourceOutline,
+        caseAddressContext: createElement(
+          "div",
+          { "data-test-case-address": true },
+          "Bylos adresas: Tordenskiolds gate 12",
+        ),
         roofPlanes: [
           {
             id: "plane-a",
@@ -69,8 +316,17 @@ describe("Admin Next unified Roof Fusion workbench", () => {
             slopeDegrees: 26,
           },
         ],
-        lines: [{ id: "ridge-a", kind: "ridge", start: { x: 0.5, y: 0.3 }, end: { x: 0.5, y: 0.7 } }],
-        obstacles: [{ id: "chimney", point: { x: 0.65, y: 0.52 }, label: "Kaminas" }],
+        lines: [
+          {
+            id: "ridge-a",
+            kind: "ridge",
+            start: { x: 0.5, y: 0.3 },
+            end: { x: 0.5, y: 0.7 },
+          },
+        ],
+        obstacles: [
+          { id: "chimney", point: { x: 0.65, y: 0.52 }, label: "Kaminas" },
+        ],
         initialLayers: { roofPlanes: true, skeleton: true },
         blockers: ["Trūksta patvirtinto nuolydžio"],
         confidence: "low",
@@ -78,12 +334,22 @@ describe("Admin Next unified Roof Fusion workbench", () => {
     );
 
     expect(html).toContain('data-roof-fusion-layer="roofPlanes"');
+    expect(html).toContain("data-roof-fusion-case-address-slot");
+    expect(html).toContain("Bylos adresas: Tordenskiolds gate 12");
     expect(html).toContain('data-roof-fusion-layer="skeleton"');
     expect(html).toContain('data-roof-fusion-line-kind="ridge"');
+    expect(html).toContain('stroke-width="1.5px"');
+    expect(html).toContain('data-roof-fusion-line-endpoint="ridge-a:0"');
+    expect(html).toContain('rx="0.003"');
+    expect(html).toContain('stroke-width="0.75px"');
+    expect(html).toContain('data-roof-fusion-vertex-hit-target="0"');
+    expect(html).toContain('rx="0.013"');
     expect(html).toContain('data-roof-fusion-obstacle="chimney"');
     expect(html).toContain("Trūksta patvirtinto nuolydžio");
-    expect(html).toContain("Pirmiausia išspręskite blokatorius");
-    expect(html).toContain('disabled=""');
+    expect(html).toContain(
+      "Paspaudus „Apskaičiuoti“ bus parodyti reikalingi sprendimai",
+    );
+    expect(html).toContain('data-roof-fusion-primary-action="calculate"');
   });
 
   it("applies only the blockers for the active guided stage", () => {
@@ -105,6 +371,52 @@ describe("Admin Next unified Roof Fusion workbench", () => {
 
     expect(outlineHtml).not.toContain("Preview išsaugojimas dar neįjungtas");
     expect(reviewHtml).toContain("Preview išsaugojimas dar neįjungtas");
-    expect(reviewHtml).toContain('disabled=""');
+    expect(reviewHtml).toContain("data-roof-fusion-preview-complete");
+    expect(reviewHtml).toContain("Matavimo rezultatas parengtas peržiūrai");
+    expect(reviewHtml).toContain("dar nenaudojamas kainodarai");
+    expect(reviewHtml).not.toContain("Patvirtinti R4 matavimą");
+    expect(reviewHtml).not.toContain("Pirmiausia išspręskite blokatorius");
+    expect(reviewHtml).not.toContain(
+      'data-roof-fusion-primary-action="review"',
+    );
+  });
+
+  it("keeps save and reload controls outside the closed normal path", () => {
+    const html = renderToStaticMarkup(
+      createElement(AdminNextRoofFusionPersistentWorkbench, {
+        actorId: "7",
+        caseId: "lead:13",
+        horizontalAreaSquareMeters: 142,
+        orthoImageAlt: "Test roof",
+        sourceOutline,
+        capture: {
+          imageUrl: "/api/admin/media/91",
+          mediaId: "91",
+          sourceId: "norge-i-bilder:91",
+          rawContentHash: "a".repeat(64),
+          capturedAt: "2026-09-03T08:00:00.000Z",
+          attribution: "©norgeibilder.no",
+          geoReference: {
+            crs: "EPSG:25833",
+            extentTrust: "actual-visible-extent",
+            bounds: {
+              minEastingM: 500000,
+              minNorthingM: 6640000,
+              maxEastingM: 500020,
+              maxNorthingM: 6640010,
+            },
+            imageWidth: 1920,
+            imageHeight: 1080,
+          },
+        },
+      }),
+    );
+
+    expect(html).toContain('data-roof-fusion-workbench="unified"');
+    expect(html).toContain("data-roof-fusion-advanced-trigger");
+    expect(html).not.toContain('data-roof-fusion-persistence="true"');
+    expect(html).not.toContain("Išsaugoti ir patvirtinti reviziją");
+    expect(html).not.toContain(">Perkrauti<");
+    expect(html).not.toContain("pakeitimai šiame pjūvyje dar neišsaugomi");
   });
 });

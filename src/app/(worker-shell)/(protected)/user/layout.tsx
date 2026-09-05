@@ -24,7 +24,10 @@ export default async function WorkerLayout({ children }: { children: React.React
             <span className="hidden max-w-48 truncate text-sm text-muted-foreground sm:block">
               {user.displayName || user.email}
             </span>
-            <PanelLanguageSwitcher locale={user.interfaceLanguage} />
+            <PanelLanguageSwitcher
+              locale={user.interfaceLanguage}
+              persistToProfile
+            />
             <LogoutButton locale={user.interfaceLanguage} />
           </div>
         </div>

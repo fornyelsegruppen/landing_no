@@ -129,3 +129,46 @@ One exact-SHA owner UAT pack on source HEAD `f231492`:
 
 Until that pack is recorded, this stream should be treated as
 `IMPLEMENTED / PENDING_OWNER_UAT`, not as Production-ready.
+
+## Owner UAT follow-ups — 2026-09-04
+
+- `RF-UX-LINE-001`: at approximately `300%` zoom the yellow ridge line is too
+  thick and obscures roof details. Make the visible stroke screen-scale-aware
+  (target roughly `3-4 px`, with compact endpoint handles) while keeping the
+  hit target comfortably large and leaving the stored geometry unchanged.
+  Verify at `100%`, `300%`, maximum zoom, and on touch input before closing.
+- `RF-UX-SOURCE-001`: the normal one-card journey currently reaches the slope
+  stage without a height surface because the free Kartverket DOM + DTM action
+  remains hidden under `Advanced`. After the explicit licensed-image action
+  succeeds, acquire the free height source in the same primary flow (with an
+  honest progress/error state and an explicit retry) so ordinary measurements
+  do not depend on opening `Advanced`. Keep all paid/provider-sensitive actions
+  explicit and never silently continue on a partial source result.
+- `RF-UX-NETWORK-001`: a transient browser-to-Preview timeout currently falls
+  back to the generic Lithuanian save error even when no request reaches the RF
+  API. Classify connection failures separately, retain the pending idempotent
+  draft, and tell the operator that the same save action can be retried safely.
+- `RF-UX-REVIEW-001`: the final Preview result is correctly `review_required`
+  and excluded from pricing, but the disabled `Patvirtinti R4 matavimą` button
+  plus `Pirmiausia išspręskite blokatorius` reads like a broken workflow. End
+  the Preview journey with an explicit completed-for-manual-review state; do not
+  imply that an R4 approval, offer write, or pricing release occurred.
+
+### Implementation status
+
+All four follow-ups are implemented on the RF workbench branch:
+
+- ridge and valley strokes/endpoints are screen-stable and compact without
+  reducing the existing interaction hit targets;
+- a successful explicit Norge i bilder capture automatically starts the free
+  Kartverket DOM + DTM request, shows progress/result/retry in the primary card,
+  binds evidence to the selected building, rejects late cross-building replies,
+  and invalidates old evidence while a capture refresh is pending;
+- workbench load/save connection failures and timeouts are classified with safe
+  Lithuanian retry guidance while CAS, idempotency, and reload-hash checks stay
+  fail-closed;
+- the final Preview state is presented as completed for manual review and remains
+  explicitly excluded from pricing and downstream approval.
+
+Validation evidence: `38` targeted Admin Next / Roof Fusion test files passed
+with `219` tests, followed by TypeScript, targeted ESLint, and diff checks.

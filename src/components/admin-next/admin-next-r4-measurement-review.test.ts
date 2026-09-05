@@ -9,6 +9,8 @@ import { adminNextCaseWorkspaceFixture } from "@/lib/admin-next/case-workspace-f
 import type { HeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 
 const measurement = adminNextCaseWorkspaceFixture.measurementReview;
+const returnTo =
+  "/admin-next-preview/cases/TF-1042?tab=evidence#case-evidence-title";
 const transientVisualization = {
   schemaVersion: "height-surface-visualization.v1" as const,
   mimeType: "image/png" as const,
@@ -40,8 +42,7 @@ const transientVisualization = {
   },
   minHeightAboveTerrainM: 3,
   maxHeightAboveTerrainM: 9,
-  attribution:
-    "Kartverket · NLOD 2.0 + OpenStreetMap contributors · ODbL 1.0",
+  attribution: "Kartverket · NLOD 2.0 + OpenStreetMap contributors · ODbL 1.0",
 } satisfies HeightSurfaceVisualizationV1;
 
 describe("Admin Next R4 measurement review", () => {
@@ -51,11 +52,15 @@ describe("Admin Next R4 measurement review", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextR4MeasurementReview, {
         address: adminNextCaseWorkspaceFixture.address,
+        addressEditHref: "/admin-v2/cases/1042#measurement-section",
+        caseRevision: 12,
         locale: "lt",
         caseReference: adminNextCaseWorkspaceFixture.reference,
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
+        measurementRevision: 7,
         owner: adminNextCaseWorkspaceFixture.owner.name,
+        returnTo,
       }),
     );
 
@@ -65,9 +70,19 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).toContain("E-04");
     expect(html).toContain("E-11");
     expect(html).toContain("EVD-R4-1042-01");
+    expect(html).toContain('data-rf-address-context="case_authoritative"');
+    expect(html).toContain("Užrakintas matavimo kontekstas");
+    expect(html).toContain("case r12 · RF r7");
+    expect(html).toContain("Taisyti bylos adresą");
+    expect(html).toContain('data-r4-scroll-region="drawer"');
+    expect(html).toContain('data-r4-metric-icon="horizontal-grid"');
+    expect(html).toContain('data-r4-metric-icon="surface-layers"');
+    expect(html).toContain('data-r4-metric-icon="average-pitch-angle"');
+    expect(html).toContain('data-r4-metric-icon="perimeter-outline"');
+    expect(html).toContain('stroke-width="1.75"');
   });
 
-  it("keeps approval disabled and exposes only the working mutation fallback", () => {
+  it("keeps approval disabled and uses one return target for close and fallback", () => {
     expect(measurement).toBeDefined();
     if (!measurement) return;
     const html = renderToStaticMarkup(
@@ -78,12 +93,14 @@ describe("Admin Next R4 measurement review", () => {
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
         owner: adminNextCaseWorkspaceFixture.owner.name,
+        returnTo,
       }),
     );
 
-    expect(html).toContain("disabled=\"\"");
+    expect(html).toContain('disabled=""');
     expect(html).toContain("Confirm užrakintas");
-    expect(html).toContain(`href="${measurement.fallbackHref}"`);
+    expect(html.split(`href="${returnTo}"`)).toHaveLength(3);
+    expect(html).not.toContain(`href="${measurement.fallbackHref}"`);
   });
 
   it("renders four primary slopes, photos, R3 delta and verification gates", () => {
@@ -97,6 +114,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: adminNextCaseWorkspaceFixture.customer,
         measurement,
         owner: adminNextCaseWorkspaceFixture.owner.name,
+        returnTo,
       }),
     );
 
@@ -134,7 +152,12 @@ describe("Admin Next R4 measurement review", () => {
           { id: "S2", vertexIds: ["v1", "v3", "v4"] },
         ],
         edges: [
-          { id: "ridge-1", fromVertexId: "v1", toVertexId: "v3", state: "verified" as const },
+          {
+            id: "ridge-1",
+            fromVertexId: "v1",
+            toVertexId: "v3",
+            state: "verified" as const,
+          },
         ],
       },
     };
@@ -146,6 +169,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: "UAT-01 Testkunde",
         measurement: approved,
         owner: "Aistė",
+        returnTo: "/admin-v2/cases/13?tab=measurement#measurement-section",
         source: "canonical",
       }),
     );
@@ -159,6 +183,40 @@ describe("Admin Next R4 measurement review", () => {
     expect(html).not.toContain("E-04");
     expect(html).not.toContain("E-11");
     expect(html).not.toContain("Sintetiniai Preview duomenys");
+  });
+
+  it("replaces the locked footer only for a verified canonical offer action", () => {
+    expect(measurement).toBeDefined();
+    if (!measurement) return;
+    const approved = {
+      ...measurement,
+      state: "verified" as const,
+      reviewEdges: [],
+      verificationGates: measurement.verificationGates.map((gate) => ({
+        ...gate,
+        state: "verified" as const,
+      })),
+    };
+    const html = renderToStaticMarkup(
+      createElement(AdminNextR4MeasurementReview, {
+        address: "Testgata 13, 0013 Oslo",
+        locale: "lt",
+        caseReference: "TF-13",
+        customer: "UAT-01 Testkunde",
+        measurement: approved,
+        offerAction: createElement(
+          "button",
+          { "data-test-offer-action": true },
+          "Įkelti matavimą į pasiūlymą",
+        ),
+        owner: "Aistė",
+        source: "canonical",
+      }),
+    );
+
+    expect(html).toContain('data-test-offer-action="true"');
+    expect(html).toContain("Įkelti matavimą į pasiūlymą");
+    expect(html).not.toContain("Confirm užrakintas");
   });
 
   it("renders real evidence previews only through the authenticated admin proxy", () => {
@@ -184,6 +242,7 @@ describe("Admin Next R4 measurement review", () => {
         customer: "UAT-01 Testkunde",
         measurement: withEvidence,
         owner: "Aistė",
+        returnTo: "/admin-v2/cases/13?tab=evidence#measurement-section",
         source: "canonical",
       }),
     );

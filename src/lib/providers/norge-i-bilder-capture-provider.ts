@@ -159,7 +159,7 @@ export interface NorgeIBilderFinalImageStore {
     capturedAt: string;
     coordinates: NorgeIBilderCaptureRequest["target"];
     trainingProhibited: true;
-  }): Promise<{ mediaId: string }>;
+  }): Promise<{ mediaId: string; rawContentHash: string }>;
 }
 
 export class NorgeIBilderCaptureError extends Error {
@@ -300,6 +300,8 @@ export class NorgeIBilderCaptureProvider {
     mediaId: string;
     attribution: typeof NORGE_I_BILDER_ATTRIBUTION;
     source: typeof NORGE_I_BILDER_SCREENSHOT_SOURCE;
+    /** SHA-256 of the exact attributed image bytes persisted as evidence. */
+    rawContentHash: string;
     attempts: number;
     /** Absent unless the browser proved the final canvas' visible extent. */
     geoReference?: NorgeIBilderGeoReference;
@@ -380,6 +382,7 @@ export class NorgeIBilderCaptureProvider {
           capturedAt,
           attribution: NORGE_I_BILDER_ATTRIBUTION,
           source: NORGE_I_BILDER_SCREENSHOT_SOURCE,
+          rawContentHash: stored.rawContentHash,
           attempts: attempt,
           geoReference: capture.actualVisibleExtent
             ? {

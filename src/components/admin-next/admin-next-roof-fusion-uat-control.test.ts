@@ -5,11 +5,21 @@ import {
   AdminNextRoofFusionUatControl,
   HeightAnalysisPanel,
   RealAddressResult,
+  roofFusionHeightErrorMessage,
   selectActiveHeightState,
 } from "./admin-next-roof-fusion-uat-control";
 import type { RoofFusionHeightAnalysisState } from "./admin-next-roof-fusion-uat-control";
 
 describe("Admin Next Roof Fusion UAT control", () => {
+  it("does not mislabel an address/OSM revalidation outage as Høydedata failure", () => {
+    expect(
+      roofFusionHeightErrorMessage("lt", "SOURCE_VALIDATION_UNAVAILABLE"),
+    ).toContain("Høydedata dar nebuvo skaitomi");
+    expect(
+      roofFusionHeightErrorMessage("lt", "SOURCE_VALIDATION_UNAVAILABLE"),
+    ).not.toContain("aukščio duomenys laikinai nepasiekiami");
+  });
+
   it("keeps the last valid surface visible when a manual correction fails", () => {
     const previous = {
       kind: "success",
@@ -20,24 +30,28 @@ describe("Admin Next Roof Fusion UAT control", () => {
 
     expect(
       selectActiveHeightState(
-        { kind: "error", code: "ROOF_NOT_DETECTED" },
+        { kind: "error", code: "RIDGE_CORRECTION_REVIEW_REQUIRED" },
         previous,
         "way/123",
       ),
     ).toBe(previous);
     expect(
       selectActiveHeightState(
-        { kind: "error", code: "ROOF_NOT_DETECTED" },
+        { kind: "error", code: "RIDGE_CORRECTION_REVIEW_REQUIRED" },
         previous,
         "way/other",
       ),
     ).toBeNull();
+    expect(
+      roofFusionHeightErrorMessage("lt", "RIDGE_CORRECTION_REVIEW_REQUIRED"),
+    ).toContain("kraigo korekcijos");
   });
 
   it("renders an explicit, Preview-only synthetic preparation action", () => {
     const html = renderToStaticMarkup(
       createElement(AdminNextRoofFusionUatControl, {
         action: async () => ({ kind: "idle" as const }),
+        actorId: "7",
         addressLookupAction: async () => ({ kind: "idle" as const }),
         heightAnalysisAction: async () => ({ kind: "idle" as const }),
         defaultCaseReference: "TF-13",
@@ -51,14 +65,20 @@ describe("Admin Next Roof Fusion UAT control", () => {
     expect(html).toContain("TF-13");
     expect(html).toContain("Production duomenys neliečiami");
     expect(html).toContain('data-roof-fusion-address="lookup-only"');
+    expect(html).toContain('data-rf-free-address-input="diagnostic-only"');
     expect(html).toContain('name="addressQuery"');
-    expect(html).toContain("Rasti pastatą");
-    expect(html).toContain("Paieška neišsaugoma ir nesukuria matavimo");
+    expect(html).toContain("Diagnostinis RF UAT");
+    expect(html).toContain("ne gyvas bylos procesas");
+    expect(html).toContain("nepatenka į kainodarą ar pasiūlymą");
+    expect(html).toContain("Rasti adresą ir atverti ortofoto");
+    expect(html).toContain("vieną licencijuotą Norge i bilder ortofoto");
+    expect(html).toContain("Matavimas dar nesukuriamas");
   });
 
   it("renders a truthful real-address footprint without claiming orthophoto or roof planes", () => {
     const html = renderToStaticMarkup(
       createElement(RealAddressResult, {
+        actorId: "7",
         caseReference: "TF-13",
         heightAnalysisAction: async () => ({ kind: "idle" as const }),
         locale: "lt",
@@ -157,6 +177,7 @@ describe("Admin Next Roof Fusion UAT control", () => {
             qualityStatus: "review_required" as const,
             measurementClass: "preliminary" as const,
             pricingReady: false as const,
+            manualRidgeCorrectionStatus: "available" as const,
             blockers: [
               "ROOF_PLANES_REQUIRED" as const,
               "ROOF_PITCH_REQUIRED" as const,

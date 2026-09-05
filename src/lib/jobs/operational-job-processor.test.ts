@@ -367,6 +367,56 @@ describe("operational job processor", () => {
     expect(JSON.stringify(state.job)).not.toContain("kunde@example.test");
   });
 
+  it("quarantines prior provider acceptance for reconciliation without resending", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.RESEND_API_KEY = "configured-for-test";
+    const providerHealth = vi.spyOn(ResendEmailProvider.prototype, "health");
+    const providerSend = vi.spyOn(ResendEmailProvider.prototype, "send");
+    const state = repository({
+      message: {
+        status: "queued",
+        sentAt: "2026-09-05T07:31:00.000Z",
+        deliveredAt: null,
+        provider: "resend",
+        providerMessageId: "email_tf2",
+        failureCode: "Error",
+        failureMessage:
+          "The operation failed. Review provider and correlation logs.",
+      },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-09-05T07:35:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({
+      attention: [3],
+      completed: [],
+      retried: [],
+    });
+    expect(state.job).toMatchObject({
+      status: "attention",
+      attempts: 1,
+      lastErrorCode: "MessageDeliveryReconciliationRequiredError",
+    });
+    expect(state.message).toMatchObject({
+      status: "attention",
+      sentAt: "2026-09-05T07:31:00.000Z",
+      deliveredAt: null,
+      provider: "resend",
+      providerMessageId: "email_tf2",
+      failureCode: "MessageDeliveryReconciliationRequiredError",
+    });
+    expect(state.lead).toMatchObject({
+      nextActionBlocker: "MESSAGE_DELIVERY_RECONCILIATION_REQUIRED",
+      nextAction: expect.stringContaining("Avstem leverandørloggen"),
+    });
+    expect(providerHealth).not.toHaveBeenCalled();
+    expect(providerSend).not.toHaveBeenCalled();
+  });
+
   it("leaves automatic operational delivery pending while the Production pause is active", async () => {
     process.env.VERCEL_ENV = "production";
     process.env.RESEND_API_KEY = "configured-for-test";
@@ -387,6 +437,45 @@ describe("operational job processor", () => {
     expect(result).toMatchObject({ paused: [3], completed: [], attention: [] });
     expect(state.job).toMatchObject({ status: "pending", attempts: 0 });
     expect(state.message).toMatchObject({ status: "queued" });
+  });
+
+  it("quarantines prior provider acceptance even while the automation pause is active", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.RESEND_API_KEY = "configured-for-test";
+    const providerSend = vi.spyOn(ResendEmailProvider.prototype, "send");
+    const state = repository({
+      job: { payload: { messageId: 2, deliveryClass: "automation" } },
+      message: {
+        category: "reminder",
+        status: "queued",
+        sentAt: "2026-09-05T07:31:00.000Z",
+        provider: "resend",
+        providerMessageId: "email_paused_ambiguity",
+        aiAnalysis: { workOrderId: 7, communicationKind: "on_way" },
+      },
+    });
+
+    const result = await processOperationalJobs(state.payload, {
+      jobIds: [3],
+      now: new Date("2026-09-05T07:35:00.000Z"),
+      rescueStale: false,
+    });
+
+    expect(result).toMatchObject({
+      paused: [],
+      attention: [3],
+      retried: [],
+    });
+    expect(state.job).toMatchObject({
+      status: "attention",
+      lastErrorCode: "MessageDeliveryReconciliationRequiredError",
+    });
+    expect(state.message).toMatchObject({
+      status: "attention",
+      sentAt: "2026-09-05T07:31:00.000Z",
+      providerMessageId: "email_paused_ambiguity",
+    });
+    expect(providerSend).not.toHaveBeenCalled();
   });
 
   it("moves a non-allowlisted automatic delivery to attention without invoking Resend", async () => {

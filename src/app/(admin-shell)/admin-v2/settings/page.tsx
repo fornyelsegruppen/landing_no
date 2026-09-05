@@ -4,6 +4,7 @@ import { SettingsForm } from "@/components/admin-v2/settings-form";
 import { ProductionTermsActivation } from "@/components/admin-v2/production-terms-activation";
 import { PRODUCTION_PILOT_TERMS } from "@/content/production-pilot-terms";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
+import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
 import {
@@ -65,6 +66,7 @@ export default async function SettingsPage() {
         locale={user.interfaceLanguage}
         operational={operational}
         releaseGate={buildReleaseGate()}
+        rollout={buildAdminNextRolloutView()}
       />
       <ProductionTermsActivation
         activeVersion={approvedTerms.docs[0]?.version}

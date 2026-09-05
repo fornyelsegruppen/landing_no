@@ -106,6 +106,15 @@ function cleanPolygon(points: Point2[]) {
   return cleaned;
 }
 
+function projectedCandidatePolygon(candidate: BuildingFootprintCandidate) {
+  return cleanPolygon(
+    candidate.polygon.map((point) => {
+      const projected = etrs89ToUtm33(point);
+      return { x: projected.eastingM, y: projected.northingM };
+    }),
+  );
+}
+
 function cross(first: Point2, second: Point2, third: Point2) {
   return (
     (second.x - first.x) * (third.y - second.y) -
@@ -171,6 +180,18 @@ function polygonArea(polygon: Point2[]) {
       }, 0),
     ) / 2
   );
+}
+
+export function manualRidgeCorrectionStatusV1(
+  candidate: BuildingFootprintCandidate,
+): "available" | "unsupported_footprint" {
+  const polygon = projectedCandidatePolygon(candidate);
+  return polygon.length >= 3 &&
+    polygon.length <= 8 &&
+    polygonArea(polygon) >= 25 &&
+    isConvex(polygon)
+    ? "available"
+    : "unsupported_footprint";
 }
 
 function quantile(sorted: number[], fraction: number) {
@@ -534,18 +555,8 @@ export function segmentSimpleRoofPlanesWithRidgeV1(input: {
       "Manual ridge points must be normalized coordinates between 0 and 1",
     );
   }
-  const polygon = cleanPolygon(
-    candidate.polygon.map((point) => {
-      const projected = etrs89ToUtm33(point);
-      return { x: projected.eastingM, y: projected.northingM };
-    }),
-  );
-  if (
-    polygon.length < 3 ||
-    polygon.length > 8 ||
-    polygonArea(polygon) < 25 ||
-    !isConvex(polygon)
-  ) {
+  const polygon = projectedCandidatePolygon(candidate);
+  if (manualRidgeCorrectionStatusV1(candidate) !== "available") {
     throw new SimpleRoofPlaneSegmentationError(
       "UNSUPPORTED_FOOTPRINT",
       "Manual ridge fitting currently accepts simple, convex footprints",
@@ -805,12 +816,7 @@ export function segmentSimpleRoofPlanesV1(input: {
       "Høydedata surface does not match the simple-roof segmentation contract",
     );
   }
-  const polygon = cleanPolygon(
-    candidate.polygon.map((point) => {
-      const projected = etrs89ToUtm33(point);
-      return { x: projected.eastingM, y: projected.northingM };
-    }),
-  );
+  const polygon = projectedCandidatePolygon(candidate);
   if (
     polygon.length < 3 ||
     polygon.length > 8 ||

@@ -9,7 +9,10 @@ import {
   buildBrandedEmailHtml,
   secureCustomerLinkLabel,
 } from "./email-template";
-import { updateCaseState } from "@/lib/cases/case-command";
+import {
+  CaseCommandConflictError,
+  updateCaseState,
+} from "@/lib/cases/case-command";
 import { caseReplyAddress } from "./case-reply";
 import { enqueueQuoteFollowUps } from "@/lib/quotes/follow-up-schedule";
 import { featureReadiness } from "@/lib/platform/features";
@@ -36,9 +39,85 @@ import {
   MessageDeliveryClassRequiredError,
   type MessageDeliveryClass,
 } from "./automation-recipient-policy";
+import { previewEmailSubject } from "./preview-email-recipient-policy";
 
 export const manualQuestionReplyPlaceholder =
   "Skriv et kontrollert svar til kunden her før utsending.";
+
+const manualReplyPlaceholders = [
+  manualQuestionReplyPlaceholder,
+  "Write a reviewed, customer-specific reply here before sending.",
+  "Parašykite patikrintą, konkrečiam klientui skirtą atsakymą prieš siųsdami.",
+] as const;
+
+function normalizeManualReplyText(value: string) {
+  return value
+    .normalize("NFKC")
+    .replace(/\p{Default_Ignorable_Code_Point}/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLocaleLowerCase("en");
+}
+
+export function isManualReplyDraftAnalysis(analysis: Record<string, unknown>) {
+  return (
+    analysis.manualQuestionReply === true ||
+    analysis.manualLeadReply === true ||
+    analysis.manualReplyDraft === true
+  );
+}
+
+export function isManualReplyPlaceholder(
+  bodyText: string,
+  analysis: Record<string, unknown>,
+) {
+  const candidates = [
+    ...manualReplyPlaceholders,
+    ...(typeof analysis.manualReplyPlaceholder === "string"
+      ? [analysis.manualReplyPlaceholder]
+      : []),
+  ].map(normalizeManualReplyText);
+  return candidates.includes(normalizeManualReplyText(bodyText));
+}
+
+function manualLeadReplyCopy(language: string | null | undefined) {
+  if (language === "en") {
+    return {
+      bodyText:
+        "Write a reviewed, customer-specific reply here before sending.",
+      subject: "Reply to your roof enquiry",
+    };
+  }
+  return {
+    bodyText: "Skriv et kontrollert svar til kunden her før utsending.",
+    subject: "Svar på din takhenvendelse",
+  };
+}
+
+export const messageDeliveryReconciliationRequiredCode =
+  "MessageDeliveryReconciliationRequiredError";
+
+export class MessageDeliveryReconciliationRequiredError extends Error {
+  constructor() {
+    super(
+      "Message has provider acceptance evidence and must be reconciled before another delivery attempt.",
+    );
+    this.name = messageDeliveryReconciliationRequiredCode;
+  }
+}
+
+export function messageDeliveryRequiresReconciliation(message: {
+  providerMessageId?: string | null;
+  sentAt?: string | null;
+  status: string;
+}) {
+  if (["sent", "delivered"].includes(message.status)) return false;
+  return Boolean(
+    (typeof message.providerMessageId === "string" &&
+      message.providerMessageId.trim()) ||
+    (typeof message.sentAt === "string" && message.sentAt.trim()),
+  );
+}
 
 function providerDeliveryIdempotencyKey(message: {
   aiAnalysis?: unknown;
@@ -114,6 +193,29 @@ async function findMessageByKey(payload: Payload, idempotencyKey: string) {
     limit: 1,
     overrideAccess: true,
     where: { idempotencyKey: { equals: idempotencyKey } },
+  });
+  return result.docs[0] || null;
+}
+
+async function findActiveCustomerQuestionReplyDraft(
+  payload: Payload,
+  leadId: number,
+  sourceMessageId: number,
+) {
+  const result = await payload.find({
+    collection: "messages",
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    sort: "-createdAt",
+    where: {
+      and: [
+        { lead: { equals: leadId } },
+        { replyToMessage: { equals: sourceMessageId } },
+        { direction: { equals: "outbound" } },
+        { status: { equals: "draft" } },
+      ],
+    },
   });
   return result.docs[0] || null;
 }
@@ -355,7 +457,7 @@ export async function createLeadAiReply(
       lead: lead.id,
       direction: "outbound",
       category: "ai_reply",
-      channel: lead.email ? "email" : "sms",
+      channel: lead.communicationEmail || lead.email ? "email" : "sms",
       subject: generated.result.subject,
       bodyText: generated.result.replyDraft,
       status: "draft",
@@ -379,6 +481,129 @@ export async function createLeadAiReply(
     },
   });
   return { duplicate: false as const, message, generated };
+}
+
+/**
+ * Creates a human-authored draft from the canonical lead enquiry. The draft is
+ * deliberately incomplete and is never queued or delivered by this command.
+ * Sending remains a separate, reviewed CAS-protected administrator action.
+ */
+export async function createManualLeadReplyDraft(
+  payload: Payload,
+  input: {
+    correlationId: string;
+    expectedRevision: number;
+    leadId: number;
+  },
+) {
+  const lead = await payload.findByID({
+    collection: "leads",
+    id: input.leadId,
+    depth: 0,
+    overrideAccess: true,
+  });
+  if (
+    ["converted", "closed"].includes(lead.status || "") ||
+    lead.recordState !== "active"
+  ) {
+    throw new TypeError(
+      "A reply draft cannot be created for a converted, closed or archived case",
+    );
+  }
+
+  const revision =
+    typeof lead.caseRevision === "number" ? lead.caseRevision : 1;
+  const idempotencyKey = makeIdempotencyKey("lead.manual-reply", {
+    leadId: lead.id,
+    revision: input.expectedRevision,
+  });
+  const duplicate = await findMessageByKey(payload, idempotencyKey);
+  if (duplicate && duplicate.status !== "cancelled") {
+    return { duplicate: true as const, message: duplicate };
+  }
+  if (revision !== input.expectedRevision) {
+    throw new CaseCommandConflictError(input.expectedRevision, revision);
+  }
+
+  const copy = manualLeadReplyCopy(lead.language);
+  const data = {
+    lead: lead.id,
+    direction: "outbound" as const,
+    category: "follow_up" as const,
+    channel:
+      lead.communicationEmail || lead.email
+        ? ("email" as const)
+        : ("sms" as const),
+    subject: copy.subject,
+    bodyText: copy.bodyText,
+    bodyHtml: null,
+    status: "draft" as const,
+    idempotencyKey,
+    aiAssisted: false,
+    aiAnalysis: {
+      manualLeadReply: true,
+      manualReplyDraft: true,
+      manualReplyRequiresEditing: true,
+      manualReplyPlaceholder: copy.bodyText,
+      sourceLeadRevision: input.expectedRevision,
+    },
+    modelVersion: null,
+    promptVersion: null,
+    approvedBy: null,
+    approvedAt: null,
+    queuedAt: null,
+    sentAt: null,
+    deliveredAt: null,
+    provider: null,
+    providerMessageId: null,
+    failureCode: null,
+    failureMessage: null,
+  };
+  const message = duplicate
+    ? await payload.update({
+        collection: "messages",
+        id: duplicate.id,
+        overrideAccess: true,
+        data,
+      })
+    : await payload.create({
+        collection: "messages",
+        overrideAccess: true,
+        data,
+      });
+
+  try {
+    await updateCaseState(payload, {
+      leadId: lead.id,
+      command: "manual_lead_reply_drafted",
+      expectedRevision: input.expectedRevision,
+      idempotencyKey: `${idempotencyKey}:${message.id}`,
+      patch: {
+        status: "draft_ready",
+        nextActionOwner: "administrator",
+        nextAction:
+          "Skriv, kontroller og godkjenn det manuelle svaret før utsending.",
+        nextActionAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    if (error instanceof CaseCommandConflictError) {
+      await payload.update({
+        collection: "messages",
+        overrideAccess: true,
+        where: {
+          and: [
+            { id: { equals: message.id } },
+            { lead: { equals: lead.id } },
+            { status: { equals: "draft" } },
+          ],
+        },
+        data: { status: "cancelled" },
+      });
+    }
+    throw error;
+  }
+  return { duplicate: false as const, message };
 }
 
 export async function createCustomerReplyDraft(
@@ -413,6 +638,14 @@ export async function createCustomerReplyDraft(
   const duplicate = await findMessageByKey(payload, idempotencyKey);
   if (duplicate && duplicate.status !== "cancelled") {
     return { duplicate: true as const, message: duplicate };
+  }
+  const activeQuestionDraft = await findActiveCustomerQuestionReplyDraft(
+    payload,
+    input.leadId,
+    source.id,
+  );
+  if (activeQuestionDraft) {
+    return { duplicate: true as const, message: activeQuestionDraft };
   }
 
   const lead = await payload.findByID({
@@ -460,7 +693,10 @@ export async function createCustomerReplyDraft(
     replyToMessage: source.id,
     direction: "outbound" as const,
     category: "ai_reply" as const,
-    channel: lead.email ? ("email" as const) : ("sms" as const),
+    channel:
+      lead.communicationEmail || lead.email
+        ? ("email" as const)
+        : ("sms" as const),
     subject: generated.result.subject,
     bodyText: generated.result.replyDraft,
     bodyHtml: null,
@@ -490,40 +726,57 @@ export async function createCustomerReplyDraft(
     failureMessage: null,
   };
   let message;
-  if (duplicate) {
-    const reactivated = await payload.update({
-      collection: "messages",
-      overrideAccess: true,
-      where: {
-        and: [
-          { id: { equals: duplicate.id } },
-          { status: { equals: "cancelled" } },
-          { updatedAt: { equals: duplicate.updatedAt } },
-        ],
-      },
-      data,
-    });
-    message = reactivated.docs?.[0];
-    if (!message) {
-      const winner = await payload.findByID({
+  try {
+    if (duplicate) {
+      const reactivated = await payload.update({
         collection: "messages",
-        id: duplicate.id,
-        depth: 0,
         overrideAccess: true,
+        where: {
+          and: [
+            { id: { equals: duplicate.id } },
+            { status: { equals: "cancelled" } },
+            { updatedAt: { equals: duplicate.updatedAt } },
+          ],
+        },
+        data,
       });
-      if (winner.status !== "cancelled") {
-        return { duplicate: true as const, message: winner };
+      message = reactivated.docs?.[0];
+      if (!message) {
+        const winner = await payload.findByID({
+          collection: "messages",
+          id: duplicate.id,
+          depth: 0,
+          overrideAccess: true,
+        });
+        if (winner.status !== "cancelled") {
+          return { duplicate: true as const, message: winner };
+        }
+        throw new TypeError(
+          "The cancelled reply changed while a new draft was generated. Retry from the current case state.",
+        );
       }
-      throw new TypeError(
-        "The cancelled reply changed while a new draft was generated. Retry from the current case state.",
-      );
+    } else {
+      message = await payload.create({
+        collection: "messages",
+        overrideAccess: true,
+        data,
+      });
     }
-  } else {
-    message = await payload.create({
-      collection: "messages",
-      overrideAccess: true,
-      data,
-    });
+  } catch (error) {
+    const winner = await findActiveCustomerQuestionReplyDraft(
+      payload,
+      input.leadId,
+      source.id,
+    );
+    if (winner) {
+      return {
+        duplicate: true as const,
+        message: winner,
+        generated,
+        factWarnings,
+      };
+    }
+    throw error;
   }
   await updateCaseState(payload, {
     leadId: lead.id,
@@ -548,6 +801,7 @@ export async function createManualCustomerQuestionReplyDraft(
   payload: Payload,
   input: {
     correlationId: string;
+    expectedRevision: number;
     generationKey?: string;
     leadId: number;
     sourceMessageId: number;
@@ -578,6 +832,14 @@ export async function createManualCustomerQuestionReplyDraft(
   if (duplicate && duplicate.status !== "cancelled") {
     return { duplicate: true as const, message: duplicate };
   }
+  const activeQuestionDraft = await findActiveCustomerQuestionReplyDraft(
+    payload,
+    input.leadId,
+    source.id,
+  );
+  if (activeQuestionDraft) {
+    return { duplicate: true as const, message: activeQuestionDraft };
+  }
 
   const lead = await payload.findByID({
     collection: "leads",
@@ -589,6 +851,11 @@ export async function createManualCustomerQuestionReplyDraft(
     throw new TypeError(
       "A reply draft cannot be generated for a closed or archived case",
     );
+  }
+  const revision =
+    typeof lead.caseRevision === "number" ? lead.caseRevision : 1;
+  if (revision !== input.expectedRevision) {
+    throw new CaseCommandConflictError(input.expectedRevision, revision);
   }
   const sourceBundle = await loadCustomerReplySourceBundle(payload, {
     leadId: input.leadId,
@@ -604,7 +871,10 @@ export async function createManualCustomerQuestionReplyDraft(
     replyToMessage: source.id,
     direction: "outbound" as const,
     category: "follow_up" as const,
-    channel: lead.email ? ("email" as const) : ("sms" as const),
+    channel:
+      lead.communicationEmail || lead.email
+        ? ("email" as const)
+        : ("sms" as const),
     subject,
     bodyText: manualQuestionReplyPlaceholder,
     status: "draft" as const,
@@ -615,36 +885,69 @@ export async function createManualCustomerQuestionReplyDraft(
       sourceMessageId: source.id,
       manualQuestionReply: true,
       manualReplyRequiresEditing: true,
+      manualReplyPlaceholder: manualQuestionReplyPlaceholder,
       replyFactContext: sourceBundle.context,
       replySourceFingerprint: sourceBundle.fingerprint,
       replySourceSnapshot: sourceBundle.snapshot,
     },
   };
-  const message = duplicate
-    ? await payload.update({
+  let message;
+  try {
+    message = duplicate
+      ? await payload.update({
+          collection: "messages",
+          id: duplicate.id,
+          overrideAccess: true,
+          data,
+        })
+      : await payload.create({
+          collection: "messages",
+          overrideAccess: true,
+          data,
+        });
+  } catch (error) {
+    const winner = await findActiveCustomerQuestionReplyDraft(
+      payload,
+      input.leadId,
+      source.id,
+    );
+    if (winner) {
+      return { duplicate: true as const, message: winner };
+    }
+    throw error;
+  }
+  try {
+    await updateCaseState(payload, {
+      leadId: lead.id,
+      command: "manual_customer_question_reply_drafted",
+      expectedRevision: input.expectedRevision,
+      idempotencyKey: `${idempotencyKey}:${message.id}`,
+      patch: {
+        status: "customer_waiting",
+        nextActionOwner: "administrator",
+        nextAction:
+          "Skriv, kontroller og send et manuelt svar på kundens spørsmål.",
+        nextActionAt: new Date().toISOString(),
+        nextActionBlocker: "CUSTOMER_QUESTION_PENDING",
+      },
+    });
+  } catch (error) {
+    if (error instanceof CaseCommandConflictError) {
+      await payload.update({
         collection: "messages",
-        id: duplicate.id,
         overrideAccess: true,
-        data,
-      })
-    : await payload.create({
-        collection: "messages",
-        overrideAccess: true,
-        data,
+        where: {
+          and: [
+            { id: { equals: message.id } },
+            { lead: { equals: lead.id } },
+            { status: { equals: "draft" } },
+          ],
+        },
+        data: { status: "cancelled" },
       });
-  await updateCaseState(payload, {
-    leadId: lead.id,
-    command: "manual_customer_question_reply_drafted",
-    idempotencyKey: `${idempotencyKey}:${message.id}`,
-    patch: {
-      status: "customer_waiting",
-      nextActionOwner: "administrator",
-      nextAction:
-        "Skriv, kontroller og send et manuelt svar på kundens spørsmål.",
-      nextActionAt: new Date().toISOString(),
-      nextActionBlocker: "CUSTOMER_QUESTION_PENDING",
-    },
-  });
+    }
+    throw error;
+  }
   return { duplicate: false as const, message };
 }
 
@@ -667,6 +970,9 @@ async function deliverMessageUnlocked(
 ) {
   if (["sent", "delivered"].includes(message.status))
     return { duplicate: true as const, message };
+  if (messageDeliveryRequiresReconciliation(message)) {
+    throw new MessageDeliveryReconciliationRequiredError();
+  }
   assertMessageCanDeliver(message);
   if (message.channel !== "email")
     throw new TypeError("SMS delivery is not enabled");
@@ -709,8 +1015,9 @@ async function deliverMessageUnlocked(
     if (deliveryClass === "automation") {
       assertControlledPilotAutomationRecipientAllowed(deliveryEmail);
     }
+    let messageForFinalUpdate = message;
     if (paymentInvoiceId !== null) {
-      await assertAndClaimPaymentReminderSend(
+      messageForFinalUpdate = await assertAndClaimPaymentReminderSend(
         payload,
         message,
         paymentInvoiceId,
@@ -720,15 +1027,16 @@ async function deliverMessageUnlocked(
     if (deliveryClass === "automation") {
       assertControlledPilotAutomationRecipientAllowed(deliveryEmail);
     }
+    const deliveredSubject = previewEmailSubject(message.subject);
     const result = await provider.send({
       template: message.category,
       to: deliveryEmail,
-      subject: message.subject,
+      subject: deliveredSubject,
       text: message.bodyText,
       html:
         message.bodyHtml ||
         buildBrandedEmailHtml({
-          subject: message.subject,
+          subject: deliveredSubject,
           text: message.bodyText,
           secureLinkLabel: secureCustomerLinkLabel(message.category),
         }),
@@ -743,10 +1051,10 @@ async function deliverMessageUnlocked(
       ...(attachments.length ? { attachments } : {}),
     });
     const analysis =
-      message.aiAnalysis &&
-      typeof message.aiAnalysis === "object" &&
-      !Array.isArray(message.aiAnalysis)
-        ? (message.aiAnalysis as Record<string, unknown> & {
+      messageForFinalUpdate.aiAnalysis &&
+      typeof messageForFinalUpdate.aiAnalysis === "object" &&
+      !Array.isArray(messageForFinalUpdate.aiAnalysis)
+        ? (messageForFinalUpdate.aiAnalysis as Record<string, unknown> & {
             alternativeQuoteId?: number;
             cancellationDecision?: string;
             recommendedNextAction?: string;
@@ -754,7 +1062,9 @@ async function deliverMessageUnlocked(
             officialInvoiceId?: number;
           })
         : {};
-    const replyContext = customerReplyContextFromAnalysis(message.aiAnalysis);
+    const replyContext = customerReplyContextFromAnalysis(
+      messageForFinalUpdate.aiAnalysis,
+    );
     const isCustomerQuestionReply =
       replyContext?.purpose === "question" ||
       analysis.manualQuestionReply === true;
@@ -763,11 +1073,8 @@ async function deliverMessageUnlocked(
       id: message.id,
       overrideAccess: true,
       data: {
-        ...(isCustomerQuestionReply
-          ? {
-              aiAnalysis: { ...analysis, deliveryRecipient: deliveryEmail },
-            }
-          : {}),
+        aiAnalysis: { ...analysis, deliveryRecipient: deliveryEmail },
+        subject: deliveredSubject,
         status: "sent",
         sentAt: result.acceptedAt,
         provider: result.provider,

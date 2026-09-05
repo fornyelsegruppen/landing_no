@@ -7,14 +7,30 @@ import {
   RotateCcw,
   TriangleAlert,
 } from "lucide-react";
-import { useState } from "react";
+import {
+  type PointerEvent,
+  type WheelEvent,
+  useCallback,
+  useRef,
+  useState,
+} from "react";
 import type { GeoPoint } from "@/lib/measurements/types";
 import type { AddressCandidate } from "@/lib/providers/contracts";
 import {
   projectWgs84ToOrthoPixels,
   type GeoReference,
 } from "./norgeibilder-projection";
-import type { RoofFusionPoint } from "./admin-next-roof-fusion-unified-workbench";
+import {
+  DEFAULT_ROOF_FUSION_VIEWPORT,
+  MAX_ROOF_FUSION_ZOOM,
+  MIN_ROOF_FUSION_ZOOM,
+  hasRoofFusionPanGestureMoved,
+  panRoofFusionViewport,
+  shouldHandleRoofFusionZoomWheel,
+  zoomRoofFusionViewportAt,
+  type RoofFusionPoint,
+  type RoofFusionViewport,
+} from "./admin-next-roof-fusion-unified-workbench";
 import { NorgeMeasurementActions } from "./norge-measurement-actions";
 
 export type NorgeIBilderCaptureRequest = {
@@ -29,6 +45,10 @@ export type NorgeIBilderCaptureResult = {
   attempts?: number;
   evidenceId?: number | string;
   source?: string;
+  /** Stable evidence identity returned by the authenticated capture route. */
+  sourceId?: string;
+  /** SHA-256 of the exact attributed bytes stored in private media. */
+  rawContentHash?: string;
   attribution?: string;
   capturedAt?: string;
   addressLabel?: string;
@@ -42,6 +62,10 @@ export type NorgeIBilderCaptureApi = (
   request: NorgeIBilderCaptureRequest,
 ) => Promise<NorgeIBilderCaptureResult>;
 
+export type NorgeIBilderCaptureContext = Readonly<{
+  candidateId?: string;
+}>;
+
 /** Convert the georeferenced pixel overlay into the workbench's 0..1 space. */
 export function normalizeOrthoOverlayPoints(
   overlay: string | null,
@@ -50,10 +74,13 @@ export function normalizeOrthoOverlayPoints(
   if (!overlay || reference.imageWidth <= 0 || reference.imageHeight <= 0) {
     return null;
   }
-  const points = overlay.trim().split(/\s+/u).map((value) => {
-    const [x, y] = value.split(",").map(Number);
-    return { x, y };
-  });
+  const points = overlay
+    .trim()
+    .split(/\s+/u)
+    .map((value) => {
+      const [x, y] = value.split(",").map(Number);
+      return { x, y };
+    });
   if (
     points.length < 3 ||
     points.some(
@@ -77,7 +104,11 @@ export function normalizeOrthoOverlayPoints(
 type CaptureState =
   | { kind: "idle" }
   | { kind: "loading"; attempt: number }
-  | { kind: "success"; result: NorgeIBilderCaptureResult }
+  | {
+      kind: "success";
+      result: NorgeIBilderCaptureResult;
+      candidateId?: string;
+    }
   | { kind: "error"; message: string };
 
 export function captureMatchesSelectedAddress(
@@ -102,18 +133,271 @@ export function captureMatchesSelectedAddress(
   return Math.hypot(latitudeMeters, longitudeMeters) <= 15;
 }
 
+type CapturePanGesture = Readonly<{
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startViewport: RoofFusionViewport;
+  moved: boolean;
+}>;
+
+export function NorgeIBilderCaptureViewport({
+  attribution,
+  geoReference,
+  imageUrl,
+  overlayOpacity,
+  overlayPoints,
+}: {
+  attribution: string;
+  geoReference?: GeoReference;
+  imageUrl: string;
+  overlayOpacity: number;
+  overlayPoints: string | null;
+}) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState<RoofFusionViewport>(
+    DEFAULT_ROOF_FUSION_VIEWPORT,
+  );
+  const [panGesture, setPanGesture] = useState<CapturePanGesture | null>(null);
+  const transform = `translate(${viewport.offsetX * 100}%, ${viewport.offsetY * 100}%) scale(${viewport.scale})`;
+  const imageWidth = geoReference?.imageWidth ?? 16;
+  const imageHeight = geoReference?.imageHeight ?? 9;
+
+  const applyViewport = useCallback((next: RoofFusionViewport) => {
+    setViewport(next);
+    if (next.scale === MIN_ROOF_FUSION_ZOOM) {
+      setPanGesture(null);
+    }
+  }, []);
+
+  const changeZoom = useCallback(
+    (delta: number) => {
+      applyViewport(zoomRoofFusionViewportAt(viewport, viewport.scale + delta));
+    },
+    [applyViewport, viewport],
+  );
+
+  const resetViewport = useCallback(() => {
+    applyViewport(DEFAULT_ROOF_FUSION_VIEWPORT);
+  }, [applyViewport]);
+
+  const handleWheel = useCallback(
+    (event: WheelEvent<HTMLDivElement>) => {
+      if (!shouldHandleRoofFusionZoomWheel(event)) return;
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const anchor = {
+        x: Math.min(
+          1,
+          Math.max(0, (event.clientX - bounds.left) / (bounds.width || 1)),
+        ),
+        y: Math.min(
+          1,
+          Math.max(0, (event.clientY - bounds.top) / (bounds.height || 1)),
+        ),
+      };
+      const boundedDelta = Math.max(-100, Math.min(100, event.deltaY));
+      applyViewport(
+        zoomRoofFusionViewportAt(
+          viewport,
+          viewport.scale * Math.exp(-boundedDelta * 0.0025),
+          anchor,
+        ),
+      );
+    },
+    [applyViewport, viewport],
+  );
+
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (
+        viewport.scale <= MIN_ROOF_FUSION_ZOOM ||
+        !event.isPrimary ||
+        event.button !== 0
+      )
+        return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setPanGesture({
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startViewport: viewport,
+        moved: false,
+      });
+    },
+    [viewport],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (panGesture?.pointerId !== event.pointerId) return;
+      const moved =
+        panGesture.moved ||
+        hasRoofFusionPanGestureMoved(
+          {
+            clientX: panGesture.startClientX,
+            clientY: panGesture.startClientY,
+          },
+          event,
+        );
+      if (!moved) return;
+      const bounds = shellRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      event.preventDefault();
+      if (!panGesture.moved) {
+        setPanGesture({ ...panGesture, moved: true });
+      }
+      setViewport(
+        panRoofFusionViewport(panGesture.startViewport, {
+          x: (event.clientX - panGesture.startClientX) / (bounds.width || 1),
+          y: (event.clientY - panGesture.startClientY) / (bounds.height || 1),
+        }),
+      );
+    },
+    [panGesture],
+  );
+
+  const finishPointerGesture = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (
+        panGesture?.pointerId === event.pointerId &&
+        event.currentTarget.hasPointerCapture?.(event.pointerId)
+      ) {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      }
+      setPanGesture(null);
+    },
+    [panGesture],
+  );
+
+  return (
+    <div data-norgeibilder-capture-viewport>
+      <div
+        aria-label="Norge i bilder vaizdo mastelio valdikliai"
+        className="flex flex-wrap items-center gap-2 border-b border-emerald-400/20 bg-[#101820] px-3 py-2"
+        data-norgeibilder-capture-viewport-controls
+        role="group"
+      >
+        <button
+          aria-label="Mažinti Norge i bilder vaizdą"
+          className="min-h-11 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={viewport.scale <= MIN_ROOF_FUSION_ZOOM}
+          onClick={() => changeZoom(-0.5)}
+          type="button"
+        >
+          Mastelis −
+        </button>
+        <output
+          aria-label="Dabartinis Norge i bilder vaizdo mastelis"
+          aria-live="polite"
+          className="min-w-16 text-center text-xs font-black text-emerald-100"
+          data-norgeibilder-capture-zoom-percent
+        >
+          {Math.round(viewport.scale * 100)}%
+        </output>
+        <button
+          aria-label="Didinti Norge i bilder vaizdą"
+          className="min-h-11 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={viewport.scale >= MAX_ROOF_FUSION_ZOOM}
+          onClick={() => changeZoom(0.5)}
+          type="button"
+        >
+          Mastelis +
+        </button>
+        <button
+          className="min-h-11 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={viewport.scale === MIN_ROOF_FUSION_ZOOM}
+          onClick={resetViewport}
+          type="button"
+        >
+          Talpinti
+        </button>
+        <span className="text-[11px] text-[var(--an-muted)]">
+          Ctrl/Cmd + ratukas keičia mastelį. Priartinus tempkite vaizdą.
+        </span>
+      </div>
+      <div className="bg-[#080d12]">
+        <div
+          className={`relative mx-auto w-full overflow-hidden ${viewport.scale > MIN_ROOF_FUSION_ZOOM ? (panGesture?.moved ? "cursor-grabbing touch-none" : "cursor-grab touch-none") : "touch-pan-y"}`}
+          data-norgeibilder-capture-direct-pan={
+            viewport.scale > MIN_ROOF_FUSION_ZOOM ? "enabled" : "disabled"
+          }
+          data-norgeibilder-capture-viewport-shell
+          onPointerCancel={finishPointerGesture}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPointerGesture}
+          onWheel={handleWheel}
+          ref={shellRef}
+          style={{
+            aspectRatio: `${imageWidth} / ${imageHeight}`,
+            maxWidth: `${(480 * imageWidth) / imageHeight}px`,
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            data-norgeibilder-capture-viewport-content
+            data-norgeibilder-capture-viewport-scale={viewport.scale}
+            style={{ transform, transformOrigin: "top left" }}
+          >
+            {/* Protected media URLs are not compatible with the public Next image optimizer. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt="Norge i bilder stogo vaizdo peržiūra"
+              className="block size-full object-contain"
+            />
+            {overlayPoints && geoReference ? (
+              <svg
+                aria-label="OSM pastato kontūras"
+                className="pointer-events-none absolute inset-0 size-full"
+                data-norgeibilder-capture-viewport-overlay
+                preserveAspectRatio="none"
+                viewBox={`0 0 ${geoReference.imageWidth} ${geoReference.imageHeight}`}
+              >
+                <polygon
+                  fill={`rgba(244,182,63,${overlayOpacity / 100})`}
+                  points={overlayPoints}
+                  stroke="#f4b63f"
+                  strokeWidth={
+                    Math.max(
+                      geoReference.imageWidth,
+                      geoReference.imageHeight,
+                    ) / 180
+                  }
+                />
+              </svg>
+            ) : null}
+          </div>
+          <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/75 px-2 py-1 text-[11px] font-bold text-white">
+            {attribution}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function NorgeIBilderCaptureControl({
   api,
   address,
   caseReference,
+  compactWhenWorkbenchActive = false,
   leadId,
   onCaptureResultChange,
+  selectedCandidateId,
   selectedFootprint,
 }: {
   api?: NorgeIBilderCaptureApi;
   caseReference: string;
+  compactWhenWorkbenchActive?: boolean;
   leadId?: number;
-  onCaptureResultChange?: (result: NorgeIBilderCaptureResult | null) => void;
+  onCaptureResultChange?: (
+    result: NorgeIBilderCaptureResult | null,
+    context: NorgeIBilderCaptureContext,
+  ) => void;
+  selectedCandidateId?: string;
   selectedFootprint?: GeoPoint[];
   address?: AddressCandidate;
 }) {
@@ -123,7 +407,8 @@ export function NorgeIBilderCaptureControl({
   async function capture() {
     if (!leadId) return;
     const clickId = crypto.randomUUID();
-    onCaptureResultChange?.(null);
+    const requestedCandidateId = selectedCandidateId;
+    onCaptureResultChange?.(null, { candidateId: requestedCandidateId });
     setState({ kind: "loading", attempt: 1 });
     try {
       const captureApi =
@@ -156,24 +441,30 @@ export function NorgeIBilderCaptureControl({
         });
       const result = await captureApi({ clickId, leadId });
       if (!result.imageUrl) throw new Error("Tuščias vaizdo rezultatas");
-      setState({ kind: "success", result });
-      onCaptureResultChange?.(result);
+      setState({
+        kind: "success",
+        result,
+        ...(requestedCandidateId ? { candidateId: requestedCandidateId } : {}),
+      });
+      onCaptureResultChange?.(result, {
+        candidateId: requestedCandidateId,
+      });
     } catch (error) {
       setState({
         kind: "error",
         message:
           error instanceof Error ? error.message : "Nepavyko gauti vaizdo.",
       });
-      onCaptureResultChange?.(null);
+      onCaptureResultChange?.(null, { candidateId: requestedCandidateId });
     }
   }
 
   const busy = state.kind === "loading";
   const captureResult = state.kind === "success" ? state.result : undefined;
-  const selectionMatchesCapture = captureMatchesSelectedAddress(
-    captureResult?.address,
-    address,
-  );
+  const selectionMatchesCapture =
+    captureMatchesSelectedAddress(captureResult?.address, address) &&
+    (!selectedCandidateId ||
+      (state.kind === "success" && state.candidateId === selectedCandidateId));
   const overlayPoints =
     selectionMatchesCapture && selectedFootprint && captureResult?.geoReference
       ? projectWgs84ToOrthoPixels(selectedFootprint, captureResult.geoReference)
@@ -189,8 +480,11 @@ export function NorgeIBilderCaptureControl({
       : undefined;
   return (
     <section
-      className="mt-4 rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface)] p-4"
+      className={`${compactWhenWorkbenchActive && state.kind !== "error" ? "hidden" : "mt-4 rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface)] p-4"}`}
       data-norgeibilder-capture="single-case"
+      data-norgeibilder-capture-mode={
+        compactWhenWorkbenchActive ? "unified-hidden" : "standalone"
+      }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -206,6 +500,7 @@ export function NorgeIBilderCaptureControl({
         </div>
         <button
           type="button"
+          id={leadId ? `roof-fusion-norge-capture-${leadId}` : undefined}
           onClick={capture}
           disabled={busy || !leadId}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-sm font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
@@ -245,7 +540,7 @@ export function NorgeIBilderCaptureControl({
           </button>
         </div>
       ) : null}
-      {state.kind === "success" ? (
+      {state.kind === "success" && !compactWhenWorkbenchActive ? (
         <div
           className="mt-4 overflow-hidden rounded-xl border border-emerald-400/35 bg-emerald-400/10"
           data-norgeibilder-preview="ready"
@@ -254,38 +549,13 @@ export function NorgeIBilderCaptureControl({
             <strong>Bylos adresas:</strong>{" "}
             {state.result.addressLabel ?? "patvirtintas serverio pagal bylą"}
           </div>
-            <div className="relative bg-[#080d12]">
-              {/* Protected media URLs are not compatible with the public Next image optimizer. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-              src={state.result.imageUrl}
-              alt="Norge i bilder stogo vaizdo peržiūra"
-              className="block max-h-[480px] w-full object-contain"
-            />
-            {overlayPoints && state.result.geoReference ? (
-              <svg
-                aria-label="OSM pastato kontūras"
-                className="pointer-events-none absolute inset-0 size-full"
-                preserveAspectRatio="none"
-                viewBox={`0 0 ${state.result.geoReference.imageWidth} ${state.result.geoReference.imageHeight}`}
-              >
-                <polygon
-                  fill={`rgba(244,182,63,${overlayOpacity / 100})`}
-                  points={overlayPoints}
-                  stroke="#f4b63f"
-                  strokeWidth={
-                    Math.max(
-                      state.result.geoReference.imageWidth,
-                      state.result.geoReference.imageHeight,
-                    ) / 180
-                  }
-                />
-              </svg>
-            ) : null}
-            <span className="absolute bottom-2 left-2 rounded bg-black/75 px-2 py-1 text-[11px] font-bold text-white">
-              {state.result.attribution ?? "©norgeibilder.no"}
-            </span>
-          </div>
+          <NorgeIBilderCaptureViewport
+            attribution={state.result.attribution ?? "©norgeibilder.no"}
+            geoReference={state.result.geoReference}
+            imageUrl={state.result.imageUrl}
+            overlayOpacity={overlayOpacity}
+            overlayPoints={overlayPoints}
+          />
           <div className="flex flex-wrap items-center justify-between gap-3 p-3">
             <div>
               <p className="inline-flex items-center gap-2 text-xs font-black text-emerald-200">

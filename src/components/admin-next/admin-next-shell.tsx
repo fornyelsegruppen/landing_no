@@ -1,213 +1,212 @@
 import Link from "next/link";
-import {
-  Bell,
-  BriefcaseBusiness,
-  CalendarDays,
-  ChevronDown,
-  CircleHelp,
-  ClipboardCheck,
-  FolderKanban,
-  House,
-  LayoutDashboard,
-  Menu,
-  Search,
-  Settings,
-  Users,
-} from "lucide-react";
+import { Bell, ChevronDown, Wrench } from "lucide-react";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { adminNextDarkThemeCss } from "@/lib/admin-next/design-tokens";
+import type { AdminWorkspaceMode } from "@/lib/admin-next/navigation-contract";
+import { AdminLanguageSwitcher } from "@/components/admin-v2/admin-language-switcher";
+import { AdminLogoutButton } from "@/components/admin-v2/admin-logout-button";
+import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
+import { AdminGlobalSearch } from "./admin-global-search";
+import { UnifiedAdminNavigation } from "./unified-admin-navigation";
 
 const copy = {
   nb: {
     product: "Takfornyelse",
-    workspace: "Admin Next",
-    preview: "Beskyttet Preview · syntetiske data",
-    search: "Søk etter kunde, adresse eller referanse",
+    workspace: "Arbeidsflate",
+    preview: "Beskyttet Preview · ingen skriving",
     account: "Administrator",
-    help: "Hjelp",
-    status: "Modulstatus",
-    menu: "Meny",
-    notifications: "Varsler er ikke tilgjengelige i beskyttet Preview",
-    nav: {
-      today: "I dag",
-      cases: "Saker",
-      calendar: "Plan",
-      customers: "Kunder",
-      work: "Arbeid",
-      documents: "Dokumenter",
-      settings: "Innstillinger",
-    },
+    skip: "Hopp til hovedinnhold",
+    notifications: "Varsler er ikke tilgjengelige ennå",
+    technical: "Teknisk administrasjon",
   },
   lt: {
     product: "Takfornyelse",
-    workspace: "Admin Next",
-    preview: "Apsaugota Preview · sintetiniai duomenys",
-    search: "Ieškoti kliento, adreso arba numerio",
+    workspace: "Darbo sistema",
+    preview: "Apsaugota Preview · be įrašymo",
     account: "Administratorius",
-    help: "Pagalba",
-    status: "Modulių būsena",
-    menu: "Meniu",
-    notifications: "Pranešimai apsaugotoje Preview versijoje dar nepasiekiami",
-    nav: {
-      today: "Šiandien",
-      cases: "Bylos",
-      calendar: "Planas",
-      customers: "Klientai",
-      work: "Darbai",
-      documents: "Dokumentai",
-      settings: "Nustatymai",
-    },
+    skip: "Pereiti prie pagrindinio turinio",
+    notifications: "Pranešimai dar nepasiekiami",
+    technical: "Techninis administravimas",
   },
   en: {
     product: "Takfornyelse",
-    workspace: "Admin Next",
-    preview: "Protected Preview · synthetic data",
-    search: "Search customer, address or reference",
+    workspace: "Operations workspace",
+    preview: "Protected Preview · no writes",
     account: "Administrator",
-    help: "Help",
-    status: "Module status",
-    menu: "Menu",
-    notifications: "Notifications are not available in protected Preview",
-    nav: {
-      today: "Today",
-      cases: "Cases",
-      calendar: "Schedule",
-      customers: "Customers",
-      work: "Work",
-      documents: "Documents",
-      settings: "Settings",
-    },
+    skip: "Skip to main content",
+    notifications: "Notifications are not available yet",
+    technical: "Technical administration",
   },
 } as const;
 
-const primaryNavigation = [
-  { key: "today", href: "/admin-next-preview/today", icon: LayoutDashboard },
-  { key: "cases", href: "/admin-next-preview/today", icon: FolderKanban },
-  { key: "calendar", href: "/admin-v2/work", icon: CalendarDays },
-  { key: "customers", href: "/admin-v2/cases", icon: Users },
-  { key: "work", href: "/admin-v2/work", icon: BriefcaseBusiness },
-  { key: "documents", href: "/admin-v2/documents", icon: ClipboardCheck },
-] as const;
-
-const mobileNavigation = [
-  { key: "today", href: "/admin-next-preview/today", icon: House },
-  { key: "cases", href: "/admin-next-preview/today", icon: FolderKanban },
-  { key: "calendar", href: "/admin-v2/work", icon: CalendarDays },
-  { key: "work", href: "/admin-v2/next-preview", icon: Menu },
-] as const;
-
 export function AdminNextShell({
   children,
-  locale,
   displayName,
+  locale,
+  mode = "preview",
+  notice,
 }: {
   children: React.ReactNode;
-  locale: PanelLocale;
   displayName?: string | null;
+  locale: PanelLocale;
+  mode?: AdminWorkspaceMode;
+  notice?: React.ReactNode;
 }) {
   const t = copy[locale];
-
+  const customerContentNotice =
+    mode === "canonical"
+      ? getAdminV2Copy(locale).customerContentNotice
+      : undefined;
+  const homeHref =
+    mode === "preview"
+      ? "/admin-next-preview/work?view=today&queue=all&limit=25"
+      : "/admin-v2";
   return (
-    <div className="admin-next-shell admin-next-theme min-h-dvh bg-[var(--an-canvas)] text-[var(--an-text)]">
-      <style>{adminNextDarkThemeCss}</style>
-      <style>{`
-        .admin-next-shell:has([data-admin-next-section="today"]) [data-admin-next-nav="today"],
-        .admin-next-shell:has([data-admin-next-section="cases"]) [data-admin-next-nav="cases"] {
-          background: var(--an-amber-soft);
-          color: var(--an-amber);
+    <div
+      className="admin-next-shell admin-next-theme min-h-dvh bg-[var(--an-canvas)] text-[var(--an-text-primary)]"
+      data-admin-shell
+      style={
+        {
+          "--an-mobile-nav-offset": "calc(5rem + env(safe-area-inset-bottom))",
+        } as React.CSSProperties
+      }
+    >
+      <style>{`${adminNextDarkThemeCss}
+        :root { --an-mobile-nav-offset: calc(5rem + env(safe-area-inset-bottom)); }
+        @media (max-width: 63.999rem) {
+          html { scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+          .admin-next-shell :where(a, button, input, select, textarea, [tabindex]):focus {
+            scroll-margin-bottom: calc(6rem + env(safe-area-inset-bottom));
+          }
         }
       `}</style>
+      <a
+        className="fixed top-3 left-3 z-[100] -translate-y-24 rounded-lg bg-[var(--an-action)] px-4 py-2 font-bold text-[var(--an-action-ink)] focus:translate-y-0"
+        href="#admin-main-content"
+      >
+        {t.skip}
+      </a>
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-[var(--an-border)] bg-[var(--an-sidebar)] px-4 py-5 lg:flex lg:flex-col">
-        <Link className="flex items-center gap-3 px-2" href="/admin-next-preview/today">
-          <span className="grid size-10 place-items-center rounded-xl bg-[var(--an-amber)] text-sm font-black text-[var(--an-amber-ink)]">
+        <Link className="flex items-center gap-3 px-2" href={homeHref}>
+          <span className="grid size-10 place-items-center rounded-xl bg-[var(--an-action)] text-sm font-black text-[var(--an-action-ink)]">
             TF
           </span>
           <span>
             <strong className="block text-sm leading-tight">{t.product}</strong>
-            <small className="text-xs font-semibold text-[var(--an-muted)]">{t.workspace}</small>
+            <small className="text-xs font-semibold text-[var(--an-text-muted)]">
+              {t.workspace}
+            </small>
           </span>
         </Link>
-
-        <nav aria-label={t.workspace} className="mt-8 grid gap-1">
-          {primaryNavigation.map(({ key, href, icon: Icon }) => {
-            return (
-              <Link
-                className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[var(--an-muted)] transition hover:bg-[var(--an-soft)] hover:text-[var(--an-text)]"
-                data-admin-next-nav={key}
-                href={href}
-                key={key}
-              >
-                <Icon aria-hidden="true" className="size-[18px]" />
-                {t.nav[key]}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="mt-auto grid gap-1 border-t border-[var(--an-border)] pt-4">
-          <Link className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[var(--an-muted)] hover:bg-[var(--an-soft)] hover:text-[var(--an-text)]" href="/admin-v2/next-preview">
-            <CircleHelp aria-hidden="true" className="size-[18px]" />
-            {t.status}
-          </Link>
-          <Link className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[var(--an-muted)] hover:bg-[var(--an-soft)] hover:text-[var(--an-text)]" href="/admin-v2/settings">
-            <Settings aria-hidden="true" className="size-[18px]" />
-            {t.nav.settings}
-          </Link>
+        <div className="mt-8 flex min-h-0 flex-1 flex-col">
+          <UnifiedAdminNavigation locale={locale} mode={mode} />
         </div>
+        {customerContentNotice ? (
+          <p
+            className="mt-4 border-t border-[var(--an-border)] px-2 pt-4 text-xs leading-relaxed text-[var(--an-text-subtle)]"
+            data-admin-customer-content-notice
+          >
+            {customerContentNotice}
+          </p>
+        ) : null}
+        <Link
+          className="mt-3 flex min-h-11 items-center gap-3 rounded-xl border border-[var(--an-border)] px-3 text-xs font-semibold text-[var(--an-text-subtle)] hover:bg-[var(--an-surface-soft)] hover:text-[var(--an-text-primary)]"
+          href="/admin"
+        >
+          <Wrench aria-hidden="true" className="size-4" />
+          {t.technical}
+        </Link>
       </aside>
-
-      <header className="sticky top-0 z-30 border-b border-[var(--an-border)] bg-[color:rgba(11,17,24,.94)] backdrop-blur lg:ml-64">
-        <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
-          <Link aria-label={t.status} className="grid size-11 place-items-center rounded-xl border border-[var(--an-border)] bg-[var(--an-surface)] lg:hidden" href="/admin-v2/next-preview">
-            <Menu aria-hidden="true" className="size-5" />
+      <header
+        className="sticky top-0 z-30 border-b border-[var(--an-border)] bg-[color:rgba(11,17,24,.94)] backdrop-blur lg:ml-64"
+        data-admin-shell-header
+      >
+        <div
+          className="flex min-h-16 min-w-0 items-center gap-3 px-4 sm:px-6 lg:px-8"
+          data-admin-shell-header-controls
+        >
+          <Link
+            className="flex min-w-0 shrink-0 items-center gap-2 lg:hidden"
+            href={homeHref}
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--an-action)] text-xs font-black text-[var(--an-action-ink)]">
+              TF
+            </span>
+            <strong className="hidden truncate text-sm sm:block">
+              {t.workspace}
+            </strong>
           </Link>
-          <Link className="flex min-w-0 items-center gap-2 lg:hidden" href="/admin-next-preview/today">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--an-amber)] text-xs font-black text-[var(--an-amber-ink)]">TF</span>
-            <strong className="truncate text-sm">{t.workspace}</strong>
-          </Link>
-
-          <form action="/admin-v2" className="mx-auto hidden w-full max-w-xl md:block" role="search">
-            <label className="sr-only" htmlFor="admin-next-global-search">{t.search}</label>
-            <div className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface)] px-3 focus-within:border-[var(--an-amber)] focus-within:ring-2 focus-within:ring-[var(--an-amber-soft)]">
-              <Search aria-hidden="true" className="size-[18px] text-[var(--an-subtle)]" />
-              <input className="min-w-0 flex-1 bg-transparent text-sm text-[var(--an-text)] outline-none placeholder:text-[var(--an-subtle)]" id="admin-next-global-search" name="q" placeholder={t.search} type="search" />
-              <kbd className="rounded border border-[var(--an-border)] bg-[var(--an-elevated)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--an-muted)]">⌘ K</kbd>
-            </div>
-          </form>
-
-          <span className="ml-auto hidden rounded-full border border-[color:rgba(244,182,63,.28)] bg-[var(--an-amber-soft)] px-3 py-1.5 text-xs font-bold text-[var(--an-amber)] xl:inline-flex">
-            {t.preview}
-          </span>
-          <button aria-label={t.notifications} className="an-disabled relative grid size-11 cursor-not-allowed place-items-center rounded-xl border" disabled title={t.notifications} type="button">
+          <div className="mx-auto hidden w-full max-w-xl min-w-0 flex-1 xl:block">
+            <AdminGlobalSearch locale={locale} />
+          </div>
+          {mode === "preview" ? (
+            <span className="ml-auto hidden rounded-full border border-[var(--an-action)] bg-[var(--an-action-soft)] px-3 py-1.5 text-xs font-bold whitespace-nowrap text-[var(--an-action)] xl:inline-flex">
+              {t.preview}
+            </span>
+          ) : null}
+          <div className="ml-auto flex shrink-0 items-center gap-2 xl:ml-0">
+            <AdminLanguageSwitcher locale={locale} />
+            <AdminLogoutButton locale={locale} />
+          </div>
+          <button
+            aria-label={t.notifications}
+            className="an-disabled relative hidden size-11 cursor-not-allowed place-items-center rounded-xl border sm:grid"
+            disabled
+            title={t.notifications}
+            type="button"
+          >
             <Bell aria-hidden="true" className="size-5" />
           </button>
-          <Link aria-label={t.nav.settings} className="hidden min-h-11 items-center gap-2 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface)] px-3 text-left sm:flex" href="/admin-v2/settings">
-            <span className="grid size-8 place-items-center rounded-full bg-[var(--an-amber-soft)] text-xs font-black text-[var(--an-amber)]">AD</span>
-            <span className="max-w-32 truncate text-xs font-semibold">{displayName || t.account}</span>
-            <ChevronDown aria-hidden="true" className="size-4 text-[var(--an-subtle)]" />
+          <Link
+            aria-label={t.account}
+            className="hidden min-h-11 items-center gap-2 rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-base)] px-3 text-left xl:flex"
+            href="/admin-v2/settings"
+          >
+            <span className="grid size-8 place-items-center rounded-full bg-[var(--an-action-soft)] text-xs font-black text-[var(--an-action)]">
+              AD
+            </span>
+            <span className="max-w-32 truncate text-xs font-semibold">
+              {displayName || t.account}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-4 text-[var(--an-text-subtle)]"
+            />
           </Link>
         </div>
-      </header>
-
-      <div className="lg:ml-64">
-        <div className="border-b border-[color:rgba(244,182,63,.25)] bg-[var(--an-amber-soft)] px-4 py-2 text-center text-xs font-semibold text-[var(--an-amber)] xl:hidden">
-          {t.preview}
+        <div
+          className="px-4 pb-3 sm:px-6 lg:px-8 xl:hidden"
+          data-admin-shell-search-row
+        >
+          <AdminGlobalSearch locale={locale} />
         </div>
-        <main className="min-h-[calc(100dvh-4rem)] px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-8 lg:pb-8">
+      </header>
+      <div className="lg:ml-64">
+        {mode === "preview" ? (
+          <div className="border-b border-[var(--an-action)] bg-[var(--an-action-soft)] px-4 py-2 text-center text-xs font-semibold text-[var(--an-action)] xl:hidden">
+            {t.preview}
+          </div>
+        ) : null}
+        <main
+          className="min-h-[calc(100dvh-4rem)] px-4 py-5 pb-[calc(var(--an-mobile-nav-offset)+1rem)] sm:px-6 lg:px-8 lg:py-8 lg:pb-8"
+          id="admin-main-content"
+          tabIndex={-1}
+        >
+          {notice}
           {children}
         </main>
       </div>
-
-      <nav aria-label={t.workspace} className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-[var(--an-border)] bg-[color:rgba(11,17,24,.96)] px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
-        {mobileNavigation.map(({ key, href, icon: Icon }) => {
-          return (
-            <Link className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold text-[var(--an-muted)]" data-admin-next-nav={key} href={href} key={key}>
-              <Icon aria-hidden="true" className="size-5" />
-              {t.nav[key]}
-            </Link>
-          );
-        })}
-      </nav>
+      <div
+        className="fixed inset-x-0 bottom-0 z-50 min-h-[var(--an-mobile-nav-offset)] border-t border-[var(--an-border)] bg-[color:rgba(11,17,24,.96)] px-2 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"
+        data-admin-mobile-navigation
+      >
+        <UnifiedAdminNavigation
+          customerContentNotice={customerContentNotice}
+          locale={locale}
+          mobile
+          mode={mode}
+        />
+      </div>
     </div>
   );
 }

@@ -1,0 +1,498 @@
+{
+  "baseUrl": "http://localhost:3100",
+  "captures": [
+    {
+      "detailRect": {
+        "x": 16,
+        "y": 2281,
+        "width": 343,
+        "height": 872.5,
+        "top": 2281,
+        "right": 359,
+        "bottom": 3153.5,
+        "left": 16
+      },
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "mainPaddingBottomPx": 96,
+      "masterRect": {
+        "x": 16,
+        "y": 881.5,
+        "width": 343,
+        "height": 1379.5,
+        "top": 881.5,
+        "right": 359,
+        "bottom": 2261,
+        "left": 16
+      },
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "queueChoices": [
+        {
+          "clipped": false,
+          "label": "Visos",
+          "rect": {
+            "x": 37,
+            "y": 414.5,
+            "width": 97.65625,
+            "height": 40,
+            "top": 414.5,
+            "right": 134.65625,
+            "bottom": 454.5,
+            "left": 37
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Mano",
+          "rect": {
+            "x": 138.65625,
+            "y": 414.5,
+            "width": 97.671875,
+            "height": 40,
+            "top": 414.5,
+            "right": 236.328125,
+            "bottom": 454.5,
+            "left": 138.65625
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Vėluoja",
+          "rect": {
+            "x": 240.328125,
+            "y": 414.5,
+            "width": 97.65625,
+            "height": 40,
+            "top": 414.5,
+            "right": 337.984375,
+            "bottom": 454.5,
+            "left": 240.328125
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Laukia",
+          "rect": {
+            "x": 37,
+            "y": 458.5,
+            "width": 97.65625,
+            "height": 40,
+            "top": 458.5,
+            "right": 134.65625,
+            "bottom": 498.5,
+            "left": 37
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Užblokuota",
+          "rect": {
+            "x": 138.65625,
+            "y": 458.5,
+            "width": 97.671875,
+            "height": 40,
+            "top": 458.5,
+            "right": 236.328125,
+            "bottom": 498.5,
+            "left": 138.65625
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Nepriskirta",
+          "rect": {
+            "x": 240.328125,
+            "y": 458.5,
+            "width": 97.65625,
+            "height": 40,
+            "top": 458.5,
+            "right": 337.984375,
+            "bottom": 498.5,
+            "left": 240.328125
+          }
+        }
+      ],
+      "queueFilterOverflowPx": 0,
+      "fixtureNextCursor": null,
+      "fixtureNextPageLinkCount": 0,
+      "focusedControlCount": 15,
+      "height": 812,
+      "interactionContractPassed": true,
+      "selectionFailClosedPassed": true,
+      "syntheticReadOnlyPassed": true,
+      "urlPersistencePassed": true,
+      "width": 375
+    },
+    {
+      "detailRect": {
+        "x": 24,
+        "y": 1955,
+        "width": 720,
+        "height": 678.25,
+        "top": 1955,
+        "right": 744,
+        "bottom": 2633.25,
+        "left": 24
+      },
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "mainPaddingBottomPx": 96,
+      "masterRect": {
+        "x": 24,
+        "y": 752,
+        "width": 720,
+        "height": 1183,
+        "top": 752,
+        "right": 744,
+        "bottom": 1935,
+        "left": 24
+      },
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "queueChoices": [
+        {
+          "clipped": false,
+          "label": "Visos",
+          "rect": {
+            "x": 49,
+            "y": 403,
+            "width": 53.3125,
+            "height": 40,
+            "top": 403,
+            "right": 102.3125,
+            "bottom": 443,
+            "left": 49
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Mano",
+          "rect": {
+            "x": 106.3125,
+            "y": 403,
+            "width": 56.546875,
+            "height": 40,
+            "top": 403,
+            "right": 162.859375,
+            "bottom": 443,
+            "left": 106.3125
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Vėluoja",
+          "rect": {
+            "x": 166.859375,
+            "y": 403,
+            "width": 65.75,
+            "height": 40,
+            "top": 403,
+            "right": 232.609375,
+            "bottom": 443,
+            "left": 166.859375
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Laukia",
+          "rect": {
+            "x": 236.609375,
+            "y": 403,
+            "width": 60.4375,
+            "height": 40,
+            "top": 403,
+            "right": 297.046875,
+            "bottom": 443,
+            "left": 236.609375
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Užblokuota",
+          "rect": {
+            "x": 301.046875,
+            "y": 403,
+            "width": 89.046875,
+            "height": 40,
+            "top": 403,
+            "right": 390.09375,
+            "bottom": 443,
+            "left": 301.046875
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Nepriskirta",
+          "rect": {
+            "x": 394.09375,
+            "y": 403,
+            "width": 87.296875,
+            "height": 40,
+            "top": 403,
+            "right": 481.390625,
+            "bottom": 443,
+            "left": 394.09375
+          }
+        }
+      ],
+      "queueFilterOverflowPx": 0,
+      "fixtureNextCursor": null,
+      "fixtureNextPageLinkCount": 0,
+      "focusedControlCount": 15,
+      "height": 1024,
+      "interactionContractPassed": true,
+      "selectionFailClosedPassed": true,
+      "syntheticReadOnlyPassed": true,
+      "urlPersistencePassed": true,
+      "width": 768
+    },
+    {
+      "detailRect": {
+        "x": 288,
+        "y": 1967,
+        "width": 704,
+        "height": 678.25,
+        "top": 1967,
+        "right": 992,
+        "bottom": 2645.25,
+        "left": 288
+      },
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "mainPaddingBottomPx": 32,
+      "masterRect": {
+        "x": 288,
+        "y": 764,
+        "width": 704,
+        "height": 1183,
+        "top": 764,
+        "right": 992,
+        "bottom": 1947,
+        "left": 288
+      },
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "queueChoices": [
+        {
+          "clipped": false,
+          "label": "Visos",
+          "rect": {
+            "x": 313,
+            "y": 415,
+            "width": 53.3125,
+            "height": 40,
+            "top": 415,
+            "right": 366.3125,
+            "bottom": 455,
+            "left": 313
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Mano",
+          "rect": {
+            "x": 370.3125,
+            "y": 415,
+            "width": 56.546875,
+            "height": 40,
+            "top": 415,
+            "right": 426.859375,
+            "bottom": 455,
+            "left": 370.3125
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Vėluoja",
+          "rect": {
+            "x": 430.859375,
+            "y": 415,
+            "width": 65.75,
+            "height": 40,
+            "top": 415,
+            "right": 496.609375,
+            "bottom": 455,
+            "left": 430.859375
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Laukia",
+          "rect": {
+            "x": 500.609375,
+            "y": 415,
+            "width": 60.4375,
+            "height": 40,
+            "top": 415,
+            "right": 561.046875,
+            "bottom": 455,
+            "left": 500.609375
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Užblokuota",
+          "rect": {
+            "x": 565.046875,
+            "y": 415,
+            "width": 89.046875,
+            "height": 40,
+            "top": 415,
+            "right": 654.09375,
+            "bottom": 455,
+            "left": 565.046875
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Nepriskirta",
+          "rect": {
+            "x": 658.09375,
+            "y": 415,
+            "width": 87.296875,
+            "height": 40,
+            "top": 415,
+            "right": 745.390625,
+            "bottom": 455,
+            "left": 658.09375
+          }
+        }
+      ],
+      "queueFilterOverflowPx": 0,
+      "fixtureNextCursor": null,
+      "fixtureNextPageLinkCount": 0,
+      "focusedControlCount": 0,
+      "height": 900,
+      "interactionContractPassed": true,
+      "selectionFailClosedPassed": true,
+      "syntheticReadOnlyPassed": true,
+      "urlPersistencePassed": true,
+      "width": 1024
+    },
+    {
+      "detailRect": {
+        "x": 759,
+        "y": 491,
+        "width": 649,
+        "height": 678.25,
+        "top": 491,
+        "right": 1408,
+        "bottom": 1169.25,
+        "left": 759
+      },
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "mainPaddingBottomPx": 32,
+      "masterRect": {
+        "x": 288,
+        "y": 491,
+        "width": 451,
+        "height": 1245.75,
+        "top": 491,
+        "right": 739,
+        "bottom": 1736.75,
+        "left": 288
+      },
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "queueChoices": [
+        {
+          "clipped": false,
+          "label": "Visos",
+          "rect": {
+            "x": 313,
+            "y": 276,
+            "width": 53.3125,
+            "height": 40,
+            "top": 276,
+            "right": 366.3125,
+            "bottom": 316,
+            "left": 313
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Mano",
+          "rect": {
+            "x": 370.3125,
+            "y": 276,
+            "width": 56.546875,
+            "height": 40,
+            "top": 276,
+            "right": 426.859375,
+            "bottom": 316,
+            "left": 370.3125
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Vėluoja",
+          "rect": {
+            "x": 430.859375,
+            "y": 276,
+            "width": 65.75,
+            "height": 40,
+            "top": 276,
+            "right": 496.609375,
+            "bottom": 316,
+            "left": 430.859375
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Laukia",
+          "rect": {
+            "x": 500.609375,
+            "y": 276,
+            "width": 60.4375,
+            "height": 40,
+            "top": 276,
+            "right": 561.046875,
+            "bottom": 316,
+            "left": 500.609375
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Užblokuota",
+          "rect": {
+            "x": 565.046875,
+            "y": 276,
+            "width": 89.046875,
+            "height": 40,
+            "top": 276,
+            "right": 654.09375,
+            "bottom": 316,
+            "left": 565.046875
+          }
+        },
+        {
+          "clipped": false,
+          "label": "Nepriskirta",
+          "rect": {
+            "x": 658.09375,
+            "y": 276,
+            "width": 87.296875,
+            "height": 40,
+            "top": 276,
+            "right": 745.390625,
+            "bottom": 316,
+            "left": 658.09375
+          }
+        }
+      ],
+      "queueFilterOverflowPx": 0,
+      "fixtureNextCursor": null,
+      "fixtureNextPageLinkCount": 0,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "interactionContractPassed": true,
+      "selectionFailClosedPassed": true,
+      "syntheticReadOnlyPassed": true,
+      "urlPersistencePassed": true,
+      "width": 1440
+    }
+  ],
+  "pngWritten": true
+}

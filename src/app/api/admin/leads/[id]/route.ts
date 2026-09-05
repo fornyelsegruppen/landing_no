@@ -8,11 +8,15 @@ import { createEmailProvider } from "@/lib/providers/email-provider";
 import {
   assertCustomerReplyDeliveryTrackingReady,
   createCustomerReplyDraft,
+  createManualLeadReplyDraft,
   createManualCustomerQuestionReplyDraft,
   createLeadAiReply,
   deliverMessage,
   enqueueMessageJob,
-  manualQuestionReplyPlaceholder,
+  isManualReplyDraftAnalysis,
+  isManualReplyPlaceholder,
+  messageDeliveryRequiresReconciliation,
+  MessageDeliveryReconciliationRequiredError,
 } from "@/lib/messages/message-engine";
 import { assertMessageCanQueue } from "@/lib/messages/message-policy";
 import {
@@ -54,6 +58,8 @@ import {
   assertPaymentReminderInvoiceReady,
   paymentReminderPrefix,
 } from "@/lib/invoices/payment-reminder-policy";
+import { resolvePreviewE2eOperatorCapabilities } from "@/lib/admin-next/preview-e2e-operator-capabilities";
+import type { CaseNextActionCapability } from "@/lib/admin-v2/case-next-action-presentation";
 
 export const maxDuration = 60;
 
@@ -70,11 +76,16 @@ const actionSchema = z
   .discriminatedUnion("action", [
     z.object({ action: z.literal("generate_reply") }),
     z.object({
+      action: z.literal("prepare_manual_reply"),
+      expectedRevision: z.number().int().positive(),
+    }),
+    z.object({
       action: z.literal("prepare_question_reply"),
       sourceMessageId: z.number().int().positive(),
     }),
     z.object({
       action: z.literal("prepare_manual_question_reply"),
+      expectedRevision: z.number().int().positive(),
       sourceMessageId: z.number().int().positive(),
     }),
     z.object({ action: z.literal("prepare_package") }),
@@ -150,6 +161,102 @@ function relationId(value: unknown) {
   )
     return (value as { id: number }).id;
   return null;
+}
+
+const previewReplyActionCapabilities: Readonly<
+  Partial<Record<string, readonly CaseNextActionCapability[]>>
+> = {
+  generate_reply: ["case.reply.prepare"],
+  prepare_manual_reply: ["case.reply.prepare"],
+  prepare_question_reply: ["case.question.reply.prepare"],
+  prepare_manual_question_reply: ["case.question.reply.prepare"],
+  save_draft: ["case.reply.prepare", "case.question.reply.prepare"],
+  cancel_draft: ["case.reply.prepare", "case.question.reply.prepare"],
+  polish_reply: ["case.reply.prepare", "case.question.reply.prepare"],
+  regenerate_reply: ["case.reply.prepare", "case.question.reply.prepare"],
+  approve_send: ["message.approve_send"],
+  retry_send: ["message.retry_send"],
+};
+
+function previewReplyMutationIsGranted(
+  action: string,
+  granted: readonly CaseNextActionCapability[],
+) {
+  const accepted = previewReplyActionCapabilities[action];
+  return (
+    !accepted || accepted.some((capability) => granted.includes(capability))
+  );
+}
+
+function messageIsCustomerReply(message: {
+  aiAnalysis?: unknown;
+  category?: string | null;
+  replyToMessage?: unknown;
+}) {
+  const analysis =
+    message.aiAnalysis &&
+    typeof message.aiAnalysis === "object" &&
+    !Array.isArray(message.aiAnalysis)
+      ? (message.aiAnalysis as Record<string, unknown>)
+      : {};
+  return (
+    message.category === "ai_reply" ||
+    isManualReplyDraftAnalysis(analysis) ||
+    typeof analysis.purpose === "string" ||
+    relationId(message.replyToMessage) !== null
+  );
+}
+
+async function assertCustomerReplyTargetsActiveQuestion(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  leadId: number,
+  message: {
+    aiAnalysis?: unknown;
+    category?: string | null;
+    id: number;
+    replyToMessage?: unknown;
+  },
+) {
+  if (!messageIsCustomerReply(message)) return;
+  const unresolved = await loadUnresolvedCustomerQuestion(payload, leadId);
+  const targetId = relationId(message.replyToMessage);
+  if (
+    unresolved &&
+    (targetId !== unresolved.question.id || unresolved.reply?.id !== message.id)
+  ) {
+    throw new TypeError(
+      "Only the active reply bound to the oldest unanswered customer question can be approved",
+    );
+  }
+  if (!unresolved && targetId !== null) {
+    throw new TypeError(
+      "This customer question is no longer active. Refresh before approving the reply",
+    );
+  }
+}
+
+async function assertNoInFlightMessageDelivery(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  messageId: number,
+) {
+  const existing = await payload.find({
+    collection: "operational-jobs",
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    where: {
+      idempotencyKey: {
+        equals: makeIdempotencyKey("message.delivery", { messageId }),
+      },
+    },
+  });
+  if (
+    ["pending", "retry", "running"].includes(existing.docs[0]?.status || "")
+  ) {
+    throw new TypeError(
+      "A delivery attempt is already in progress. Reconcile it before retrying",
+    );
+  }
 }
 
 async function assertCustomerReplySourcesForAction(
@@ -274,6 +381,21 @@ export async function POST(
     const parsed = actionSchema.safeParse(await request.json());
     if (!parsed.success)
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    if (process.env.VERCEL_ENV === "preview") {
+      const granted = resolvePreviewE2eOperatorCapabilities({
+        role: user.role,
+      });
+      if (!previewReplyMutationIsGranted(parsed.data.action, granted)) {
+        return NextResponse.json(
+          {
+            code: "PREVIEW_CAPABILITY_REQUIRED",
+            error:
+              "This Preview account is not allowed to perform that customer-message action.",
+          },
+          { status: 403 },
+        );
+      }
+    }
     const lead = await payload.findByID({
       collection: "leads",
       id: leadId,
@@ -316,6 +438,17 @@ export async function POST(
         messageId: generated.message.id,
         duplicate: generated.duplicate,
       };
+    } else if (parsed.data.action === "prepare_manual_reply") {
+      const prepared = await createManualLeadReplyDraft(payload, {
+        correlationId,
+        expectedRevision: parsed.data.expectedRevision,
+        leadId,
+      });
+      result = {
+        messageId: prepared.message.id,
+        duplicate: prepared.duplicate,
+        manual: true,
+      };
     } else if (parsed.data.action === "prepare_question_reply") {
       assertFeatureReady("aiDrafts");
       await assertQuestionReplyCanBePrepared(
@@ -346,6 +479,7 @@ export async function POST(
       );
       const prepared = await createManualCustomerQuestionReplyDraft(payload, {
         correlationId,
+        expectedRevision: parsed.data.expectedRevision,
         leadId,
         sourceMessageId: parsed.data.sourceMessageId,
       });
@@ -389,10 +523,10 @@ export async function POST(
         message.aiAnalysis && typeof message.aiAnalysis === "object"
           ? (message.aiAnalysis as Record<string, unknown>)
           : {};
-      const manualQuestionReply = analysis.manualQuestionReply === true;
+      const manualReplyDraft = isManualReplyDraftAnalysis(analysis);
       if (
-        manualQuestionReply &&
-        parsed.data.bodyText.trim() === manualQuestionReplyPlaceholder
+        manualReplyDraft &&
+        isManualReplyPlaceholder(parsed.data.bodyText, analysis)
       ) {
         throw new TypeError(
           "Write and save a customer-specific answer before sending",
@@ -415,7 +549,7 @@ export async function POST(
           subject: parsed.data.subject,
           bodyText: parsed.data.bodyText,
           bodyHtml: null,
-          ...(manualQuestionReply
+          ...(manualReplyDraft
             ? {
                 aiAnalysis: {
                   ...analysis,
@@ -473,6 +607,7 @@ export async function POST(
         recoveryMode === "manual"
           ? await createManualCustomerQuestionReplyDraft(payload, {
               correlationId,
+              expectedRevision: currentRevision,
               generationKey,
               leadId,
               sourceMessageId,
@@ -575,6 +710,21 @@ export async function POST(
           { error: "Message does not belong to lead" },
           { status: 409 },
         );
+      if (
+        messageIsCustomerReply(message) &&
+        (["closed", "converted"].includes(lead.status || "") ||
+          ["archived", "trashed"].includes(lead.recordState || ""))
+      ) {
+        throw new TypeError(
+          "Customer replies cannot be approved or retried for a closed, converted or archived case",
+        );
+      }
+      if (
+        parsed.data.action === "retry_send" &&
+        messageDeliveryRequiresReconciliation(message)
+      ) {
+        throw new MessageDeliveryReconciliationRequiredError();
+      }
       let replyPurpose: "question" | "decline" | "cancellation" | undefined;
       let approvedBodyText =
         parsed.data.action === "approve_send"
@@ -597,13 +747,18 @@ export async function POST(
             ? (message.aiAnalysis as Record<string, unknown>)
             : {};
         if (
-          analysis.manualReplyRequiresEditing === true &&
-          parsed.data.bodyText.trim() === manualQuestionReplyPlaceholder
+          isManualReplyDraftAnalysis(analysis) &&
+          isManualReplyPlaceholder(parsed.data.bodyText, analysis)
         ) {
           throw new TypeError(
             "Write and save a customer-specific answer before sending",
           );
         }
+        await assertCustomerReplyTargetsActiveQuestion(
+          payload,
+          leadId,
+          message,
+        );
         const currentSources = await assertCustomerReplySourcesForAction(
           payload,
           message,
@@ -632,6 +787,7 @@ export async function POST(
         );
       }
       if (parsed.data.action === "retry_send") {
+        await assertNoInFlightMessageDelivery(payload, message.id);
         const currentSources = await assertCustomerReplySourcesForAction(
           payload,
           message,
@@ -717,7 +873,9 @@ export async function POST(
             approvedBy: user.id,
             approvedAt: now,
             queuedAt: now,
-            ...(analysis.manualQuestionReply === true
+            ...(analysis.manualQuestionReply === true ||
+            analysis.manualLeadReply === true ||
+            analysis.manualReplyDraft === true
               ? {
                   aiAnalysis: {
                     ...analysis,
@@ -744,10 +902,22 @@ export async function POST(
           previousDeliveryAttempt >= 1
             ? previousDeliveryAttempt + 1
             : 1;
-        queued = await payload.update({
+        if (typeof message.updatedAt !== "string" || !message.updatedAt) {
+          throw new MessageRevisionConflictError();
+        }
+        const retryQueueResult = await payload.update({
           collection: "messages",
-          id: message.id,
           overrideAccess: true,
+          where: {
+            and: [
+              { id: { equals: message.id } },
+              { lead: { equals: leadId } },
+              { status: { equals: message.status } },
+              { updatedAt: { equals: message.updatedAt } },
+              { sentAt: { equals: null } },
+              { providerMessageId: { equals: null } },
+            ],
+          },
           data: {
             status: "queued",
             approvedBy: message.approvedBy,
@@ -757,12 +927,12 @@ export async function POST(
               ...retryAnalysis,
               deliveryAttempt,
             },
-            sentAt: null,
-            deliveredAt: null,
-            provider: null,
-            providerMessageId: null,
           },
         });
+        queued = retryQueueResult.docs?.[0];
+        if (!queued) {
+          throw new MessageRevisionConflictError();
+        }
       }
       const job = await enqueueMessageJob(
         payload,
@@ -971,6 +1141,12 @@ export async function POST(
           address: parsed.data.address,
           postal: parsed.data.postal,
           city: parsed.data.city || null,
+          addressVerificationStatus: "unverified",
+          addressVerificationProvider: null,
+          addressVerificationProviderId: null,
+          addressLatitude: null,
+          addressLongitude: null,
+          addressVerifiedAt: null,
           inquiryType: parsed.data.inquiryType,
           nextAction: "Finn og kontroller riktig bygning.",
           nextActionOwner: "administrator",
@@ -1110,6 +1286,14 @@ export async function POST(
         {
           error: error.message,
           code: "MESSAGE_REVISION_CONFLICT",
+        },
+        { status: 409 },
+      );
+    if (error instanceof MessageDeliveryReconciliationRequiredError)
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: "MESSAGE_DELIVERY_RECONCILIATION_REQUIRED",
         },
         { status: 409 },
       );

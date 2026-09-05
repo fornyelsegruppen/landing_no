@@ -1,0 +1,1184 @@
+{
+  "baseUrl": "http://localhost:3100",
+  "captureCount": 22,
+  "captures": [
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 1,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-next-preview/cases/9001/measurements/9101",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "executable_measurement_review",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 1,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-next-preview/cases/9001/measurements/9101",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "executable_measurement_review",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 9,
+      "height": 1024,
+      "historyDisclosureToggled": true,
+      "width": 768,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 1,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-next-preview/cases/9001/measurements/9101",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "executable_measurement_review",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 900,
+      "historyDisclosureToggled": true,
+      "width": 1024,
+      "zoom": {
+        "documentOverflowPx": 0,
+        "linkClipping": [],
+        "navigationOverflowPx": 0,
+        "simulatedCssViewport": {
+          "height": 450,
+          "width": 512
+        },
+        "workspaceOverflowPx": 0
+      }
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 1,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-next-preview/cases/9001/measurements/9101",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "executable_measurement_review",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": {
+        "documentOverflowPx": 0,
+        "linkClipping": [],
+        "navigationOverflowPx": 0,
+        "simulatedCssViewport": {
+          "height": 500,
+          "width": 720
+        },
+        "workspaceOverflowPx": 0
+      }
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 2,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "waiting_customer",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 2,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "waiting_customer",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 9,
+      "height": 1024,
+      "historyDisclosureToggled": true,
+      "width": 768,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 2,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "waiting_customer",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 900,
+      "historyDisclosureToggled": true,
+      "width": 1024,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 2,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "waiting_customer",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 4,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-v2/cases/9003?target=work_order%3A9303",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "overdue_unassigned",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 4,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-v2/cases/9003?target=work_order%3A9303",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "overdue_unassigned",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 1,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 4,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-v2/cases/9004?target=work_order%3A9404",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "blocked_work_recovery",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 1,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 4,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-v2/cases/9004?target=work_order%3A9404",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "blocked_work_recovery",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 9,
+      "height": 1024,
+      "historyDisclosureToggled": true,
+      "width": 768,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 1,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 4,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-v2/cases/9004?target=work_order%3A9404",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "blocked_work_recovery",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 900,
+      "historyDisclosureToggled": true,
+      "width": 1024,
+      "zoom": {
+        "documentOverflowPx": 0,
+        "linkClipping": [],
+        "navigationOverflowPx": 0,
+        "simulatedCssViewport": {
+          "height": 450,
+          "width": 512
+        },
+        "workspaceOverflowPx": 0
+      }
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "ready",
+          "text": "Golden būsena suprojektuota14:00Būsena suprojektuota iš patikrintų sintetinių duomenų.Fixture projekcija"
+        }
+      ],
+      "blockerCount": 1,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 4,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "ready",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": true,
+      "primaryHref": "/admin-v2/cases/9004?target=work_order%3A9404",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "blocked_work_recovery",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": {
+        "documentOverflowPx": 0,
+        "linkClipping": [],
+        "navigationOverflowPx": 0,
+        "simulatedCssViewport": {
+          "height": 500,
+          "width": 720
+        },
+        "workspaceOverflowPx": 0
+      }
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "denied",
+          "text": "Neturite teisės peržiūrėti audito istorijos."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 3,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "denied",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "capability_read_only",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "denied",
+          "text": "Neturite teisės peržiūrėti audito istorijos."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 3,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "denied",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "capability_read_only",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "unavailable",
+          "text": "Audito istorija laikinai nepasiekiama."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 2,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "unavailable",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "target_unavailable",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "unavailable",
+          "text": "Audito istorija laikinai nepasiekiama."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 2,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 1,
+      "currentStageLabels": 1,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "unavailable",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "target_unavailable",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 6,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 0,
+      "currentStageLabels": 0,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "completed_no_action",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 10,
+      "height": 812,
+      "historyDisclosureToggled": true,
+      "width": 375,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 6,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 0,
+      "currentStageLabels": 0,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 96,
+      "mobileNavigationHeightPx": 80,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "completed_no_action",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 9,
+      "height": 1024,
+      "historyDisclosureToggled": true,
+      "width": 768,
+      "zoom": null
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 1,
+      "caseTitleClipped": false,
+      "completeStageLabels": 6,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 0,
+      "currentStageLabels": 0,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": true,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "completed_no_action",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 900,
+      "historyDisclosureToggled": true,
+      "width": 1024,
+      "zoom": {
+        "documentOverflowPx": 0,
+        "linkClipping": [],
+        "navigationOverflowPx": 0,
+        "simulatedCssViewport": {
+          "height": 450,
+          "width": 512
+        },
+        "workspaceOverflowPx": 0
+      }
+    },
+    {
+      "auditStateCount": 1,
+      "auditStates": [
+        {
+          "state": "empty",
+          "text": "Šiai bylai audito įvykių neužregistruota."
+        }
+      ],
+      "blockerCount": 0,
+      "caseHeaderColumnCount": 2,
+      "caseTitleClipped": false,
+      "completeStageLabels": 6,
+      "contextCurrentCount": 1,
+      "contextHrefs": [
+        "#case-summary",
+        "#case-evidence",
+        "#case-history"
+      ],
+      "contextLinkCount": 3,
+      "contextNavigationOverflowPx": 0,
+      "contextTargetIds": [
+        "case-summary",
+        "case-evidence",
+        "case-history"
+      ],
+      "currentAriaCount": 0,
+      "currentStageLabels": 0,
+      "documentOverflowPx": 0,
+      "headerOverlaps": [],
+      "historyContentVisible": true,
+      "historyRailOpen": true,
+      "historyStateSummary": "empty",
+      "historySummaryVisible": false,
+      "mainPaddingBottomPx": 32,
+      "mobileNavigationHeightPx": 0,
+      "mobileNavigationOverflowPx": 0,
+      "primaryActionClass": false,
+      "primaryHref": "/admin-v2/cases",
+      "primaryLinkCount": 1,
+      "stageCount": 6,
+      "stageOverlaps": [],
+      "stageTextClipped": [],
+      "stateId": "completed_no_action",
+      "totalAuditStateCount": 1,
+      "contextKeyboardActivationCount": 3,
+      "focusedControlCount": 0,
+      "height": 1000,
+      "historyDisclosureToggled": false,
+      "width": 1440,
+      "zoom": {
+        "documentOverflowPx": 0,
+        "linkClipping": [],
+        "navigationOverflowPx": 0,
+        "simulatedCssViewport": {
+          "height": 500,
+          "width": 720
+        },
+        "workspaceOverflowPx": 0
+      }
+    }
+  ],
+  "fixtureRoute": "/admin-next-case-golden-fixture",
+  "invalidStateReturned404": true
+}

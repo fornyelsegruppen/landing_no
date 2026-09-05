@@ -43,4 +43,43 @@ describe("ResendEmailProvider", () => {
       }],
     }), { idempotencyKey: "contract-signed:12" });
   });
+
+  it("brands and restricts a real Preview send to the exact allowlist", async () => {
+    const provider = new ResendEmailProvider({
+      NODE_ENV: "test",
+      VERCEL_ENV: "preview",
+      RESEND_API_KEY: "test-key",
+      LEAD_FROM_EMAIL: "post@takfornyelse.as",
+      PREVIEW_EMAIL_RECIPIENT_ALLOWLIST: "fornyelsegruppen@gmail.com",
+    });
+
+    await provider.send({
+      template: "quote",
+      to: "fornyelsegruppen@gmail.com",
+      subject: "Tilbud TF-9",
+      text: "Test",
+      idempotencyKey: "preview-quote:9",
+      correlationId: "preview-quote-9",
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "fornyelsegruppen@gmail.com",
+        subject: "[PREVIEW TEST] Tilbud TF-9",
+      }),
+      { idempotencyKey: "preview-quote:9" },
+    );
+
+    await expect(
+      provider.send({
+        template: "quote",
+        to: "other@example.no",
+        subject: "Tilbud TF-10",
+        text: "Test",
+        idempotencyKey: "preview-quote:10",
+        correlationId: "preview-quote-10",
+      }),
+    ).rejects.toMatchObject({ reason: "recipient_not_allowed" });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
 });

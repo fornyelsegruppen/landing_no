@@ -92,7 +92,7 @@ function fixture(input?: {
     store: {
       async saveFinal(entry) {
         saved.push(entry);
-        return { mediaId: "private-media-42" };
+        return { mediaId: "private-media-42", rawContentHash: "a".repeat(64) };
       },
     },
   });
@@ -117,6 +117,7 @@ describe("Norge i bilder server capture policy", () => {
       capturedAt: expect.any(String),
       attribution: NORGE_I_BILDER_ATTRIBUTION,
       source: "norge-i-bilder-screenshot",
+      rawContentHash: "a".repeat(64),
       attempts: 1,
       geoReference: {
         crs: "EPSG:25833",

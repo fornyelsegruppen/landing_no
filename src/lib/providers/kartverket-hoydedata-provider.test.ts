@@ -84,6 +84,108 @@ describe("Kartverket Høydedata provider", () => {
     ).toBe(true);
   });
 
+  it.each(["network", "abort", "429", "503"] as const)(
+    "retries each DOM/DTM read once for a transient %s failure and uses no-store",
+    async (failure) => {
+      const attempts = new Map<string, number>();
+      const fetcher = async (
+        input: RequestInfo | URL,
+        init?: RequestInit & { next?: unknown },
+      ) => {
+        const url = new URL(String(input));
+        const coverage = url.searchParams.get("coverage") ?? "unknown";
+        const attempt = (attempts.get(coverage) ?? 0) + 1;
+        attempts.set(coverage, attempt);
+        expect(init?.cache).toBe("no-store");
+        expect(init?.next).toBeUndefined();
+        if (attempt === 1) {
+          if (failure === "network") throw new TypeError("socket reset");
+          if (failure === "abort") {
+            throw new DOMException("request timed out", "AbortError");
+          }
+          return new Response("temporary", { status: Number(failure) });
+        }
+        const width = Number(url.searchParams.get("width"));
+        const height = Number(url.searchParams.get("height"));
+        const body = await constantTiff(
+          width,
+          height,
+          coverage.includes("_dom_") ? 20 : 5,
+        );
+        return new Response(body, {
+          status: 200,
+          headers: { "Content-Type": "image/tiff" },
+        });
+      };
+
+      await expect(
+        new KartverketHeightDataProvider(fetcher as typeof fetch).getSurface({
+          polygon,
+          cacheMode: "no-store",
+          deadlineAtMs: Date.now() + 5_000,
+        }),
+      ).resolves.toMatchObject({ quality: { coverageRatio: 1 } });
+      expect([...attempts.values()]).toEqual([2, 2]);
+    },
+  );
+
+  it.each([
+    "400",
+    "404",
+    "xml",
+    "oversized",
+    "invalid_tiff",
+    "non_transport_error",
+  ] as const)("does not retry a non-retriable %s response", async (failure) => {
+    let calls = 0;
+    const fetcher = async () => {
+      calls += 1;
+      if (failure === "non_transport_error") {
+        throw new Error("unexpected client failure");
+      }
+      if (failure === "400" || failure === "404")
+        return new Response("bad request", { status: Number(failure) });
+      if (failure === "xml") {
+        return new Response("<ServiceExceptionReport />", {
+          status: 200,
+          headers: { "Content-Type": "application/vnd.ogc.se_xml" },
+        });
+      }
+      if (failure === "oversized") {
+        return new Response(new Uint8Array([1]), {
+          status: 200,
+          headers: {
+            "Content-Type": "image/tiff",
+            "Content-Length": "2000001",
+          },
+        });
+      }
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "Content-Type": "image/tiff" },
+      });
+    };
+    await expect(
+      new KartverketHeightDataProvider(fetcher as typeof fetch).getSurface({
+        polygon,
+        cacheMode: "no-store",
+      }),
+    ).rejects.toBeInstanceOf(KartverketHeightDataError);
+    expect(calls).toBe(2);
+  });
+
+  it("does not start a retry after the action budget is exhausted", async () => {
+    let calls = 0;
+    const provider = new KartverketHeightDataProvider((async () => {
+      calls += 1;
+      throw new TypeError("must not be called");
+    }) as typeof fetch);
+    await expect(
+      provider.getSurface({ polygon, deadlineAtMs: Date.now() - 1 }),
+    ).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
+    expect(calls).toBe(0);
+  });
+
   it("fails closed when a status-200 WCS exception is returned", async () => {
     const provider = new KartverketHeightDataProvider(
       (async () =>

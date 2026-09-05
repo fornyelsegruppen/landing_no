@@ -11,6 +11,7 @@ import {
 import Image from "next/image";
 import { CalendarDays, CircleX } from "lucide-react";
 import { norwayDateKey } from "@/lib/norway-time";
+import type { PreviewNonbindingDocumentBrand } from "@/lib/platform/preview-nonbinding-documents";
 
 type Display = {
   reference: string;
@@ -194,6 +195,80 @@ export function CustomerQuoteDeclinedNotice(props: { reference: string }) {
   );
 }
 
+export function CustomerQuoteNonbindingNotice(props: {
+  brand: PreviewNonbindingDocumentBrand;
+}) {
+  return (
+    <section
+      aria-label={props.brand.marker}
+      className="mb-8 rounded-2xl border-2 border-red-400 bg-red-950/80 p-5 text-red-50 shadow-lg sm:p-6"
+      role="alert"
+    >
+      <p className="text-sm font-black tracking-[.12em] uppercase">
+        {props.brand.marker}
+      </p>
+      <p className="mt-2 text-base leading-7 font-bold">
+        {props.brand.description}
+      </p>
+    </section>
+  );
+}
+
+export function customerQuoteSigningCopy(
+  nonbindingBrand?: PreviewNonbindingDocumentBrand,
+) {
+  if (nonbindingBrand) {
+    return {
+      heading: "Registrer en ikke-bindende testsignatur",
+      introduction:
+        "Kontroller testdokumentet. Bekreftelsene nedenfor brukes bare til å verifisere Preview-flyten.",
+      termsConsent:
+        "Jeg bekrefter at jeg har lest testtilbudet og de viste testvilkårene.",
+      withdrawalConsent:
+        "Jeg bekrefter at testflyten viser informasjon om angrerett og standard angreskjema.",
+      paymentConsent:
+        "Jeg forstår at denne Preview-testen ikke oppretter en bestilling eller betalingsplikt.",
+      earlyStartConsent:
+        "Jeg tester det valgfrie feltet for tidlig oppstart. Ingen reelt arbeid bestilles eller startes.",
+      earlyLossConsent:
+        "Jeg tester den betingede bekreftelsen. Den har ingen rettslig eller økonomisk virkning.",
+      partyHeading: "Testperson og testsignatur",
+      nameHelp:
+        "Navnet er hentet fra testhenvendelsen og låst til testdokumentet.",
+      signatureLegend: "Tegn testsignaturen i feltet",
+      clearSignature: "Tøm testsignaturfeltet",
+      pending: "Registrerer testsignatur …",
+      submit: "Registrer ikke-bindende testsignatur",
+      success:
+        "Testsignaturen er registrert for kontroll av Preview-flyten. Den oppretter ingen bindende bestilling, betalingsplikt eller arbeidsoppstart.",
+    };
+  }
+
+  return {
+    heading: "Godta og signer",
+    introduction:
+      "Kontroller sammendraget og velg selv om du vil åpne den fullstendige teksten før du bekrefter.",
+    termsConsent: "Jeg har lest og godtar tilbudet og avtalevilkårene.",
+    withdrawalConsent:
+      "Jeg har mottatt informasjon om 14 dagers angrerett og standard angreskjema.",
+    paymentConsent:
+      "Jeg forstår at bestillingen medfører plikt til å betale avtalt pris.",
+    earlyStartConsent:
+      "Jeg ber uttrykkelig om at arbeidet kan starte før angrefristen er utløpt (valgfritt).",
+    earlyLossConsent:
+      "Jeg forstår at angreretten går tapt når tjenesten er fullt utført, og at jeg kan måtte betale forholdsmessig for arbeid som er utført før jeg angrer.",
+    partyHeading: "Avtalepart og underskriver",
+    nameHelp:
+      "Navnet er hentet fra henvendelsen og låst til dette dokumentet. Kontakt Takfornyelse før signering dersom navnet må korrigeres.",
+    signatureLegend: "Tegn signaturen i feltet",
+    clearSignature: "Tøm signaturfeltet",
+    pending: "Signerer …",
+    submit: "Bestilling med forpliktelse til å betale og signer",
+    success:
+      "Signaturen din er mottatt. Takfornyelse kontrollerer og medsignerer avtalen før den endelige kopien sendes til deg.",
+  };
+}
+
 export type CustomerContractRequestKind = "change_or_cancel" | "withdrawal";
 
 export type CustomerContractRequestStatus =
@@ -252,6 +327,7 @@ function preferredCustomerQuoteScrollBehavior() {
 export function CustomerQuoteSignedNotice(props: {
   companySignedAt?: string | null;
   contractRequest?: CustomerContractRequestView | null;
+  nonbindingBrand?: PreviewNonbindingDocumentBrand;
   token: string;
 }) {
   if (isActiveCustomerContractRequest(props.contractRequest)) {
@@ -328,6 +404,23 @@ export function CustomerQuoteSignedNotice(props: {
     );
   }
 
+  if (props.nonbindingBrand) {
+    return (
+      <section className="mb-8 rounded-2xl border-2 border-red-400 bg-red-950/80 p-6 text-red-50">
+        <h2 className="text-xl font-bold">
+          Den ikke-bindende testsignaturen er registrert
+        </h2>
+        <p className="mt-2">{props.nonbindingBrand.signingNotice}</p>
+        <a
+          className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-red-200/50 px-4 font-bold"
+          href={`/api/customer/quote/${encodeURIComponent(props.token)}/pdf`}
+        >
+          Åpne merket test-PDF
+        </a>
+      </section>
+    );
+  }
+
   return (
     <section className="mb-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6">
       <h2 className="text-xl font-bold">
@@ -377,9 +470,11 @@ export function CustomerQuote(props: {
   signedAt?: string | null;
   companySignedAt?: string | null;
   optionKind?: string | null;
+  nonbindingBrand?: PreviewNonbindingDocumentBrand;
   measurementEvidenceHref?: string;
   questionState?: "none" | "pending" | "resolved";
 }) {
+  const signingCopy = customerQuoteSigningCopy(props.nonbindingBrand);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const focusDeclineAfterSubmit = useRef(false);
   const followUpDateRef = useRef<HTMLInputElement>(null);
@@ -601,9 +696,7 @@ export function CustomerQuote(props: {
       const result = (await response.json()) as { error?: string };
       if (response.ok) {
         setSigned(true);
-        setNotice(
-          "Signaturen din er mottatt. Takfornyelse kontrollerer og medsignerer avtalen før den endelige kopien sendes til deg.",
-        );
+        setNotice(signingCopy.success);
       } else setNotice(result.error ?? "Signeringen kunne ikke fullføres.");
     } catch {
       setNotice(
@@ -772,6 +865,9 @@ export function CustomerQuote(props: {
   const d = props.display;
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      {props.nonbindingBrand ? (
+        <CustomerQuoteNonbindingNotice brand={props.nonbindingBrand} />
+      ) : null}
       <header className="mb-8 border-b border-white/10 pb-6">
         <p className="text-accent text-xs font-bold tracking-[.18em] uppercase">
           Takfornyelse
@@ -804,6 +900,7 @@ export function CustomerQuote(props: {
         <CustomerQuoteSignedNotice
           companySignedAt={props.companySignedAt}
           contractRequest={contractRequest}
+          nonbindingBrand={props.nonbindingBrand}
           token={props.token}
         />
       ) : null}
@@ -1070,10 +1167,9 @@ export function CustomerQuote(props: {
               className="border-accent/50 mt-8 rounded-2xl border-2 bg-[#12151c] p-5 sm:p-7"
               onSubmit={submitSign}
             >
-              <h2 className="text-2xl font-bold">Godta og signer</h2>
+              <h2 className="text-2xl font-bold">{signingCopy.heading}</h2>
               <p className="text-muted-foreground mt-2 text-sm">
-                Kontroller sammendraget og velg selv om du vil åpne den
-                fullstendige teksten før du bekrefter.
+                {signingCopy.introduction}
               </p>
               <div className="mt-5">
                 <LegalDisclosure
@@ -1089,9 +1185,7 @@ export function CustomerQuote(props: {
                     required
                     type="checkbox"
                   />
-                  <span>
-                    Jeg har lest og godtar tilbudet og avtalevilkårene.
-                  </span>
+                  <span>{signingCopy.termsConsent}</span>
                 </label>
                 <label className="flex gap-3">
                   <input
@@ -1100,10 +1194,7 @@ export function CustomerQuote(props: {
                     required
                     type="checkbox"
                   />
-                  <span>
-                    Jeg har mottatt informasjon om 14 dagers angrerett og
-                    standard angreskjema.
-                  </span>
+                  <span>{signingCopy.withdrawalConsent}</span>
                 </label>
                 <label className="flex gap-3">
                   <input
@@ -1112,10 +1203,7 @@ export function CustomerQuote(props: {
                     required
                     type="checkbox"
                   />
-                  <span>
-                    Jeg forstår at bestillingen medfører plikt til å betale
-                    avtalt pris.
-                  </span>
+                  <span>{signingCopy.paymentConsent}</span>
                 </label>
                 <label className="flex gap-3">
                   <input
@@ -1124,10 +1212,7 @@ export function CustomerQuote(props: {
                     onChange={(event) => setEarlyStart(event.target.checked)}
                     type="checkbox"
                   />
-                  <span>
-                    Jeg ber uttrykkelig om at arbeidet kan starte før
-                    angrefristen er utløpt (valgfritt).
-                  </span>
+                  <span>{signingCopy.earlyStartConsent}</span>
                 </label>
                 {earlyStart ? (
                   <label className="flex gap-3">
@@ -1137,16 +1222,12 @@ export function CustomerQuote(props: {
                       required
                       type="checkbox"
                     />
-                    <span>
-                      Jeg forstår at angreretten går tapt når tjenesten er fullt
-                      utført, og at jeg kan måtte betale forholdsmessig for
-                      arbeid som er utført før jeg angrer.
-                    </span>
+                    <span>{signingCopy.earlyLossConsent}</span>
                   </label>
                 ) : null}
               </div>
               <div className="mt-5">
-                <p className="font-semibold">Avtalepart og underskriver</p>
+                <p className="font-semibold">{signingCopy.partyHeading}</p>
                 <p
                   className="mt-2 min-h-12 rounded-lg border border-white/20 bg-black/20 px-4 py-3 font-bold"
                   aria-label="Navn på avtalepart"
@@ -1154,14 +1235,12 @@ export function CustomerQuote(props: {
                   {props.customerName}
                 </p>
                 <p className="text-muted-foreground mt-2 text-sm">
-                  Navnet er hentet fra henvendelsen og låst til dette
-                  dokumentet. Kontakt Takfornyelse før signering dersom navnet
-                  må korrigeres.
+                  {signingCopy.nameHelp}
                 </p>
               </div>
               <fieldset className="mt-5">
                 <legend className="font-semibold">
-                  Tegn signaturen i feltet
+                  {signingCopy.signatureLegend}
                 </legend>
                 <canvas
                   aria-label="Signaturfelt"
@@ -1177,17 +1256,26 @@ export function CustomerQuote(props: {
                   onClick={clearSignature}
                   type="button"
                 >
-                  Tøm signaturfeltet
+                  {signingCopy.clearSignature}
                 </button>
               </fieldset>
+              {props.nonbindingBrand ? (
+                <div
+                  className="mt-5 rounded-xl border-2 border-red-400 bg-red-950/80 p-4 text-red-50"
+                  role="note"
+                >
+                  <p className="font-black">{props.nonbindingBrand.marker}</p>
+                  <p className="mt-1 font-semibold">
+                    {props.nonbindingBrand.signingNotice}
+                  </p>
+                </div>
+              ) : null}
               <button
                 className="bg-accent hover:bg-accent-hover mt-6 min-h-14 w-full rounded-xl px-5 text-base font-black text-black disabled:opacity-50"
                 disabled={pending || !hasSignature}
                 type="submit"
               >
-                {pending
-                  ? "Signerer …"
-                  : "Bestilling med forpliktelse til å betale og signer"}
+                {pending ? signingCopy.pending : signingCopy.submit}
               </button>
             </form>
           ) : null}

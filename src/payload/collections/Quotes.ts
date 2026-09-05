@@ -1,17 +1,116 @@
 import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
-import { documentHash } from "@/lib/quotes/document";
+import { documentHash, quoteSnapshotSchema } from "@/lib/quotes/document";
 import { assertQuoteTransition, type QuoteStatus } from "@/lib/quotes/workflow";
 import { adminOnly, userIsAdmin } from "../access/roles";
 
 const immutableFields = ["lead", "measurement", "priceCalculation", "version", "optionGroup", "optionKind", "siblingQuote", "snapshot", "snapshotHash", "termsVersion", "validUntil"] as const;
+const roofFusionImmutableFields = [
+  "reference",
+  "lead",
+  "measurement",
+  "priceCalculation",
+  "version",
+  "supersedes",
+  "optionGroup",
+  "optionKind",
+  "siblingQuote",
+  "snapshot",
+  "snapshotHash",
+  "serviceDescription",
+  "totalIncVatOre",
+  "maximumTotalIncVatOre",
+  "termsVersion",
+  "validUntil",
+] as const;
+
+function hasRoofFusionBinding(snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot))
+    return false;
+  const measurement = (snapshot as Record<string, unknown>).measurement;
+  return Boolean(
+    measurement &&
+      typeof measurement === "object" &&
+      !Array.isArray(measurement) &&
+      (measurement as Record<string, unknown>).rfBinding,
+  );
+}
+
+function relationId(value: unknown) {
+  if (typeof value === "number") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof (value as { id?: unknown }).id === "number"
+  ) {
+    return (value as { id: number }).id;
+  }
+  return null;
+}
+
+function assertRoofFusionQuoteCreateBinding(data: Record<string, unknown>) {
+  const parsed = quoteSnapshotSchema.safeParse(data.snapshot);
+  if (!parsed.success || !parsed.data.measurement.rfBinding) {
+    throw new Error("Roof Fusion quote snapshot binding is invalid");
+  }
+  const snapshot = parsed.data;
+  if (
+    relationId(data.lead) !== snapshot.leadId ||
+    relationId(data.measurement) !== snapshot.measurement.id ||
+    relationId(data.priceCalculation) !== snapshot.pricing.calculationId ||
+    data.reference !== snapshot.quoteReference ||
+    data.serviceDescription !== snapshot.serviceDescription ||
+    data.totalIncVatOre !== snapshot.pricing.totalIncVatOre ||
+    data.maximumTotalIncVatOre !== snapshot.pricing.maximumTotalIncVatOre ||
+    data.termsVersion !== snapshot.termsVersion ||
+    data.validUntil !== snapshot.validUntil
+  ) {
+    throw new Error(
+      "Roof Fusion quote fields disagree with the immutable snapshot",
+    );
+  }
+}
 
 export const protectQuoteVersion: CollectionBeforeChangeHook = ({ data, originalDoc, operation, req, context }) => {
   if (operation === "create") {
     if (data.status && data.status !== "draft") throw new Error("New quotes must start as drafts");
+    if (
+      hasRoofFusionBinding(data.snapshot) &&
+      context?.trustedRoofFusionOfferBridge !== true
+    ) {
+      throw new Error(
+        "Roof Fusion quote drafts require the canonical Preview offer bridge",
+      );
+    }
+    if (hasRoofFusionBinding(data.snapshot)) {
+      assertRoofFusionQuoteCreateBinding(data);
+    }
     if (data.snapshot) data.snapshotHash = documentHash(data.snapshot);
     return data;
   }
   if (!originalDoc) return data;
+  const nextDoc = { ...originalDoc, ...data };
+  if (
+    hasRoofFusionBinding(nextDoc.snapshot) &&
+    !hasRoofFusionBinding(originalDoc.snapshot) &&
+    context?.trustedRoofFusionOfferBridge !== true
+  ) {
+    throw new Error(
+      "Roof Fusion quote bindings require the canonical Preview offer bridge",
+    );
+  }
+  if (hasRoofFusionBinding(originalDoc.snapshot)) {
+    const changed = roofFusionImmutableFields.some(
+      (field) =>
+        field in data &&
+        JSON.stringify(data[field]) !== JSON.stringify(originalDoc[field]),
+    );
+    if (changed) {
+      throw new Error(
+        "A Roof Fusion-bound quote draft is immutable. Create a new version.",
+      );
+    }
+  }
   if (data.status && data.status !== originalDoc.status) assertQuoteTransition(originalDoc.status as QuoteStatus, data.status as QuoteStatus);
   if (data.status === "approved" && originalDoc.status !== "approved") {
     if (!userIsAdmin(req.user) && context?.trustedQuoteApproval !== true) throw new Error("Only an active administrator may approve a quote");

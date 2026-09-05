@@ -1,4 +1,8 @@
-import type { CollectionBeforeChangeHook, CollectionBeforeDeleteHook, CollectionConfig } from "payload";
+import type {
+  CollectionBeforeChangeHook,
+  CollectionBeforeDeleteHook,
+  CollectionConfig,
+} from "payload";
 import { deletePrivateMedia } from "@/lib/private-media-storage";
 import { adminOnly, adminOnlyField, adminsAndEditors } from "../access/roles";
 
@@ -6,54 +10,196 @@ const adminManagedField = {
   update: adminOnlyField,
 };
 const caseStateFields = new Set([
-  "status", "recordState", "archiveClassification", "archiveReason", "assignedTo",
-  "nextAction", "nextActionAt", "nextActionOwner", "nextActionBlocker", "caseRevision",
+  "status",
+  "recordState",
+  "archiveClassification",
+  "archiveReason",
+  "assignedTo",
+  "nextAction",
+  "nextActionAt",
+  "nextActionOwner",
+  "nextActionBlocker",
+  "caseRevision",
+]);
+const caseAddressFields = new Set([
+  "address",
+  "houseNumber",
+  "postal",
+  "city",
+  "addressVerificationStatus",
+  "addressVerificationProvider",
+  "addressVerificationProviderId",
+  "addressLatitude",
+  "addressLongitude",
+  "addressVerifiedAt",
 ]);
 
-export const protectCaseStateWrites: CollectionBeforeChangeHook = ({ context, data, operation, originalDoc, req }) => {
+export const protectPreviewCaseAddressWrites: CollectionBeforeChangeHook = ({
+  context,
+  data,
+  operation,
+  originalDoc,
+}) => {
   if (operation !== "update" || !originalDoc) return data;
-  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true") return data;
-  const actualRevision = Number(originalDoc.caseRevision || 1);
-  const requestedRevision = "caseRevision" in data ? Number(data.caseRevision) : null;
-  // Payload can drop custom context when a Local API update crosses a
-  // serverless bundle boundary. A local, monotonic +1 revision remains an
-  // internal command write; REST writes and skipped revisions stay blocked.
-  const trustedLocalRevisionWrite = req.payloadAPI === "local"
-    && requestedRevision === actualRevision + 1;
-  const trustedCaseCommand = context?.trustedCaseCommand === true || trustedLocalRevisionWrite;
-  if (context?.trustedCaseCommand === true && typeof context.expectedCaseRevision === "number") {
-    if (actualRevision !== context.expectedCaseRevision) {
-      throw new Error(`CASE_REVISION_CONFLICT:${context.expectedCaseRevision}:${actualRevision}`);
-    }
+  const writesAddress = Object.keys(data).some((key) =>
+    caseAddressFields.has(key),
+  );
+  const writesAddressRevision = "addressRevision" in data;
+  if (!writesAddress && !writesAddressRevision) return data;
+
+  const trusted = context?.trustedCaseAddressCommand === true;
+  if (writesAddressRevision && !trusted) {
+    throw new Error(
+      "Address revision is managed by the canonical case address command",
+    );
   }
-  if ("caseRevision" in data && !trustedCaseCommand) {
-    throw new Error("Case revision is managed by the central case command layer");
+  if (process.env.VERCEL_ENV !== "preview") return data;
+  if (!trusted) {
+    throw new Error(
+      "Preview case address fields require the canonical case address command",
+    );
   }
-  if (trustedCaseCommand) return data;
-  const directStateFields = Object.keys(data).filter((key) => caseStateFields.has(key));
-  if (directStateFields.length) {
-    throw new Error(`Case state fields require the central command layer: ${directStateFields.join(", ")}`);
+
+  const actualCaseRevision = Number(originalDoc.caseRevision || 1);
+  const actualAddressRevision = Number(originalDoc.addressRevision || 1);
+  if (context.expectedCaseRevision !== actualCaseRevision) {
+    throw new Error(
+      `CASE_REVISION_CONFLICT:${context.expectedCaseRevision}:${actualCaseRevision}`,
+    );
+  }
+  if (context.expectedAddressRevision !== actualAddressRevision) {
+    throw new Error(
+      `ADDRESS_REVISION_CONFLICT:${context.expectedAddressRevision}:${actualAddressRevision}`,
+    );
+  }
+  if (
+    Number(data.caseRevision) !== actualCaseRevision + 1 ||
+    Number(data.addressRevision) !== actualAddressRevision + 1
+  ) {
+    throw new Error("Case address revisions must advance exactly once");
   }
   return data;
 };
 
-export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({ context, id, req }) => {
-  if (context?.trustedLeadPurge !== true) {
-    throw new Error("Customer cases must be archived or moved to trash. Permanent deletion is only available through the controlled retention workflow.");
+export const protectCaseStateWrites: CollectionBeforeChangeHook = ({
+  context,
+  data,
+  operation,
+  originalDoc,
+  req,
+}) => {
+  if (operation !== "update" || !originalDoc) return data;
+  if (process.env.FEATURE_CASE_STATE_ENGINE_V2 !== "true") return data;
+  const actualRevision = Number(originalDoc.caseRevision || 1);
+  const requestedRevision =
+    "caseRevision" in data ? Number(data.caseRevision) : null;
+  // Payload can drop custom context when a Local API update crosses a
+  // serverless bundle boundary. A local, monotonic +1 revision remains an
+  // internal command write; REST writes and skipped revisions stay blocked.
+  const trustedLocalRevisionWrite =
+    req.payloadAPI === "local" && requestedRevision === actualRevision + 1;
+  const trustedCaseCommand =
+    context?.trustedCaseCommand === true || trustedLocalRevisionWrite;
+  if (
+    context?.trustedCaseCommand === true &&
+    typeof context.expectedCaseRevision === "number"
+  ) {
+    if (actualRevision !== context.expectedCaseRevision) {
+      throw new Error(
+        `CASE_REVISION_CONFLICT:${context.expectedCaseRevision}:${actualRevision}`,
+      );
+    }
   }
-  const quotes = await req.payload.find({ collection: "quotes", depth: 0, limit: 100, overrideAccess: true, req, where: { lead: { equals: id } } });
+  if ("caseRevision" in data && !trustedCaseCommand) {
+    throw new Error(
+      "Case revision is managed by the central case command layer",
+    );
+  }
+  if (trustedCaseCommand) return data;
+  const directStateFields = Object.keys(data).filter((key) =>
+    caseStateFields.has(key),
+  );
+  if (directStateFields.length) {
+    throw new Error(
+      `Case state fields require the central command layer: ${directStateFields.join(", ")}`,
+    );
+  }
+  return data;
+};
+
+export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({
+  context,
+  id,
+  req,
+}) => {
+  if (context?.trustedLeadPurge !== true) {
+    throw new Error(
+      "Customer cases must be archived or moved to trash. Permanent deletion is only available through the controlled retention workflow.",
+    );
+  }
+  const quotes = await req.payload.find({
+    collection: "quotes",
+    depth: 0,
+    limit: 100,
+    overrideAccess: true,
+    req,
+    where: { lead: { equals: id } },
+  });
   for (const quote of quotes.docs) {
-    const contracts = await req.payload.find({ collection: "contracts", depth: 0, limit: 100, overrideAccess: true, req, where: { quote: { equals: quote.id } } });
+    const contracts = await req.payload.find({
+      collection: "contracts",
+      depth: 0,
+      limit: 100,
+      overrideAccess: true,
+      req,
+      where: { quote: { equals: quote.id } },
+    });
     if (contracts.docs.some((contract) => contract.status === "signed")) {
-      throw new Error("A lead with a signed contract must be archived according to the retention policy, not deleted.");
+      throw new Error(
+        "A lead with a signed contract must be archived according to the retention policy, not deleted.",
+      );
     }
     for (const contract of contracts.docs) {
-      const changes = await req.payload.find({ collection: "change-agreements", depth: 0, limit: 100, overrideAccess: true, req, where: { contract: { equals: contract.id } } });
-      for (const change of changes.docs) await req.payload.delete({ collection: "change-agreements", id: change.id, overrideAccess: true, req });
-      await req.payload.delete({ collection: "contracts", id: contract.id, overrideAccess: true, req });
+      const changes = await req.payload.find({
+        collection: "change-agreements",
+        depth: 0,
+        limit: 100,
+        overrideAccess: true,
+        req,
+        where: { contract: { equals: contract.id } },
+      });
+      for (const change of changes.docs)
+        await req.payload.delete({
+          collection: "change-agreements",
+          id: change.id,
+          overrideAccess: true,
+          req,
+        });
+      await req.payload.delete({
+        collection: "contracts",
+        id: contract.id,
+        overrideAccess: true,
+        req,
+      });
     }
-    await req.payload.update({ collection: "access-tokens", overrideAccess: true, req, where: { and: [{ subjectType: { equals: "quote" } }, { subjectId: { equals: String(quote.id) } }] }, data: { revokedAt: new Date().toISOString() } });
-    await req.payload.delete({ collection: "quotes", id: quote.id, overrideAccess: true, req });
+    await req.payload.update({
+      collection: "access-tokens",
+      overrideAccess: true,
+      req,
+      where: {
+        and: [
+          { subjectType: { equals: "quote" } },
+          { subjectId: { equals: String(quote.id) } },
+        ],
+      },
+      data: { revokedAt: new Date().toISOString() },
+    });
+    await req.payload.delete({
+      collection: "quotes",
+      id: quote.id,
+      overrideAccess: true,
+      req,
+    });
   }
   await req.payload.delete({
     collection: "price-calculations",
@@ -79,9 +225,15 @@ export const deleteLeadMessagesBeforeLead: CollectionBeforeDeleteHook = async ({
     limit: 500,
     overrideAccess: true,
     req,
-    where: { and: [{ ownerType: { equals: "lead" } }, { ownerId: { equals: String(id) } }] },
+    where: {
+      and: [
+        { ownerType: { equals: "lead" } },
+        { ownerId: { equals: String(id) } },
+      ],
+    },
   });
-  for (const media of privateMedia.docs) await deletePrivateMedia(req.payload, media);
+  for (const media of privateMedia.docs)
+    await deletePrivateMedia(req.payload, media);
 };
 
 export const Leads: CollectionConfig = {
@@ -109,7 +261,10 @@ export const Leads: CollectionConfig = {
     read: adminsAndEditors,
     update: adminsAndEditors,
   },
-  hooks: { beforeChange: [protectCaseStateWrites], beforeDelete: [deleteLeadMessagesBeforeLead] },
+  hooks: {
+    beforeChange: [protectCaseStateWrites, protectPreviewCaseAddressWrites],
+    beforeDelete: [deleteLeadMessagesBeforeLead],
+  },
   fields: [
     { name: "name", type: "text", required: true, access: adminManagedField },
     { name: "email", type: "email", access: adminManagedField },
@@ -159,6 +314,51 @@ export const Leads: CollectionConfig = {
     { name: "houseNumber", type: "text", access: adminManagedField },
     { name: "postal", type: "text", required: true, access: adminManagedField },
     { name: "city", type: "text", access: adminManagedField },
+    {
+      name: "addressVerificationStatus",
+      type: "select",
+      label: "Adresseverifisering",
+      access: adminManagedField,
+      index: true,
+      options: [
+        { label: "Ikke verifisert", value: "unverified" },
+        { label: "Manuelt oppgitt", value: "manual" },
+        { label: "Verifisering mislyktes", value: "verification_failed" },
+        { label: "Serververifisert", value: "verified" },
+      ],
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressVerificationProvider",
+      type: "text",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressVerificationProviderId",
+      type: "text",
+      access: adminManagedField,
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressLatitude",
+      type: "number",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressLongitude",
+      type: "number",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressVerifiedAt",
+      type: "date",
+      access: adminManagedField,
+      admin: { readOnly: true },
+    },
     { name: "approxSqm", type: "number", access: adminManagedField },
     {
       name: "photoUrls",
@@ -250,13 +450,54 @@ export const Leads: CollectionConfig = {
       ],
       admin: { readOnly: true },
     },
-    { name: "archiveReason", type: "textarea", label: "Begrunnelse", admin: { readOnly: true } },
-    { name: "archivedAt", type: "date", label: "Arkivert", index: true, admin: { readOnly: true } },
-    { name: "archivedBy", type: "relationship", relationTo: "users", label: "Arkivert av", admin: { readOnly: true } },
-    { name: "trashedAt", type: "date", label: "Flyttet til papirkurven", index: true, admin: { readOnly: true } },
-    { name: "trashedBy", type: "relationship", relationTo: "users", label: "Flyttet av", admin: { readOnly: true } },
-    { name: "purgeAfter", type: "date", label: "Tidligste permanente sletting", index: true, admin: { readOnly: true } },
-    { name: "assignedTo", type: "relationship", relationTo: "users", label: "Ansvarlig", index: true },
+    {
+      name: "archiveReason",
+      type: "textarea",
+      label: "Begrunnelse",
+      admin: { readOnly: true },
+    },
+    {
+      name: "archivedAt",
+      type: "date",
+      label: "Arkivert",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "archivedBy",
+      type: "relationship",
+      relationTo: "users",
+      label: "Arkivert av",
+      admin: { readOnly: true },
+    },
+    {
+      name: "trashedAt",
+      type: "date",
+      label: "Flyttet til papirkurven",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "trashedBy",
+      type: "relationship",
+      relationTo: "users",
+      label: "Flyttet av",
+      admin: { readOnly: true },
+    },
+    {
+      name: "purgeAfter",
+      type: "date",
+      label: "Tidligste permanente sletting",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "assignedTo",
+      type: "relationship",
+      relationTo: "users",
+      label: "Ansvarlig",
+      index: true,
+    },
     { name: "nextAction", type: "textarea", label: "Neste handling" },
     { name: "nextActionAt", type: "date", label: "Frist", index: true },
     {
@@ -269,13 +510,51 @@ export const Leads: CollectionConfig = {
       options: ["administrator", "customer", "system", "worker"],
       admin: { readOnly: true },
     },
-    { name: "nextActionBlocker", type: "text", label: "Blokkeringskode", admin: { readOnly: true } },
-    { name: "caseRevision", type: "number", label: "Saksversjon", required: true, defaultValue: 1, min: 1, admin: { readOnly: true } },
+    {
+      name: "nextActionBlocker",
+      type: "text",
+      label: "Blokkeringskode",
+      admin: { readOnly: true },
+    },
+    {
+      name: "caseRevision",
+      type: "number",
+      label: "Saksversjon",
+      required: true,
+      defaultValue: 1,
+      min: 1,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressRevision",
+      type: "number",
+      label: "Adresseversjon",
+      required: true,
+      defaultValue: 1,
+      min: 1,
+      admin: { readOnly: true },
+    },
     { name: "lastContactAt", type: "date", label: "Sist kontaktet" },
-    { name: "adminReviewedAt", type: "date", label: "Først gjennomgått", index: true, admin: { readOnly: true } },
-    { name: "adminReviewedBy", type: "relationship", relationTo: "users", label: "Gjennomgått av", admin: { readOnly: true } },
+    {
+      name: "adminReviewedAt",
+      type: "date",
+      label: "Først gjennomgått",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "adminReviewedBy",
+      type: "relationship",
+      relationTo: "users",
+      label: "Gjennomgått av",
+      admin: { readOnly: true },
+    },
     { name: "closedAt", type: "date", label: "Lukket" },
-    { name: "qualification", type: "json", label: "AI-oppsummering (kontrolleres av admin)" },
+    {
+      name: "qualification",
+      type: "json",
+      label: "AI-oppsummering (kontrolleres av admin)",
+    },
     {
       name: "workflowActions",
       type: "ui",

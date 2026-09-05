@@ -16,7 +16,8 @@ export type RoofFusionPreviewReadErrorCodeV1 =
   | "PREVIEW_REQUIRED"
   | "CAPABILITY_DENIED"
   | "CASE_ACCESS_DENIED"
-  | "CASE_NOT_FOUND";
+  | "CASE_NOT_FOUND"
+  | "SOURCE_INVALIDATED";
 
 export class RoofFusionPreviewReadErrorV1 extends Error {
   constructor(
@@ -195,6 +196,12 @@ export class AdminRoofFusionPreviewReadAdapterV1 {
     const snapshot = await this.repository.readSnapshot(snapshotId);
     if (!snapshot) return null;
     assertSnapshotCase(snapshot, caseId);
+    if (await this.repository.isSnapshotInvalidated(snapshot)) {
+      throw new RoofFusionPreviewReadErrorV1(
+        "SOURCE_INVALIDATED",
+        "Roof Fusion source was invalidated by a case address correction",
+      );
+    }
     return snapshot;
   }
 
@@ -203,6 +210,12 @@ export class AdminRoofFusionPreviewReadAdapterV1 {
     const snapshot = await this.repository.readLatestSnapshot(caseId);
     if (!snapshot) return null;
     assertSnapshotCase(snapshot, caseId);
+    if (await this.repository.isSnapshotInvalidated(snapshot)) {
+      throw new RoofFusionPreviewReadErrorV1(
+        "SOURCE_INVALIDATED",
+        "Roof Fusion source was invalidated by a case address correction",
+      );
+    }
     return snapshot;
   }
 
@@ -215,6 +228,12 @@ export class AdminRoofFusionPreviewReadAdapterV1 {
     const snapshot = await this.repository.readSnapshot(snapshotId);
     if (!snapshot) return null;
     assertSnapshotCase(snapshot, caseId);
+    if (await this.repository.isSnapshotInvalidated(snapshot)) {
+      throw new RoofFusionPreviewReadErrorV1(
+        "SOURCE_INVALIDATED",
+        "Roof Fusion source was invalidated by a case address correction",
+      );
+    }
     return {
       schemaVersion: ROOF_FUSION_PREVIEW_READ_VERSION,
       caseId,

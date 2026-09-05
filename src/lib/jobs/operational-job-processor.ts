@@ -8,6 +8,9 @@ import {
   createCustomerReplyDraft,
   createLeadAiReply,
   deliverMessage,
+  messageDeliveryReconciliationRequiredCode,
+  messageDeliveryRequiresReconciliation,
+  MessageDeliveryReconciliationRequiredError,
 } from "@/lib/messages/message-engine";
 import {
   customerReplyPurposes,
@@ -19,6 +22,7 @@ import {
   messageDeliveryClass,
   MessageDeliveryClassRequiredError,
 } from "@/lib/messages/automation-recipient-policy";
+import { PreviewEmailRecipientBlockedError } from "@/lib/messages/preview-email-recipient-policy";
 import { featureReadiness } from "@/lib/platform/features";
 import { automaticCommunicationIsPaused } from "@/lib/platform/operating-mode";
 import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
@@ -95,6 +99,7 @@ async function automaticCommunicationJobIsPaused(
     .catch(() => null);
   if (!message) return false;
   if (["sent", "delivered"].includes(message.status)) return false;
+  if (messageDeliveryRequiresReconciliation(message)) return false;
   const analysis =
     message.aiAnalysis && typeof message.aiAnalysis === "object"
       ? (message.aiAnalysis as Record<string, unknown>)
@@ -187,6 +192,8 @@ async function markMessageContactAttention(
   });
   const hasPhone =
     typeof lead.phone === "string" && lead.phone.trim().length >= 8;
+  const reconciliationRequired =
+    reason === messageDeliveryReconciliationRequiredCode;
   await updateCaseState(payload, {
     leadId,
     command: "message_delivery_attention",
@@ -197,10 +204,14 @@ async function markMessageContactAttention(
     patch: {
       nextActionOwner: "administrator",
       nextActionAt: now.toISOString(),
-      nextActionBlocker: "MESSAGE_DELIVERY_FAILED",
-      nextAction: hasPhone
-        ? "Kundemeldingen kunne ikke leveres. Kontroller e-postadressen og kontakt kunden manuelt på telefon."
-        : "Kundemeldingen kunne ikke leveres, og kunden har ingen brukbar reservekanal. Finn en trygg manuell kontaktmåte.",
+      nextActionBlocker: reconciliationRequired
+        ? "MESSAGE_DELIVERY_RECONCILIATION_REQUIRED"
+        : "MESSAGE_DELIVERY_FAILED",
+      nextAction: reconciliationRequired
+        ? "Leverandøren har tidligere akseptert meldingen, men leveringsstatusen er uklar. Avstem leverandørloggen før ny utsending."
+        : hasPhone
+          ? "Kundemeldingen kunne ikke leveres. Kontroller e-postadressen og kontakt kunden manuelt på telefon."
+          : "Kundemeldingen kunne ikke leveres, og kunden har ingen brukbar reservekanal. Finn en trygg manuell kontaktmåte.",
     },
   });
 }
@@ -276,6 +287,9 @@ export async function processOperationalJobs(
           depth: 0,
           overrideAccess: true,
         });
+        if (messageDeliveryRequiresReconciliation(message)) {
+          throw new MessageDeliveryReconciliationRequiredError();
+        }
         if (["sent", "delivered"].includes(message.status)) {
           jobResult = {
             processed: true,
@@ -467,7 +481,9 @@ export async function processOperationalJobs(
       const exhausted =
         error instanceof ChannelUnavailableError ||
         error instanceof AutomaticRecipientBlockedError ||
+        error instanceof PreviewEmailRecipientBlockedError ||
         error instanceof MessageDeliveryClassRequiredError ||
+        error instanceof MessageDeliveryReconciliationRequiredError ||
         attempts >= (job.maxAttempts || 3) ||
         /requires configuration|daily request limit/i.test(
           error instanceof Error ? error.message : "",

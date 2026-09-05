@@ -27,7 +27,44 @@ const lockedFields = [
   "imageryCapturedAt",
   "manualAreaSource",
   "manualAreaReason",
+  "sourceKind",
+  "caseRevision",
+  "addressRevision",
+  "rfSnapshotId",
+  "rfSnapshotRevision",
+  "rfSnapshotHash",
+  "rfInputHash",
+  "rfRendererHash",
 ] as const;
+
+const roofFusionProjectionFields = [
+  "sourceKind",
+  "caseRevision",
+  "addressRevision",
+  "rfSnapshotId",
+  "rfSnapshotRevision",
+  "rfSnapshotHash",
+  "rfInputHash",
+  "rfRendererHash",
+] as const;
+
+export const protectRoofFusionMeasurementProjection: CollectionBeforeChangeHook =
+  ({ context, data, operation }) => {
+    const writesRoofFusionProjection =
+      data.sourceKind === "roof_fusion" ||
+      roofFusionProjectionFields.some(
+        (field) => field !== "sourceKind" && field in data,
+      );
+    if (
+      writesRoofFusionProjection &&
+      context?.trustedRoofFusionProjection !== true
+    ) {
+      throw new Error(
+        `${operation} of Roof Fusion measurement bindings requires the canonical Preview bridge`,
+      );
+    }
+    return data;
+  };
 
 export const protectApprovedMeasurement: CollectionBeforeChangeHook = ({
   data,
@@ -61,6 +98,7 @@ function relationId(value: unknown) {
 }
 
 export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({
+  context,
   data,
   originalDoc,
   req,
@@ -68,6 +106,30 @@ export const enforceMeasurementApproval: CollectionBeforeChangeHook = async ({
   if (data.status !== "approved" || originalDoc?.status === "approved")
     return data;
   const merged = { ...originalDoc, ...data };
+  if (context?.trustedRoofFusionProjection === true) {
+    const positiveInteger = (value: unknown) =>
+      Number.isSafeInteger(value) && Number(value) > 0;
+    const sha256 = (value: unknown) =>
+      typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+    if (
+      merged.sourceKind !== "roof_fusion" ||
+      !positiveInteger(merged.caseRevision) ||
+      !positiveInteger(merged.addressRevision) ||
+      typeof merged.rfSnapshotId !== "string" ||
+      !positiveInteger(merged.rfSnapshotRevision) ||
+      !sha256(merged.rfSnapshotHash) ||
+      !sha256(merged.rfInputHash) ||
+      !sha256(merged.rfRendererHash) ||
+      !sha256(merged.inputHash) ||
+      !positiveInteger(merged.approvedBy) ||
+      typeof merged.approvedAt !== "string"
+    ) {
+      throw new Error(
+        "Canonical Roof Fusion projection requires an exact approved snapshot binding",
+      );
+    }
+    return data;
+  }
   const leadId = relationId(merged.lead);
   if (!leadId) throw new Error("Measurement approval requires a lead");
   const lead = await req.payload.findByID({
@@ -223,7 +285,11 @@ export const RoofMeasurements: CollectionConfig = {
     delete: adminOnly,
   },
   hooks: {
-    beforeChange: [protectApprovedMeasurement, enforceMeasurementApproval],
+    beforeChange: [
+      protectRoofFusionMeasurementProjection,
+      protectApprovedMeasurement,
+      enforceMeasurementApproval,
+    ],
   },
   fields: [
     {
@@ -246,6 +312,62 @@ export const RoofMeasurements: CollectionConfig = {
       type: "relationship",
       relationTo: "roof-measurements",
       index: true,
+    },
+    {
+      name: "sourceKind",
+      type: "select",
+      required: true,
+      defaultValue: "legacy",
+      index: true,
+      admin: { readOnly: true },
+      options: [
+        { label: "Legacy", value: "legacy" },
+        { label: "Roof Fusion", value: "roof_fusion" },
+      ],
+    },
+    {
+      name: "caseRevision",
+      type: "number",
+      min: 1,
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "addressRevision",
+      type: "number",
+      min: 1,
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "rfSnapshotId",
+      type: "text",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "rfSnapshotRevision",
+      type: "number",
+      min: 1,
+      admin: { readOnly: true },
+    },
+    {
+      name: "rfSnapshotHash",
+      type: "text",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "rfInputHash",
+      type: "text",
+      index: true,
+      admin: { readOnly: true },
+    },
+    {
+      name: "rfRendererHash",
+      type: "text",
+      index: true,
+      admin: { readOnly: true },
     },
     {
       name: "measurementMode",

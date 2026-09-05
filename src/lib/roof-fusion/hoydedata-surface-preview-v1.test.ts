@@ -281,6 +281,9 @@ describe("Roof Fusion Høydedata surface Preview", () => {
     });
 
     expect(result.segmentation).toBeNull();
+    expect(result.summary.manualRidgeCorrectionStatus).toBe(
+      "unsupported_footprint",
+    );
     expect(result.geometryInput.surfaces).toHaveLength(1);
     expect(result.summary.pricingReady).toBe(false);
   });

@@ -5,8 +5,10 @@ node_modules/
 .next/
 .env*
 coverage/
+tmp/
 test-results/
 playwright-report/
 blob-report/
 *.db
 *.db-*
+*.tsbuildinfo

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   enforceMeasurementApproval,
   protectApprovedMeasurement,
+  protectRoofFusionMeasurementProjection,
 } from "./RoofMeasurements";
 
 describe("approved roof measurement immutability", () => {
@@ -41,6 +42,72 @@ describe("approved roof measurement immutability", () => {
         originalDoc: { status: "approved", evidenceHash: "a".repeat(64) },
       } as never),
     ).toThrow(/new version/);
+  });
+
+  it("rejects changing an approved Roof Fusion binding in place", () => {
+    expect(() =>
+      protectApprovedMeasurement({
+        operation: "update",
+        data: { rfSnapshotHash: "b".repeat(64) },
+        originalDoc: {
+          status: "approved",
+          rfSnapshotHash: "a".repeat(64),
+        },
+      } as never),
+    ).toThrow(/new version/);
+  });
+
+  it("accepts only a complete exact binding from the trusted Roof Fusion projection", async () => {
+    const complete = {
+      status: "approved",
+      sourceKind: "roof_fusion",
+      caseRevision: 3,
+      addressRevision: 2,
+      rfSnapshotId: "rf-lead-12-r2-approved",
+      rfSnapshotRevision: 2,
+      rfSnapshotHash: "a".repeat(64),
+      rfInputHash: "b".repeat(64),
+      rfRendererHash: "c".repeat(64),
+      inputHash: "d".repeat(64),
+      approvedBy: 7,
+      approvedAt: "2026-09-04T19:00:00.000Z",
+    };
+    await expect(
+      enforceMeasurementApproval({
+        operation: "create",
+        context: { trustedRoofFusionProjection: true },
+        data: complete,
+        req: { payload: {}, user: { id: 7 } },
+      } as never),
+    ).resolves.toEqual(complete);
+    await expect(
+      enforceMeasurementApproval({
+        operation: "create",
+        context: { trustedRoofFusionProjection: true },
+        data: { ...complete, rfRendererHash: undefined },
+        req: { payload: {}, user: { id: 7 } },
+      } as never),
+    ).rejects.toThrow(/exact approved snapshot binding/);
+  });
+
+  it("rejects direct Roof Fusion binding writes outside the canonical bridge", () => {
+    expect(() =>
+      protectRoofFusionMeasurementProjection({
+        operation: "create",
+        context: {},
+        data: {
+          sourceKind: "roof_fusion",
+          rfSnapshotId: "rf-lead-12-r2-approved",
+        },
+      } as never),
+    ).toThrow(/canonical Preview bridge/);
+    expect(
+      protectRoofFusionMeasurementProjection({
+        operation: "create",
+        context: { trustedRoofFusionProjection: true },
+        data: { sourceKind: "roof_fusion" },
+      } as never),
+    ).toEqual({ sourceKind: "roof_fusion" });
   });
 
   it("blocks low confidence even through the collection API", async () => {

@@ -41,6 +41,7 @@ export default defineConfig({
         process.env.PAYLOAD_SECRET ?? "playwright-secret-for-local-smoke-tests",
       DATABASE_URL: process.env.DATABASE_URL ?? "file:./playwright.db",
       NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? baseURL,
+      FEATURE_WORKER_PORTAL: process.env.FEATURE_WORKER_PORTAL ?? "true",
     },
   },
 });

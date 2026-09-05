@@ -1,4 +1,8 @@
 import { Resend } from "resend";
+import {
+  assertPreviewEmailRecipientsAllowed,
+  previewEmailSubject,
+} from "@/lib/messages/preview-email-recipient-policy";
 import type { DeliveryResult, EmailMessage, EmailProvider, ProviderHealth } from "./contracts";
 import { ProviderUnavailableError } from "./contracts";
 
@@ -17,11 +21,12 @@ export class ResendEmailProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<DeliveryResult> {
     if (!this.apiKey) throw new ProviderUnavailableError("resend", "configuration_required");
+    assertPreviewEmailRecipientsAllowed({ to: message.to }, this.environment);
     const response = await new Resend(this.apiKey).emails.send(
       {
         from: this.environment.LEAD_FROM_EMAIL || "Takfornyelse <post@takfornyelse.as>",
         to: message.to,
-        subject: message.subject,
+        subject: previewEmailSubject(message.subject, this.environment),
         text: message.text,
         ...(message.html ? { html: message.html } : {}),
         ...(message.replyTo ? { replyTo: message.replyTo } : {}),

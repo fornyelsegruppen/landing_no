@@ -110,7 +110,7 @@ export const Users: CollectionConfig = {
       ],
       admin: {
         description:
-          "Gjelder bare /user. Kundetekster, tilbud og kontrakter forblir på norsk.",
+          "Brukes i ansatt-/adminpanelet og interne varsler til denne kontoen. Kundetekster, tilbud og kontrakter påvirkes ikke.",
       },
     },
     {

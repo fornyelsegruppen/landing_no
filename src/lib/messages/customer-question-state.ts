@@ -132,7 +132,9 @@ export function selectUnresolvedCustomerQuestion<
 >(messages: T[]) {
   const questions = customerQuestions(messages);
 
-  for (const question of questions) {
+  // Operators must work the oldest unanswered customer question first so an
+  // earlier request cannot be hidden indefinitely by newer follow-ups.
+  for (const question of [...questions].reverse()) {
     const replies = repliesForQuestion(messages, question.id);
     const delivered = replies.some((reply) => reply.status === "delivered");
     if (!delivered) return { question, reply: replies[0] || null };

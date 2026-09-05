@@ -14,16 +14,18 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import { postgresSslOptions } from "./postgres-ssl.mjs";
+import { selectMigrationDatabase } from "./preview-database-guard.mjs";
 
-const rawUrl =
-  process.env.DATABASE_URL_MIGRATE ||
-  process.env.DATABASE_URL ||
-  "file:./takfornying.db";
-const databaseUrl = rawUrl;
+const { databaseUrl, previewFingerprint } = selectMigrationDatabase();
+if (previewFingerprint) {
+  console.log(
+    `Preview database branch verified (${previewFingerprint.slice(0, 16)}).`,
+  );
+}
 
 if (!databaseUrl.startsWith("postgres")) {
   console.log(
-    `Skipping migrations (DATABASE_URL is not Postgres: ${databaseUrl.slice(0, 32)}…).`,
+    "Skipping migrations because the configured database is not PostgreSQL.",
   );
   process.exit(0);
 }

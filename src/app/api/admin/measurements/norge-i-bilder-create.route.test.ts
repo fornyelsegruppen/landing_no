@@ -52,10 +52,17 @@ const lead = {
   houseNumber: "28A",
   postal: "1182",
   city: "OSLO",
+  addressVerificationStatus: "verified",
+  addressVerificationProvider: "kartverket-address-rest-v1",
+  addressVerificationProviderId: "kartverket-7",
+  addressLatitude: 59.8964,
+  addressLongitude: 10.798,
+  addressVerifiedAt: "2026-09-05T08:00:00.000Z",
 };
 const trustedAddress = {
   id: "kartverket-7",
   label: "Lyngveien 28A, 1182 OSLO",
+  streetAddress: "Lyngveien 28A",
   postalCode: "1182",
   city: "OSLO",
   latitude: 59.8964,
@@ -195,7 +202,7 @@ describe("POST /api/admin/measurements Norge i bilder capture integration", () =
     );
   });
 
-  it("overrides a malicious client address with the Lead's current Kartverket address", async () => {
+  it("overrides a malicious client address with the Lead's server-verified address", async () => {
     const response = await POST(
       new Request("https://preview.example/api/admin/measurements", {
         method: "POST",
@@ -216,7 +223,7 @@ describe("POST /api/admin/measurements Norge i bilder capture integration", () =
     );
 
     expect(response?.status).toBe(201);
-    expect(mocks.searchAddress).toHaveBeenCalledWith("Lyngveien 28A 1182 OSLO");
+    expect(mocks.searchAddress).not.toHaveBeenCalled();
     expect(mocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

@@ -1,34 +1,228 @@
 export type AdminNextCaseStageId =
-  | "inquiry"
-  | "measurement"
-  | "offer"
-  | "contract"
-  | "work";
+  "inquiry" | "evidence" | "commercial" | "agreement" | "work" | "completion";
 
 export type AdminNextCaseStageState =
-  | "complete"
-  | "current"
-  | "blocked"
-  | "upcoming";
+  "complete" | "current" | "blocked" | "upcoming";
+
+export type AdminNextCaseStage = {
+  id: AdminNextCaseStageId;
+  state: AdminNextCaseStageState;
+};
 
 export type AdminNextEvidenceKind =
-  | "measurement"
-  | "photo"
-  | "document"
-  | "communication";
+  "measurement" | "photo" | "document" | "communication";
 
 export type AdminNextEvidenceState = "verified" | "review" | "missing";
 
 export type AdminNextTimelineKind =
-  | "automation"
-  | "measurement"
-  | "message"
-  | "assignment";
+  "automation" | "measurement" | "message" | "assignment";
+
+export type AdminNextCaseCommunication = {
+  id: string;
+  direction: "inbound" | "outbound";
+  channel: string;
+  category: string;
+  status: string;
+  subject: string;
+  bodyText: string;
+  at: string;
+  sentAt?: string;
+  deliveredAt?: string;
+  replyToMessageId?: number;
+  delivery?: {
+    approvedAt?: string;
+    queuedAt?: string;
+    recipient?: string;
+    provider?: string;
+    providerMessageId?: string;
+    failureCode?: string;
+    failureMessage?: string;
+    reconciliationState?: "provider_accepted_unreconciled";
+    manualRecovery?: {
+      channel?: string;
+      status?: string;
+      preparedAt?: string;
+      contactedAt?: string;
+      resentAt?: string;
+    };
+  };
+  attachments: readonly {
+    id: string;
+    filename: string;
+    href: string;
+  }[];
+  fallbackHref: string;
+};
+
+export type AdminNextCaseCommunicationPage = {
+  items: readonly AdminNextCaseCommunication[];
+  pageInfo: {
+    remainingCount: number;
+    totalCount: number;
+    nextCursor: string | null;
+    loadMoreHref: string | null;
+  };
+};
+
+export type AdminNextCustomerQuestion = {
+  id: string;
+  subject: string;
+  bodyText: string;
+  channel: string;
+  receivedAt: string;
+  documentReferences: readonly string[];
+  replyStage:
+    "prepare" | "review" | "queued" | "sent" | "delivered" | "delivery_failed";
+  reply?: {
+    id: string;
+    subject: string;
+    bodyText: string;
+    status: string;
+    at: string;
+  };
+  fallbackHref: string;
+};
+
+export type AdminNextOriginalInquiry = {
+  receivedAt: string | null;
+  inquiryType: string | null;
+  message: string | null;
+  approximateAreaSquareMeters?: number | null;
+  areaProvenance?: "customer_reported_unverified";
+  contact: {
+    email: string | null;
+    phone: string | null;
+  };
+  address: {
+    streetAddress: string | null;
+    postalCode: string | null;
+    city: string | null;
+  };
+  photoCount: number;
+};
+
+export type AdminNextCustomerRecord = {
+  originalInquiry?: AdminNextOriginalInquiry;
+  activeReplyDraft?: {
+    id: number;
+    aiAssisted: boolean;
+    bodyText: string;
+    manualReplyRequiresEditing: boolean;
+    replyTarget?: {
+      id: number;
+      subject: string;
+      bodyText: string;
+    };
+    subject: string;
+    updatedAt: string;
+  };
+  questions: {
+    total: number;
+    unresolved: boolean;
+    outstanding: readonly AdminNextCustomerQuestion[];
+    active?: AdminNextCustomerQuestion;
+  };
+  communications: readonly AdminNextCaseCommunication[];
+  communicationPage?: AdminNextCaseCommunicationPage["pageInfo"];
+  commercialVersions: readonly {
+    id: string;
+    kind: "quote" | "contract";
+    reference: string;
+    version: number;
+    status: string;
+    role: "effective" | "working" | "historical";
+    supersedesReference?: string;
+    createdAt: string;
+    signedAt?: string;
+    companySignedAt?: string;
+    documentHash?: string;
+    pdfHref: string | null;
+    fallbackHref: string;
+  }[];
+  documents: readonly {
+    id: string;
+    filename: string;
+    classification: string;
+    mimeType: string;
+    createdAt: string;
+    ownerType?: string;
+    ownerId?: string;
+    href: string;
+  }[];
+  history: readonly {
+    id: string;
+    kind:
+      | "change"
+      | "contract"
+      | "contract_request"
+      | "document"
+      | "invoice"
+      | "lead"
+      | "measurement"
+      | "message"
+      | "price"
+      | "quote"
+      | "warranty"
+      | "work";
+    title: string;
+    status: string;
+    at: string;
+    href: string | null;
+  }[];
+};
+
+export type AdminNextCaseInteraction =
+  | { mode: "executable"; activation: "open_workbench" }
+  | { mode: "waiting"; waitingParty: "customer" | "system" | "worker" }
+  | {
+      mode: "read_only";
+      reason:
+        | "capability_denied"
+        | "diagnostic_blocker"
+        | "no_action"
+        | "target_unavailable";
+    };
+
+export type AdminNextAuditTimelineDetails = {
+  action: string;
+  label?: string;
+  actor: {
+    kind: AuditHistoryActorKind;
+    display: string | null;
+  };
+  atUtc: string;
+  changedFields: readonly string[];
+  changedFieldsStatus: "absent" | "projected" | "rejected";
+  result: AuditHistoryResult | null;
+  reason: string | null;
+  version: string | number | null;
+  source: string | null;
+  trace?: readonly string[];
+  correlationId: string;
+  integrity: {
+    hashStatus: AuditHistoryHashStatus;
+    tamperStatus: "not_assessable";
+  };
+};
+
+export type AdminNextTimelineState =
+  | { status: "ready"; source: "canonical" | "fixture" }
+  | {
+      status: "unavailable" | "denied";
+      source: "canonical";
+      reason: "audit_unavailable" | "audit_read_denied";
+    };
 
 export type AdminNextCaseWorkspaceView = {
+  leadId?: number;
+  caseRevision?: number;
   reference: string;
   customer: string;
   address: string;
+  addressVerification?: {
+    status: "manual" | "unverified" | "verification_failed" | "verified";
+    verifiedAt: string | null;
+  };
   service: string;
   status: "attention" | "on_track" | "waiting";
   owner: {
@@ -37,17 +231,26 @@ export type AdminNextCaseWorkspaceView = {
   };
   sla: {
     deadline: string;
-    remainingMinutes: number;
-    state: "overdue" | "due_soon" | "on_track";
+    remainingMinutes: number | null;
+    state: "overdue" | "due_soon" | "on_track" | "unknown";
   };
   nextAction: {
+    kind: CaseNextActionKind;
     title: string;
     reason: string;
+    label: string | null;
+    href: string | null;
+    processStage: CaseNextActionProcessStage;
+    requiredCapability: CaseNextActionCapability;
+    reviewMode: CaseNextActionReviewMode;
+    interaction: AdminNextCaseInteraction;
+    diagnosticBlocker?: {
+      code: string;
+      recovery: string;
+    };
   };
-  stages: readonly {
-    id: AdminNextCaseStageId;
-    state: AdminNextCaseStageState;
-  }[];
+  stages: readonly AdminNextCaseStage[];
+  customerRecord?: AdminNextCustomerRecord;
   evidence: readonly {
     id: string;
     kind: AdminNextEvidenceKind;
@@ -56,13 +259,15 @@ export type AdminNextCaseWorkspaceView = {
     summary: string;
     metric?: string;
     recordedAt: string;
-    fallbackHref: string;
+    fallbackHref: string | null;
     previewHref?: string;
     previewAction?: "review_measurement" | "document_preflight";
   }[];
   measurementReview?: {
     reference: string;
     state: "review_required" | "verified";
+    horizontalAreaSquareMeters?: number;
+    surfaceAreaSquareMeters?: number;
     areaSquareMeters: number;
     overallPitchDegrees?: number;
     perimeterMeters?: number;
@@ -157,7 +362,12 @@ export type AdminNextCaseWorkspaceView = {
       summary: string;
     }[];
     sequence: readonly {
-      id: "measurement_review" | "reload" | "verify_artifacts" | "owner_gate" | "send";
+      id:
+        | "measurement_review"
+        | "reload"
+        | "verify_artifacts"
+        | "owner_gate"
+        | "send";
       state: "current" | "locked" | "ready";
     }[];
     blocker: string;
@@ -171,7 +381,9 @@ export type AdminNextCaseWorkspaceView = {
     summary: string;
     at: string;
     actor: string;
+    audit?: AdminNextAuditTimelineDetails;
   }[];
+  timelineState: AdminNextTimelineState;
   fallback: {
     caseHref: string;
     documentsHref: string;
@@ -197,3 +409,14 @@ export function loadAdminNextCaseWorkspace(
 ) {
   return adapter.load(reference.trim().toUpperCase());
 }
+import type { CaseNextActionKind } from "@/lib/admin-v2/case-read-model";
+import type {
+  CaseNextActionCapability,
+  CaseNextActionProcessStage,
+  CaseNextActionReviewMode,
+} from "@/lib/admin-v2/case-next-action-presentation";
+import type {
+  AuditHistoryActorKind,
+  AuditHistoryHashStatus,
+  AuditHistoryResult,
+} from "@/lib/audit/audit-history-projection";

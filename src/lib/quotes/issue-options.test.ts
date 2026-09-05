@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildQuoteSnapshot } from "./document";
 
 const mocks = vi.hoisted(() => ({ issueToken: vi.fn(), revokeTokens: vi.fn() }));
@@ -12,12 +12,19 @@ function snapshot(reference: string, serviceKey: string, serviceDescription: str
 }
 
 describe("grouped quote issuing", () => {
+  afterEach(() => {
+    delete process.env.PREVIEW_E2E_NONBINDING_DOCUMENTS;
+    delete process.env.VERCEL_ENV;
+  });
+
   beforeEach(() => {
     mocks.revokeTokens.mockReset().mockResolvedValue(undefined);
     mocks.issueToken.mockReset().mockResolvedValueOnce({ token: "base-token", record: { id: 31 } }).mockResolvedValueOnce({ token: "recommended-token", record: { id: 32 } });
   });
 
   it("sends base and recommended alternatives in one message", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.PREVIEW_E2E_NONBINDING_DOCUMENTS = "true";
     const base = { id: 10, reference: "T-1-V2", lead: 1, version: 2, validUntil: "2099-09-01T00:00:00Z", status: "approved", optionKind: "base", siblingQuote: 11, snapshot: snapshot("T-1-V2", "takvask", "Takvask", 1_250_000) };
     const recommended = { id: 11, reference: "T-1-V3", lead: 1, version: 3, validUntil: "2099-09-01T00:00:00Z", status: "approved", optionKind: "recommended", siblingQuote: 10, snapshot: snapshot("T-1-V3", "takvask_impregnering", "Takvask og impregnering", 1_750_000) };
     const create = vi.fn().mockImplementation(async ({ data }: { data: unknown }) => ({ id: 90, ...(data as object) }));
@@ -28,12 +35,15 @@ describe("grouped quote issuing", () => {
       create,
     };
     const result = await issueQuoteCustomerLink(payload as never, 10);
-    const message = create.mock.calls[0][0].data as { bodyText: string };
+    const message = create.mock.calls[0][0].data as { bodyText: string; subject: string };
     expect(result.alternative?.quote.id).toBe(11);
     expect(message.bodyText).toContain("Opprinnelig forespørsel");
     expect(message.bodyText).toContain("Anbefalt alternativ");
     expect(message.bodyText).toContain("base-token");
     expect(message.bodyText).toContain("recommended-token");
+    expect(message.subject).toContain("[PREVIEW TEST] [IKKE BINDENDE]");
+    expect(message.bodyText).toContain("[PREVIEW TEST – IKKE BINDENDE]");
+    expect(message.bodyText).toContain("ingen bindende bestilling");
     expect(mocks.revokeTokens).toHaveBeenCalledTimes(2);
   });
 

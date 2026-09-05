@@ -9,6 +9,7 @@ import {
 const address: AddressCandidate = {
   id: "0301-1-1-0-0-Karl-Johans-gate-1",
   label: "Karl Johans gate 1, 0154 OSLO",
+  streetAddress: "Karl Johans gate 1",
   postalCode: "0154",
   city: "OSLO",
   latitude: 59.911377,

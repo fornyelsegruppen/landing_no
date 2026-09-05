@@ -1,9 +1,7 @@
 import type { PayloadRequest } from "payload";
 import { describe, expect, it, vi } from "vitest";
 import {
-  adminNextFixtureR4Adapter,
   createAdminNextRoofFusionR4Adapter,
-  loadAdminNextR4WithMissingCanonicalFallback,
   parseAdminNextR4CaseIdentityV1,
   projectRoofSnapshotToR4,
 } from "@/lib/admin-next/r4-read-adapter";
@@ -25,10 +23,10 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
       readLatestSnapshot: vi.fn().mockResolvedValue(snapshot),
       readSnapshot: vi.fn().mockResolvedValue(previous),
     };
-    const result = await createAdminNextRoofFusionR4Adapter(
-      reader,
-      admin,
-    ).load("TF-12", snapshot.snapshotId);
+    const result = await createAdminNextRoofFusionR4Adapter(reader, admin).load(
+      "TF-12",
+      snapshot.snapshotId,
+    );
 
     expect(reader.readLatestSnapshot).toHaveBeenCalledWith("lead:12", admin);
     expect(reader.readSnapshot).toHaveBeenCalledWith(
@@ -67,6 +65,57 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
         },
       },
     });
+    if (result.status !== "ready" || result.source !== "canonical") {
+      throw new Error("Expected canonical RF snapshot binding");
+    }
+    expect(result.binding.measurement).toEqual({
+      id: result.binding.snapshot.id,
+      revision: result.binding.snapshot.revision,
+    });
+  });
+
+  it("reads an exact snapshot for a pinned review context and exposes its canonical binding", async () => {
+    const plan = await buildRoofFusionPreviewUatGoldenPlanV1(12);
+    const snapshot = plan.finalSnapshot;
+    const previous = plan.snapshots.find(
+      (item) => item.snapshotId === snapshot.supersedesSnapshotId,
+    );
+    const reader = {
+      readLatestSnapshot: vi.fn(),
+      readSnapshot: vi.fn(async (_caseId: string, snapshotId: string) =>
+        snapshotId === snapshot.snapshotId ? snapshot : previous || null,
+      ),
+    };
+
+    const result = await createAdminNextRoofFusionR4Adapter(reader, admin).load(
+      "TF-12",
+      snapshot.snapshotId,
+      snapshot.snapshotId,
+    );
+
+    expect(reader.readLatestSnapshot).not.toHaveBeenCalled();
+    expect(reader.readSnapshot).toHaveBeenCalledWith(
+      "lead:12",
+      snapshot.snapshotId,
+      admin,
+    );
+    expect(result).toMatchObject({
+      status: "ready",
+      source: "canonical",
+      binding: {
+        measurement: {
+          id: snapshot.snapshotId,
+          revision: snapshot.revision,
+        },
+        snapshot: {
+          id: snapshot.snapshotId,
+          revision: snapshot.revision,
+          hash: snapshot.snapshotHash,
+          inputHash: snapshot.inputHash,
+          renderHash: snapshot.rendererPayload.renderHash,
+        },
+      },
+    });
   });
 
   it("rejects ambiguous case references before any repository read", async () => {
@@ -91,7 +140,7 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
     });
   });
 
-  it("uses the fixture only when the canonical snapshot is objectively absent", async () => {
+  it("returns a fail-closed missing result instead of substituting the fixture", async () => {
     const missingCanonical = createAdminNextRoofFusionR4Adapter(
       {
         readLatestSnapshot: vi.fn().mockResolvedValue(null),
@@ -99,18 +148,16 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
       },
       admin,
     );
-    await expect(
-      loadAdminNextR4WithMissingCanonicalFallback({
-        canonical: missingCanonical,
-        fixture: adminNextFixtureR4Adapter,
-        caseReference: "TF-1042",
-        measurementReference: "R4-2026-1042",
-      }),
-    ).resolves.toMatchObject({ status: "ready", source: "fixture" });
+    const result = await missingCanonical.load("TF-1042", "R4-2026-1042");
+    expect(result).toEqual({
+      status: "not_found",
+      reason: "canonical_snapshot_missing",
+    });
+    expect(JSON.stringify(result)).not.toContain("Demo ·");
+    expect(JSON.stringify(result)).not.toContain("TF-1042");
 
-    const snapshot = (
-      await buildRoofFusionPreviewUatGoldenPlanV1(1042)
-    ).finalSnapshot;
+    const snapshot = (await buildRoofFusionPreviewUatGoldenPlanV1(1042))
+      .finalSnapshot;
     const mismatch = createAdminNextRoofFusionR4Adapter(
       {
         readLatestSnapshot: vi.fn().mockResolvedValue(snapshot),
@@ -118,14 +165,7 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
       },
       admin,
     );
-    await expect(
-      loadAdminNextR4WithMissingCanonicalFallback({
-        canonical: mismatch,
-        fixture: adminNextFixtureR4Adapter,
-        caseReference: "TF-1042",
-        measurementReference: "R4-2026-1042",
-      }),
-    ).resolves.toEqual({
+    await expect(mismatch.load("TF-1042", "R4-2026-1042")).resolves.toEqual({
       status: "not_found",
       reason: "measurement_mismatch",
     });
@@ -150,11 +190,13 @@ describe("Admin Next authorized Roof Fusion R4 reader", () => {
     expect(result.surfaceAreaSquareMeters).toBeCloseTo(92.37604307, 8);
     expect(result.areaSquareMeters).toBeCloseTo(90.990402424, 8);
     expect(result.overallPitchDegrees).toBeUndefined();
-    expect(result.planes.every((surface) => surface.pitchDegrees === undefined)).toBe(
-      true,
-    );
     expect(
-      result.primarySlopes.every((surface) => surface.pitchDegrees === undefined),
+      result.planes.every((surface) => surface.pitchDegrees === undefined),
+    ).toBe(true);
+    expect(
+      result.primarySlopes.every(
+        (surface) => surface.pitchDegrees === undefined,
+      ),
     ).toBe(true);
   });
 });

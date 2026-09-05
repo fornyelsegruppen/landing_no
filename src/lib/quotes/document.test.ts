@@ -28,6 +28,32 @@ describe("locked quote and contract documents", () => {
     expect(documentHash(contract)).toBe(documentHash(structuredClone(contract)));
   });
 
+  it("retains the exact Roof Fusion lineage in quote and contract snapshots", () => {
+    const rfBinding = {
+      caseRevision: 3,
+      addressRevision: 2,
+      snapshotId: "rf-lead-1-r4-approved",
+      snapshotRevision: 4,
+      snapshotHash: "c".repeat(64),
+      sourceInputHash: "d".repeat(64),
+      rendererHash: "e".repeat(64),
+    };
+    const rfQuote = buildQuoteSnapshot({
+      ...quote,
+      measurement: { ...quote.measurement, rfBinding },
+    });
+    const rfContract = buildContractSnapshot({
+      contractReference: "K-1-V2",
+      quote: rfQuote,
+      customer: { name: "Test Kunde", address: "Testveien 1" },
+      terms: contract.terms,
+    });
+
+    expect(rfQuote.measurement.rfBinding).toEqual(rfBinding);
+    expect(rfContract.quote.measurement.rfBinding).toEqual(rfBinding);
+    expect(rfContract.quoteHash).toBe(documentHash(rfQuote));
+  });
+
   it("hashes the persisted JSON shape of optional values", () => {
     expect(documentHash({ required: "value", optional: undefined }))
       .toBe(documentHash({ required: "value" }));

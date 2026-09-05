@@ -20,17 +20,19 @@ import {
   enqueueMessageJob,
 } from "@/lib/messages/message-engine";
 import { createEmailProvider } from "@/lib/providers/email-provider";
-import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
+import type { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
 import {
   OpenStreetMapBuildingProvider,
   type BuildingFootprintCandidate,
 } from "@/lib/providers/osm-building-provider";
 import { updateCaseState } from "@/lib/cases/case-command";
 import { persistSchematicMeasurementEvidence } from "@/lib/measurements/persist-evidence";
+import { verifiedLeadAddressCandidate } from "@/lib/leads/address-verification";
 
 export type AutomaticPackageBlockCode =
   | "ADDRESS_REQUIRED"
   | "ADDRESS_NOT_FOUND"
+  | "ADDRESS_UNVERIFIED"
   | "BUILDING_NOT_FOUND"
   | "BUILDING_AMBIGUOUS"
   | "EVIDENCE_STORAGE_FAILED"
@@ -75,22 +77,6 @@ function usableAddress(value: unknown): value is string {
     value.trim().length >= 4 &&
     !/^ikke oppgitt$/i.test(value.trim())
   );
-}
-
-function uniqueAddressParts(parts: unknown[]) {
-  const seen = new Set<string>();
-  return parts
-    .filter(
-      (part): part is string =>
-        typeof part === "string" && part.trim().length > 0,
-    )
-    .map((part) => part.trim())
-    .filter((part) => {
-      const key = part.toLocaleLowerCase("nb-NO");
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
 }
 
 export function selectAutomaticBuildingCandidate(
@@ -234,27 +220,15 @@ export async function prepareAutomaticLeadMeasurement(
     );
   }
 
-  const query = uniqueAddressParts([
-    lead.address,
-    lead.houseNumber,
-    lead.postal,
-    lead.city,
-  ]).join(" ");
-  const addresses = await (
-    providers.addresses ?? new KartverketAddressProvider()
-  ).searchAddress(query);
-  if (!addresses.length) {
+  const address = verifiedLeadAddressCandidate(lead);
+  if (!address) {
     return markBlocked(
       payload,
       lead as typeof lead & Record<string, unknown>,
-      "ADDRESS_NOT_FOUND",
-      "Kartverket fant ikke adressen. Kontroller gate, husnummer og postnummer.",
+      "ADDRESS_UNVERIFIED",
+      "Adressen må verifiseres mot Kartverket på serveren før automatisk takmåling.",
     );
   }
-  const exactPostal = lead.postal
-    ? addresses.filter((address) => address.postalCode === lead.postal)
-    : addresses;
-  const address = exactPostal[0] ?? addresses[0];
   const candidates = await (
     providers.buildings ?? new OpenStreetMapBuildingProvider()
   ).findBuildings({
@@ -325,6 +299,7 @@ export async function prepareAutomaticLeadMeasurement(
       lead: leadId,
       version,
       supersedes: previousMeasurement?.id,
+      sourceKind: "legacy",
       measurementMode: "schematic",
       normalizedAddress: address.label,
       addressSourceId: address.id,

@@ -2,6 +2,26 @@ import type {
   AdminNextCaseWorkspaceAdapter,
   AdminNextCaseWorkspaceView,
 } from "@/lib/admin-next/case-workspace-contract";
+import {
+  ADMIN_NEXT_RF_ROUTE_VERSION,
+  buildAdminNextRfRoute,
+} from "@/lib/admin-next/rf-route-contract";
+
+const fixtureRfRoute = buildAdminNextRfRoute({
+  version: ADMIN_NEXT_RF_ROUTE_VERSION,
+  mode: "review",
+  case: { id: 1042, reference: "TF-1042", revision: 12 },
+  measurement: { id: "R4-2026-1042", revision: 7 },
+  snapshot: {
+    id: "R4-2026-1042",
+    revision: 7,
+    hash: "a".repeat(64),
+  },
+  blocker: "measurement.review_required",
+  evidence: ["EVD-R4-1042-01"],
+  returnTo:
+    "/admin-next-preview/cases/TF-1042?tab=evidence#case-evidence-title",
+});
 
 export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
   reference: "TF-1042",
@@ -19,17 +39,199 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
     state: "overdue",
   },
   nextAction: {
+    kind: "approve_measurement",
     title: "Patikrinti R4 matavimą",
     reason:
       "Matavimo patikimumas yra 82 %. Prieš pasiūlymą reikia patvirtinti du stogo kraštus.",
+    label: "Peržiūrėti R4",
+    href: fixtureRfRoute,
+    processStage: "evidence",
+    requiredCapability: "measurement.review_approve",
+    reviewMode: "review_and_commit",
+    interaction: { mode: "executable", activation: "open_workbench" },
   },
   stages: [
     { id: "inquiry", state: "complete" },
-    { id: "measurement", state: "current" },
-    { id: "offer", state: "blocked" },
-    { id: "contract", state: "upcoming" },
+    { id: "evidence", state: "current" },
+    { id: "commercial", state: "blocked" },
+    { id: "agreement", state: "upcoming" },
     { id: "work", state: "upcoming" },
+    { id: "completion", state: "upcoming" },
   ],
+  customerRecord: {
+    originalInquiry: {
+      receivedAt: "2026-09-03T14:40:00.000Z",
+      inquiryType: "takvask_impregnering",
+      message:
+        "Vi ønsker en vurdering av taket før vi bestemmer om impregnering.",
+      contact: {
+        email: "kari.nilsen@example.no",
+        phone: "+47 900 00 000",
+      },
+      address: {
+        streetAddress: "Testveien 12",
+        postalCode: "0164",
+        city: "Oslo",
+      },
+      photoCount: 2,
+    },
+    questions: {
+      total: 1,
+      unresolved: true,
+      outstanding: [
+        {
+          id: "message-104203",
+          subject: "Re: Tilbud på takfornyelse",
+          bodyText:
+            "Takk. Kan dere sende tilbudet i dag, og bekrefte at stillas er inkludert?",
+          channel: "email",
+          receivedAt: "2026-09-03T15:06:00.000Z",
+          documentReferences: ["T-1042-V1", "K-1042-V1"],
+          replyStage: "prepare",
+          fallbackHref: "/admin-v2/cases/1042",
+        },
+      ],
+      active: {
+        id: "message-104203",
+        subject: "Re: Tilbud på takfornyelse",
+        bodyText:
+          "Takk. Kan dere sende tilbudet i dag, og bekrefte at stillas er inkludert?",
+        channel: "email",
+        receivedAt: "2026-09-03T15:06:00.000Z",
+        documentReferences: ["T-1042-V1", "K-1042-V1"],
+        replyStage: "prepare",
+        fallbackHref: "/admin-v2/cases/1042",
+      },
+    },
+    communications: [
+      {
+        id: "message-104203",
+        direction: "inbound",
+        channel: "email",
+        category: "customer_question",
+        status: "received",
+        subject: "Re: Tilbud på takfornyelse",
+        bodyText:
+          "Takk. Kan dere sende tilbudet i dag, og bekrefte at stillas er inkludert?",
+        at: "2026-09-03T15:06:00.000Z",
+        replyToMessageId: 104202,
+        attachments: [],
+        fallbackHref: "/admin-v2/cases/1042#message-104203",
+      },
+      {
+        id: "message-104202",
+        direction: "outbound",
+        channel: "email",
+        category: "quote",
+        status: "delivered",
+        subject: "Tilbud på takfornyelse",
+        bodyText:
+          "Hei Kari. Vi har mottatt forespørselen og forbereder tilbud og avtalegrunnlag.",
+        at: "2026-09-03T14:58:00.000Z",
+        sentAt: "2026-09-03T14:57:00.000Z",
+        deliveredAt: "2026-09-03T14:58:00.000Z",
+        delivery: {
+          approvedAt: "2026-09-03T14:56:00.000Z",
+          queuedAt: "2026-09-03T14:56:30.000Z",
+          recipient: "kari.nilsen@example.no",
+          provider: "Resend",
+        },
+        attachments: [
+          {
+            id: "document-104201",
+            filename: "tilbud-T-1042-V1.pdf",
+            href: "/api/admin/media/104201",
+          },
+          {
+            id: "document-104202",
+            filename: "kontrakt-K-1042-V1.pdf",
+            href: "/api/admin/media/104202",
+          },
+        ],
+        fallbackHref: "/admin-v2/cases/1042#message-104202",
+      },
+    ],
+    communicationPage: {
+      totalCount: 27,
+      remainingCount: 25,
+      nextCursor: "mtlngbeo.28ei",
+      loadMoreHref: "/api/admin-next/cases/1042/communications",
+    },
+    commercialVersions: [
+      {
+        id: "contract-104201",
+        kind: "contract",
+        reference: "K-1042-V1",
+        version: 1,
+        status: "draft",
+        role: "working",
+        createdAt: "2026-09-03T15:12:00.000Z",
+        documentHash: "sha256:demo-contract-1042-v1",
+        pdfHref: "/api/admin/quotes/104201/pdf",
+        fallbackHref: "/admin-v2/cases/1042",
+      },
+      {
+        id: "quote-104201",
+        kind: "quote",
+        reference: "T-1042-V1",
+        version: 1,
+        status: "draft",
+        role: "working",
+        createdAt: "2026-09-03T15:10:00.000Z",
+        documentHash: "sha256:demo-quote-1042-v1",
+        pdfHref: "/api/admin/quotes/104201/pdf",
+        fallbackHref: "/admin-v2/cases/1042",
+      },
+    ],
+    documents: [
+      {
+        id: "document-104201",
+        filename: "tilbud-T-1042-V1.pdf",
+        classification: "quote",
+        mimeType: "application/pdf",
+        createdAt: "2026-09-03T15:10:00.000Z",
+        ownerType: "quote",
+        ownerId: "104201",
+        href: "/api/admin/media/104201",
+      },
+      {
+        id: "document-104202",
+        filename: "kontrakt-K-1042-V1.pdf",
+        classification: "contract",
+        mimeType: "application/pdf",
+        createdAt: "2026-09-03T15:12:00.000Z",
+        ownerType: "contract",
+        ownerId: "104201",
+        href: "/api/admin/media/104202",
+      },
+    ],
+    history: [
+      {
+        id: "message-104203-received",
+        kind: "message",
+        title: "Kundespørsmål mottatt",
+        status: "received",
+        at: "2026-09-03T15:06:00.000Z",
+        href: "/admin-v2/cases/1042#message-104203",
+      },
+      {
+        id: "message-104202-delivered",
+        kind: "message",
+        title: "E-post levert til kunden",
+        status: "delivered",
+        at: "2026-09-03T14:58:00.000Z",
+        href: "/admin-v2/cases/1042#message-104202",
+      },
+      {
+        id: "lead-1042-created",
+        kind: "lead",
+        title: "Forespørsel mottatt",
+        status: "new",
+        at: "2026-09-03T14:48:00.000Z",
+        href: "/admin-v2/cases/1042",
+      },
+    ],
+  },
   evidence: [
     {
       id: "R4-2026-1042",
@@ -40,8 +242,7 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       metric: "186,4 m² · 82 %",
       recordedAt: "08:41",
       fallbackHref: "/admin-v2/cases",
-      previewHref:
-        "/admin-next-preview/cases/TF-1042/measurements/R4-2026-1042",
+      previewHref: fixtureRfRoute,
       previewAction: "review_measurement",
     },
     {
@@ -79,6 +280,8 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
   measurementReview: {
     reference: "R4-2026-1042",
     state: "review_required",
+    horizontalAreaSquareMeters: 170.2,
+    surfaceAreaSquareMeters: 190.8,
     areaSquareMeters: 186.4,
     overallPitchDegrees: 22,
     perimeterMeters: 61.2,
@@ -116,15 +319,50 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       },
     ],
     primarySlopes: [
-      { id: "S1", areaSquareMeters: 54.2, pitchDegrees: 22, perimeterMeters: 31.8 },
-      { id: "S2", areaSquareMeters: 49.8, pitchDegrees: 24, perimeterMeters: 29.6 },
-      { id: "S3", areaSquareMeters: 43.6, pitchDegrees: 22, perimeterMeters: 27.4 },
-      { id: "S4", areaSquareMeters: 38.8, pitchDegrees: 17, perimeterMeters: 25.9 },
+      {
+        id: "S1",
+        areaSquareMeters: 54.2,
+        pitchDegrees: 22,
+        perimeterMeters: 31.8,
+      },
+      {
+        id: "S2",
+        areaSquareMeters: 49.8,
+        pitchDegrees: 24,
+        perimeterMeters: 29.6,
+      },
+      {
+        id: "S3",
+        areaSquareMeters: 43.6,
+        pitchDegrees: 22,
+        perimeterMeters: 27.4,
+      },
+      {
+        id: "S4",
+        areaSquareMeters: 38.8,
+        pitchDegrees: 17,
+        perimeterMeters: 25.9,
+      },
     ],
     photos: [
-      { id: "IMG-1042-N", label: "Šiaurinė stogo pusė", source: "Aerial source A", capturedAt: "2026-09-01 08:35" },
-      { id: "IMG-1042-S", label: "Pietinė stogo pusė", source: "Aerial source B", capturedAt: "2026-09-01 08:36" },
-      { id: "IMG-1042-C", label: "Kamino ir kraigo zona", source: "Field photo 07", capturedAt: "2026-09-01 08:37" },
+      {
+        id: "IMG-1042-N",
+        label: "Šiaurinė stogo pusė",
+        source: "Aerial source A",
+        capturedAt: "2026-09-01 08:35",
+      },
+      {
+        id: "IMG-1042-S",
+        label: "Pietinė stogo pusė",
+        source: "Aerial source B",
+        capturedAt: "2026-09-01 08:36",
+      },
+      {
+        id: "IMG-1042-C",
+        label: "Kamino ir kraigo zona",
+        source: "Field photo 07",
+        capturedAt: "2026-09-01 08:37",
+      },
     ],
     deltaFromR3: {
       areaSquareMeters: 3.8,
@@ -132,10 +370,22 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       planeCount: 1,
     },
     verificationGates: [
-      { id: "source_identity", state: "verified", detail: "Evidence ID ir checksum sutampa" },
+      {
+        id: "source_identity",
+        state: "verified",
+        detail: "Evidence ID ir checksum sutampa",
+      },
       { id: "plane_sum", state: "verified", detail: "S1–S4 suma yra 186,4 m²" },
-      { id: "review_edges", state: "review_required", detail: "E-04 ir E-11 dar nepatvirtinti" },
-      { id: "approval", state: "locked", detail: "Confirm laukia exact edge review" },
+      {
+        id: "review_edges",
+        state: "review_required",
+        detail: "E-04 ir E-11 dar nepatvirtinti",
+      },
+      {
+        id: "approval",
+        state: "locked",
+        detail: "Confirm laukia exact edge review",
+      },
     ],
     nextAction:
       "Palyginti E-04 ir E-11 kraštus su objekto nuotraukomis, tada patvirtinti arba pataisyti geometriją veikiančiame matavimo sraute.",
@@ -246,6 +496,7 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
       actor: "Takfornyelse CRM",
     },
   ],
+  timelineState: { status: "ready", source: "fixture" },
   fallback: {
     caseHref: "/admin-v2/cases",
     documentsHref: "/admin-v2/documents",
@@ -253,15 +504,16 @@ export const adminNextCaseWorkspaceFixture: AdminNextCaseWorkspaceView = {
   },
 };
 
-export const adminNextFixtureCaseWorkspaceAdapter: AdminNextCaseWorkspaceAdapter = {
-  async load(reference) {
-    if (reference !== adminNextCaseWorkspaceFixture.reference) {
-      return { status: "not_found" };
-    }
-    return {
-      status: "ready",
-      source: "fixture",
-      value: adminNextCaseWorkspaceFixture,
-    };
-  },
-};
+export const adminNextFixtureCaseWorkspaceAdapter: AdminNextCaseWorkspaceAdapter =
+  {
+    async load(reference) {
+      if (reference !== adminNextCaseWorkspaceFixture.reference) {
+        return { status: "not_found" };
+      }
+      return {
+        status: "ready",
+        source: "fixture",
+        value: adminNextCaseWorkspaceFixture,
+      };
+    },
+  };

@@ -5,6 +5,7 @@ import { CustomerQuote } from "@/components/quotes/customer-quote";
 import { getPayload } from "@/lib/payload";
 import { loadCustomerQuote } from "@/lib/quotes/customer-view";
 import { loadCustomerQuestionState } from "@/lib/messages/customer-question-state";
+import { previewNonbindingDocumentBrand } from "@/lib/platform/preview-nonbinding-documents";
 import "../../globals.css";
 
 const manrope = Manrope({
@@ -39,6 +40,7 @@ export default async function CustomerQuotePage({
     }),
   ]);
   const latestContractRequest = contractRequests.docs[0];
+  const nonbindingBrand = previewNonbindingDocumentBrand("nb");
   return (
     <html className={manrope.variable} lang="no">
       <body className="bg-background text-foreground min-h-svh font-sans antialiased">
@@ -63,6 +65,7 @@ export default async function CustomerQuotePage({
               : null
           }
           optionKind={view.optionKind}
+          nonbindingBrand={nonbindingBrand ?? undefined}
           measurementEvidenceHref={
             view.snapshot.quote.measurement.mode === "manual_no_visual"
               ? undefined

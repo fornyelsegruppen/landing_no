@@ -1,5 +1,4 @@
 import { headers } from "next/headers";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPayload } from "@/lib/payload";
 import {
@@ -12,7 +11,7 @@ import {
   type PanelLocale,
 } from "@/lib/panel-i18n";
 import { adminAccessDecision } from "@/lib/admin-v2/access";
-import { panelLanguagePreferenceCookie } from "@/lib/panel-language-preference";
+import { adminNextPreviewWorkQueueEntry } from "@/lib/admin-next/work-queue-navigation";
 
 export type InternalUser = {
   active: true;
@@ -32,11 +31,6 @@ export async function getInternalUser(): Promise<InternalUser | null> {
 
   if (!user || !role || !userIsActive(user)) return null;
 
-  const cookieStore = await cookies();
-  const savedInterfaceLanguage =
-    cookieStore.get(panelLanguagePreferenceCookie)?.value ??
-    cookieStore.get("tf_panel_language")?.value;
-
   return {
     active: true,
     displayName:
@@ -46,8 +40,7 @@ export async function getInternalUser(): Promise<InternalUser | null> {
     email: typeof user.email === "string" ? user.email : "",
     id: Number(user.id),
     interfaceLanguage: normalizePanelLocale(
-      savedInterfaceLanguage ??
-        ("interfaceLanguage" in user ? user.interfaceLanguage : null),
+      "interfaceLanguage" in user ? user.interfaceLanguage : null,
     ),
     role,
   };
@@ -59,10 +52,27 @@ export async function requireInternalUser() {
   return user;
 }
 
-export async function requireAdminUser() {
+export function adminLoginHref(
+  input: {
+    environment?: Pick<NodeJS.ProcessEnv, "VERCEL_ENV">;
+    returnTo?: string;
+  } = {},
+) {
+  const environment = input.environment ?? process.env;
+  const returnTo =
+    environment.VERCEL_ENV === "preview" &&
+    input.returnTo === adminNextPreviewWorkQueueEntry
+      ? adminNextPreviewWorkQueueEntry
+      : "/admin-v2";
+  return `/admin/login?redirect=${encodeURIComponent(returnTo)}`;
+}
+
+export async function requireAdminUser(options?: { loginReturnTo?: string }) {
   const user = await getInternalUser();
   const decision = adminAccessDecision(user);
-  if (decision === "login") redirect("/admin/login?redirect=%2Fadmin-v2");
+  if (decision === "login") {
+    redirect(adminLoginHref({ returnTo: options?.loginReturnTo }));
+  }
   if (decision === "worker-portal") redirect("/user");
   if (!user) throw new Error("Unreachable admin access state");
   return user;

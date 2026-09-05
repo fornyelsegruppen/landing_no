@@ -1,43 +1,499 @@
-import { AlertTriangle, CheckCircle2, Clock3, DatabaseBackup, MailCheck, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  DatabaseBackup,
+  Info,
+  Layers3,
+  ShieldCheck,
+} from "lucide-react";
+import type {
+  AdminNextCapabilityState,
+  AdminNextRolloutView,
+} from "@/lib/admin-next/rollout-view";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import { panelDateLocale } from "@/lib/panel-i18n";
+import {
+  featureEnvironmentKeys,
+  type FeatureFlagName,
+} from "@/lib/platform/features";
 import type { OperationalHealth, PlatformHealth } from "@/lib/platform/health";
 import type { buildReleaseGate } from "@/lib/platform/release-gate";
+import {
+  evidenceLabels,
+  featureLabels,
+  integrationLabels,
+  moduleLabels,
+  platformHealthCopy,
+  stateLabels,
+} from "./platform-health-copy";
 
 type ReleaseGate = ReturnType<typeof buildReleaseGate>;
 
-const copy = {
-  nb: { title: "Systemstatus og produksjonsport", intro: "Trygg driftsstatus uten nøkler eller kundedata.", ready: "Klar", attention: "Må rettes", disabled: "Deaktivert med vilje", production: "Produksjonsport", productionReady: "Alle aktive porter er godkjent", productionBlocked: "Produksjon er fortsatt blokkert", integrations: "Integrasjoner", operations: "Drift", lastJob: "Siste fullførte job", overdueJobs: "Forfalte jobber", failedJobs: "Feilede jobber", email: "Siste leverte e-post", emailFailures: "E-postfeil", seo: "Siste SEO-kjøring", seoFailures: "SEO-feil", quota: "Quota-varsler", backup: "Sist verifiserte backup", missing: "Ikke registrert", evidence: "Restore-bevis er registrert", noEvidence: "Restore-bevis mangler", blockers: "Aktive production-blokkeringer" },
-  lt: { title: "Sistemos būklė ir production vartai", intro: "Saugi veikimo santrauka be raktų ir klientų duomenų.", ready: "Paruošta", attention: "Reikia taisyti", disabled: "Sąmoningai išjungta", production: "Production vartai", productionReady: "Visi aktyvūs vartai patvirtinti", productionBlocked: "Production vis dar užblokuota", integrations: "Integracijos", operations: "Veikimas", lastJob: "Paskutinis sėkmingas job", overdueJobs: "Vėluojantys job", failedJobs: "Nepavykę job", email: "Paskutinis pristatytas laiškas", emailFailures: "El. pašto klaidos", seo: "Paskutinis SEO vykdymas", seoFailures: "SEO klaidos", quota: "Quota perspėjimai", backup: "Paskutinis patikrintas backup", missing: "Neužfiksuota", evidence: "Atkūrimo įrodymas užfiksuotas", noEvidence: "Atkūrimo įrodymo nėra", blockers: "Aktyvūs production blokavimai" },
-  en: { title: "System health and production gate", intro: "Safe operational summary without keys or customer data.", ready: "Ready", attention: "Needs attention", disabled: "Intentionally disabled", production: "Production gate", productionReady: "All active gates are approved", productionBlocked: "Production remains blocked", integrations: "Integrations", operations: "Operations", lastJob: "Last completed job", overdueJobs: "Overdue jobs", failedJobs: "Failed jobs", email: "Last delivered email", emailFailures: "Email failures", seo: "Last SEO run", seoFailures: "SEO failures", quota: "Quota warnings", backup: "Last verified backup", missing: "Not recorded", evidence: "Restore evidence is recorded", noEvidence: "Restore evidence is missing", blockers: "Active production blockers" },
-} as const;
-
 function tone(ok: boolean) {
-  return ok ? "border-emerald-400/25 bg-emerald-400/8 text-emerald-200" : "border-danger/35 bg-danger/10 text-white";
+  return ok
+    ? "border-emerald-400/25 bg-emerald-400/8 text-emerald-200"
+    : "border-[var(--an-danger)] bg-[color:rgba(244,63,94,.08)] text-[var(--an-text-primary)]";
 }
 
-export function PlatformHealthPanel({ health, locale, operational, releaseGate }: { health: PlatformHealth; locale: PanelLocale; operational: OperationalHealth; releaseGate: ReleaseGate }) {
-  const t = copy[locale];
-  const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : t.missing;
-  const stats = [
-    [t.lastJob, formatDate(operational.jobs.lastCompletedAt), operational.jobs.failed === 0 && operational.jobs.overdue === 0],
-    [t.overdueJobs, String(operational.jobs.overdue), operational.jobs.overdue === 0],
-    [t.failedJobs, String(operational.jobs.failed), operational.jobs.failed === 0],
-    [t.email, formatDate(operational.email.lastDeliveredAt), operational.email.failed === 0],
-    [t.emailFailures, String(operational.email.failed), operational.email.failed === 0],
-    [t.seo, formatDate(operational.seo.lastCompletedAt), operational.seo.failed === 0],
-    [t.seoFailures, String(operational.seo.failed), operational.seo.failed === 0],
-    [t.quota, String(operational.jobs.quotaWarnings), operational.jobs.quotaWarnings === 0],
-  ] as const;
-  const blockers = Object.entries(releaseGate.features).filter(([, item]) => item.status === "no_go");
+function stateTone(state: AdminNextCapabilityState) {
+  if (state === "preview_ready" || state === "enabled") return tone(true);
+  if (state === "planned" || state === "legacy_active") {
+    return "border-[var(--an-border)] bg-[var(--an-surface-soft)] text-[var(--an-text-muted)]";
+  }
+  return tone(false);
+}
 
-  return <section className="space-y-5 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 sm:p-6">
-    <header><p className="text-xs font-bold uppercase tracking-[.18em] text-accent">{t.production}</p><h2 className="mt-2 text-2xl font-bold">{t.title}</h2><p className="mt-2 text-sm text-muted-foreground">{t.intro}</p></header>
-    <div className={`flex items-start gap-3 rounded-2xl border p-4 ${tone(releaseGate.productionReady)}`}>{releaseGate.productionReady ? <ShieldCheck aria-hidden="true" className="mt-0.5 size-6 shrink-0"/> : <AlertTriangle aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-danger"/>}<div><strong>{releaseGate.productionReady ? t.productionReady : t.productionBlocked}</strong><p className="mt-1 text-sm opacity-80">GO {releaseGate.counts.go} · NO-GO {releaseGate.counts.noGo} · {t.disabled} {releaseGate.counts.disabled}</p></div></div>
-    <div><h3 className="mb-3 font-bold">{t.integrations}</h3><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.values(health.integrations).map((integration) => { const ok = integration.readiness === "ready"; const intentionallyDisabled = integration.readiness === "disabled"; return <article className={`rounded-2xl border p-4 ${intentionallyDisabled ? "border-white/10 bg-black/15" : tone(ok)}`} key={integration.name}><div className="flex items-center gap-2">{ok ? <CheckCircle2 aria-hidden="true" className="size-4"/> : <AlertTriangle aria-hidden="true" className="size-4"/>}<strong className="capitalize">{integration.name}</strong></div><p className="mt-2 text-sm">{intentionallyDisabled ? t.disabled : ok ? t.ready : t.attention} · {integration.provider}</p>{integration.missing.length ? <p className="mt-2 break-words text-xs opacity-75">{integration.missing.join(", ")}</p> : null}</article>; })}</div></div>
-    <div><h3 className="mb-3 font-bold">{t.operations}</h3><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{stats.map(([label, value, ok]) => <article className={`rounded-2xl border p-4 ${tone(ok)}`} key={label}><Clock3 aria-hidden="true" className="size-4"/><p className="mt-3 text-xs font-bold uppercase tracking-wider opacity-70">{label}</p><strong className="mt-1 block break-words text-lg">{value}</strong></article>)}</div></div>
-    <div className={`flex items-start gap-3 rounded-2xl border p-4 ${tone(Boolean(operational.backup.lastVerifiedAt && operational.backup.referenceConfigured))}`}><DatabaseBackup aria-hidden="true" className="mt-0.5 size-5 shrink-0"/><div><strong>{t.backup}: {formatDate(operational.backup.lastVerifiedAt)}</strong><p className="mt-1 text-sm opacity-80">{operational.backup.referenceConfigured ? t.evidence : t.noEvidence}</p></div></div>
-    {blockers.length ? <details className="rounded-2xl border border-danger/30 p-4"><summary className="cursor-pointer font-bold text-danger">{t.blockers} ({blockers.length})</summary><div className="mt-3 grid gap-2">{blockers.map(([name, item]) => <div className="rounded-xl bg-black/20 p-3 text-sm" key={name}><strong>{name}</strong><p className="mt-1 break-words text-muted-foreground">{[...item.unavailableIntegrations, ...item.missingEvidence].join(", ")}</p></div>)}</div></details> : null}
-    <p className="flex items-center gap-2 text-xs text-muted-foreground"><MailCheck aria-hidden="true" className="size-4"/> {new Intl.DateTimeFormat(panelDateLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(health.generatedAt))}</p>
-  </section>;
+function technicalList(values: readonly string[]) {
+  return values.length ? values.join(" · ") : "—";
+}
+
+export function PlatformHealthPanel({
+  headingLevel = "h2",
+  health,
+  locale,
+  operational,
+  releaseGate,
+  rollout,
+}: {
+  headingLevel?: "h1" | "h2";
+  health: PlatformHealth;
+  locale: PanelLocale;
+  operational: OperationalHealth;
+  releaseGate: ReleaseGate;
+  rollout: AdminNextRolloutView;
+}) {
+  const t = platformHealthCopy[locale];
+  const Title = headingLevel;
+  const formatDate = (value?: string) =>
+    value
+      ? new Intl.DateTimeFormat(panelDateLocale(locale), {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone: "Europe/Oslo",
+        }).format(new Date(value))
+      : t.missing;
+  const stats = [
+    [
+      t.lastJob,
+      formatDate(operational.jobs.lastCompletedAt),
+      operational.jobs.failed === 0 && operational.jobs.overdue === 0,
+    ],
+    [
+      t.overdueJobs,
+      String(operational.jobs.overdue),
+      operational.jobs.overdue === 0,
+    ],
+    [
+      t.failedJobs,
+      String(operational.jobs.failed),
+      operational.jobs.failed === 0,
+    ],
+    [
+      t.email,
+      formatDate(operational.email.lastDeliveredAt),
+      operational.email.failed === 0,
+    ],
+    [
+      t.emailFailures,
+      String(operational.email.failed),
+      operational.email.failed === 0,
+    ],
+    [
+      t.seo,
+      formatDate(operational.seo.lastCompletedAt),
+      operational.seo.failed === 0,
+    ],
+    [
+      t.seoFailures,
+      String(operational.seo.failed),
+      operational.seo.failed === 0,
+    ],
+    [
+      t.quota,
+      String(operational.jobs.quotaWarnings),
+      operational.jobs.quotaWarnings === 0,
+    ],
+  ] as const;
+  const featureDecisions = Object.entries(releaseGate.features) as [
+    FeatureFlagName,
+    ReleaseGate["features"][FeatureFlagName],
+  ][];
+  const activeBlockers = featureDecisions.filter(
+    ([, item]) => item.status === "no_go",
+  );
+  const availableModules = rollout.modules.filter(
+    (module) => module.state === "preview_ready" || module.state === "enabled",
+  ).length;
+  const limitedModules = rollout.modules.filter(
+    (module) =>
+      module.state === "implemented_disabled" ||
+      module.state === "blocked_configuration",
+  ).length;
+  const operationalIssueCount =
+    stats.filter(([, , ok]) => !ok).length +
+    (operational.backup.lastVerifiedAt && operational.backup.referenceConfigured
+      ? 0
+      : 1);
+  const previewReady =
+    rollout.state === "preview" &&
+    availableModules > 0 &&
+    limitedModules === 0 &&
+    operationalIssueCount === 0;
+  const previewHeading =
+    rollout.state === "legacy"
+      ? t.previewOff
+      : rollout.state === "active"
+        ? t.canonicalActive
+        : previewReady
+          ? t.previewReady
+          : t.previewAttention;
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6" data-system-health-dashboard>
+      <header className="max-w-3xl">
+        <p className="text-xs font-bold tracking-[.18em] text-[var(--an-action)] uppercase">
+          {t.title}
+        </p>
+        <Title className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+          {t.title}
+        </Title>
+        <p className="mt-3 text-[var(--an-text-muted)]">{t.intro}</p>
+      </header>
+
+      <section
+        aria-labelledby="preview-health-title"
+        className="space-y-4 rounded-3xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-5 sm:p-6"
+        data-preview-health-status={previewReady ? "ready" : "attention"}
+      >
+        <header className="max-w-3xl">
+          <p className="text-xs font-bold tracking-[.18em] text-[var(--an-action)] uppercase">
+            {t.previewEyebrow}
+          </p>
+          <h2 className="mt-2 text-2xl font-bold" id="preview-health-title">
+            {t.previewTitle}
+          </h2>
+          <p className="mt-2 text-sm text-[var(--an-text-muted)]">
+            {t.previewIntro}
+          </p>
+        </header>
+
+        <div
+          className={`flex items-start gap-3 rounded-2xl border p-4 ${tone(previewReady)}`}
+        >
+          {previewReady ? (
+            <CheckCircle2
+              aria-hidden="true"
+              className="mt-0.5 size-6 shrink-0"
+            />
+          ) : (
+            <AlertTriangle
+              aria-hidden="true"
+              className="mt-0.5 size-6 shrink-0 text-[var(--an-danger)]"
+            />
+          )}
+          <div>
+            <strong>{previewHeading}</strong>
+            <p className="mt-1 text-sm opacity-80">
+              {t.availableModules}: {availableModules} · {t.moduleAttention}:{" "}
+              {limitedModules} · {t.operationalSignals}: {operationalIssueCount}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-3">
+          <details
+            className="rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-4 lg:col-span-2"
+            data-preview-module-details
+          >
+            <summary className="cursor-pointer font-bold">{t.modules}</summary>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {rollout.modules.map((module) => {
+                const visibleDependencies = module.disabledDependencies.map(
+                  (feature) => featureLabels[locale][feature],
+                );
+                const visibleIntegrations = module.unavailableIntegrations.map(
+                  (integration) => integrationLabels[locale][integration],
+                );
+                return (
+                  <article
+                    className={`rounded-xl border p-3 ${stateTone(module.state)}`}
+                    key={module.id}
+                  >
+                    <div className="flex items-start gap-2">
+                      <Layers3
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <strong className="block">
+                          {moduleLabels[locale][module.id]}
+                        </strong>
+                        <span className="mt-1 block text-xs opacity-80">
+                          {stateLabels[locale][module.state]}
+                        </span>
+                      </div>
+                    </div>
+                    {visibleDependencies.length ||
+                    visibleIntegrations.length ? (
+                      <p className="mt-2 text-xs opacity-80">
+                        {[...visibleDependencies, ...visibleIntegrations].join(
+                          " · ",
+                        )}
+                      </p>
+                    ) : null}
+                    <details className="mt-3 border-t border-current/15 pt-2 text-xs">
+                      <summary className="cursor-pointer font-semibold">
+                        {t.technical}
+                      </summary>
+                      <dl className="mt-2 grid gap-1 break-words opacity-80">
+                        <div>
+                          <dt className="font-semibold">ID</dt>
+                          <dd>{module.id}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-semibold">{t.technicalCodes}</dt>
+                          <dd>
+                            {technicalList(
+                              module.dependencies.map(
+                                (feature) => featureEnvironmentKeys[feature],
+                              ),
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
+                  </article>
+                );
+              })}
+            </div>
+          </details>
+
+          <details className="rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-4">
+            <summary className="cursor-pointer font-bold">
+              {t.integrations}
+            </summary>
+            <div className="mt-4 grid gap-2">
+              {Object.values(health.integrations).map((integration) => {
+                const ok = integration.readiness === "ready";
+                const intentionallyDisabled =
+                  integration.readiness === "disabled";
+                return (
+                  <article
+                    className={`rounded-xl border p-3 ${
+                      intentionallyDisabled
+                        ? "border-[var(--an-border)] bg-[var(--an-surface-base)] text-[var(--an-text-muted)]"
+                        : tone(ok)
+                    }`}
+                    key={integration.name}
+                  >
+                    <div className="flex items-start gap-2">
+                      {ok ? (
+                        <CheckCircle2
+                          aria-hidden="true"
+                          className="mt-0.5 size-4 shrink-0"
+                        />
+                      ) : (
+                        <AlertTriangle
+                          aria-hidden="true"
+                          className="mt-0.5 size-4 shrink-0"
+                        />
+                      )}
+                      <div>
+                        <strong>
+                          {integrationLabels[locale][integration.name]}
+                        </strong>
+                        <p className="mt-1 text-xs opacity-80">
+                          {intentionallyDisabled
+                            ? t.disabled
+                            : ok
+                              ? t.ready
+                              : t.attention}
+                        </p>
+                      </div>
+                    </div>
+                    <details className="mt-2 border-t border-current/15 pt-2 text-xs">
+                      <summary className="cursor-pointer font-semibold">
+                        {t.technical}
+                      </summary>
+                      <p className="mt-2 break-words opacity-80">
+                        {t.provider}: {integration.provider}
+                        {integration.missing.length
+                          ? ` · ${t.technicalCodes}: ${technicalList(
+                              integration.missing,
+                            )}`
+                          : ""}
+                      </p>
+                    </details>
+                  </article>
+                );
+              })}
+            </div>
+          </details>
+        </div>
+
+        <details className="rounded-2xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-4">
+          <summary className="cursor-pointer font-bold">{t.operations}</summary>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map(([label, value, ok]) => (
+              <article
+                className={`rounded-xl border p-3 ${tone(ok)}`}
+                key={label}
+              >
+                <Clock3 aria-hidden="true" className="size-4" />
+                <p className="mt-2 text-xs font-bold tracking-wider uppercase opacity-70">
+                  {label}
+                </p>
+                <strong className="mt-1 block text-base break-words">
+                  {value}
+                </strong>
+              </article>
+            ))}
+          </div>
+          <div
+            className={`mt-3 flex items-start gap-3 rounded-xl border p-3 ${tone(
+              Boolean(
+                operational.backup.lastVerifiedAt &&
+                operational.backup.referenceConfigured,
+              ),
+            )}`}
+          >
+            <DatabaseBackup
+              aria-hidden="true"
+              className="mt-0.5 size-5 shrink-0"
+            />
+            <div>
+              <strong>
+                {t.backup}: {formatDate(operational.backup.lastVerifiedAt)}
+              </strong>
+              <p className="mt-1 text-sm opacity-80">
+                {operational.backup.referenceConfigured
+                  ? t.evidence
+                  : t.noEvidence}
+              </p>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section
+        aria-labelledby="production-release-title"
+        className="space-y-4 rounded-3xl border border-[var(--an-border)] bg-[var(--an-surface-base)] p-5 sm:p-6"
+        data-production-release-gate={
+          releaseGate.productionReady ? "go" : "no_go"
+        }
+      >
+        <header className="max-w-3xl">
+          <p className="text-xs font-bold tracking-[.18em] text-[var(--an-amber)] uppercase">
+            {t.productionEyebrow}
+          </p>
+          <h2 className="mt-2 text-2xl font-bold" id="production-release-title">
+            {t.productionTitle}
+          </h2>
+          <p className="mt-2 text-sm text-[var(--an-text-muted)]">
+            {t.productionIntro}
+          </p>
+        </header>
+
+        <div
+          className={`flex items-start gap-3 rounded-2xl border p-4 ${tone(
+            releaseGate.productionReady,
+          )}`}
+        >
+          {releaseGate.productionReady ? (
+            <ShieldCheck
+              aria-hidden="true"
+              className="mt-0.5 size-6 shrink-0"
+            />
+          ) : (
+            <AlertTriangle
+              aria-hidden="true"
+              className="mt-0.5 size-6 shrink-0 text-[var(--an-danger)]"
+            />
+          )}
+          <div>
+            <strong>
+              {releaseGate.productionReady
+                ? t.productionReady
+                : t.productionBlocked}
+            </strong>
+            <p className="mt-1 text-sm opacity-80">
+              {t.go}: {releaseGate.counts.go} · {t.noGo}:{" "}
+              {releaseGate.counts.noGo} · {t.disabled}:{" "}
+              {releaseGate.counts.disabled}
+            </p>
+          </div>
+        </div>
+
+        {activeBlockers.length ? (
+          <details className="rounded-2xl border border-[var(--an-danger)] bg-[color:rgba(244,63,94,.06)] p-4">
+            <summary className="cursor-pointer font-bold text-[var(--an-danger)]">
+              {t.blockers} ({activeBlockers.length})
+            </summary>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {activeBlockers.map(([name, item]) => {
+                const humanRequirements = [
+                  ...item.unavailableIntegrations.map(
+                    (integration) => integrationLabels[locale][integration],
+                  ),
+                  ...item.missingEvidence.map(
+                    (requirement) =>
+                      evidenceLabels[locale][requirement] ||
+                      t.requirementPending,
+                  ),
+                ];
+                return (
+                  <article
+                    className="rounded-xl border border-[var(--an-border)] bg-[var(--an-surface-soft)] p-3"
+                    key={name}
+                  >
+                    <strong>{featureLabels[locale][name]}</strong>
+                    <p className="mt-2 text-xs font-semibold text-[var(--an-text-muted)]">
+                      {t.requirements}
+                    </p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-[var(--an-text-muted)]">
+                      {humanRequirements.map((requirement) => (
+                        <li key={requirement}>{requirement}</li>
+                      ))}
+                    </ul>
+                    <details className="mt-3 border-t border-[var(--an-border)] pt-2 text-xs text-[var(--an-text-muted)]">
+                      <summary className="cursor-pointer font-semibold text-[var(--an-text-primary)]">
+                        {t.technical}
+                      </summary>
+                      <dl className="mt-2 grid gap-2 break-words">
+                        <div>
+                          <dt className="font-semibold">{t.featureFlag}</dt>
+                          <dd>{item.flag}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-semibold">
+                            {t.missingIntegrations}
+                          </dt>
+                          <dd>{technicalList(item.unavailableIntegrations)}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-semibold">{t.missingEvidence}</dt>
+                          <dd>{technicalList(item.missingEvidence)}</dd>
+                        </div>
+                      </dl>
+                    </details>
+                  </article>
+                );
+              })}
+            </div>
+          </details>
+        ) : (
+          <p className="flex items-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-400/8 p-4 text-sm text-emerald-200">
+            <CheckCircle2 aria-hidden="true" className="size-4" />
+            {t.noBlockers}
+          </p>
+        )}
+      </section>
+
+      <p className="flex items-center gap-2 text-xs text-[var(--an-text-muted)]">
+        <Info aria-hidden="true" className="size-4" />
+        {t.generated}: {formatDate(health.generatedAt)}
+      </p>
+    </div>
+  );
 }

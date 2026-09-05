@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import type { PayloadRequest } from "payload";
 import {
   AdminNextRoofFusionUatControl,
@@ -11,16 +12,11 @@ import { resolveAdminNextPreviewAccess } from "@/lib/admin-next/preview-access";
 import { buildAdminNextRolloutView } from "@/lib/admin-next/rollout-view";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
+import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { KartverketAddressProvider } from "@/lib/providers/kartverket-address-provider";
-import {
-  KartverketHeightDataError,
-  KartverketHeightDataProvider,
-} from "@/lib/providers/kartverket-hoydedata-provider";
+import { KartverketHeightDataProvider } from "@/lib/providers/kartverket-hoydedata-provider";
 import { OpenStreetMapBuildingProvider } from "@/lib/providers/osm-building-provider";
-import {
-  buildRoofFusionHeightSurfacePreviewV1,
-  RoofFusionHeightSurfacePreviewError,
-} from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
+import { buildRoofFusionHeightSurfacePreviewV1 } from "@/lib/roof-fusion/hoydedata-surface-preview-v1";
 import { buildHeightSurfaceVisualizationV1 } from "@/lib/roof-fusion/hoydedata-surface-visualization-v1";
 import { PayloadRoofSnapshotRepositoryV1 } from "@/lib/roof-fusion/payload-repository-v1";
 import { buildRoofFusionOsmFootprintPreviewV1 } from "@/lib/roof-fusion/osm-footprint-preview-v1";
@@ -29,7 +25,12 @@ import {
   PayloadRoofFusionCaseAuthorizationV1,
 } from "@/lib/roof-fusion/preview-read-adapters-v1";
 import { prepareRoofFusionPreviewUatGoldenV1 } from "@/lib/roof-fusion/preview-uat-golden-v1";
-import { SimpleRoofPlaneSegmentationError } from "@/lib/roof-fusion/simple-roof-plane-segmentation-v1";
+import {
+  mapRoofFusionHeightActionFailureV1,
+  type RoofFusionHeightActionPhaseV1,
+} from "@/lib/roof-fusion/preview-height-action-failure-v1";
+
+export const maxDuration = 60;
 
 function manualRidgeFromFormV1(formData: FormData) {
   const names = ["ridgeFromX", "ridgeFromY", "ridgeToX", "ridgeToY"] as const;
@@ -176,8 +177,19 @@ export default async function AdminNextRoofFusionUatPage() {
   ): Promise<RoofFusionHeightAnalysisState> {
     "use server";
 
+    const actionDeadlineAtMs = Date.now() + 50_000;
     assertRoofFusionPreviewEnabledV1(process.env);
     await requireAdminUser();
+    const correlationId = correlationIdFromHeaders(await headers());
+    const fail = (phase: RoofFusionHeightActionPhaseV1, error: unknown) => {
+      const mapped = mapRoofFusionHeightActionFailureV1(
+        phase,
+        error,
+        correlationId,
+      );
+      console.warn(mapped.diagnostic.event, mapped.diagnostic);
+      return mapped.state;
+    };
     const query = String(formData.get("addressQuery") ?? "")
       .trim()
       .replace(/\s+/gu, " ");
@@ -192,24 +204,42 @@ export default async function AdminNextRoofFusionUatPage() {
       return { kind: "error", code: "INVALID_SELECTION" };
     }
 
+    // Re-resolve both public sources server-side. The client-selected ID is
+    // accepted only when it still belongs to this address lookup. A timeout
+    // here happens before Høydedata is read and must not be labeled as a
+    // height-provider failure.
+    let addresses;
     try {
-      // Re-resolve both public sources server-side. The client-selected ID is
-      // accepted only when it still belongs to this address lookup.
-      const addresses = await new KartverketAddressProvider().searchAddress(
-        query,
-      );
-      const address = addresses[0];
-      if (!address) return { kind: "error", code: "INVALID_SELECTION" };
-      const candidates =
-        await new OpenStreetMapBuildingProvider().findBuildings({
-          latitude: address.latitude,
-          longitude: address.longitude,
-        });
-      const candidate = candidates.find((item) => item.id === candidateId);
-      if (!candidate) return { kind: "error", code: "INVALID_SELECTION" };
-      const surface = await new KartverketHeightDataProvider().getSurface({
-        polygon: candidate.polygon,
+      addresses = await new KartverketAddressProvider().searchAddress(query);
+    } catch (error) {
+      return fail("address_revalidation", error);
+    }
+    const address = addresses[0];
+    if (!address) return { kind: "error", code: "INVALID_SELECTION" };
+    let candidates;
+    try {
+      candidates = await new OpenStreetMapBuildingProvider().findBuildings({
+        latitude: address.latitude,
+        longitude: address.longitude,
       });
+    } catch (error) {
+      return fail("building_revalidation", error);
+    }
+    const candidate = candidates.find((item) => item.id === candidateId);
+    if (!candidate) return { kind: "error", code: "INVALID_SELECTION" };
+
+    let surface;
+    try {
+      surface = await new KartverketHeightDataProvider().getSurface({
+        polygon: candidate.polygon,
+        cacheMode: "no-store",
+        deadlineAtMs: actionDeadlineAtMs,
+      });
+    } catch (error) {
+      return fail("height_fetch", error);
+    }
+
+    try {
       const preview = buildRoofFusionHeightSurfacePreviewV1({
         address,
         candidate,
@@ -226,24 +256,17 @@ export default async function AdminNextRoofFusionUatPage() {
         candidateId,
         summary: preview.summary,
         visualization,
+        surface,
       };
     } catch (error) {
-      if (
-        error instanceof RoofFusionHeightSurfacePreviewError ||
-        error instanceof SimpleRoofPlaneSegmentationError
-      ) {
-        return { kind: "error", code: "ROOF_NOT_DETECTED" };
-      }
-      if (error instanceof KartverketHeightDataError) {
-        return { kind: "error", code: "HEIGHT_DATA_UNAVAILABLE" };
-      }
-      return { kind: "error", code: "HEIGHT_DATA_UNAVAILABLE" };
+      return fail("height_processing", error);
     }
   }
 
   return (
     <AdminNextRoofFusionUatControl
       action={prepareR4Uat}
+      actorId={String(user.id)}
       addressLookupAction={lookupRealAddress}
       defaultCaseReference="TF-13"
       heightAnalysisAction={analyzeHeightSurface}

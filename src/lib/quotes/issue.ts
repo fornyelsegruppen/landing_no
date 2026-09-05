@@ -1,5 +1,6 @@
 import type { Payload } from "payload";
 import { makeIdempotencyKey } from "@/lib/jobs/idempotency";
+import { brandPreviewNonbindingEmail } from "@/lib/platform/preview-nonbinding-documents";
 import { siteConfig } from "@/lib/site";
 import { issueQuoteAccessToken, revokeQuoteAccessTokens } from "./customer-access";
 import { quoteDisplayModel } from "./document";
@@ -54,9 +55,13 @@ export async function issueQuoteCustomerLink(payload: Payload, quoteId: number) 
     `Lenken er personlig og gyldig til ${new Date(quote.validUntil).toLocaleDateString("nb-NO")}.`,
     "", "Vennlig hilsen", "Takfornyelse", siteConfig.phone,
   ].filter((line): line is string => line !== null).join("\n");
+  const email = brandPreviewNonbindingEmail({
+    subject: `Tilbud ${quote.reference} fra Takfornyelse`,
+    bodyText: body,
+  });
   const message = await payload.create({ collection: "messages", overrideAccess: true, data: {
     lead: lead.id, direction: "outbound", category: "quote", channel: "email",
-    subject: `Tilbud ${quote.reference} fra Takfornyelse`, bodyText: body, status: "draft",
+    subject: email.subject, bodyText: email.bodyText, status: "draft",
     idempotencyKey: makeIdempotencyKey("quote.issue", { quoteId: quote.id, accessTokenId: access.record.id, alternativeAccessTokenId: alternative?.accessRecordId }),
     aiAssisted: false, aiAnalysis: { quoteId: quote.id, contractId: contract.id, accessTokenId: access.record.id, alternativeQuoteId: alternative?.quote.id, alternativeContractId: alternative?.contract.id, alternativeAccessTokenId: alternative?.accessRecordId },
   } });

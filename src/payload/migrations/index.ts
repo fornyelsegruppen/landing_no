@@ -39,6 +39,11 @@ import * as migration_20260826_150000_customer_contract_requests from "./2026082
 import * as migration_20260827_090000_lead_inquiry_type_combined_service from "./20260827_090000_lead_inquiry_type_combined_service";
 import * as migration_20260827_230000_manual_contact_recovery from "./20260827_230000_manual_contact_recovery";
 import * as migration_20260901_120000_roof_fusion_v1 from "./20260901_120000_roof_fusion_v1";
+import * as migration_20260903_120000_roof_fusion_workbench_drafts from "./20260903_120000_roof_fusion_workbench_drafts";
+import * as migration_20260904_180000_preview_case_address_revisions from "./20260904_180000_preview_case_address_revisions";
+import * as migration_20260904_190000_preview_rf_offer_bridge from "./20260904_190000_preview_rf_offer_bridge";
+import * as migration_20260905_100000_lead_address_verification from "./20260905_100000_lead_address_verification";
+import * as migration_20260905_110000_active_question_reply_draft_unique from "./20260905_110000_active_question_reply_draft_unique";
 
 export const migrations = [
   {
@@ -245,5 +250,30 @@ export const migrations = [
     up: migration_20260901_120000_roof_fusion_v1.up,
     down: migration_20260901_120000_roof_fusion_v1.down,
     name: "20260901_120000_roof_fusion_v1",
+  },
+  {
+    up: migration_20260903_120000_roof_fusion_workbench_drafts.up,
+    down: migration_20260903_120000_roof_fusion_workbench_drafts.down,
+    name: "20260903_120000_roof_fusion_workbench_drafts",
+  },
+  {
+    up: migration_20260904_180000_preview_case_address_revisions.up,
+    down: migration_20260904_180000_preview_case_address_revisions.down,
+    name: "20260904_180000_preview_case_address_revisions",
+  },
+  {
+    up: migration_20260904_190000_preview_rf_offer_bridge.up,
+    down: migration_20260904_190000_preview_rf_offer_bridge.down,
+    name: "20260904_190000_preview_rf_offer_bridge",
+  },
+  {
+    up: migration_20260905_100000_lead_address_verification.up,
+    down: migration_20260905_100000_lead_address_verification.down,
+    name: "20260905_100000_lead_address_verification",
+  },
+  {
+    up: migration_20260905_110000_active_question_reply_draft_unique.up,
+    down: migration_20260905_110000_active_question_reply_draft_unique.down,
+    name: "20260905_110000_active_question_reply_draft_unique",
   },
 ];

@@ -1,22 +1,30 @@
 import { z } from "zod";
-import type { AddressCandidate, MapProvider, ProviderHealth } from "./contracts";
+import type {
+  AddressCandidate,
+  MapProvider,
+  ProviderHealth,
+} from "./contracts";
 
 const responseSchema = z.object({
-  adresser: z.array(z.object({
-    adressetekst: z.string(),
-    postnummer: z.string(),
-    poststed: z.string(),
-    kommunenummer: z.string(),
-    gardsnummer: z.number().int(),
-    bruksnummer: z.number().int(),
-    festenummer: z.number().int().optional().default(0),
-    undernummer: z.number().int().nullable().optional(),
-    representasjonspunkt: z.object({
-      epsg: z.string(),
-      lat: z.number(),
-      lon: z.number(),
-    }),
-  })).default([]),
+  adresser: z
+    .array(
+      z.object({
+        adressetekst: z.string(),
+        postnummer: z.string(),
+        poststed: z.string(),
+        kommunenummer: z.string(),
+        gardsnummer: z.number().int(),
+        bruksnummer: z.number().int(),
+        festenummer: z.number().int().optional().default(0),
+        undernummer: z.number().int().nullable().optional(),
+        representasjonspunkt: z.object({
+          epsg: z.string(),
+          lat: z.number(),
+          lon: z.number(),
+        }),
+      }),
+    )
+    .default([]),
 });
 
 export class KartverketAddressProvider implements MapProvider {
@@ -29,7 +37,8 @@ export class KartverketAddressProvider implements MapProvider {
     return {
       status: "ready",
       provider: "kartverket-address-rest-v1",
-      detail: "Official Matrikkelen address distribution; normally updated daily.",
+      detail:
+        "Official Matrikkelen address distribution; normally updated daily.",
     };
   }
 
@@ -44,14 +53,19 @@ export class KartverketAddressProvider implements MapProvider {
     url.searchParams.set("side", "0");
 
     const response = await this.fetcher(url, {
-      headers: { Accept: "application/json", "User-Agent": "Takfornyelse-address-validation/1.0" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Takfornyelse-address-validation/1.0",
+      },
       signal: AbortSignal.timeout(8_000),
     });
-    if (!response.ok) throw new Error(`Kartverket address lookup failed (${response.status})`);
+    if (!response.ok)
+      throw new Error(`Kartverket address lookup failed (${response.status})`);
     const parsed = responseSchema.parse(await response.json());
     return parsed.adresser.map((address) => ({
       id: `${address.kommunenummer}-${address.gardsnummer}-${address.bruksnummer}-${address.festenummer}-${address.undernummer ?? 0}-${address.adressetekst}`,
       label: `${address.adressetekst}, ${address.postnummer} ${address.poststed}`,
+      streetAddress: address.adressetekst,
       postalCode: address.postnummer,
       city: address.poststed,
       latitude: address.representasjonspunkt.lat,
@@ -71,19 +85,24 @@ export type ImageryAccess = {
 export function norgeIBilderAccess(): ImageryAccess {
   const hasDurableQuotaStore = Boolean(
     (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL) &&
-      (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN),
+    (process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN),
   );
   if (
     process.env.NORGE_I_BILDER_CAPTURE_APPROVAL_REFERENCE?.trim() &&
     process.env.NORGE_I_BILDER_CHROMIUM_PACK_URL?.trim() &&
     hasDurableQuotaStore
   ) {
-    return { status: "ready", provider: "norge-i-bilder", credits: "©norgeibilder.no" };
+    return {
+      status: "ready",
+      provider: "norge-i-bilder",
+      credits: "©norgeibilder.no",
+    };
   }
   return {
     status: "configuration_required",
     provider: "norge-i-bilder",
     credits: "©norgeibilder.no",
-    reason: "Written screenshot approval, the Chromium pack URL and durable capture quota storage are required before user-triggered capture.",
+    reason:
+      "Written screenshot approval, the Chromium pack URL and durable capture quota storage are required before user-triggered capture.",
   };
 }

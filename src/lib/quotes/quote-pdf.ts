@@ -7,6 +7,7 @@ import {
 import { createBrandedPdf, PDF_MARGIN, pdfSafe } from "@/lib/pdf/branded-pdf";
 import { formatNorwayDateTime } from "@/lib/norway-time";
 import { withdrawalFormCopy } from "@/content/withdrawal";
+import { previewNonbindingDocumentBrand } from "@/lib/platform/preview-nonbinding-documents";
 import {
   quoteDisplayModel,
   type CompanySignatureEvidenceRecord,
@@ -111,12 +112,27 @@ export async function buildQuoteContractPdf(input: {
   companyEvidence?: CompanySignatureEvidenceRecord;
   measurementEvidence?: PdfMeasurementEvidence;
 }) {
+  const nonbindingBrand = previewNonbindingDocumentBrand("nb");
   const pdf = await createBrandedPdf({
-    title: `Tilbud og kontrakt ${input.contract.contractReference}`,
-    subject: "Tilbud, håndverkerkontrakt og angrerettinformasjon",
+    title: `${nonbindingBrand ? `${nonbindingBrand.marker} ` : ""}Tilbud og kontrakt ${input.contract.contractReference}`,
+    subject: `${nonbindingBrand ? `${nonbindingBrand.marker} ` : ""}Tilbud, håndverkerkontrakt og angrerettinformasjon`,
+    ...(nonbindingBrand ? { documentMarker: nonbindingBrand.marker } : {}),
   });
   const model = quoteDisplayModel(input.contract.quote);
 
+  if (nonbindingBrand) {
+    pdf.text(nonbindingBrand.marker, {
+      size: 12.5,
+      strong: true,
+      color: rgb(0.58, 0.06, 0.06),
+      gap: 5,
+    });
+    pdf.text(nonbindingBrand.description, {
+      strong: true,
+      color: rgb(0.42, 0.08, 0.08),
+      gap: 12,
+    });
+  }
   pdf.text(`Tilbud og håndverkerkontrakt ${input.contract.contractReference}`, {
     size: 17,
     strong: true,

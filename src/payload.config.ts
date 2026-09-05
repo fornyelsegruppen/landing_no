@@ -43,9 +43,15 @@ import {
   RoofFusionCommands,
   RoofFusionSnapshots,
 } from "./payload/collections/RoofFusion";
+import { RoofFusionWorkbenchDrafts } from "./payload/collections/RoofFusionWorkbenchDrafts";
+import { CaseAddressRevisions } from "./payload/collections/CaseAddressRevisions";
+import { RoofFusionOfferCommands } from "./payload/collections/RoofFusionOfferCommands";
 import { migrations } from "./payload/migrations";
 import { resolvePayloadSecret } from "./lib/payload-secret";
 import { resolveAdminNextPreviewTrustedOrigin } from "./lib/auth/preview-trusted-origin";
+import { isPreviewCaseAddressCommandEnabled } from "./lib/cases/preview-case-address-feature";
+import { withPreviewEmailPolicy } from "./lib/messages/preview-payload-email-adapter";
+import { resolveSiteUrl } from "./lib/site";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -58,6 +64,8 @@ const databaseUrl = rawDatabaseUrl;
 const usePostgres = databaseUrl.startsWith("postgres");
 const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
 const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const previewCaseAddressTransactionsEnabled =
+  isPreviewCaseAddressCommandEnabled(process.env);
 
 function payloadFromAddress() {
   const configured = process.env.PAYLOAD_FROM_EMAIL?.trim();
@@ -67,10 +75,12 @@ function payloadFromAddress() {
 }
 
 const serverURL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000");
+  process.env.VERCEL_ENV === "preview"
+    ? resolveSiteUrl(process.env)
+    : process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : "http://localhost:3000");
 
 /** Origins allowed to use the auth cookie (CSRF). Must include every host where /admin is opened. */
 const trustedOrigins = Array.from(
@@ -105,11 +115,14 @@ const databaseAdapter = usePostgres
         idleTimeoutMillis: 20_000,
         connectionTimeoutMillis: 15_000,
       },
-      // Roof Fusion persists each snapshot and its command ledger entry as one
-      // append-only unit. Enable database transactions only with the independent
-      // Roof Fusion flag; the repository owns and closes every transaction.
+      // Roof Fusion and the Preview address command each persist an append-only
+      // ledger with their canonical write. Production never enables transactions
+      // from the Preview-only address flag.
       transactionOptions:
-        process.env.FEATURE_ROOF_FUSION_V1 === "true" ? undefined : false,
+        process.env.FEATURE_ROOF_FUSION_V1 === "true" ||
+        previewCaseAddressTransactionsEnabled
+          ? undefined
+          : false,
       // Production never auto-pushes; migrations handle schema.
       // Local/dev push stays available unless explicitly disabled.
       push: process.env.NODE_ENV !== "production",
@@ -125,11 +138,13 @@ const databaseAdapter = usePostgres
 export default buildConfig({
   serverURL,
   email: resendApiKey
-    ? resendAdapter({
-        apiKey: resendApiKey,
-        defaultFromAddress: payloadFromAddress(),
-        defaultFromName: "Takfornyelse",
-      })
+    ? withPreviewEmailPolicy(
+        resendAdapter({
+          apiKey: resendApiKey,
+          defaultFromAddress: payloadFromAddress(),
+          defaultFromName: "Takfornyelse",
+        }),
+      )
     : undefined,
   csrf: trustedOrigins,
   cors: trustedOrigins,
@@ -190,6 +205,9 @@ export default buildConfig({
     PrivateMedia,
     RoofFusionSnapshots,
     RoofFusionCommands,
+    RoofFusionWorkbenchDrafts,
+    CaseAddressRevisions,
+    RoofFusionOfferCommands,
   ],
   globals: [SiteSettings],
   editor: lexicalEditor(),

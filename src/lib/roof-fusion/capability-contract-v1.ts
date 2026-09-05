@@ -36,6 +36,26 @@ export const roofFusionCapabilityContractV1 = {
       payload: "roof-repository-command.v1#approve",
       scope: "case_scoped_internal",
     },
+    "roof_fusion.case_address.correct": {
+      actors: ["administrator"],
+      payload: "preview-case-address-command.v1",
+      scope: "preview_case_scoped_mutation",
+    },
+    "roof_fusion.draft.continue": {
+      actors: ["administrator"],
+      payload: "rf-draft-recovery-decision.v1#continue_old",
+      scope: "preview_case_scoped_mutation",
+    },
+    "roof_fusion.draft.create": {
+      actors: ["administrator"],
+      payload: "rf-draft-recovery-decision.v1#start_new",
+      scope: "preview_case_scoped_mutation",
+    },
+    "roof_fusion.offer.create_draft": {
+      actors: ["administrator"],
+      payload: "roof-fusion-offer-bridge-request.v1",
+      scope: "preview_case_scoped_mutation",
+    },
     "roof_fusion.renderer.read_approved": {
       actors: ["administrator", "assigned_worker", "customer", "pdf_service"],
       payload: "approved-roof-renderer-envelope.v1",

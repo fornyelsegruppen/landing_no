@@ -33,6 +33,15 @@ describe("Admin Next Case Workspace adapter boundary", () => {
     expect(result.source).toBe("fixture");
     expect(result.value.reference).toBe("TF-1042");
     expect(result.value.evidence).toHaveLength(4);
+    expect(result.value.stages.map(({ id }) => id)).toEqual([
+      "inquiry",
+      "evidence",
+      "commercial",
+      "agreement",
+      "work",
+      "completion",
+    ]);
+    expect(new Set(result.value.stages.map(({ id }) => id)).size).toBe(6);
     expect(result.value.measurementReview?.areaSquareMeters).toBe(186.4);
     expect(result.value.measurementReview?.confidencePercent).toBe(82);
     expect(result.value.measurementReview?.planes).toHaveLength(7);
@@ -50,11 +59,11 @@ describe("Admin Next Case Workspace adapter boundary", () => {
       adminNextCaseWorkspaceFixture.fallback.caseHref,
       adminNextCaseWorkspaceFixture.fallback.documentsHref,
       adminNextCaseWorkspaceFixture.fallback.workHref,
-      ...adminNextCaseWorkspaceFixture.evidence.map(({ fallbackHref }) =>
-        fallbackHref,
+      ...adminNextCaseWorkspaceFixture.evidence.map(
+        ({ fallbackHref }) => fallbackHref,
       ),
       adminNextCaseWorkspaceFixture.measurementReview?.fallbackHref || "",
-    ];
+    ].filter((href): href is string => Boolean(href));
 
     expect(hrefs.every((href) => href.startsWith("/admin-v2/"))).toBe(true);
   });
@@ -71,10 +80,7 @@ describe("Admin Next Case Workspace adapter boundary", () => {
       (total, slope) => total + slope.areaSquareMeters,
       0,
     );
-    expect(primarySlopeSum).toBeCloseTo(
-      measurement?.areaSquareMeters || 0,
-      5,
-    );
+    expect(primarySlopeSum).toBeCloseTo(measurement?.areaSquareMeters || 0, 5);
   });
 
   it("keeps PS-SEND-007 blocked until the exact measurement review completes", () => {
