@@ -216,7 +216,7 @@ export interface User {
   displayName?: string | null;
   phone?: string | null;
   /**
-   * Gjelder bare /user. Kundetekster, tilbud og kontrakter forblir på norsk.
+   * Brukes i ansatt-/adminpanelet og interne varsler til denne kontoen. Kundetekster, tilbud og kontrakter påvirkes ikke.
    */
   interfaceLanguage: "nb" | "lt" | "en";
   role: "admin" | "worker";

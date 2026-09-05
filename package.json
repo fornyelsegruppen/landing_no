@@ -18,7 +18,7 @@
     "test:e2e": "playwright test",
     "test:preview:auth-smoke": "node scripts/verify-protected-preview.mjs",
     "payload": "payload",
-    "generate:types": "payload generate:types",
+    "generate:types": "payload generate:types && prettier --write src/payload/payload-types.ts",
     "generate:importmap": "payload generate:importmap",
     "db:push": "node --env-file=.env scripts/push-schema-jiti.mjs",
     "db:bootstrap": "node --env-file=.env scripts/push-schema-jiti.mjs --baseline-current-migrations",
