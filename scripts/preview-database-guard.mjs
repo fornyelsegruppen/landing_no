@@ -40,11 +40,6 @@ export function assertPreviewMigrationDatabase(environment = process.env) {
     }
     return null;
   }
-  if (environment.DATABASE_URL_MIGRATE?.trim()) {
-    throw new Error(
-      "Refusing Preview migration while DATABASE_URL_MIGRATE overrides the deployment database branch.",
-    );
-  }
   const previewRuntimeUrl = environment.DATABASE_URL?.trim() || "";
   if (!previewRuntimeUrl) {
     throw new Error(
@@ -76,4 +71,16 @@ export function assertPreviewMigrationDatabase(environment = process.env) {
     );
   }
   return previewFingerprint;
+}
+
+export function selectMigrationDatabase(environment = process.env) {
+  const previewFingerprint = assertPreviewMigrationDatabase(environment);
+  const isVercelPreview = environment.VERCEL_ENV === "preview";
+  const databaseUrl = isVercelPreview
+    ? environment.DATABASE_URL?.trim() || ""
+    : environment.DATABASE_URL_MIGRATE ||
+      environment.DATABASE_URL ||
+      "file:./takfornying.db";
+
+  return { databaseUrl, previewFingerprint };
 }

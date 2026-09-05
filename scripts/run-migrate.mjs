@@ -14,23 +14,14 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import { postgresSslOptions } from "./postgres-ssl.mjs";
-import { assertPreviewMigrationDatabase } from "./preview-database-guard.mjs";
+import { selectMigrationDatabase } from "./preview-database-guard.mjs";
 
-const isVercelPreview = process.env.VERCEL_ENV === "preview";
-const previewRuntimeUrl = process.env.DATABASE_URL?.trim() || "";
-const previewFingerprint = assertPreviewMigrationDatabase();
+const { databaseUrl, previewFingerprint } = selectMigrationDatabase();
 if (previewFingerprint) {
   console.log(
     `Preview database branch verified (${previewFingerprint.slice(0, 16)}).`,
   );
 }
-
-const rawUrl = isVercelPreview
-  ? previewRuntimeUrl
-  : process.env.DATABASE_URL_MIGRATE ||
-    process.env.DATABASE_URL ||
-    "file:./takfornying.db";
-const databaseUrl = rawUrl;
 
 if (!databaseUrl.startsWith("postgres")) {
   console.log(

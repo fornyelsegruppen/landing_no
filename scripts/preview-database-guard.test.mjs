@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 import {
   assertPreviewMigrationDatabase,
   normalizedNeonEndpointId,
+  selectMigrationDatabase,
 } from "./preview-database-guard.mjs";
 
 const branchUrl =
@@ -49,13 +50,30 @@ describe("Preview migration database guard", () => {
     );
   });
 
-  it("rejects a static migration override", () => {
+  it("ignores a retained migration override and selects the injected Preview branch", () => {
+    const retainedUrl =
+      "postgres://user:secret@ep-retained-override.us-east-1.aws.neon.tech/app";
+    assert.deepEqual(
+      selectMigrationDatabase(
+        approvedEnvironment({ DATABASE_URL_MIGRATE: retainedUrl }),
+      ),
+      {
+        databaseUrl: branchUrl,
+        previewFingerprint: branchFingerprint,
+      },
+    );
+  });
+
+  it("never falls back to a retained migration override in Preview", () => {
     assert.throws(
       () =>
-        assertPreviewMigrationDatabase(
-          approvedEnvironment({ DATABASE_URL_MIGRATE: branchUrl }),
-        ),
-      /DATABASE_URL_MIGRATE overrides/,
+        selectMigrationDatabase({
+          ...approvedEnvironment(),
+          DATABASE_URL: "",
+          DATABASE_URL_MIGRATE:
+            "postgres://user:secret@ep-retained-override.us-east-1.aws.neon.tech/app",
+        }),
+      /deployment DATABASE_URL/,
     );
   });
 
@@ -71,12 +89,37 @@ describe("Preview migration database guard", () => {
       /endpoint fingerprint/,
     ],
     [
+      "malformed base fingerprint",
+      approvedEnvironment({
+        PREVIEW_BASE_DATABASE_ENDPOINT_SHA256: "not-a-hash",
+      }),
+      /endpoint fingerprint/,
+    ],
+    [
       "protected base endpoint",
       approvedEnvironment({
         DATABASE_URL:
           "postgres://user:secret@ep-protected-base.us-east-1.aws.neon.tech/app",
       }),
       /protected base branch/,
+    ],
+    [
+      "protected base pooler endpoint",
+      approvedEnvironment({
+        DATABASE_URL:
+          "postgres://user:secret@ep-protected-base-pooler.us-east-1.aws.neon.tech/app",
+      }),
+      /protected base branch/,
+    ],
+    [
+      "missing expected Neon project",
+      approvedEnvironment({ PREVIEW_EXPECTED_NEON_PROJECT_ID: "" }),
+      /project identity/,
+    ],
+    [
+      "missing actual Neon project",
+      approvedEnvironment({ NEON_PROJECT_ID: "" }),
+      /project identity/,
     ],
     [
       "wrong Neon project",
@@ -108,14 +151,29 @@ describe("Preview migration database guard", () => {
   }
 
   it("leaves non-Preview migration selection unchanged", () => {
-    assert.equal(
-      assertPreviewMigrationDatabase({
-        DATABASE_URL_MIGRATE:
-          "postgres://user:secret@production.example.test/app",
+    const productionUrl = "postgres://user:secret@production.example.test/app";
+    assert.deepEqual(
+      selectMigrationDatabase({
+        DATABASE_URL_MIGRATE: productionUrl,
+        DATABASE_URL: "postgres://user:secret@runtime.example.test/app",
         VERCEL_ENV: "production",
       }),
-      null,
+      { databaseUrl: productionUrl, previewFingerprint: null },
     );
+    assert.deepEqual(
+      selectMigrationDatabase({
+        DATABASE_URL: "postgres://user:secret@runtime.example.test/app",
+        VERCEL_ENV: "production",
+      }),
+      {
+        databaseUrl: "postgres://user:secret@runtime.example.test/app",
+        previewFingerprint: null,
+      },
+    );
+    assert.deepEqual(selectMigrationDatabase({}), {
+      databaseUrl: "file:./takfornying.db",
+      previewFingerprint: null,
+    });
   });
 
   it("rejects Preview release controls on a non-Preview deployment target", () => {
