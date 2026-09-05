@@ -185,8 +185,6 @@ export async function POST(request: Request) {
           : null,
         imageWidth: result.geoReference?.imageWidth ?? null,
         imageHeight: result.geoReference?.imageHeight ?? null,
-        requestedAddressId: parsed.data.address.id,
-        capturedAddressId: address.id,
         trainingProhibited: true,
       },
     });

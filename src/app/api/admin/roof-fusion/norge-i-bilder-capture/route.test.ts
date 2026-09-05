@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/payload", () => ({ getPayload: mocks.getPayload }));
-vi.mock("@/lib/audit/audit-event", () => ({ recordAuditEvent: mocks.audit }));
+vi.mock("@/lib/audit/audit-event", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/audit/audit-event")>()),
+  recordAuditEvent: mocks.audit,
+}));
 vi.mock("@/lib/audit/payload-audit-writer", () => ({
   createPayloadAuditWriter: vi.fn(() => vi.fn()),
 }));
@@ -36,6 +39,7 @@ vi.mock("@/lib/providers/kartverket-address-provider", () => ({
   },
 }));
 
+import { prepareAuditEvent } from "@/lib/audit/audit-event";
 import { POST } from "./route";
 
 function request(body: unknown, headers: Record<string, string> = {}) {
@@ -189,6 +193,9 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
         }),
       }),
     );
+    expect(() =>
+      prepareAuditEvent(mocks.audit.mock.calls[0]![1]),
+    ).not.toThrow();
   });
 
   it("captures the explicitly selected address instead of the test case address", async () => {
