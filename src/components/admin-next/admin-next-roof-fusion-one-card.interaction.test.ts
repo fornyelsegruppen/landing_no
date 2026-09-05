@@ -166,14 +166,14 @@ describe("Roof Fusion one-card Preview flow", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    expect(container.textContent).toContain("Vaizdas pridėtas prie bylos");
+    expect(container.textContent).toContain("Vaizdas gautas skaičiavimui");
 
     await act(async () => {
       root.render(renderCapture("success-remount", "way/123"));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(captureApi).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain("Vaizdas pridėtas prie bylos");
+    expect(container.textContent).toContain("Vaizdas gautas skaičiavimui");
   });
 
   it("normalizes the address-level capture key without including a building candidate", () => {

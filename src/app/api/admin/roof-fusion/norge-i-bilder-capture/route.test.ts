@@ -87,6 +87,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
         id: "0301-149-181",
         label: "Lyngveien 28A, 1182 OSLO",
         postalCode: "1182",
+        city: "OSLO",
         latitude: 59.8964,
         longitude: 10.798,
         source: "Kartverket",
@@ -101,6 +102,15 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
   const body = {
     leadId: 18,
     clickId: "88b9b81d-3a8d-48de-8e99-e29c9e781807",
+    address: {
+      id: "KVE:PostalAddress:0301:Lyngveien:28:A",
+      label: "Lyngveien 28A, Oslo",
+      postalCode: "1182",
+      city: "OSLO",
+      latitude: 59.896416,
+      longitude: 10.797993,
+      source: "Kartverket matrikkeladresser per Entur Geocoder v3",
+    },
   };
 
   it("requires same-origin browser intent before reading a case or opening Chromium", async () => {
@@ -132,6 +142,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
         id: "0301-149-181",
         label: "Lyngveien 28A, 1182 OSLO",
         postalCode: "1182",
+        city: "OSLO",
         latitude: 59.8964,
         longitude: 10.798,
         source: "Kartverket",
@@ -155,6 +166,7 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
     expect(mocks.findByID).toHaveBeenCalledWith(
       expect.objectContaining({ collection: "leads", id: 18 }),
     );
+    expect(mocks.searchAddress).toHaveBeenCalledWith(body.address.label);
     expect(mocks.capture).toHaveBeenCalledWith(
       expect.objectContaining({
         caseId: "lead-18",
@@ -177,6 +189,64 @@ describe("POST /api/admin/roof-fusion/norge-i-bilder-capture", () => {
         }),
       }),
     );
+  });
+
+  it("captures the explicitly selected address instead of the test case address", async () => {
+    const selectedAddress = {
+      id: "KVE:PostalAddress:0301:Simensbratveien:15",
+      label: "Simensbråtveien 15, Oslo",
+      postalCode: "1182",
+      city: "OSLO",
+      latitude: 59.900148,
+      longitude: 10.792366,
+      source: "Kartverket matrikkeladresser per Entur Geocoder v3",
+    };
+    mocks.searchAddress.mockResolvedValue([
+      {
+        id: "0301-200-300-0-0-Simensbråtveien 15",
+        label: "Simensbråtveien 15, 1182 OSLO",
+        postalCode: "1182",
+        city: "OSLO",
+        latitude: 59.90015,
+        longitude: 10.79236,
+        source: "Kartverket",
+      },
+    ]);
+
+    const response = await POST(request({ ...body, address: selectedAddress }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.searchAddress).toHaveBeenCalledWith(selectedAddress.label);
+    expect(mocks.capture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: "lead-18",
+        target: expect.objectContaining({
+          addressLabel: "Simensbråtveien 15, 1182 OSLO",
+          latitude: 59.90015,
+          longitude: 10.79236,
+        }),
+      }),
+    );
+  });
+
+  it("rejects a client-selected address that cannot be verified nearby", async () => {
+    const response = await POST(
+      request({
+        ...body,
+        address: {
+          ...body.address,
+          label: "Annen vei 1, Oslo",
+          latitude: 60.1,
+          longitude: 11.1,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Selected address could not be verified",
+    });
+    expect(mocks.capture).not.toHaveBeenCalled();
   });
 
   it("does not launch a browser for a missing concrete case", async () => {

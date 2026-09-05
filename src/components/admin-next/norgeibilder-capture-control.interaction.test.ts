@@ -83,8 +83,16 @@ describe("Norge i Bilder capture request identity", () => {
 
     await act(async () => root.render(renderAddress(addressA)));
     await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    expect(api).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ leadId: 13, address: addressA }),
+    );
     await act(async () => root.render(renderAddress(addressB)));
     await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    expect(api).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ leadId: 13, address: addressB }),
+    );
 
     await act(async () => {
       resolvers[0]!(resultFor(addressA, "91"));

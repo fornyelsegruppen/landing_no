@@ -37,6 +37,7 @@ import { NorgeMeasurementActions } from "./norge-measurement-actions";
 export type NorgeIBilderCaptureRequest = {
   leadId: number;
   clickId: string;
+  address: AddressCandidate;
 };
 
 export type NorgeIBilderCaptureResult = {
@@ -491,7 +492,7 @@ export function NorgeIBilderCaptureControl({
 
   const capture = useCallback(
     async (reason: "automatic" | "explicit") => {
-      if (!leadId) return;
+      if (!leadId || !address) return;
       const requestedCandidateId = selectedCandidateId;
       const registry = defaultCaptureDedupe;
       const dedupeKey = captureKey?.trim();
@@ -563,6 +564,7 @@ export function NorgeIBilderCaptureControl({
       const capturePromise = (api ?? requestNorgeIBilderCapture)({
         clickId,
         leadId,
+        address,
       }).then((result) => {
         if (!result.imageUrl) throw new Error("Tuščias vaizdo rezultatas");
         return result;
@@ -606,7 +608,14 @@ export function NorgeIBilderCaptureControl({
         });
       }
     },
-    [api, captureKey, leadId, onCaptureResultChange, selectedCandidateId],
+    [
+      address,
+      api,
+      captureKey,
+      leadId,
+      onCaptureResultChange,
+      selectedCandidateId,
+    ],
   );
 
   useEffect(() => {
@@ -649,8 +658,8 @@ export function NorgeIBilderCaptureControl({
           </p>
           <h3 className="mt-1 text-base font-black">Gauti stogo vaizdą</h3>
           <p className="mt-1 max-w-xl text-xs leading-5 text-[var(--an-muted)]">
-            Vienas darbuotojo inicijuotas vaizdas šiai bylai pagal serverio
-            patvirtintą bylos adresą. Nėra foninio ar masinio rinkimo. Šaltinis:
+            Vienas darbuotojo inicijuotas vaizdas pagal serverio patikrintą
+            pasirinktą adresą. Nėra foninio ar masinio rinkimo. Šaltinis:
             ©norgeibilder.no.
           </p>
         </div>
@@ -658,7 +667,7 @@ export function NorgeIBilderCaptureControl({
           type="button"
           id={leadId ? `roof-fusion-norge-capture-${leadId}` : undefined}
           onClick={() => void capture("explicit")}
-          disabled={busy || !leadId}
+          disabled={busy || !leadId || !address}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--an-amber)] px-4 text-sm font-black text-[var(--an-amber-ink)] disabled:cursor-wait disabled:opacity-70"
         >
           {busy ? (
@@ -669,9 +678,10 @@ export function NorgeIBilderCaptureControl({
           {busy ? "Gaunamas vaizdas…" : "Gauti vaizdą iš Norge i bilder"}
         </button>
       </div>
-      {!leadId ? (
+      {!leadId || !address ? (
         <p className="mt-3 text-xs font-bold text-amber-200" role="status">
-          Įveskite galiojantį bylos numerį (TF-N), kad galėtumėte gauti vaizdą.
+          Pasirinkite galiojantį adresą ir testinę bylą, kad galėtumėte gauti
+          vaizdą.
         </p>
       ) : null}
       {state.kind === "loading" ? (
@@ -702,8 +712,8 @@ export function NorgeIBilderCaptureControl({
           data-norgeibilder-preview="ready"
         >
           <div className="border-b border-emerald-400/20 px-3 py-2 text-xs text-emerald-100">
-            <strong>Bylos adresas:</strong>{" "}
-            {state.result.addressLabel ?? "patvirtintas serverio pagal bylą"}
+            <strong>Pasirinktas adresas:</strong>{" "}
+            {state.result.addressLabel ?? "patvirtintas serverio"}
           </div>
           <NorgeIBilderCaptureViewport
             attribution={state.result.attribution ?? "©norgeibilder.no"}
@@ -716,7 +726,7 @@ export function NorgeIBilderCaptureControl({
             <div>
               <p className="inline-flex items-center gap-2 text-xs font-black text-emerald-200">
                 <CheckCircle2 className="size-4" />
-                Vaizdas pridėtas prie bylos {caseReference}
+                Vaizdas gautas skaičiavimui ({caseReference})
                 {state.result.attempts && state.result.attempts > 1
                   ? ` · bandymai: ${state.result.attempts}`
                   : ""}
