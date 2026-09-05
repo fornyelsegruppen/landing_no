@@ -968,9 +968,9 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         return;
       }
       if (stage !== "skeleton" || !lineMode) return;
-      let constrainedPoint: RoofFusionPoint;
+      let outlineConstrainedPoint: RoofFusionPoint;
       try {
-        constrainedPoint = constrainWorkbenchPointToOutlineV1(
+        outlineConstrainedPoint = constrainWorkbenchPointToOutlineV1(
           point,
           draftOutline,
           endpointMetric,
@@ -984,12 +984,30 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         );
         return;
       }
-      const snapped =
-        constrainedPoint.x !== point.x || constrainedPoint.y !== point.y;
+      const constrainedPoint = endpointMetric
+        ? constrainRoofFusionDraggedEndpoint(
+            outlineConstrainedPoint,
+            draftOutline,
+            roofFusionLineJunctionTargets(
+              draftLines,
+              undefined,
+              outlineConstrainedPoint,
+            ),
+            endpointMetric,
+          )
+        : outlineConstrainedPoint;
+      const snappedToJunction =
+        constrainedPoint.x !== outlineConstrainedPoint.x ||
+        constrainedPoint.y !== outlineConstrainedPoint.y;
+      const snappedToOutline =
+        outlineConstrainedPoint.x !== point.x ||
+        outlineConstrainedPoint.y !== point.y;
       setLineCaptureNotice(
-        snapped
-          ? `Taškas magnetiškai pritrauktas prie patvirtinto kontūro (${WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX} px).`
-          : null,
+        snappedToJunction
+          ? `Taškas magnetiškai pritrauktas prie kraigo arba sąlajos jungties (${WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX} px).`
+          : snappedToOutline
+            ? `Taškas magnetiškai pritrauktas prie patvirtinto kontūro (${WORKBENCH_ENDPOINT_SNAP_TOLERANCE_PX} px).`
+            : null,
       );
       setLineCaptureProblem(null);
       if (!pendingLinePoint) {
@@ -1018,7 +1036,6 @@ export function AdminNextRoofFusionUnifiedWorkbench({
         draftLines.filter((line) => line.kind === lineMode).length + 1;
       setLineSequence((current) => current + 1);
       setPendingLinePoint(null);
-      setLineMode(null);
       setLineCaptureNotice(drawnLineSummary(lineMode, completedKindCount));
       onLineCapture?.(capturedLine);
     },

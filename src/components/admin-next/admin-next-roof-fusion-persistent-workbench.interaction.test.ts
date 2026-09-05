@@ -211,7 +211,10 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     await click("[data-roof-fusion-advanced-close]");
   };
 
-  const dispatchCanvasPointerActivation = async (clientX: number) => {
+  const dispatchCanvasPointerActivation = async (
+    clientX: number,
+    clientY = 200,
+  ) => {
     const canvas = container.querySelector<SVGSVGElement>(
       "[data-roof-fusion-canvas]",
     );
@@ -222,7 +225,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
           bubbles: true,
           button: 0,
           clientX,
-          clientY: 200,
+          clientY,
           isPrimary: true,
           pointerId: 1,
         }),
@@ -234,7 +237,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
           bubbles: true,
           button: 0,
           clientX,
-          clientY: 200,
+          clientY,
           isPrimary: true,
           pointerId: 1,
         }),
@@ -242,7 +245,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     });
   };
 
-  const dispatchCanvasClick = async (clientX: number) => {
+  const dispatchCanvasClick = async (clientX: number, clientY = 200) => {
     const canvas = container.querySelector<SVGSVGElement>(
       "[data-roof-fusion-canvas]",
     );
@@ -252,15 +255,15 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
         new MouseEvent("click", {
           bubbles: true,
           clientX,
-          clientY: 200,
+          clientY,
         }),
       );
     });
   };
 
-  const activateCanvasPoint = async (clientX: number) => {
-    await dispatchCanvasPointerActivation(clientX);
-    await dispatchCanvasClick(clientX);
+  const activateCanvasPoint = async (clientX: number, clientY = 200) => {
+    await dispatchCanvasPointerActivation(clientX, clientY);
+    await dispatchCanvasClick(clientX, clientY);
   };
 
   const panCanvas = async (fromX: number, toX: number) => {
@@ -1622,13 +1625,13 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       container
         .querySelector('[data-roof-fusion-line-mode="valley"]')
         ?.getAttribute("aria-pressed"),
-    ).toBe("false");
+    ).toBe("true");
     expect(buttonWithText("Dar viena sąlaja")).toBeDefined();
     await clickCanvasAt(500);
     expect(
       container.querySelector("[data-roof-fusion-pending-line-point]"),
-    ).toBeNull();
-    expect(renderedLines()).toHaveLength(2);
+    ).not.toBeNull();
+    expect(renderedLines()).toHaveLength(3);
 
     await click('[data-roof-fusion-line-mode="ridge"]');
     await clickCanvasAt(10);
@@ -1711,7 +1714,7 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
       container
         .querySelector('[data-roof-fusion-line-mode="ridge"]')
         ?.getAttribute("aria-pressed"),
-    ).toBe("false");
+    ).toBe("true");
 
     await click("[data-roof-fusion-undo-last-line]");
 
@@ -1738,6 +1741,57 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(latest?.source.sourceId).toBe(capture.sourceId);
     expect(stage()).toBe("skeleton");
     expect(container.textContent).toContain("300%");
+  });
+
+  it("snaps a newly drawn sąlaja to an existing ridge and keeps the tool active for another line", async () => {
+    await act(async () => {
+      root.render(renderWorkbench());
+      await flushAsyncWork();
+    });
+    await click('[data-roof-fusion-stage-tab="skeleton"]');
+    await click('[data-roof-fusion-line-mode="valley"]');
+
+    const canvasShell = container.querySelector<HTMLDivElement>(
+      "[data-roof-fusion-canvas-shell]",
+    );
+    expect(canvasShell).not.toBeNull();
+    canvasShell!.getBoundingClientRect = () =>
+      ({
+        bottom: 500,
+        height: 500,
+        left: 0,
+        right: 1_000,
+        top: 0,
+        width: 1_000,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) satisfies DOMRect;
+
+    // The saved ridge is at y=.5. A click 6 CSS px away must become a
+    // shared ridge/sąlaja junction before the line is persisted.
+    await activateCanvasPoint(500, 256);
+    expect(
+      container
+        .querySelector("[data-roof-fusion-pending-line-point]")
+        ?.getAttribute("cy"),
+    ).toBe("0.5");
+    expect(container.textContent).toContain(
+      "Taškas magnetiškai pritrauktas prie kraigo arba sąlajos jungties (14 px)",
+    );
+
+    await activateCanvasPoint(600, 250);
+    expect(renderedLines()).toHaveLength(2);
+    expect(
+      container
+        .querySelector('[data-roof-fusion-line-mode="valley"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    await activateCanvasPoint(496, 247);
+    expect(
+      container.querySelector("[data-roof-fusion-pending-line-point]"),
+    ).not.toBeNull();
   });
 
   it("rehydrates on save and explicit reload without resetting skeleton stage or zoom", async () => {
@@ -1862,7 +1916,6 @@ describe("AdminNextRoofFusionPersistentWorkbench interaction", () => {
     expect(container.textContent).toContain("300%");
     expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
-    await click('[data-roof-fusion-line-mode="ridge"]');
     await captureLine(350, 650);
     expect(renderedLines()).toHaveLength(3);
     expect(
