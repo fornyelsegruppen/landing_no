@@ -66,8 +66,9 @@ publication is part of preflight or deploy smoke.
 
 ## Fresh rollback evidence
 
-The authenticated Vercel rollback runbook is
-[`rollback-seo-ux-2026-09-12.md`](./rollback-seo-ux-2026-09-12.md).
+There is no separate rollback document on this clean release branch. The
+evidence and the two narrowly scoped recovery commands required for this
+candidate are recorded in this section; all commands remain unexecuted.
 
 Verified rollback target for both `takfornyelsenorge.no` and
 `www.takfornyelsenorge.no`:
@@ -81,9 +82,34 @@ target/state: production / READY
 The deployment is retained and authenticated inspection succeeds. Its inspect
 metadata has no `gitSource`/source-SHA field; source SHA is therefore `unknown`
 with CLI inspect property-list provenance. This is not fabricated as
-`412a6e9`. The exact two-alias rollback commands are in the rollback runbook
-and remain unexecuted. Old `takfornyelse.as` aliases are out of scope and must
-not be changed.
+`412a6e9`. Old `takfornyelse.as` aliases are out of scope and must not be
+changed.
+
+Immediately before any separately approved release, authenticate and re-check
+the project, both aliases, and the retained deployment:
+
+```powershell
+$Scope = 'darbasnorvegija4-8212s-projects'
+$Project = 'landing-no'
+$ProjectId = 'prj_MWKBmg22GIxgiGmTtbT9Om3469aI'
+$RollbackDeployment = 'dpl_GETi3v8dvpSxk8JgRbjtkFPoHga6'
+$RollbackImmutableUrl = 'https://landing-lizkuhfql-darbasnorvegija4-8212s-projects.vercel.app'
+function Invoke-Vercel59 { & npx.cmd --yes vercel@59.16.0 @args }
+
+Invoke-Vercel59 whoami
+Invoke-Vercel59 project inspect $ProjectId --scope $Scope
+Invoke-Vercel59 alias ls --scope $Scope
+Invoke-Vercel59 inspect $RollbackDeployment --scope $Scope --json
+```
+
+Only after an incident/rollback decision, the recovery operator may mutate the
+two new aliases and then re-run `alias ls` plus the public smoke checks. These
+commands are not part of deployment:
+
+```powershell
+Invoke-Vercel59 alias set $RollbackImmutableUrl takfornyelsenorge.no --scope $Scope
+Invoke-Vercel59 alias set $RollbackImmutableUrl www.takfornyelsenorge.no --scope $Scope
+```
 
 ## Configuration: verified names, desired explicit overrides, unknowns
 
@@ -91,8 +117,10 @@ The authenticated project-production env listing confirms names only; Vercel
 returns encrypted or hidden values and no secret was read or exported. It
 contains the relevant names `FEATURE_AI_DRAFTS`, `FEATURE_SEO_AUTO_PUBLISH`,
 `FEATURE_SEO_SCHEDULER`, `NEXT_PUBLIC_SITE_URL`, `LEAD_TO_EMAIL`, and
-`PLATFORM_OPERATING_MODE`. Target inspect confirms `arn1`, the six configured
-60-second functions, and the three configured cron paths match `vercel.json`.
+`PLATFORM_OPERATING_MODE`. A fresh read-only `project inspect landing-no --scope
+darbasnorvegija4-8212s-projects` confirms project ID
+`prj_MWKBmg22GIxgiGmTtbT9Om3469aI`, root directory `.`, Next.js preset, and
+Node.js `24.x`.
 
 `PUBLIC_SITE_URL` is intentionally omitted: the application uses
 `NEXT_PUBLIC_SITE_URL` for the relevant site/payload URL path; no release change
@@ -130,9 +158,14 @@ deployment but does not assign either custom domain because of `--skip-domain`.
 
 ```powershell
 $Scope = 'darbasnorvegija4-8212s-projects'
+$Project = 'landing-no'
+$ProjectId = 'prj_MWKBmg22GIxgiGmTtbT9Om3469aI'
 function Invoke-Vercel59 { & npx.cmd --yes vercel@59.16.0 @args }
 
-Invoke-Vercel59 deploy --prod --skip-domain --scope $Scope `
+# Read-only identity gate. Stop if project ID is not the value above.
+Invoke-Vercel59 project inspect $ProjectId --scope $Scope
+
+Invoke-Vercel59 deploy --prod --skip-domain --project $Project --scope $Scope `
   --build-env NEXT_PUBLIC_SITE_URL=https://takfornyelsenorge.no `
   --env NEXT_PUBLIC_SITE_URL=https://takfornyelsenorge.no `
   --env LEAD_TO_EMAIL=post@takfornyelsenorge.no `
@@ -147,9 +180,12 @@ Invoke-Vercel59 deploy --prod --skip-domain --scope $Scope `
 
 Do not pass secrets on this command line. Do not use local QA data, local
 build artifacts, a prebuilt upload, or a dummy production `DATABASE_URL`. Do
-not run `vercel alias set` as part of this step. Before assigning new aliases
-in a later, separately authorized step, re-read the rollback mapping and follow
-the rollback runbook.
+not run `vercel alias set` as part of this step. `--prod --skip-domain` still
+creates a production-environment deployment; it is not a neutral preview and
+may have project alias or cron consequences. A true remote build check requires
+a separately authorized preview deployment or an approved CI runner. Before
+assigning new aliases in a later, separately authorized step, re-read the
+rollback evidence above.
 
 ## Local verification and limits
 
@@ -165,12 +201,21 @@ The first isolated Turbopack `next build` attempt failed before application
 compilation because this Windows host installed the ARM `lightningcss` optional
 binary while the build uses portable x64 Node. After a clean x64 dependency
 install (the x64 binary was present and `process.arch` was `x64`), the isolated
-Webpack build still ended with `failed: true` in Next's compile-stage trace after
-232.8 seconds. It left no application error, TypeScript error, or schema error
-in the build diagnostics. Therefore a clean production build is **not verified**
-on this host and release remains blocked pending a successful fresh build in a
-compatible runner (or Vercel's build log after a separately authorized preview
-deployment). Do not treat a remote build as having run here.
+Webpack build recorded `failed: true` in Next's compile-stage trace after
+232.8 seconds (`run-webpack` 230.8 seconds; `next-build` 232.8 seconds).
+
+The x64 Node build process and its parent shell both exited. There was no saved
+stdout/stderr for that Webpack invocation, no application error, TypeScript
+error, or schema error in `.next/diagnostics`, and no same-day Windows
+Application Error/Windows Error Reporting event. The final process exit
+code/signal is unavailable. The available evidence proves only that Next marked
+the build as failed in its compile stage; it cannot distinguish an application
+compile failure from host/process termination or another runner limit. No new
+long build was started after this diagnostic review. A clean production build is
+therefore **not verified** and release remains blocked pending a successful
+fresh build in a compatible runner (or a separately authorized preview
+deployment with its Vercel build log). Do not treat a remote build as having run
+here.
 
 Post-deploy smoke, after user authorization and before any alias mutation, is
 limited to public new-domain `/no`, `/no/blogg`, sitemap, robots, and expected
