@@ -7,6 +7,7 @@ export function blogGenerationError(result: {
   const intro = {
     lt: "AI tekstas nepraėjo kokybės patikros. Straipsnis nesukurtas ir nepublikuotas.",
     no: "AI-teksten bestod ikke kvalitetskontrollen. Ingen artikkel ble opprettet eller publisert.",
+    nb: "AI-teksten bestod ikke kvalitetskontrollen. Ingen artikkel ble opprettet eller publisert.",
     en: "AI text did not pass quality review. No article was created or published.",
   }[locale];
   const details = (result.issues || []).map((issue) => {
