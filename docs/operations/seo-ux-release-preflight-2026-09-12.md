@@ -245,6 +245,8 @@ Completed on the clean branch:
 - diff checks confirm no schema/migration/DB-auth/public-redirect/mail-route
   source changes.
 
+### Historical local-only build failure
+
 The first isolated Turbopack `next build` attempt failed before application
 compilation because this Windows host installed the ARM `lightningcss` optional
 binary while the build uses portable x64 Node. After a clean x64 dependency
@@ -259,11 +261,10 @@ Application Error/Windows Error Reporting event. The final process exit
 code/signal is unavailable. The available evidence proves only that Next marked
 the build as failed in its compile stage; it cannot distinguish an application
 compile failure from host/process termination or another runner limit. No new
-long build was started after this diagnostic review. A clean production build is
-therefore **not verified** and release remains blocked pending a successful
-fresh build in a compatible runner (or a separately authorized preview
-deployment with its Vercel build log). Do not treat a remote build as having run
-here.
+long build was started after this diagnostic review. This is a historical
+local-host limitation, not the current remote-build result.
+
+### Remote candidate build: PASS; release configuration: NOT READY
 
 The one authorized remote candidate build subsequently passed on Vercel
 (`iad1`, 2 cores, 8 GB): dependency installation, `npm run build`, migration
@@ -272,7 +273,16 @@ and TypeScript all completed successfully. The build emitted expected CMS
 fallback messages because `PAYLOAD_BUILD_WITHOUT_DB=1` deliberately forbids
 database access during static generation; the runtime candidate inherits the
 existing database secret and the flag is build-only. This confirms a safe remote
-build, not a database-content or authenticated-admin write test.
+build, not a database-content or authenticated-admin write test. A `200` status
+for a page, blog index, sitemap, or robots file does **not** prove the intended
+published CMS/SEO content or sitemap entries are present while those build-time
+fallbacks are in use. A later release plan must verify that content explicitly.
+
+The candidate's empty provider keys, disabled AI, and empty cron secret are
+intentional candidate-only safety guards. They materially differ from the
+intended release configuration, so this deployment is **not a final release
+candidate and must not be promoted**. No second deployment is implied or
+authorized by this record.
 
 Post-build read-only evidence: authenticated candidate GET smoke for `/no`,
 `/no/blogg`, `/robots.txt`, `/sitemap.xml`, and `/admin/login` returned `200`;
