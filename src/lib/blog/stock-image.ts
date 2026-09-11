@@ -15,6 +15,7 @@ type StockPost = {
     provider?: string | null;
     assetId?: string | null;
   } | null;
+  heroImage?: unknown;
 };
 
 const queryByVariant: Record<NonNullable<StockPost["ctaVariant"]>, string> = {
@@ -56,6 +57,7 @@ function isUnchangedPexelsImage(
   imageAlt: string,
 ) {
   return (
+    !post.heroImage &&
     post.stockImage?.provider === "pexels" &&
     post.stockImage.assetId === assetId &&
     post.imageAlt?.trim() === imageAlt

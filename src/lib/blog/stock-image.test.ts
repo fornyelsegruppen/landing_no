@@ -203,6 +203,52 @@ describe("blog stock images", () => {
     expect(result.reviewInvalidated).toBe(false);
   });
 
+  it("invalidates scheduled review evidence when an uploaded hero overrides matching stock metadata", async () => {
+    const update = vi.fn(async (input) => ({ id: 24, ...input.data }));
+    const result = await attachPexelsStockImageToPost({
+      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      post: {
+        id: 24,
+        titleNo: "Takfornying",
+        editorialStatus: "scheduled",
+        imageAlt: "Pexels-bilde",
+        heroImage: 999,
+        stockImage: { provider: "pexels", assetId: "222" },
+      },
+      provider: {
+        search: vi.fn(async () => [
+          {
+            id: 222,
+            width: 2400,
+            height: 1350,
+            pageUrl: "https://www.pexels.com/photo/roof-222/",
+            photographer: "Matching Metadata",
+            photographerUrl: "https://www.pexels.com/@matching/",
+            alt: "",
+            imageUrl: "https://images.pexels.com/photos/222/roof.jpeg",
+          },
+        ]),
+      } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          heroImage: null,
+          editorialStatus: "human_review",
+          qualityScore: null,
+          qualityChecks: null,
+          reviewerName: null,
+          reviewedAt: null,
+          scheduledAt: null,
+          _status: "draft",
+        }),
+      }),
+    );
+    expect(result.reviewInvalidated).toBe(true);
+  });
+
   it("keeps an approved remote Pexels image when media storage is unavailable", async () => {
     const selected = {
       id: 456,
