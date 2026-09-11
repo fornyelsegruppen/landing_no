@@ -1,4 +1,5 @@
 .agents/
+tmp/
 .tmp-playwright-*/
 skills-lock.json
 node_modules/
