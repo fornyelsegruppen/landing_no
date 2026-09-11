@@ -1,0 +1,179 @@
+# SEO / Admin V2 UX release preflight — 2026-09-12
+
+## Status
+
+**BLOCKED — a clean production build has not completed on this host.**
+
+This document prepares a deployment command; it does not authorize or execute
+a deployment, alias assignment, environment mutation, DNS change, database
+operation, publication, or customer contact. The production-release decision
+remains a separate explicit user GO.
+
+## Clean release branch and source manifest
+
+| Item | Value |
+| --- | --- |
+| Branch | `codex/release-preflight-4adef31` |
+| Clean application candidate | `e11a895` |
+| Base | `4adef31e3016cb471c75f2238bd6614abf4ab847` |
+| Source scope | Four SEO fixes, two case-history UX commits, anchored-disclosure implementation and guard, and the case-process key fix only |
+
+The application commits, in order, are:
+
+```text
+e7f4986  fix(seo): use Pexels alt for stock images
+7c19ffe  fix(seo): isolate initial stock image QA trust
+33e8e55  fix(seo): reset review on stock asset change
+4018189  fix(seo): reset review for uploaded hero override
+94dd46b  fix(admin-v2): collapse older case messages
+d3831a2  test(admin-v2): cover collapsed message history
+950bc4a  fix(admin-v2): reveal anchored older messages
+a25b64c  fix(admin-v2): guard message fragment disclosure
+e11a895  fix(admin): key case process stage panels
+```
+
+The resulting application diff contains only these paths:
+
+```text
+src/app/(admin-shell)/admin-v2/cases/[id]/page.tsx
+src/components/admin-v2/case-message-history-disclosure.test.ts
+src/components/admin-v2/case-message-history-disclosure.tsx
+src/components/admin-v2/case-message-history.test.ts
+src/components/admin-v2/case-message-history.tsx
+src/lib/admin-v2/case-message-history.test.ts
+src/lib/admin-v2/case-message-history.ts
+src/lib/admin-v2/case-workspace-i18n.ts
+src/lib/blog/payload-blog-engine.ts
+src/lib/blog/stock-image.test.ts
+src/lib/blog/stock-image.ts
+src/payload/collections/Posts.test.ts
+```
+
+Excluded by construction: `d937cc8` local fixture seeding, the local candidate
+E2E test with synthetic credentials and IDs, generated `AGENTS.md`/`CLAUDE.md`,
+generated Payload import maps, local runtime, `node_modules`, SQLite files,
+environment files, and screenshots/artifacts.
+
+## Schema, data, routing, and contact boundary
+
+`git diff --name-only` from the base contains no migration, schema, Drizzle,
+lockfile, `vercel.json`, `next.config`, lead route, webhook, middleware, or
+public-redirect change. This release has no database migration and no data
+rollback requirement. It does not change mail routing in source; any delivery
+configuration below is a deployment-scoped explicit override, not a data change.
+No form submission, message send, resend, AI generation, Pexels request, or SEO
+publication is part of preflight or deploy smoke.
+
+## Fresh rollback evidence
+
+The authenticated Vercel rollback runbook is
+[`rollback-seo-ux-2026-09-12.md`](./rollback-seo-ux-2026-09-12.md).
+
+Verified rollback target for both `takfornyelsenorge.no` and
+`www.takfornyelsenorge.no`:
+
+```text
+deployment: dpl_GETi3v8dvpSxk8JgRbjtkFPoHga6
+immutable URL: https://landing-lizkuhfql-darbasnorvegija4-8212s-projects.vercel.app
+target/state: production / READY
+```
+
+The deployment is retained and authenticated inspection succeeds. Its inspect
+metadata has no `gitSource`/source-SHA field; source SHA is therefore `unknown`
+with CLI inspect property-list provenance. This is not fabricated as
+`412a6e9`. The exact two-alias rollback commands are in the rollback runbook
+and remain unexecuted. Old `takfornyelse.as` aliases are out of scope and must
+not be changed.
+
+## Configuration: verified names, desired explicit overrides, unknowns
+
+The authenticated project-production env listing confirms names only; Vercel
+returns encrypted or hidden values and no secret was read or exported. It
+contains the relevant names `FEATURE_AI_DRAFTS`, `FEATURE_SEO_AUTO_PUBLISH`,
+`FEATURE_SEO_SCHEDULER`, `NEXT_PUBLIC_SITE_URL`, `LEAD_TO_EMAIL`, and
+`PLATFORM_OPERATING_MODE`. Target inspect confirms `arn1`, the six configured
+60-second functions, and the three configured cron paths match `vercel.json`.
+
+`PUBLIC_SITE_URL` is intentionally omitted: the application uses
+`NEXT_PUBLIC_SITE_URL` for the relevant site/payload URL path; no release change
+is invented for an unused variable.
+
+The following are explicit desired overrides, drawn from the recorded
+new-domain/mail contract in `norge-admin-v2-seo-release-2026-09-11.md`. They
+are a planned deployment configuration, **not** evidence of the currently
+stored value:
+
+| Name | Planned value | Scope | Reason |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SITE_URL` | `https://takfornyelsenorge.no` | build + runtime | Canonical new-domain site URL. |
+| `LEAD_TO_EMAIL` | `post@takfornyelsenorge.no` | runtime | New-domain admin recipient contract. |
+| `LEAD_ADMIN_COPY_EMAIL` | `post@takfornyelse.as` | runtime | Preserves the recorded admin-copy route. |
+| `FEATURE_AI_DRAFTS` | `true` | build + runtime | Recorded controlled-pilot behavior. |
+| `FEATURE_SEO_AUTO_PUBLISH` | `false` | build + runtime | Keeps publication behind human review. |
+| `FEATURE_SEO_SCHEDULER` | `false` | build + runtime | Keeps scheduled generation disabled. |
+| `PUBLIC_HOST_REDIRECTS_ENABLED` | `false` | build + runtime | New-domain-only deployment; old redirect deployment remains untouched. |
+| `DATABASE_URL_MIGRATE` | `file:./seo-no-migrations.db` | build only | Isolates the package build migration step from production DB. |
+| `PAYLOAD_BUILD_WITHOUT_DB` | `1` | build only | Prevents Payload database access during build rendering. |
+
+Unknown current values are accepted only because the deployment plan sets the
+non-secret required values explicitly and inherits existing production secrets
+without reading, exporting, or overriding them. This includes database, mail,
+AI, Pexels, storage, and token credentials. Deployment-scoped current values for
+`LEAD_ADMIN_COPY_EMAIL` and `PUBLIC_HOST_REDIRECTS_ENABLED` are not available
+from read-only inspect and are intentionally called out rather than assumed.
+
+## Planned deployment command — do not execute
+
+Run only after a separate user Release GO, from this clean branch and with the
+authenticated account/team already checked. It creates a new production
+deployment but does not assign either custom domain because of `--skip-domain`.
+
+```powershell
+$Scope = 'darbasnorvegija4-8212s-projects'
+function Invoke-Vercel59 { & npx.cmd --yes vercel@59.16.0 @args }
+
+Invoke-Vercel59 deploy --prod --skip-domain --scope $Scope `
+  --build-env NEXT_PUBLIC_SITE_URL=https://takfornyelsenorge.no `
+  --env NEXT_PUBLIC_SITE_URL=https://takfornyelsenorge.no `
+  --env LEAD_TO_EMAIL=post@takfornyelsenorge.no `
+  --env LEAD_ADMIN_COPY_EMAIL=post@takfornyelse.as `
+  --build-env FEATURE_AI_DRAFTS=true --env FEATURE_AI_DRAFTS=true `
+  --build-env FEATURE_SEO_AUTO_PUBLISH=false --env FEATURE_SEO_AUTO_PUBLISH=false `
+  --build-env FEATURE_SEO_SCHEDULER=false --env FEATURE_SEO_SCHEDULER=false `
+  --build-env PUBLIC_HOST_REDIRECTS_ENABLED=false --env PUBLIC_HOST_REDIRECTS_ENABLED=false `
+  --build-env DATABASE_URL_MIGRATE=file:./seo-no-migrations.db `
+  --build-env PAYLOAD_BUILD_WITHOUT_DB=1
+```
+
+Do not pass secrets on this command line. Do not use local QA data, local
+build artifacts, a prebuilt upload, or a dummy production `DATABASE_URL`. Do
+not run `vercel alias set` as part of this step. Before assigning new aliases
+in a later, separately authorized step, re-read the rollback mapping and follow
+the rollback runbook.
+
+## Local verification and limits
+
+Completed on the clean branch:
+
+- targeted unit tests: 6 files / 39 tests passed;
+- TypeScript: `tsc --noEmit` passed;
+- targeted ESLint passed;
+- diff checks confirm no schema/migration/DB-auth/public-redirect/mail-route
+  source changes.
+
+The first isolated Turbopack `next build` attempt failed before application
+compilation because this Windows host installed the ARM `lightningcss` optional
+binary while the build uses portable x64 Node. After a clean x64 dependency
+install (the x64 binary was present and `process.arch` was `x64`), the isolated
+Webpack build still ended with `failed: true` in Next's compile-stage trace after
+232.8 seconds. It left no application error, TypeScript error, or schema error
+in the build diagnostics. Therefore a clean production build is **not verified**
+on this host and release remains blocked pending a successful fresh build in a
+compatible runner (or Vercel's build log after a separately authorized preview
+deployment). Do not treat a remote build as having run here.
+
+Post-deploy smoke, after user authorization and before any alias mutation, is
+limited to public new-domain `/no`, `/no/blogg`, sitemap, robots, and expected
+admin-login protection. An authenticated Admin V2 blog/case read-only smoke may
+be performed with the approved production operator account. No SEO generation,
+save, publish, contact send, resend, or old-domain alias action is authorized.
