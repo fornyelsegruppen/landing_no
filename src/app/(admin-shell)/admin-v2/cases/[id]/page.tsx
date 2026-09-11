@@ -1141,7 +1141,7 @@ export default async function AdminCasePage({
                   : undefined;
   const processStagePanels = {
     contact: (
-      <div className="grid gap-4">
+      <div className="grid gap-4" key="process-stage-contact">
         <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
@@ -1210,7 +1210,7 @@ export default async function AdminCasePage({
       </div>
     ),
     measurement: caseData.measurement ? (
-      <div className="grid gap-4">
+      <div className="grid gap-4" key="process-stage-measurement">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <strong>{caseData.measurement.reference}</strong>
@@ -1255,10 +1255,12 @@ export default async function AdminCasePage({
         ) : null}
       </div>
     ) : (
-      <p className="text-muted-foreground">{copy.missing}</p>
+      <p className="text-muted-foreground" key="process-stage-measurement">
+        {copy.missing}
+      </p>
     ),
     commercial: (
-      <div className="grid gap-4">
+      <div className="grid gap-4" key="process-stage-commercial">
         <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="text-muted-foreground text-xs">{copy.priceExVat}</dt>
@@ -1307,7 +1309,7 @@ export default async function AdminCasePage({
       </div>
     ),
     agreement: (
-      <div className="grid gap-4">
+      <div className="grid gap-4" key="process-stage-agreement">
         {caseData.contract ? (
           <div className="rounded-xl border border-white/10 bg-black/15 p-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1360,7 +1362,7 @@ export default async function AdminCasePage({
       </div>
     ),
     work: caseData.workOrder ? (
-      <div className="grid gap-4">
+      <div className="grid gap-4" key="process-stage-work">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <strong>{caseData.workOrder.reference}</strong>
           <Status
@@ -1400,10 +1402,15 @@ export default async function AdminCasePage({
         ) : null}
       </div>
     ) : (
-      <p className="text-muted-foreground">{copy.missing}</p>
+      <p className="text-muted-foreground" key="process-stage-work">
+        {copy.missing}
+      </p>
     ),
     completion: (
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className="grid gap-3 sm:grid-cols-2"
+        key="process-stage-completion"
+      >
         <div className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm">
           <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
             {copy.invoiceDraft}
