@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { prepareEditorialPost, validateEditorialPost } from "./editorial-policy";
 import { blogPostLanguageUrls } from "./routing";
+import { publicSeoOrigin } from "./canonical";
 import { safePreviewPath } from "@/lib/preview-path";
 import {
   captureLeadAttribution,
@@ -50,10 +51,10 @@ describe("manual article publishing and measured lead flow", () => {
     expect(
       blogPostLanguageUrls(
         { slug: "takvask-pris", ...published },
-        "https://www.takfornyelse.as",
+        publicSeoOrigin,
       ),
     ).toEqual({
-      no: "https://www.takfornyelse.as/no/blogg/takvask-pris",
+      no: "https://takfornyelsenorge.no/no/blogg/takvask-pris",
     });
 
     const values = new Map<string, string>();
@@ -64,7 +65,7 @@ describe("manual article publishing and measured lead flow", () => {
     storeContentSource(storage, "/no/blogg/takvask-pris", 1_000);
     expect(
       captureLeadAttribution(
-        "https://www.takfornyelse.as/no?utm_source=google",
+        "https://takfornyelsenorge.no/no?utm_source=google",
         "https://www.google.no/",
         readContentSource(storage, 2_000),
       ),

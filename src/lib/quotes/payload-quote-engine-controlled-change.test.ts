@@ -5,10 +5,13 @@ describe("controlled quote change", () => {
   const previousLegalReference = process.env.LEGAL_REVIEW_REFERENCE;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T12:00:00.000Z"));
     process.env.LEGAL_REVIEW_REFERENCE = "OWNER-APPROVED-CONTROLLED-PILOT-2026-08-26";
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     if (previousLegalReference === undefined) delete process.env.LEGAL_REVIEW_REFERENCE;
     else process.env.LEGAL_REVIEW_REFERENCE = previousLegalReference;
   });

@@ -5,6 +5,7 @@ import { GoogleSearchConsoleProvider } from "@/lib/providers/google-search-conso
 import { userIsAdmin } from "@/payload/access/roles";
 import { recommendContentAudit } from "@/lib/blog/content-audit";
 import { articleLeadMetrics } from "@/lib/blog/article-attribution";
+import { canonicalBlogUrl } from "@/lib/blog/canonical";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { createPayloadAuditWriter } from "@/lib/audit/payload-audit-writer";
 import { recordAuditEvent } from "@/lib/audit/audit-event";
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     const inspections = new Map<number, Awaited<ReturnType<GoogleSearchConsoleProvider["inspectUrl"]>>>();
     if (searchReady && searchConsole !== "degraded") {
       await Promise.all(posts.docs.map(async (post) => {
-        const publicUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://takfornyelsenorge.no"}/no/blogg/${post.slug}`;
+        const publicUrl = canonicalBlogUrl("no", post.slug);
         try { inspections.set(post.id, await provider.inspectUrl(publicUrl)); }
         catch (error) { inspectionFailures += 1; captureException(error, { route: "POST /api/admin/blog/performance", operation: "url-inspection", postId: post.id, correlationId }); }
       }));

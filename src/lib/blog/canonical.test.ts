@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { canonicalBlogUrl, publicSeoOrigin } from "./canonical";
 
 describe("public blog canonical URLs", () => {
+  afterEach(() => vi.unstubAllEnvs());
   it("always points Preview metadata at the final public domain", () => {
-    process.env.NEXT_PUBLIC_SITE_URL =
-      "https://landing-preview-example.vercel.app";
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://landing-preview-example.vercel.app");
 
-    expect(publicSeoOrigin).toBe("https://www.takfornyelse.as");
+    expect(publicSeoOrigin).toBe("https://takfornyelsenorge.no");
     expect(canonicalBlogUrl("no", "takmaling-pris")).toBe(
-      "https://www.takfornyelse.as/no/blogg/takmaling-pris",
+      "https://takfornyelsenorge.no/no/blogg/takmaling-pris",
     );
   });
 });
