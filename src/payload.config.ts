@@ -39,8 +39,10 @@ import { InvoiceRecords } from "./payload/collections/InvoiceRecords";
 import { Warranties } from "./payload/collections/Warranties";
 import { OfficialInvoices } from "./payload/collections/OfficialInvoices";
 import { CustomerContractRequests } from "./payload/collections/CustomerContractRequests";
-import { migrations } from "./payload/migrations";
+import { assertPayloadDatabaseStartupSafe } from "./lib/payload-database-safety";
 import { resolvePayloadSecret } from "./lib/payload-secret";
+
+assertPayloadDatabaseStartupSafe();
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -104,11 +106,12 @@ const databaseAdapter = usePostgres
       },
       // Avoid nested transaction connection grabs that stall with small pools.
       transactionOptions: false,
-      // Production never auto-pushes; migrations handle schema.
+      // Schema changes run only through the explicit migration command.
+      disableCreateDatabase: true,
+      // Production never auto-pushes.
       // Local/dev push stays available unless explicitly disabled.
       push: process.env.NODE_ENV !== "production",
       migrationDir,
-      prodMigrations: migrations,
     })
   : (await import("@payloadcms/db-sqlite")).sqliteAdapter({
       client: {
