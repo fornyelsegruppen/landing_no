@@ -15,7 +15,7 @@ No changes against the cutover base in public-host migration, proxy, contact for
 
 - Typecheck and ESLint passed.
 - Initial complete unit run: 1069 passed, one failed because an August quote fixture had expired against the real clock. Fixed only the test clock, not quote business logic. Targeted rerun of quote fixture, canonical and blog publishing flow: 3/3 passed.
-- Complete unit rerun pending final result at document creation.
+- Complete unit rerun passed: 232 files, 1070 tests.
 - `next build` passed with database-independent mode and dummy loopback PostgreSQL URL. This verifies compilation/static fallbacks, not live CMS access. Migration runner deliberately not executed against PostgreSQL.
 - First build attempts hit unavailable Google Fonts in sandbox and unsupported Windows ARM SQLite dependency; final build used network access and PostgreSQL adapter.
 - `git diff --check` passed.
