@@ -11,6 +11,10 @@ type StockPost = {
   ctaVariant?: "assessment" | "wash" | "renewal" | "new_roof" | null;
   imageAlt?: string | null;
   editorialStatus?: string | null;
+  stockImage?: {
+    provider?: string | null;
+    assetId?: string | null;
+  } | null;
 };
 
 const queryByVariant: Record<NonNullable<StockPost["ctaVariant"]>, string> = {
@@ -46,6 +50,18 @@ export function pexelsImageAlt(value?: string | null) {
   return description ? description.slice(0, 180) : "Pexels-bilde";
 }
 
+function isUnchangedPexelsImage(
+  post: StockPost,
+  assetId: string,
+  imageAlt: string,
+) {
+  return (
+    post.stockImage?.provider === "pexels" &&
+    post.stockImage.assetId === assetId &&
+    post.imageAlt?.trim() === imageAlt
+  );
+}
+
 export async function attachPexelsStockImageToPost(input: {
   payload: Payload;
   post: StockPost;
@@ -63,6 +79,9 @@ export async function attachPexelsStockImageToPost(input: {
     throw new TypeError("Fant ingen egnet Pexels-bilde for dette søket");
   const selectedAt = new Date().toISOString();
   const imageAlt = pexelsImageAlt(selected.alt);
+  const reviewInvalidated =
+    input.preserveInitialQuality !== true &&
+    !isUnchangedPexelsImage(input.post, String(selected.id), imageAlt);
   let media: Awaited<ReturnType<Payload["create"]>> | null = null;
   const persistToMedia = input.persistToMedia ?? shouldPersistPexelsMedia();
   if (persistToMedia) {
@@ -99,14 +118,25 @@ export async function attachPexelsStockImageToPost(input: {
     id: input.post.id,
     draft: true,
     overrideAccess: true,
-    // A later human-triggered stock replacement is deliberately untrusted,
-    // even if the post happens to still have the ai_qa status.
+    // A later human-triggered stock replacement invalidates prior QA/review
+    // evidence whenever its Pexels asset or factual alt text changes.
     ...(input.preserveInitialQuality === true
       ? { context: { trustedBlogQualityRevalidation: true } }
       : {}),
     data: {
       ...(media ? { heroImage: media.id } : { heroImage: null }),
       imageAlt,
+      ...(reviewInvalidated
+        ? {
+            _status: "draft" as const,
+            editorialStatus: "human_review" as const,
+            qualityScore: null,
+            qualityChecks: null,
+            reviewerName: null,
+            reviewedAt: null,
+            scheduledAt: null,
+          }
+        : {}),
       stockImage: {
         provider: "pexels",
         assetId: String(selected.id),
@@ -120,5 +150,5 @@ export async function attachPexelsStockImageToPost(input: {
       },
     },
   });
-  return { post, media, selected, query };
+  return { post, media, selected, query, reviewInvalidated };
 }
