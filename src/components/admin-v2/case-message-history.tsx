@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { splitCaseMessageHistory } from "@/lib/admin-v2/case-message-history";
+import { CaseMessageHistoryDisclosure } from "./case-message-history-disclosure";
 
 export function CaseMessageHistory<T extends { id: string | number }>({
   excludedMessageId,
@@ -23,14 +24,11 @@ export function CaseMessageHistory<T extends { id: string | number }>({
     <div className="grid min-w-0 gap-3">
       {recent.map(renderMessage)}
       {older.length ? (
-        <details className="rounded-2xl border border-white/10 bg-black/10 p-4">
-          <summary className="hover:text-accent cursor-pointer font-semibold">
-            {olderLabel} ({older.length})
-          </summary>
-          <div className="mt-3 grid min-w-0 gap-3">
-            {older.map(renderMessage)}
-          </div>
-        </details>
+        <CaseMessageHistoryDisclosure
+          summary={`${olderLabel} (${older.length})`}
+        >
+          {older.map(renderMessage)}
+        </CaseMessageHistoryDisclosure>
       ) : null}
     </div>
   );
