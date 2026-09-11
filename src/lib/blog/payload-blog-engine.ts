@@ -352,6 +352,7 @@ export async function generateNextPayloadBlogDraft(input: {
           payload: input.payload,
           post,
           provider: stockProvider,
+          preserveInitialQuality: true,
         });
         post = stockResult.post;
       } catch {

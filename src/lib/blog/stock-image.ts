@@ -52,6 +52,8 @@ export async function attachPexelsStockImageToPost(input: {
   query?: string;
   provider?: PexelsStockImageProvider;
   persistToMedia?: boolean;
+  /** Only the generator's server-side initial enrichment may set this. */
+  preserveInitialQuality?: boolean;
 }) {
   const provider = input.provider || new PexelsStockImageProvider();
   const query = stockQueryForPost(input.post, input.query);
@@ -97,10 +99,9 @@ export async function attachPexelsStockImageToPost(input: {
     id: input.post.id,
     draft: true,
     overrideAccess: true,
-    // Initial AI QA has already checked the newly-created draft. A later
-    // human-triggered stock replacement is deliberately untrusted, so it
-    // invalidates review evidence through the normal Payload hook.
-    ...(input.post.editorialStatus === "ai_qa"
+    // A later human-triggered stock replacement is deliberately untrusted,
+    // even if the post happens to still have the ai_qa status.
+    ...(input.preserveInitialQuality === true
       ? { context: { trustedBlogQualityRevalidation: true } }
       : {}),
     data: {

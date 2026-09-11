@@ -82,6 +82,7 @@ describe("blog stock images", () => {
       },
       provider: { search, download } as unknown as PexelsStockImageProvider,
       persistToMedia: true,
+      preserveInitialQuality: true,
     });
 
     expect(create).toHaveBeenCalledWith(
@@ -101,6 +102,7 @@ describe("blog stock images", () => {
         collection: "posts",
         id: 9,
         draft: true,
+        context: { trustedBlogQualityRevalidation: true },
         data: expect.objectContaining({
           heroImage: 41,
           imageAlt: "Tiled roof",
@@ -114,6 +116,32 @@ describe("blog stock images", () => {
       }),
     );
     expect(result.media?.id).toBe(41);
+  });
+
+  it("does not trust manual stock replacement for ai_qa or approved drafts", async () => {
+    const selected = {
+      id: 321,
+      width: 2400,
+      height: 1350,
+      pageUrl: "https://www.pexels.com/photo/roof-321/",
+      photographer: "Manual Review",
+      photographerUrl: "https://www.pexels.com/@manual/",
+      alt: "Red tiled roof",
+      imageUrl: "https://images.pexels.com/photos/321/roof.jpeg",
+    };
+
+    for (const editorialStatus of ["ai_qa", "approved"]) {
+      const update = vi.fn(async (input) => ({ id: 22, ...input.data }));
+      await attachPexelsStockImageToPost({
+        payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+        post: { id: 22, titleNo: "Takfornying", editorialStatus },
+        provider: {
+          search: vi.fn(async () => [selected]),
+        } as unknown as PexelsStockImageProvider,
+        persistToMedia: false,
+      });
+      expect(update.mock.calls[0]?.[0]).not.toHaveProperty("context");
+    }
   });
 
   it("keeps an approved remote Pexels image when media storage is unavailable", async () => {

@@ -94,6 +94,34 @@ describe("Posts technical editor quality policy", () => {
     ).toThrow(/kvalitetskontrollen/);
   });
 
+  it("invalidates QA and review evidence when an untrusted stock alt changes", () => {
+    for (const editorialStatus of ["ai_qa", "approved"] as const) {
+      const result = beforeChangeHook()({
+        context: {},
+        data: { imageAlt: "Red tiled roof against blue sky" },
+        operation: "update",
+        originalDoc: { ...original, editorialStatus },
+        req: {
+          user: {
+            active: true,
+            displayName: "Administrator",
+            role: "admin",
+          },
+        },
+      } as never);
+
+      expect(result).toMatchObject({
+        _status: "draft",
+        editorialStatus: "human_review",
+        qualityScore: null,
+        qualityChecks: null,
+        reviewerName: null,
+        reviewedAt: null,
+        scheduledAt: null,
+      });
+    }
+  });
+
   it("preserves a deterministic fresh QA result from the trusted revalidation path", async () => {
     const result = await beforeChangeHook()({
       context: { trustedBlogQualityRevalidation: true },
