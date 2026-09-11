@@ -1,5 +1,11 @@
 # SEO / Admin V2 UX release preflight — 2026-09-12
 
+> Historical candidate record, not the final release runbook. Use
+> [the CONTROL-review final runbook](./seo-ux-final-release-runbook-2026-09-12.md)
+> for current requirements, runtime-migration findings, rollback source SHA,
+> active scheduler evidence, and corrections to the smoke-test claims below.
+> The empty-provider candidate command here must not be used for final release.
+
 ## Status
 
 **STAGED CANDIDATE READY — custom domains remain on the verified rollback target.**
