@@ -150,6 +150,30 @@ AI, Pexels, storage, and token credentials. Deployment-scoped current values for
 `LEAD_ADMIN_COPY_EMAIL` and `PUBLIC_HOST_REDIRECTS_ENABLED` are not available
 from read-only inspect and are intentionally called out rather than assumed.
 
+## Candidate-only runtime safety boundary
+
+The separately authorized staged production candidate is **not** a release
+candidate that may be promoted as-is. It uses deployment-only runtime overrides
+to prevent outbound provider calls and automatic work while its generated URL is
+reviewed. They do not change project-level Vercel environment records and do
+not affect the currently aliased deployment.
+
+| Candidate-only override | Reason |
+| --- | --- |
+| `CRON_SECRET=` | Makes all three Vercel cron routes return `401` before any work. This is required because the project declares `purge-leads`, which permanently deletes eligible trashed cases and blobs and has no feature flag. |
+| `RESEND_API_KEY=`, `GEMINI_API_KEY=`, `PEXELS_API_KEY=` | Prevents candidate mail, AI, and stock-image provider calls. |
+| `FEATURE_AI_DRAFTS=false` | Prevents manual AI draft generation during candidate review. This deliberately differs from the later controlled-pilot release value. |
+| `FEATURE_SEO_AUTO_PUBLISH=false`, `FEATURE_SEO_SCHEDULER=false` | Keeps editorial publication and scheduled draft generation disabled. |
+| `AUTOMATION_EMERGENCY_PAUSE=true` | Keeps automatic communication paused explicitly in production-target runtime. |
+
+Vercel documents that cron jobs are created for production deployments and that
+the `CRON_SECRET` value is sent as their authorization header. The application
+checks for a non-empty expected secret before comparing the header; the empty
+candidate override therefore fails closed regardless of whether the scheduler
+uses the project or deployment value. The candidate must be replaced by a fresh
+authorized release deployment with its intended configuration before any later
+domain promotion.
+
 ## Planned deployment command — do not execute
 
 Run only after a separate user Release GO, from this clean branch and with the
@@ -170,22 +194,28 @@ Invoke-Vercel59 deploy --prod --skip-domain --project $Project --scope $Scope `
   --env NEXT_PUBLIC_SITE_URL=https://takfornyelsenorge.no `
   --env LEAD_TO_EMAIL=post@takfornyelsenorge.no `
   --env LEAD_ADMIN_COPY_EMAIL=post@takfornyelse.as `
-  --build-env FEATURE_AI_DRAFTS=true --env FEATURE_AI_DRAFTS=true `
+  --build-env FEATURE_AI_DRAFTS=false --env FEATURE_AI_DRAFTS=false `
   --build-env FEATURE_SEO_AUTO_PUBLISH=false --env FEATURE_SEO_AUTO_PUBLISH=false `
   --build-env FEATURE_SEO_SCHEDULER=false --env FEATURE_SEO_SCHEDULER=false `
   --build-env PUBLIC_HOST_REDIRECTS_ENABLED=false --env PUBLIC_HOST_REDIRECTS_ENABLED=false `
   --build-env DATABASE_URL_MIGRATE=file:./seo-no-migrations.db `
-  --build-env PAYLOAD_BUILD_WITHOUT_DB=1
+  --build-env PAYLOAD_BUILD_WITHOUT_DB=1 `
+  --env CRON_SECRET= `
+  --env RESEND_API_KEY= `
+  --env GEMINI_API_KEY= `
+  --env PEXELS_API_KEY= `
+  --env AUTOMATION_EMERGENCY_PAUSE=true
 ```
 
 Do not pass secrets on this command line. Do not use local QA data, local
 build artifacts, a prebuilt upload, or a dummy production `DATABASE_URL`. Do
 not run `vercel alias set` as part of this step. `--prod --skip-domain` still
 creates a production-environment deployment; it is not a neutral preview and
-may have project alias or cron consequences. A true remote build check requires
-a separately authorized preview deployment or an approved CI runner. Before
-assigning new aliases in a later, separately authorized step, re-read the
-rollback evidence above.
+may have project alias or cron consequences. The candidate-only empty cron and
+provider-key overrides above are mandatory; do not remove them or promote this
+candidate. Before assigning new aliases in a later, separately authorized step,
+re-read the rollback evidence above and make a fresh release deployment with
+its approved release configuration.
 
 ## Local verification and limits
 
