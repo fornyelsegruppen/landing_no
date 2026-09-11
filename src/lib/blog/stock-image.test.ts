@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Payload } from "payload";
 import {
   attachPexelsStockImageToPost,
+  pexelsImageAlt,
   shouldPersistPexelsMedia,
   stockQueryForPost,
 } from "./stock-image";
@@ -42,6 +43,13 @@ describe("blog stock images", () => {
     ).toBe("mossy tiled roof house exterior");
   });
 
+  it("never derives stock alt text from the article topic or location", () => {
+    expect(pexelsImageAlt("  Red tiled roof against blue sky  ")).toBe(
+      "Red tiled roof against blue sky",
+    );
+    expect(pexelsImageAlt("")).toBe("Pexels-bilde");
+  });
+
   it("imports attribution metadata and replaces the draft hero image", async () => {
     const search = vi.fn(async () => [
       {
@@ -69,7 +77,8 @@ describe("blog stock images", () => {
         id: 9,
         titleNo: "Takvask etter vinteren",
         ctaVariant: "wash",
-        imageAlt: "Tak med mose før vask",
+        imageAlt: "Tak med mose i Oslo før vask",
+        editorialStatus: "ai_qa",
       },
       provider: { search, download } as unknown as PexelsStockImageProvider,
       persistToMedia: true,
@@ -79,7 +88,7 @@ describe("blog stock images", () => {
       expect.objectContaining({
         collection: "media",
         data: expect.objectContaining({
-          alt: "Tak med mose før vask",
+          alt: "Tiled roof",
           stockProvider: "pexels",
           stockAssetId: "123",
           stockPhotographer: "Test Photographer",
@@ -94,6 +103,7 @@ describe("blog stock images", () => {
         draft: true,
         data: expect.objectContaining({
           heroImage: 41,
+          imageAlt: "Tiled roof",
           stockImage: expect.objectContaining({
             provider: "pexels",
             assetId: "123",
@@ -146,6 +156,7 @@ describe("blog stock images", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           heroImage: null,
+          imageAlt: "House roof",
           stockImage: expect.objectContaining({
             provider: "pexels",
             assetId: "456",

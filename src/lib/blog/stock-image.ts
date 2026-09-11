@@ -10,6 +10,7 @@ type StockPost = {
   primaryKeyword?: string | null;
   ctaVariant?: "assessment" | "wash" | "renewal" | "new_roof" | null;
   imageAlt?: string | null;
+  editorialStatus?: string | null;
 };
 
 const queryByVariant: Record<NonNullable<StockPost["ctaVariant"]>, string> = {
@@ -35,6 +36,16 @@ export function shouldPersistPexelsMedia(
   return Boolean(environment.PUBLIC_MEDIA_BLOB_READ_WRITE_TOKEN?.trim());
 }
 
+/**
+ * A stock asset must never inherit an AI-written alt text about the article,
+ * its subject, or its location. Use Pexels' own description when supplied;
+ * otherwise retain only neutral source provenance.
+ */
+export function pexelsImageAlt(value?: string | null) {
+  const description = value?.trim().replace(/\s+/g, " ");
+  return description ? description.slice(0, 180) : "Pexels-bilde";
+}
+
 export async function attachPexelsStockImageToPost(input: {
   payload: Payload;
   post: StockPost;
@@ -49,6 +60,7 @@ export async function attachPexelsStockImageToPost(input: {
   if (!selected)
     throw new TypeError("Fant ingen egnet Pexels-bilde for dette søket");
   const selectedAt = new Date().toISOString();
+  const imageAlt = pexelsImageAlt(selected.alt);
   let media: Awaited<ReturnType<Payload["create"]>> | null = null;
   const persistToMedia = input.persistToMedia ?? shouldPersistPexelsMedia();
   if (persistToMedia) {
@@ -59,8 +71,7 @@ export async function attachPexelsStockImageToPost(input: {
         overrideAccess: true,
         file,
         data: {
-          alt:
-            input.post.imageAlt?.trim() || selected.alt || input.post.titleNo,
+          alt: imageAlt,
           stockProvider: "pexels",
           stockAssetId: String(selected.id),
           stockSourceUrl: selected.pageUrl,
@@ -86,8 +97,15 @@ export async function attachPexelsStockImageToPost(input: {
     id: input.post.id,
     draft: true,
     overrideAccess: true,
+    // Initial AI QA has already checked the newly-created draft. A later
+    // human-triggered stock replacement is deliberately untrusted, so it
+    // invalidates review evidence through the normal Payload hook.
+    ...(input.post.editorialStatus === "ai_qa"
+      ? { context: { trustedBlogQualityRevalidation: true } }
+      : {}),
     data: {
       ...(media ? { heroImage: media.id } : { heroImage: null }),
+      imageAlt,
       stockImage: {
         provider: "pexels",
         assetId: String(selected.id),
