@@ -14,6 +14,7 @@ import {
 } from "./topic-engine";
 import { attachPexelsStockImageToPost } from "./stock-image";
 import { PexelsStockImageProvider } from "@/lib/providers/pexels-stock-image-provider";
+import { blogServiceAreas } from "./knowledge-base";
 
 type TriggerSource = "manual" | "cron" | "regenerate";
 
@@ -222,6 +223,11 @@ async function nextTopic(payload: Payload) {
       and: [
         { status: { in: ["candidate", "queued"] } },
         { overlapScore: { less_than: 70 } },
+        { or: [
+          { location: { exists: false } },
+          { location: { equals: "" } },
+          { location: { in: blogServiceAreas } },
+        ] },
       ],
     },
   });
@@ -301,6 +307,7 @@ export async function generateNextPayloadBlogDraft(input: {
       collection: "posts",
       draft: true,
       overrideAccess: true,
+      context: { trustedBlogQualityRevalidation: true },
       data: {
         slug,
         titleNo: generated.article.title,
@@ -415,6 +422,9 @@ export async function regeneratePayloadBlogPost(input: {
   });
   if (post._status === "published") {
     throw new TypeError("Published articles cannot be regenerated in place");
+  }
+  if (post.locationText && !blogServiceAreas.includes(post.locationText)) {
+    throw new TypeError("Straipsnio vietovė nepatenka į aptarnaujamą Oslo regioną. Sukurkite naują tinkamos vietovės juodraštį.");
   }
   const run = await input.payload.create({
     collection: "seo-runs",

@@ -29,6 +29,24 @@ const original = {
 };
 
 describe("Posts technical editor quality policy", () => {
+  it("keeps freshly evaluated generation QA when Payload supplies an empty original document", async () => {
+    const result = await beforeChangeHook()({
+      context: { trustedBlogQualityRevalidation: true },
+      operation: "create",
+      originalDoc: {},
+      req: { user: null },
+      data: {
+        _status: "draft", editorialStatus: "ai_qa", aiAssisted: true,
+        titleNo: "Kontrollert tittel", contentNo: "Kontrollert innhold",
+        qualityScore: 93, qualityChecks: { passed: true },
+      },
+    } as never);
+    expect(result).toMatchObject({
+      _status: "draft", editorialStatus: "ai_qa",
+      qualityScore: 93, qualityChecks: { passed: true },
+    });
+  });
+
   it("turns a material edit plus publish request back into an unreviewed draft", async () => {
     const result = await beforeChangeHook()({
       context: {},

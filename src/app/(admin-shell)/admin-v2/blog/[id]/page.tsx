@@ -44,6 +44,7 @@ export default async function BlogArticleAdminPage({
     !Array.isArray(post.qualityChecks)
       ? post.qualityChecks
       : null;
+  const imageUrl = image?.url || post.stockImage?.imageUrl;
   const reviewInput = {
     aiAssisted: post.aiAssisted === true,
     qualityChecks: qualityChecks
@@ -100,12 +101,12 @@ export default async function BlogArticleAdminPage({
             <ExternalLink className="size-4" />
           </a>
         </div>
-        {image?.url ? (
+        {imageUrl ? (
           <Image
             alt={post.imageAlt || post.titleNo}
             className="mt-6 aspect-[16/7] w-full rounded-2xl object-cover"
             height={700}
-            src={image.url}
+            src={imageUrl}
             unoptimized
             width={1600}
           />

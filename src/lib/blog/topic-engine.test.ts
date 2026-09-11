@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { blogServiceAreas, approvedBlogKnowledge } from "./knowledge-base";
 import {
   candidateFromSignal,
   containsPersonalData,
@@ -8,6 +9,14 @@ import {
 } from "./topic-engine";
 
 describe("SEO topic engine", () => {
+  it("limits local seed topics and declared coverage to Oslo surroundings", () => {
+    const local = manualTopicSeeds.filter((topic) => topic.location);
+    expect(local.length).toBeGreaterThan(0);
+    expect(local.every((topic) => blogServiceAreas.includes(topic.location!))).toBe(true);
+    expect(approvedBlogKnowledge.servedAreas).toContain("Oslo");
+    expect(approvedBlogKnowledge.servedAreas).not.toContain("Ålesund");
+    expect(manualTopicSeeds.some((topic) => topic.topic.includes("Ålesund"))).toBe(false);
+  });
   it("contains at least ten approved fallback candidates", () => {
     expect(manualTopicSeeds).toHaveLength(10);
     expect(manualTopicSeeds.every((topic) => topic.source === "manual")).toBe(true);

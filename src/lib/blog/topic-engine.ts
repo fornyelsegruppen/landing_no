@@ -158,7 +158,7 @@ export const manualTopicSeeds: TopicCandidate[] = [
   ["Tegn på at takstein ikke bør males", "male takstein", "informational", "takmaling"],
   ["Slik vurderes taket etter vinteren", "sjekk tak etter vinter", "informational", "takfornying"],
   ["Når på året er det best å vaske taket?", "beste tid for takvask", "informational", "takvask"],
-  ["Takfornying i Ålesund og påvirkning fra kystklima", "takfornying Ålesund", "local", "takfornying"],
+  ["Takfornying i Oslo: hva bør boligeiere vurdere?", "takfornying Oslo", "local", "takfornying"],
 ].map(([topic, keyword, intent, serviceKey]) => ({
   topic,
   primaryKeyword: keyword,
@@ -166,7 +166,7 @@ export const manualTopicSeeds: TopicCandidate[] = [
   searchIntent: intent as TopicCandidate["searchIntent"],
   source: "manual" as const,
   serviceKey,
-  ...(intent === "local" ? { location: "Ålesund" } : {}),
+  ...(intent === "local" ? { location: "Oslo" } : {}),
   factors: {
     serviceRelevance: 1,
     demand: 0.55,

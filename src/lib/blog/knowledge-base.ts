@@ -1,4 +1,5 @@
-export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-03-v5";
+export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-11-oslo-v6";
+export const blogServiceAreas = ["Oslo", "Bærum", "Asker", "Lillestrøm", "Lørenskog", "Ski"];
 
 export const approvedPackageDefinitions = {
   Basic:
@@ -51,19 +52,8 @@ export const approvedBlogKnowledge = {
   rejectedGenericSources: [
     "https://www.dibk.no/regelverk/byggteknisk-forskrift-tek17",
   ],
-  servedAreas: [
-    "Agder",
-    "Innlandet",
-    "Møre og Romsdal",
-    "Nordland",
-    "Oslo",
-    "Rogaland",
-    "Trøndelag",
-    "Vestfold og Telemark",
-    "Vestland",
-    "Viken",
-    "Ålesund",
-  ],
+  servedAreas: blogServiceAreas,
+  serviceAreaPolicy: "Kun Oslo og de navngitte nærområdene. Ikke lov landsdekkende tjeneste eller tilby arbeid i andre regioner.",
   safety:
     "Ikke oppfordre boligeiere til å gå opp på taket. Ved lekkasje, snølast, konstruksjonsrisiko eller usikkerhet skal fagperson vurdere saken.",
   cta: "Be om en gratis og uforpliktende vurdering.",
