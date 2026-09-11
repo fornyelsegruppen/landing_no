@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
+export function hashTargetIdFromFragment(fragment: string) {
+  try {
+    return decodeURIComponent(fragment.slice(1));
+  } catch {
+    return null;
+  }
+}
+
 export function CaseMessageHistoryDisclosure({
   children,
   summary,
@@ -13,7 +21,7 @@ export function CaseMessageHistoryDisclosure({
 
   useEffect(() => {
     const revealHashTarget = () => {
-      const targetId = decodeURIComponent(window.location.hash.slice(1));
+      const targetId = hashTargetIdFromFragment(window.location.hash);
       const target = targetId ? document.getElementById(targetId) : null;
 
       if (target && disclosureRef.current?.contains(target)) {
