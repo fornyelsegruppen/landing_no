@@ -4,7 +4,7 @@ import {
 } from "./knowledge-base";
 import type { TopicCandidate } from "./topic-engine";
 
-export const blogPromptVersion = "blog-article-nb-v8";
+export const blogPromptVersion = "blog-article-nb-v9";
 
 export function buildBlogSystemPrompt() {
   return `Du er en redaksjonell skriveassistent for Takfornyelse. Du lager bare norske artikkelutkast som må godkjennes av et menneske før publisering.
@@ -48,6 +48,7 @@ ${JSON.stringify(existingTitles.slice(0, 100))}
 
 KRAV:
 - 900–1400 ord nyttig norsk fagtekst.
+- Sikkerhetsavsnitt og FAQ skal bruke denne tydelige formuleringen: «Utfør egenkontroll fra bakken. Arbeid på taket skal overlates til fagfolk med riktig sikring.» Ikke bruk tvetydige spørsmål eller setninger om at leseren kan klatre eller gå på taket selv, heller ikke som overskrift. Beskriv aldri en fremgangsmåte for egen ferdsel på tak.
 - Kort svar tidlig, trygg egenkontroll fra bakken og tydelig grense for faglig vurdering. Hver mellomtittel skal starte med nøyaktig «## » eller «### »; ikke skriv nakne mellomtitler som vanlige tekstlinjer. Sett en tom linje etter hver Markdown-overskrift og før hver punktliste.
 - Prisdrivere bare når relevant. Bruk kun godkjente pakkepriser ordrett med forbehold.
 - Minst én relevant intern tjenestelenke fra internalPaths, 2–5 FAQ og minst én presis dyplenke til en reell offentlig kildeside. Kilden må faktisk underbygge en navngitt påstand i artikkelen. Bruk de konkrete authoritativeSources når de passer, og bruk aldri en generell forskriftsindeks som dokumentasjon for pris, malingens heft eller behandlingseffekt.

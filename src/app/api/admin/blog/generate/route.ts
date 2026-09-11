@@ -7,6 +7,7 @@ import { GeminiAiProvider } from "@/lib/providers/gemini-ai-provider";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation-id";
 import { ensureManualBlogTopics, generateNextPayloadBlogDraft } from "@/lib/blog/payload-blog-engine";
 import { userIsAdmin } from "@/payload/access/roles";
+import { ArticleQualityBlockedError } from "@/lib/blog/draft-engine";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +38,14 @@ export async function POST(request: Request) {
       { headers: { "Cache-Control": "no-store", "x-correlation-id": correlationId } },
     );
   } catch (error) {
+    if (error instanceof ArticleQualityBlockedError) {
+      return NextResponse.json({
+        error: "AI draft did not pass quality review. No article was created or published.",
+        code: "article_quality_blocked",
+        issues: error.quality.issues.map(({ code, message }) => ({ code, message })),
+        correlationId,
+      }, { status: 422 });
+    }
     if (error instanceof FeatureUnavailableError) {
       return NextResponse.json(
         { error: error.reason, missing: error.unavailable },
