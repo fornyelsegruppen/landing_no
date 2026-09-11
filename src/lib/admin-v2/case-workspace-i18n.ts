@@ -91,6 +91,7 @@ export type CaseWorkspaceCopy = {
   blockers: Record<CaseWorkspaceBlockerKey, string>;
   evidence: Record<CaseWorkspaceEvidenceKey, string>;
   help: Record<CaseWorkspaceHelpKey, string>;
+  messageHistoryOlder: string;
   process: CaseWorkspaceProcessCopy;
   photos: CaseWorkspacePhotoCopy;
   questions: Record<
@@ -133,6 +134,7 @@ const nb = {
     trashed: "Saken er skrivebeskyttet mens den ligger i papirkurven.",
     waiting: "Statusen er ikke et bekreftet sluttresultat ennå.",
   },
+  messageHistoryOlder: "Vis eldre meldinger",
   process: {
     title: "Saksprosess",
     help: "De seks hovedfasene i saken og hvor den står nå.",
@@ -282,6 +284,7 @@ const lt = {
     trashed: "Kol byla yra šiukšlinėje, ją galima tik peržiūrėti.",
     waiting: "Tai dar nėra patvirtintas galutinis rezultatas.",
   },
+  messageHistoryOlder: "Rodyti ankstesnes žinutes",
   process: {
     title: "Bylos procesas",
     help: "Šeši pagrindiniai bylos etapai ir dabartinė jos vieta.",
@@ -432,6 +435,7 @@ const en = {
     trashed: "The case is read-only while it is in the trash.",
     waiting: "This is not a confirmed final result yet.",
   },
+  messageHistoryOlder: "Show older messages",
   process: {
     title: "Case process",
     help: "The six main case stages and its current position.",

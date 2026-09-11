@@ -53,6 +53,7 @@ import {
   quoteDeclineReasonLabel,
 } from "@/components/admin-v2/quote-decline-workbench";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
+import { splitCaseMessageHistory } from "@/lib/admin-v2/case-message-history";
 import { selectPrimaryCustomerQuestion } from "@/lib/admin-v2/case-primary-question";
 import {
   caseWorkspaceText,
@@ -76,6 +77,7 @@ import {
   loadAdminCaseWorkspace,
   type AdminCaseWorkspace,
   type CaseEntity,
+  type CaseMessage,
   type CasePriceCalculation,
   type CaseTimelineItem,
 } from "@/lib/admin-v2/case-read-model";
@@ -809,6 +811,12 @@ export default async function AdminCasePage({
     ? caseWorkspaceText(user.interfaceLanguage, primaryState.helpKey)
     : "";
   const primaryQuestionActive = primaryState.priority === "question";
+  const messageHistory = splitCaseMessageHistory(
+    caseData.messages.filter(
+      (message) =>
+        message.id !== (primaryQuestionActive ? displayedReply?.id : undefined),
+    ),
+  );
   const secondaryMutationsAllowed =
     caseData.lead.recordState === "active" &&
     (primaryState.priority === "business" || primaryState.priority === "idle");
@@ -1540,6 +1548,106 @@ export default async function AdminCasePage({
       locale={user.interfaceLanguage}
     />
   ) : null;
+
+  const renderMessage = (message: CaseMessage) => {
+    const draftAccess = customerQuestionDraftAccess(
+      caseData.customerQuestionContext,
+      message,
+    );
+    const source = draftAccess.replyTarget;
+
+    return message.status === "draft" &&
+      message.direction === "outbound" &&
+      secondaryMutationsAllowed ? (
+      <div
+        className="scroll-mt-24"
+        id={`message-${message.id}`}
+        key={message.id}
+      >
+        <MessageDraftEditor
+          aiAssisted={message.aiAssisted}
+          blockedByActiveQuestion={draftAccess.readOnly}
+          bodyText={message.bodyText}
+          caseRevision={caseData.lead.revision}
+          factWarnings={factWarnings(message.aiAnalysis)}
+          leadId={caseData.lead.id}
+          locale={user.interfaceLanguage}
+          manualReplyRequiresEditing={manualReplyRequiresEditing(
+            message.aiAnalysis,
+          )}
+          messageId={message.id}
+          messageUpdatedAt={message.updatedAt || message.createdAt || ""}
+          replyTarget={
+            source
+              ? {
+                  bodyText: source.bodyText,
+                  id: source.id,
+                  subject: source.subject,
+                }
+              : null
+          }
+          sourceBody={source?.bodyText}
+          sourceSubject={source?.subject}
+          subject={message.subject}
+        />
+        <TechnicalLink
+          entity={message}
+          label={copy.technicalDetail}
+          summary={copy.advancedTechnical}
+        />
+      </div>
+    ) : (
+      <article
+        className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4"
+        id={`message-${message.id}`}
+        key={message.id}
+      >
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <strong className="[overflow-wrap:anywhere] break-words">
+              {message.subject}
+            </strong>
+            <p className="text-muted-foreground mt-1 text-xs break-words">
+              {metadataLabel(user.interfaceLanguage, message.direction)} ·{" "}
+              {metadataLabel(user.interfaceLanguage, message.category)} ·{" "}
+              {metadataLabel(user.interfaceLanguage, message.channel)}
+            </p>
+          </div>
+          <Status
+            {...statusStamp(
+              message.deliveredAt,
+              message.sentAt,
+              message.updatedAt,
+              message.createdAt,
+            )}
+            locale={user.interfaceLanguage}
+            value={message.status}
+          />
+        </div>
+        <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
+          {message.bodyText}
+        </p>
+        {message.failureMessage ? (
+          <p className="text-danger mt-3 text-sm">{message.failureMessage}</p>
+        ) : null}
+        {secondaryMutationsAllowed &&
+        message.direction === "outbound" &&
+        message.channel === "email" &&
+        !["draft", "cancelled"].includes(message.status || "") ? (
+          <ManualContactRecoveryPanel
+            locale={user.interfaceLanguage}
+            messageId={message.id}
+            recovery={message.manualRecovery}
+          />
+        ) : null}
+        <TechnicalLink
+          entity={message}
+          label={copy.technicalDetail}
+          summary={copy.advancedTechnical}
+        />
+      </article>
+    );
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -2416,133 +2524,20 @@ export default async function AdminCasePage({
                     id="messages-section"
                     title={workspaceCopy.sections.messages}
                   >
-                    {caseData.messages.length ? (
+                    {messageHistory.recent.length ? (
                       <div className="grid min-w-0 gap-3">
-                        {caseData.messages
-                          .filter(
-                            (message) =>
-                              message.id !==
-                              (primaryQuestionActive
-                                ? displayedReply?.id
-                                : undefined),
-                          )
-                          .map((message) => {
-                            const draftAccess = customerQuestionDraftAccess(
-                              caseData.customerQuestionContext,
-                              message,
-                            );
-                            const source = draftAccess.replyTarget;
-                            return message.status === "draft" &&
-                              message.direction === "outbound" &&
-                              secondaryMutationsAllowed ? (
-                              <div
-                                className="scroll-mt-24"
-                                id={`message-${message.id}`}
-                                key={message.id}
-                              >
-                                <MessageDraftEditor
-                                  aiAssisted={message.aiAssisted}
-                                  blockedByActiveQuestion={draftAccess.readOnly}
-                                  bodyText={message.bodyText}
-                                  caseRevision={caseData.lead.revision}
-                                  factWarnings={factWarnings(
-                                    message.aiAnalysis,
-                                  )}
-                                  leadId={caseData.lead.id}
-                                  locale={user.interfaceLanguage}
-                                  manualReplyRequiresEditing={manualReplyRequiresEditing(
-                                    message.aiAnalysis,
-                                  )}
-                                  messageId={message.id}
-                                  messageUpdatedAt={
-                                    message.updatedAt || message.createdAt || ""
-                                  }
-                                  replyTarget={
-                                    source
-                                      ? {
-                                          bodyText: source.bodyText,
-                                          id: source.id,
-                                          subject: source.subject,
-                                        }
-                                      : null
-                                  }
-                                  sourceBody={source?.bodyText}
-                                  sourceSubject={source?.subject}
-                                  subject={message.subject}
-                                />
-                                <TechnicalLink
-                                  entity={message}
-                                  label={copy.technicalDetail}
-                                  summary={copy.advancedTechnical}
-                                />
-                              </div>
-                            ) : (
-                              <article
-                                className="min-w-0 scroll-mt-24 rounded-2xl border border-white/10 bg-black/15 p-4"
-                                id={`message-${message.id}`}
-                                key={message.id}
-                              >
-                                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                                  <div className="min-w-0 flex-1">
-                                    <strong className="[overflow-wrap:anywhere] break-words">
-                                      {message.subject}
-                                    </strong>
-                                    <p className="text-muted-foreground mt-1 text-xs break-words">
-                                      {metadataLabel(
-                                        user.interfaceLanguage,
-                                        message.direction,
-                                      )}{" "}
-                                      ·{" "}
-                                      {metadataLabel(
-                                        user.interfaceLanguage,
-                                        message.category,
-                                      )}{" "}
-                                      ·{" "}
-                                      {metadataLabel(
-                                        user.interfaceLanguage,
-                                        message.channel,
-                                      )}
-                                    </p>
-                                  </div>
-                                  <Status
-                                    {...statusStamp(
-                                      message.deliveredAt,
-                                      message.sentAt,
-                                      message.updatedAt,
-                                      message.createdAt,
-                                    )}
-                                    locale={user.interfaceLanguage}
-                                    value={message.status}
-                                  />
-                                </div>
-                                <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
-                                  {message.bodyText}
-                                </p>
-                                {message.failureMessage ? (
-                                  <p className="text-danger mt-3 text-sm">
-                                    {message.failureMessage}
-                                  </p>
-                                ) : null}
-                                {secondaryMutationsAllowed &&
-                                message.direction === "outbound" &&
-                                message.channel === "email" &&
-                                !["draft", "cancelled"].includes(
-                                  message.status || "",
-                                ) ? (
-                                  <ManualContactRecoveryPanel
-                                    locale={user.interfaceLanguage}
-                                    messageId={message.id}
-                                    recovery={message.manualRecovery}
-                                  />
-                                ) : null}
-                                <TechnicalLink
-                                  entity={message}
-                                  label={copy.technicalDetail}
-                                  summary={copy.advancedTechnical}
-                                />
-                              </article>
-                            );
-                          })}
+                        {messageHistory.recent.map(renderMessage)}
+                        {messageHistory.older.length ? (
+                          <details className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                            <summary className="hover:text-accent cursor-pointer font-semibold">
+                              {workspaceCopy.messageHistoryOlder} (
+                              {messageHistory.older.length})
+                            </summary>
+                            <div className="mt-3 grid min-w-0 gap-3">
+                              {messageHistory.older.map(renderMessage)}
+                            </div>
+                          </details>
+                        ) : null}
                       </div>
                     ) : (
                       <p className="text-muted-foreground">{copy.noMessages}</p>
