@@ -2,12 +2,30 @@
 
 ## Status
 
-**BLOCKED — a clean production build has not completed on this host.**
+**STAGED CANDIDATE READY — custom domains remain on the verified rollback target.**
 
 This document prepares a deployment command; it does not authorize or execute
 a deployment, alias assignment, environment mutation, DNS change, database
 operation, publication, or customer contact. The production-release decision
 remains a separate explicit user GO.
+
+On 2026-09-12, after a separate explicit authorization for one staged
+production candidate, the documented command was run once with the
+candidate-only guards. It produced the following `READY` deployment:
+
+```text
+deployment: dpl_5fRW63c5w6hWyxg4kdxwQZV417BX
+immutable URL: https://landing-o1i7i1qjd-darbasnorvegija4-8212s-projects.vercel.app
+target/state: production / READY (staged with --skip-domain)
+source at deploy: 330856fd4aa1177affb62e5c97bc3df625959841
+```
+
+It has only the project alias
+`landing-no-darbasnorvegija4-8212s-projects.vercel.app`. No custom-domain
+promotion, `vercel promote`, `vercel alias set`, shared environment mutation,
+DNS operation, database migration, mail, AI, Pexels, contact submission, or
+SEO publication was performed. This candidate must **not** be promoted as-is:
+it intentionally uses the candidate-only runtime guards below.
 
 ## Clean release branch and source manifest
 
@@ -246,6 +264,26 @@ therefore **not verified** and release remains blocked pending a successful
 fresh build in a compatible runner (or a separately authorized preview
 deployment with its Vercel build log). Do not treat a remote build as having run
 here.
+
+The one authorized remote candidate build subsequently passed on Vercel
+(`iad1`, 2 cores, 8 GB): dependency installation, `npm run build`, migration
+skip (`DATABASE_URL_MIGRATE=file:./seo-no-migrations.db`), Next compilation,
+and TypeScript all completed successfully. The build emitted expected CMS
+fallback messages because `PAYLOAD_BUILD_WITHOUT_DB=1` deliberately forbids
+database access during static generation; the runtime candidate inherits the
+existing database secret and the flag is build-only. This confirms a safe remote
+build, not a database-content or authenticated-admin write test.
+
+Post-build read-only evidence: authenticated candidate GET smoke for `/no`,
+`/no/blogg`, `/robots.txt`, `/sitemap.xml`, and `/admin/login` returned `200`;
+the protected `/admin-v2` route redirects to Vercel SSO. An authenticated Vercel
+GET to candidate `/api/cron/purge-leads` returned `{"error":"Unauthorized"}`
+before the handler can open Payload, proving the candidate's empty cron-secret
+guard. No authenticated Admin V2 read was performed. After the candidate build,
+both new custom aliases still map to
+`landing-lizkuhfql-darbasnorvegija4-8212s-projects.vercel.app` and both old
+`.as` aliases still map to
+`landing-9hjfau7e4-darbasnorvegija4-8212s-projects.vercel.app`.
 
 Post-deploy smoke, after user authorization and before any alias mutation, is
 limited to public new-domain `/no`, `/no/blogg`, sitemap, robots, and expected
