@@ -20,9 +20,21 @@ No changes against the cutover base in public-host migration, proxy, contact for
 - First build attempts hit unavailable Google Fonts in sandbox and unsupported Windows ARM SQLite dependency; final build used network access and PostgreSQL adapter.
 - `git diff --check` passed.
 
-## Live release gate — not yet deployed
+## Live release gate
 
-Authenticate Vercel; read current project, aliases and environment before deployment. Preserve existing old-domain redirect behavior and mail routing. Do not upload dummy build environment or local prebuilt output. Build remotely with verified production configuration.
+Candidate deployed READY: `dpl_DyQ6DykyNp4nQTtCkjaoTsiW52tG`, https://landing-3icdk2w80-darbasnorvegija4-8212s-projects.vercel.app, source `8415a28`. Remote build passed using existing CMS configuration; migrations explicitly skipped via build-only DATABASE_URL_MIGRATE=file:./seo-no-migrations.db. No local dummy database/build environment uploaded. Created with --prod --skip-domain; candidate creation updated the generic project alias only, not custom domains.
+
+Fresh preflight confirmed the new custom domains still point to historical Phase A. Both old apex and www return 308 to new /no. Candidate authenticated GET checks: /no, /no/blogg, /sitemap.xml, /robots.txt return 200 with new-domain URLs. Admin authentication check and custom-domain assignment pending at this checkpoint.
+
+Read safe production config: FEATURE_AI_DRAFTS=true; FEATURE_SEO_SCHEDULER=false; FEATURE_SEO_AUTO_PUBLISH=false. Project-wide LEAD_TO_EMAIL remains old address, so this deployment explicitly sets LEAD_TO_EMAIL=post@takfornyelsenorge.no and LEAD_ADMIN_COPY_EMAIL=post@takfornyelse.as. Existing sender retained. New-domain URL explicitly set for build/runtime, PUBLIC_HOST_REDIRECTS_ENABLED=false for this new-domain-only deployment. Old-domain deployment is untouched.
+
+Gemini and Pexels credentials are present, but not live generation PASS. Search Console credentials and dedicated public-media token are absent from project listing. Pexels remote-asset attribution fallback is supported; manually uploaded public images need dedicated public storage configuration. Search Console metrics are not yet connected.
+
+Final live status: both takfornyelsenorge.no and www.takfornyelsenorge.no assigned successfully to candidate dpl_DyQ6DykyNp4nQTtCkjaoTsiW52tG. Post-assignment public GETs /no, /no/blogg, /sitemap.xml and /robots.txt return 200. Admin V2 blog returns 307 to same-domain /admin/login (expected without CMS session). New www /no and both old-domain /no return 308 directly to new apex /no. Robots allows public crawling and advertises the new-domain sitemap. No customer form submitted during these checks.
+
+Pending user-authenticated acceptance: open /admin-v2/blog, generate one unpublished draft, review quality/source/image/editor actions. Vercel authentication completed, but no authenticated CMS session was available to perform this final test. Do not call generation PASS or claim Search Console connected. Rollback for the two new aliases remains the freshly verified historical Phase A URL above.
+
+For subsequent deployments: preserve existing old-domain redirect behavior and mail routing. Do not upload dummy build environment or local prebuilt output. Build remotely with verified production configuration. Deployment-scoped overrides are recorded above; project defaults alone do not preserve recipient migration.
 
 Check AI provider credentials, FEATURE_AI_DRAFTS, public image storage/stock provider and CMS access without disclosing secrets. Keep FEATURE_SEO_AUTO_PUBLISH false; do not enable scheduled generation until a single manual draft is verified. Never reuse prior mail canary commands.
 
