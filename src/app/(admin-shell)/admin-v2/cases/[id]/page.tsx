@@ -21,6 +21,7 @@ import { ChangeAgreementPanel } from "@/components/admin-v2/change-agreement-pan
 import { InformationRequestButton } from "@/components/admin-v2/information-request-button";
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
+import { CaseMessageHistory } from "@/components/admin-v2/case-message-history";
 import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
@@ -53,7 +54,6 @@ import {
   quoteDeclineReasonLabel,
 } from "@/components/admin-v2/quote-decline-workbench";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
-import { splitCaseMessageHistory } from "@/lib/admin-v2/case-message-history";
 import { selectPrimaryCustomerQuestion } from "@/lib/admin-v2/case-primary-question";
 import {
   caseWorkspaceText,
@@ -811,12 +811,6 @@ export default async function AdminCasePage({
     ? caseWorkspaceText(user.interfaceLanguage, primaryState.helpKey)
     : "";
   const primaryQuestionActive = primaryState.priority === "question";
-  const messageHistory = splitCaseMessageHistory(
-    caseData.messages.filter(
-      (message) =>
-        message.id !== (primaryQuestionActive ? displayedReply?.id : undefined),
-    ),
-  );
   const secondaryMutationsAllowed =
     caseData.lead.recordState === "active" &&
     (primaryState.priority === "business" || primaryState.priority === "idle");
@@ -2524,21 +2518,15 @@ export default async function AdminCasePage({
                     id="messages-section"
                     title={workspaceCopy.sections.messages}
                   >
-                    {messageHistory.recent.length ? (
-                      <div className="grid min-w-0 gap-3">
-                        {messageHistory.recent.map(renderMessage)}
-                        {messageHistory.older.length ? (
-                          <details className="rounded-2xl border border-white/10 bg-black/10 p-4">
-                            <summary className="hover:text-accent cursor-pointer font-semibold">
-                              {workspaceCopy.messageHistoryOlder} (
-                              {messageHistory.older.length})
-                            </summary>
-                            <div className="mt-3 grid min-w-0 gap-3">
-                              {messageHistory.older.map(renderMessage)}
-                            </div>
-                          </details>
-                        ) : null}
-                      </div>
+                    {caseData.messages.length ? (
+                      <CaseMessageHistory
+                        excludedMessageId={
+                          primaryQuestionActive ? displayedReply?.id : undefined
+                        }
+                        messages={caseData.messages}
+                        olderLabel={workspaceCopy.messageHistoryOlder}
+                        renderMessage={renderMessage}
+                      />
                     ) : (
                       <p className="text-muted-foreground">{copy.noMessages}</p>
                     )}
