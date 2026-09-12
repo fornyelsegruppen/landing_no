@@ -13,6 +13,14 @@ function beforeChangeHook() {
   return hook;
 }
 
+function beforeOperationHook() {
+  const hook = Posts.hooks?.beforeOperation?.[0];
+  if (typeof hook !== "function") {
+    throw new TypeError("Posts beforeOperation hook is not configured");
+  }
+  return hook;
+}
+
 const original = {
   _status: "draft",
   editorialStatus: "approved",
@@ -33,6 +41,22 @@ const original = {
 };
 
 describe("Posts technical editor quality policy", () => {
+  it("rejects restores that Payload did not mark as drafts", () => {
+    expect(() =>
+      beforeOperationHook()({
+        args: { collection: "posts", id: "version-1" },
+        operation: "restoreVersion",
+      } as never),
+    ).toThrow(/only be restored as drafts/);
+
+    expect(
+      beforeOperationHook()({
+        args: { collection: "posts", draft: true, id: "version-1" },
+        operation: "restoreVersion",
+      } as never),
+    ).toMatchObject({ draft: true, id: "version-1" });
+  });
+
   it("keeps freshly evaluated generation QA when Payload supplies an empty original document", async () => {
     const result = await beforeChangeHook()({
       context: { trustedBlogQualityRevalidation: true },

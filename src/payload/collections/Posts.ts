@@ -49,6 +49,17 @@ export const Posts: CollectionConfig = {
     maxPerDoc: 20,
   },
   hooks: {
+    beforeOperation: [
+      ({ args, operation }) => {
+        if (
+          operation === "restoreVersion" &&
+          (args as { draft?: boolean }).draft !== true
+        ) {
+          throw new TypeError("Posts versions can only be restored as drafts");
+        }
+        return args;
+      },
+    ],
     beforeChange: [
       ({ context, data, originalDoc, req }) =>
         (data._status === "published" && userIsAdmin(req.user)
