@@ -2,11 +2,15 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const script = fileURLToPath(new URL("./one-ui-local-boundary-fixture.mjs", import.meta.url));
+const script = fileURLToPath(
+  new URL("./one-ui-local-boundary-fixture.mjs", import.meta.url),
+);
 
 describe("one-ui local boundary fixture guard", () => {
   it("prints a bounded, PII-free manifest without opening a database", () => {
-    const output = execFileSync(process.execPath, [script, "manifest"], { encoding: "utf8" });
+    const output = execFileSync(process.execPath, [script, "manifest"], {
+      encoding: "utf8",
+    });
     const value = JSON.parse(output);
     expect(value.target).toMatchObject({
       database: "seo_automation_browser_20260912",
@@ -19,12 +23,12 @@ describe("one-ui local boundary fixture guard", () => {
       selectiveFilterLeads: 26,
       messagesOnAnchorLead: 126,
       ownerVersions: 126,
-      measurements: 126,
-      quotes: 126,
-      contracts: 126,
-      workOrders: 126,
-      invoiceRecords: 126,
-      warranties: 126,
+      measurements: 127,
+      quotes: 127,
+      contracts: 127,
+      workOrders: 127,
+      invoiceRecords: 127,
+      warranties: 127,
       officialInvoices: 126,
       contractRequests: 126,
       privateMediaDecoys: 501,
@@ -37,10 +41,15 @@ describe("one-ui local boundary fixture guard", () => {
       "invoice-record",
       "warranty",
     ]);
+    expect(value.ownerVersionsLeadOrdinal).toBe(1);
+    expect(value.invoiceOwnerVersionOrdinals).toEqual([31, 32]);
+    expect(value.selectiveMatchLeadOrdinal).toBe(26);
+    expect(value.boundedCounts.anchorPrivateMedia).toBe(756);
+    expect(value.boundedCounts.syntheticWorkersWithoutCredentials).toBe(1);
     expect(value.boundaryAssertions).toEqual(
       expect.arrayContaining([
         expect.stringContaining("actual private_media source rows"),
-        expect.stringContaining("local3217 has no roof_measurements.version"),
+        expect.stringContaining("checks roof_measurements.version at runtime"),
       ]),
     );
     expect(output).not.toMatch(/@(?!(example\.invalid))/i);
