@@ -22,6 +22,8 @@ const props = {
   qualityPassed: false,
   qualityScore: null,
   publishEligible: false,
+  scheduledAt: "2026-09-12T08:30:00.000Z",
+  schedulerEnabled: false,
   updatedAt: "2026-09-12T10:00:00.000Z",
 };
 
@@ -34,5 +36,9 @@ describe("blog editor", () => {
     expect(html).toContain("flex flex-wrap gap-3");
     expect(html).toContain("disabled:cursor-not-allowed");
     expect(html).toContain("Ką reikia pagerinti?");
+    expect(html).toContain(
+      "Išsaugotas planas: 2026-09-12T10:30 (Europe/Oslo).",
+    );
+    expect(html).toContain("Planavimas sustabdytas funkcijos nustatymu.");
   });
 });

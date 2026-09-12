@@ -24,7 +24,7 @@ describe("blog editor action request", () => {
     });
   });
 
-  it("trims a supplied stock query and serializes a supplied schedule", () => {
+  it("trims a supplied stock query and serializes a supplied Oslo schedule", () => {
     const scheduledAt = "2026-09-03T08:30";
 
     expect(
@@ -35,7 +35,7 @@ describe("blog editor action request", () => {
       }),
     ).toEqual({
       action: "schedule",
-      scheduledAt: new Date(scheduledAt).toISOString(),
+      scheduledAt: "2026-09-03T06:30:00.000Z",
     });
   });
 

@@ -37,6 +37,13 @@ type BlogEditorCopy = {
   regenerationConfirm: string;
   scheduleNeedsApproval: string;
   scheduleNeedsFutureDate: string;
+  scheduleInvalidTime: string;
+  scheduleNonexistentTime: string;
+  scheduleAmbiguousTime: string;
+  scheduleSaved: string;
+  scheduleUnsavedPlan: string;
+  schedulerPaused: string;
+  schedulerPlanOnly: string;
   publishLocked: string;
   refreshPending: string;
   refreshDelayed: string;
@@ -91,6 +98,17 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
       "Et nytt AI-utkast erstatter det nåværende upubliserte utkastet og nullstiller kontroll og planlegging. Fortsette?",
     scheduleNeedsApproval: "Planlegging åpnes etter faglig godkjenning.",
     scheduleNeedsFutureDate: "Velg et fremtidig tidspunkt før planlegging.",
+    scheduleInvalidTime: "Oppgi et gyldig Oslo-tidspunkt før planlegging.",
+    scheduleNonexistentTime:
+      "Det valgte Oslo-tidspunktet finnes ikke på grunn av sommertid. Velg et annet tidspunkt.",
+    scheduleAmbiguousTime:
+      "Det valgte Oslo-tidspunktet forekommer to ganger ved overgang til vintertid. Velg et annet entydig tidspunkt.",
+    scheduleSaved: "Lagret plan: {time} (Europe/Oslo).",
+    scheduleUnsavedPlan: "Det valgte tidspunktet er ikke lagret ennå.",
+    schedulerPaused:
+      "Planlegging er pauset av funksjonsinnstillingen. Ingen kjøring er bekreftet.",
+    schedulerPlanOnly:
+      "Planlegging registrerer bare en plan; godkjenning og en aktiv kjører kreves før publisering.",
     publishLocked: "Publisering er låst til alle kontrollkrav er oppfylt.",
     refreshPending: "Henter de nyeste artikkelopplysningene …",
     refreshDelayed:
@@ -143,6 +161,17 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     scheduleNeedsApproval:
       "Planavimas bus galimas po specialisto patvirtinimo.",
     scheduleNeedsFutureDate: "Prieš planuodami pasirinkite būsimą laiką.",
+    scheduleInvalidTime: "Prieš planuodami įveskite tinkamą Oslo laiką.",
+    scheduleNonexistentTime:
+      "Pasirinktas Oslo laikas neegzistuoja dėl vasaros laiko. Pasirinkite kitą laiką.",
+    scheduleAmbiguousTime:
+      "Pasirinktas Oslo laikas pereinant į žiemos laiką pasikartoja du kartus. Pasirinkite kitą, vienareikšmį laiką.",
+    scheduleSaved: "Išsaugotas planas: {time} (Europe/Oslo).",
+    scheduleUnsavedPlan: "Pasirinktas laikas dar neišsaugotas.",
+    schedulerPaused:
+      "Planavimas sustabdytas funkcijos nustatymu. Vykdytojo būsena nepatvirtinta.",
+    schedulerPlanOnly:
+      "Planavimas tik įrašo planą; prieš publikavimą būtinas patvirtinimas ir aktyvus vykdytojas.",
     publishLocked:
       "Publikavimas užrakintas, kol neįvykdyti visi patikros reikalavimai.",
     refreshPending: "Įkeliama naujausia straipsnio informacija …",
@@ -197,6 +226,17 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
       "A new AI draft replaces the current unpublished draft and resets review and scheduling. Continue?",
     scheduleNeedsApproval: "Scheduling opens after expert approval.",
     scheduleNeedsFutureDate: "Choose a future time before scheduling.",
+    scheduleInvalidTime: "Enter a valid Oslo time before scheduling.",
+    scheduleNonexistentTime:
+      "The selected Oslo time does not exist because of daylight saving time. Choose another time.",
+    scheduleAmbiguousTime:
+      "The selected Oslo time occurs twice when daylight saving time ends. Choose another unambiguous time.",
+    scheduleSaved: "Saved plan: {time} (Europe/Oslo).",
+    scheduleUnsavedPlan: "The selected time is not saved yet.",
+    schedulerPaused:
+      "Scheduling is paused by the feature setting. No executor is confirmed.",
+    schedulerPlanOnly:
+      "Scheduling records only a plan; approval and an active executor are still required before publication.",
     publishLocked:
       "Publishing stays locked until every review requirement is met.",
     refreshPending: "Loading the latest article details …",

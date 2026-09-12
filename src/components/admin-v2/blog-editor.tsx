@@ -20,6 +20,10 @@ import {
   blogEditorRefreshState,
   BLOG_EDITOR_REFRESH_RECOVERY_MS,
 } from "@/lib/admin-v2/blog-editor-refresh-state";
+import {
+  osloLocalDateTime,
+  osloScheduleIso,
+} from "@/lib/admin-v2/blog-schedule-time";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 type QualityIssue = {
@@ -54,6 +58,8 @@ type Props = {
   qualityPassed?: boolean;
   qualityScore?: number | null;
   reviewerName: string;
+  scheduledAt?: string | null;
+  schedulerEnabled?: boolean | null;
   seoDescriptionNo?: string;
   seoTitleNo?: string;
   status?: string;
@@ -86,6 +92,7 @@ export function BlogEditor(props: Props) {
         seoDescriptionNo: props.seoDescriptionNo || "",
         primaryKeyword: props.primaryKeyword || "",
         reviewerName: props.reviewerName,
+        scheduledAt: osloLocalDateTime(props.scheduledAt),
       }),
     [
       props.contentNo,
@@ -94,6 +101,7 @@ export function BlogEditor(props: Props) {
       props.reviewerName,
       props.seoDescriptionNo,
       props.seoTitleNo,
+      props.scheduledAt,
       props.titleNo,
     ],
   );
@@ -190,11 +198,14 @@ export function BlogEditor(props: Props) {
   const busy = busyAction !== null || refreshState.freezeEditor;
   const needsQualityRecheck =
     props.qualityPassed !== true || typeof props.qualityScore !== "number";
+  const scheduleConversion = osloScheduleIso(form.scheduledAt);
   const scheduleDateIsFuture =
-    Boolean(form.scheduledAt) &&
-    new Date(form.scheduledAt).getTime() > currentTime;
+    scheduleConversion.ok &&
+    new Date(scheduleConversion.iso).getTime() > currentTime;
   const scheduleDisabled =
     busy || props.status !== "approved" || !scheduleDateIsFuture;
+  const savedScheduledAt = osloLocalDateTime(props.scheduledAt);
+  const hasUnsavedSchedulePlan = form.scheduledAt !== savedScheduledAt;
   const publishDisabled = busy || !props.publishEligible;
   const mutedActionClass =
     "disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-white/35 disabled:opacity-100";
@@ -251,6 +262,18 @@ export function BlogEditor(props: Props) {
       setFeedback({
         kind: "warning",
         message: serverUpdatedWhileDirty ? copy.serverUpdated : copy.saveFirst,
+      });
+      return;
+    }
+    if (action === "schedule" && !scheduleConversion.ok) {
+      setFeedback({
+        kind: "warning",
+        message:
+          scheduleConversion.reason === "ambiguous"
+            ? copy.scheduleAmbiguousTime
+            : scheduleConversion.reason === "nonexistent"
+              ? copy.scheduleNonexistentTime
+              : copy.scheduleInvalidTime,
       });
       return;
     }
@@ -515,6 +538,17 @@ export function BlogEditor(props: Props) {
             {copy.scheduleNeedsFutureDate}
           </p>
         ) : null}
+        <div className="text-muted-foreground mt-3 grid gap-1 text-sm">
+          {savedScheduledAt ? (
+            <p>{copy.scheduleSaved.replace("{time}", savedScheduledAt)}</p>
+          ) : null}
+          {hasUnsavedSchedulePlan ? <p>{copy.scheduleUnsavedPlan}</p> : null}
+          <p>
+            {props.schedulerEnabled === false
+              ? copy.schedulerPaused
+              : copy.schedulerPlanOnly}
+          </p>
+        </div>
         {!props.publishEligible ? (
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.publishLocked}

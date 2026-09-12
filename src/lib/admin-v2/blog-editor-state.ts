@@ -14,7 +14,7 @@ export type BlogEditorForm = {
 export type BlogEditorInitialValues = Omit<
   BlogEditorForm,
   "scheduledAt" | "query" | "regenerationInstructions"
->;
+> & { scheduledAt?: string };
 
 export type BlogEditorSavedFields = Pick<
   BlogEditorForm,
@@ -31,7 +31,7 @@ export function initialBlogEditorForm(
 ): BlogEditorForm {
   return {
     ...values,
-    scheduledAt: "",
+    scheduledAt: values.scheduledAt || "",
     query: "",
     regenerationInstructions: "",
   };

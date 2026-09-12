@@ -1,4 +1,5 @@
 import type { BlogEditorForm } from "./blog-editor-state";
+import { osloScheduleIso } from "./blog-schedule-time";
 
 export type { BlogEditorForm } from "./blog-editor-state";
 
@@ -36,13 +37,13 @@ export function blogEditorActionRequest(
     };
   if (action === "stock-image")
     return { ...request, ...(trimmedQuery ? { query: trimmedQuery } : {}) };
-  if (action === "schedule")
+  if (action === "schedule") {
+    const conversion = osloScheduleIso(scheduledAt);
     return {
       ...request,
-      ...(scheduledAt
-        ? { scheduledAt: new Date(scheduledAt).toISOString() }
-        : {}),
+      ...(conversion.ok ? { scheduledAt: conversion.iso } : {}),
     };
+  }
   if (action === "approve")
     return {
       ...request,

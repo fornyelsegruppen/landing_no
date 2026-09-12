@@ -9,6 +9,7 @@ import { blogPublishEligibility } from "@/lib/admin-v2/blog-review";
 import { statusLabel } from "@/lib/admin-v2/labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { getPayload } from "@/lib/payload";
+import { readFeatureFlags } from "@/lib/platform/features";
 import { publicReviewerName, reviewerNameForUser } from "@/lib/blog/reviewer";
 
 export const dynamic = "force-dynamic";
@@ -126,6 +127,8 @@ export default async function BlogArticleAdminPage({
         reviewerName={
           publicReviewerName(post.reviewerName) || reviewerNameForUser(user)
         }
+        scheduledAt={post.scheduledAt || null}
+        schedulerEnabled={readFeatureFlags().seoScheduler}
         seoDescriptionNo={post.seoDescriptionNo || undefined}
         seoTitleNo={post.seoTitleNo || undefined}
         status={post.editorialStatus}

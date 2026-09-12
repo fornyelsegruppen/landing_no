@@ -39,9 +39,22 @@ describe("blog editor state", () => {
       ...original,
       contentNo: "Serverens oppdaterte artikkeltekst.",
       reviewerName: "Ola",
+      scheduledAt: "2026-09-12T14:30",
     });
     expect(refreshed.contentNo).toBe("Serverens oppdaterte artikkeltekst.");
     expect(refreshed.reviewerName).toBe("Ola");
+    expect(refreshed.scheduledAt).toBe("2026-09-12T14:30");
+  });
+
+  it("clears a saved schedule when fresh server props invalidate it", () => {
+    const scheduled = initialBlogEditorForm({
+      ...original,
+      scheduledAt: "2026-09-12T14:30",
+    });
+    expect(
+      reconcileCleanBlogEditorForm(scheduled, { ...original, scheduledAt: "" })
+        .scheduledAt,
+    ).toBe("");
   });
 
   it("blocks every mutation when a newer server version arrives during editing", () => {
