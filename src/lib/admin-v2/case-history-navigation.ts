@@ -1,5 +1,11 @@
 export type CaseHistoryNavigationContext = {
   caseId: number;
+  selectedRecords?: {
+    invoiceRequested?: string | string[];
+    warrantyRequested?: string | string[];
+    invoiceId?: number;
+    warrantyId?: number;
+  };
   messages: {
     requested?: string | string[];
     page: number;
@@ -15,6 +21,12 @@ export type CaseHistoryNavigationContext = {
   };
 };
 
+export function parseCaseRecordId(value: string | string[] | undefined) {
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id <= 2147483647 ? id : null;
+}
+
 type HistoryLocation = { pathname: string; search: string; hash: string };
 export type CaseHistoryNavigationTarget = {
   section: "messages" | "documents";
@@ -28,6 +40,34 @@ export function resolveCaseHistoryNavigation(
 ): CaseHistoryNavigationTarget | null {
   if (location.pathname !== `/admin-v2/cases/${context.caseId}`) return null;
   const params = new URLSearchParams(location.search);
+  const selected = context.selectedRecords;
+  const selectedTargets: string[] = [];
+  for (const [key, requested, id, kind] of [
+    [
+      "invoiceRecord",
+      selected?.invoiceRequested,
+      selected?.invoiceId,
+      "invoice",
+    ],
+    [
+      "warrantyRecord",
+      selected?.warrantyRequested,
+      selected?.warrantyId,
+      "warranty",
+    ],
+  ] as const) {
+    const values = params.getAll(key);
+    if (
+      values.length > 1 ||
+      Array.isArray(requested) ||
+      values[0] !== requested
+    )
+      return null;
+    if (requested !== undefined) {
+      if (!id || parseCaseRecordId(requested) !== id) return null;
+      selectedTargets.push(`${kind}-${id}`);
+    }
+  }
   for (const [key, page] of [
     ["messagePage", context.messages],
     ["documentPage", context.documents],
@@ -57,6 +97,12 @@ export function resolveCaseHistoryNavigation(
     return { section: "messages", targetId: fragment };
   if (fragment === "documents-section")
     return { section: "documents", targetId: fragment };
+  if (
+    selectedTargets.length &&
+    /^(invoice|warranty)-/.test(fragment) &&
+    !selectedTargets.includes(fragment)
+  )
+    return null;
   if (/^message-[1-9]\d*$/.test(fragment)) {
     const id = Number(fragment.slice("message-".length));
     return Number.isSafeInteger(id) && context.messages.ids.includes(id)
@@ -75,8 +121,14 @@ export function resolveCaseHistoryNavigation(
     )
       return { section: "documents", targetId: fragment };
   }
+  if (selectedTargets.includes(fragment))
+    return { section: "documents", targetId: fragment };
   // Do not reinterpret unknown fragments or ambiguous dual-page URLs.
   if (fragment) return null;
+  if (selectedTargets.length)
+    return selectedTargets.length === 1
+      ? { section: "documents", targetId: selectedTargets[0] }
+      : null;
   const messages = params.has("messagePage");
   const documents = params.has("documentPage");
   if (messages === documents) return null;

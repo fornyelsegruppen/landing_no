@@ -110,6 +110,111 @@ describe("document register SQL", () => {
     expect(result.rows[0]).toMatchObject({ source_id: 800, href: "/api/admin/media/800" });
   });
 
+  it("keeps more than 125 same-lead invoice records without PDFs reachable", async () => {
+    await database.exec(`
+      INSERT INTO invoice_records (id, reference, lead_id, status, document_hash, document_id, created_at)
+        SELECT id, 'BOUNDARY-NOPDF-INVOICE-' || id::text, 901, 'approved', 'hash-' || id::text, NULL,
+          '2026-02-01T00:00:00Z'::timestamptz
+        FROM generate_series(1001, 1130) AS ids(id);
+    `);
+
+    const filters = { type: "invoice_draft" as const, query: "BOUNDARY-NOPDF" };
+    const seen = new Set<string>();
+    let page = await rows({ filters });
+    expect(page.rows).toHaveLength(26);
+
+    for (let index = 0; index < 5; index += 1) {
+      if (index > 0) {
+        page = await rows({
+          filters,
+          cursor: cursor(page.rows.at(-1)!, "forward", filters),
+        });
+      }
+      for (const row of page.rows) {
+        seen.add(row.id);
+        expect(row.filename).toBe("");
+        expect(row.href).toBe(`/admin-v2/cases/901?invoiceRecord=${row.source_id}#invoice-${row.source_id}`);
+      }
+    }
+
+    expect(seen.size).toBe(130);
+  });
+
+  it("finds zero-PDF invoice and warranty records through the normal search", async () => {
+    await database.exec(`
+      INSERT INTO invoice_records (id, reference, lead_id, status, document_hash, document_id, created_at)
+        VALUES (2301, 'ZERO-PDF-INVOICE', 901, 'approved', 'invoice-zero-hash', NULL, '2026-04-01T00:00:00Z');
+      INSERT INTO warranties (id, reference, lead_id, status, document_hash, document_id, created_at)
+        VALUES (2302, 'ZERO-PDF-WARRANTY', 901, 'active', 'warranty-zero-hash', NULL, '2026-04-01T00:00:00Z');
+    `);
+
+    const invoice = await rows({ filters: { type: "invoice_draft", query: "ZERO-PDF" } });
+    const warranty = await rows({ filters: { type: "warranty", query: "ZERO-PDF" } });
+
+    expect(invoice.rows).toHaveLength(1);
+    expect(invoice.rows[0]).toMatchObject({
+      source_id: 2301,
+      filename: "",
+      hash: null,
+      href: "/admin-v2/cases/901?invoiceRecord=2301#invoice-2301",
+    });
+    expect(warranty.rows).toHaveLength(1);
+    expect(warranty.rows[0]).toMatchObject({
+      source_id: 2302,
+      filename: "",
+      hash: null,
+      href: "/admin-v2/cases/901?warrantyRecord=2302#warranty-2302",
+    });
+  });
+
+  it("keeps mixed PDF and no-PDF rows on exact 25-item pages with keyset navigation", async () => {
+    await database.exec(`
+      INSERT INTO invoice_records (id, reference, lead_id, status, document_hash, document_id, created_at)
+        SELECT id, 'MIXED-INVOICE-' || id::text, 901, 'approved', 'mixed-invoice-hash-' || id::text, NULL,
+          '2026-05-01T00:00:00Z'::timestamptz
+        FROM generate_series(2101, 2125) AS ids(id);
+      INSERT INTO private_media (id, filename, created_at)
+        VALUES (1726, 'mixed-invoice.pdf', '2026-05-01T00:00:00Z'), (1727, 'mixed-warranty.pdf', '2026-05-01T00:00:00Z');
+      INSERT INTO invoice_records (id, reference, lead_id, status, document_hash, document_id, created_at)
+        VALUES (2126, 'MIXED-INVOICE-PDF', 901, 'approved', 'mixed-invoice-pdf-hash', 1726, '2026-05-01T00:00:00Z');
+      INSERT INTO warranties (id, reference, lead_id, status, document_hash, document_id, created_at)
+        VALUES (2201, 'MIXED-WARRANTY-NOPDF', 901, 'active', 'mixed-warranty-zero-hash', NULL, '2026-05-02T00:00:00Z'),
+          (2202, 'MIXED-WARRANTY-PDF', 901, 'active', 'mixed-warranty-pdf-hash', 1727, '2026-05-02T00:00:00Z');
+    `);
+
+    const filters = { query: "MIXED-" };
+    const first = await rows({ filters });
+    expect(first.rows).toHaveLength(26);
+    expect(first.rows.slice(0, 25)).toHaveLength(25);
+
+    const invoiceWithoutPdf = first.rows.find((row) => row.source_id === 2125);
+    const warrantyWithoutPdf = first.rows.find((row) => row.source_id === 2201);
+    const invoiceWithPdf = first.rows.find((row) => row.source_id === 2126);
+    const warrantyWithPdf = first.rows.find((row) => row.source_id === 2202);
+    expect(invoiceWithoutPdf).toMatchObject({
+      filename: "",
+      href: "/admin-v2/cases/901?invoiceRecord=2125#invoice-2125",
+    });
+    expect(warrantyWithoutPdf).toMatchObject({
+      filename: "",
+      href: "/admin-v2/cases/901?warrantyRecord=2201#warranty-2201",
+    });
+    expect(invoiceWithPdf).toMatchObject({ filename: "mixed-invoice.pdf", href: "/api/admin/media/1726" });
+    expect(warrantyWithPdf).toMatchObject({ filename: "mixed-warranty.pdf", href: "/api/admin/media/1727" });
+
+    const second = await rows({
+      filters,
+      cursor: cursor(first.rows[24], "forward", filters),
+    });
+    expect(second.rows).toHaveLength(3);
+    const previous = await rows({
+      filters,
+      direction: "backward",
+      cursor: cursor(second.rows[0], "backward", filters),
+    });
+    expect(previous.rows.reverse().map((row) => row.id)).toEqual(first.rows.slice(0, 25).map((row) => row.id));
+  });
+
   it("treats search punctuation literally and returns only the matching relation", async () => {
     const result = await rows({ filters: { type: "quote", query: "%_" } });
     expect(result.rows).toHaveLength(1);

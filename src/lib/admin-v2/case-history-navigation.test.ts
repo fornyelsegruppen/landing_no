@@ -28,6 +28,116 @@ function context(
 const location = (path: string) => new URL(path, "http://localhost:3217");
 
 describe("validated case history navigation", () => {
+  it("rejects mismatched record hashes; dual valid queries require an explicit target", () => {
+    const input = context();
+    input.documents.invoiceId = 126;
+    input.selectedRecords = { invoiceRequested: "1", invoiceId: 1 };
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=1#invoice-126"),
+      ),
+    ).toBeNull();
+    input.selectedRecords = {
+      invoiceRequested: "1",
+      invoiceId: 1,
+      warrantyRequested: "2",
+      warrantyId: 2,
+    };
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=1&warrantyRecord=2"),
+      ),
+    ).toBeNull();
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location(
+          "/admin-v2/cases/1?invoiceRecord=1&warrantyRecord=2#warranty-2",
+        ),
+      )?.targetId,
+    ).toBe("warranty-2");
+  });
+
+  it("preserves selected metadata across the existing document pager", () => {
+    const href = caseHistoryPageHref(
+      "/admin-v2/cases/1",
+      { documentPage: "2", invoiceRecord: "1", warrantyRecord: "2" },
+      "documentPage",
+      3,
+    );
+    const input = context(undefined, "3");
+    input.selectedRecords = {
+      invoiceRequested: "1",
+      invoiceId: 1,
+      warrantyRequested: "2",
+      warrantyId: 2,
+    };
+    expect(href).toContain("invoiceRecord=1");
+    expect(href).toContain("warrantyRecord=2");
+    expect(resolveCaseHistoryNavigation(input, location(href))).toEqual({
+      section: "documents",
+      targetId: "documents-section",
+    });
+  });
+  it("opens an exact server-validated historical invoice/warranty rather than current", () => {
+    const input = context();
+    input.documents.totalPages = 0; // A case can have metadata but no PDF files.
+    input.documents.invoiceId = 126;
+    input.documents.warrantyId = 126;
+    input.selectedRecords = { invoiceRequested: "1", invoiceId: 1 };
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=1#invoice-1"),
+      ),
+    ).toEqual({ section: "documents", targetId: "invoice-1" });
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=1"),
+      )?.targetId,
+    ).toBe("invoice-1");
+    input.selectedRecords = { warrantyRequested: "2", warrantyId: 2 };
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?warrantyRecord=2#warranty-2"),
+      )?.targetId,
+    ).toBe("warranty-2");
+  });
+
+  it("does not open latest record when the historical query is invalid, foreign, stale or duplicated", () => {
+    const input = context();
+    input.documents.invoiceId = 126;
+    input.selectedRecords = { invoiceRequested: "201" };
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=201#invoice-126"),
+      ),
+    ).toBeNull();
+    input.selectedRecords = { invoiceRequested: "1", invoiceId: 1 };
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=2#invoice-2"),
+      ),
+    ).toBeNull();
+    expect(
+      resolveCaseHistoryNavigation(
+        input,
+        location("/admin-v2/cases/1?invoiceRecord=1&invoiceRecord=1#invoice-1"),
+      ),
+    ).toBeNull();
+    expect(
+      resolveCaseHistoryNavigation(
+        context(),
+        location("/admin-v2/cases/1?invoiceRecord=01#invoice-1"),
+      ),
+    ).toBeNull();
+  });
   it("activates canonical invoice/warranty links only for rendered case-owned targets", () => {
     const input = context();
     input.documents.invoiceId = 31;

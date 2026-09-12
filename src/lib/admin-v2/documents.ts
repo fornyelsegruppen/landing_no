@@ -28,6 +28,16 @@ export type AdminDocumentItem = {
   version?: number;
 };
 
+export function isMetadataOnlyDocument(
+  item: Pick<AdminDocumentItem, "type" | "filename" | "href">,
+) {
+  return (
+    (item.type === "invoice_draft" || item.type === "warranty") &&
+    item.filename === "" &&
+    item.href.startsWith("/admin-v2/cases/")
+  );
+}
+
 /** Consecutive groups preserve the register's global keyset order. */
 export function groupDocumentPage(items: AdminDocumentItem[]) {
   const groups: {

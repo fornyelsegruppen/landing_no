@@ -11,6 +11,7 @@ import {
 import {
   adminDocumentTypes,
   groupDocumentPage,
+  isMetadataOnlyDocument,
   type AdminDocumentType,
 } from "@/lib/admin-v2/documents";
 import {
@@ -23,6 +24,7 @@ import { statusLabel } from "@/lib/admin-v2/labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import { getPayload } from "@/lib/payload";
+import { getCaseRecordCopy } from "@/lib/admin-v2/case-record-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,7 @@ export default async function AdminDocumentsPage({
 }) {
   const user = await requireAdminUser();
   const copy = getAdminV2Copy(user.interfaceLanguage);
+  const recordCopy = getCaseRecordCopy(user.interfaceLanguage);
   const params = await searchParams;
   const filters = {
     query: value(params.q),
@@ -57,8 +60,8 @@ export default async function AdminDocumentsPage({
       ? {
           previous: "Ankstesni",
           next: "Kiti",
-          page: "dokumentai šiame puslapyje",
-          help: "Iki 25 dokumentų puslapyje. Paieška apima visą registrą. Nauji įrašai ar būsenų pakeitimai gali pakeisti kitą puslapį.",
+          page: "dokumentai ir įrašai šiame puslapyje",
+          help: "Iki 25 dokumentų ar įrašų puslapyje. Paieška apima visą registrą. Nauji įrašai ar būsenų pakeitimai gali pakeisti kitą puslapį.",
           error:
             "Dokumentų registro nepavyko įkelti. Bandykite dar kartą nuo pradžios.",
           unsupported:
@@ -70,8 +73,8 @@ export default async function AdminDocumentsPage({
         ? {
             previous: "Previous",
             next: "Next",
-            page: "documents on this page",
-            help: "Up to 25 documents per page. Search covers the entire register. New records or status changes may affect the next page.",
+            page: "documents and records on this page",
+            help: "Up to 25 documents or records per page. Search covers the entire register. New records or status changes may affect the next page.",
             error:
               "The document register could not be loaded. Please try again from the start.",
             unsupported:
@@ -82,8 +85,8 @@ export default async function AdminDocumentsPage({
         : {
             previous: "Forrige",
             next: "Neste",
-            page: "dokumenter på denne siden",
-            help: "Opptil 25 dokumenter per side. Søket dekker hele registeret. Nye oppføringer eller statusendringer kan påvirke neste side.",
+            page: "dokumenter og oppføringer på denne siden",
+            help: "Opptil 25 dokumenter eller oppføringer per side. Søket dekker hele registeret. Nye oppføringer eller statusendringer kan påvirke neste side.",
             error:
               "Dokumentregisteret kunne ikke lastes. Prøv igjen fra starten.",
             unsupported:
@@ -346,7 +349,9 @@ export default async function AdminDocumentsPage({
                           {document.reference}
                         </strong>
                         <p className="text-muted-foreground truncate text-sm">
-                          {document.filename}
+                          {isMetadataOnlyDocument(document)
+                            ? recordCopy.noPdf
+                            : document.filename}
                         </p>
                       </div>
                       <div className="text-muted-foreground text-sm">
@@ -376,10 +381,16 @@ export default async function AdminDocumentsPage({
                         className="bg-accent text-accent-foreground hover:bg-accent-hover inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold"
                         href={document.href}
                         rel="noreferrer"
-                        target="_blank"
+                        target={
+                          isMetadataOnlyDocument(document)
+                            ? undefined
+                            : "_blank"
+                        }
                       >
                         <FileSearch aria-hidden="true" className="size-4" />
-                        {copy.documents.openDocument}
+                        {isMetadataOnlyDocument(document)
+                          ? recordCopy.openRecord
+                          : copy.documents.openDocument}
                       </a>
                     </div>
                   ))}

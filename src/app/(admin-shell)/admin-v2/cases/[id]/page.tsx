@@ -24,6 +24,9 @@ import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CaseMessageHistory } from "@/components/admin-v2/case-message-history";
 import { CaseMessageFailureNotice } from "@/components/admin-v2/case-message-failure-notice";
 import { CaseHistoryPagination } from "@/components/admin-v2/case-history-pagination";
+import { CaseSelectedRecordDetails } from "@/components/admin-v2/case-selected-record-details";
+import { loadCaseSelectedRecords } from "@/lib/admin-v2/case-selected-records";
+import { getCaseRecordCopy } from "@/lib/admin-v2/case-record-copy";
 import { loadCaseDocumentHistory } from "@/lib/admin-v2/case-document-history";
 import { loadCaseCurrentSelection } from "@/lib/admin-v2/case-current-selection";
 import { loadCaseQuestionContext } from "@/lib/admin-v2/case-question-context";
@@ -780,6 +783,19 @@ export default async function AdminCasePage({
     }),
   ]);
   if (!caseData) notFound();
+  const selectedRecords =
+    query.invoiceRecord !== undefined || query.warrantyRecord !== undefined
+      ? await loadCaseSelectedRecords(payload, user, caseData.lead.id, {
+          invoiceRecord: query.invoiceRecord,
+          warrantyRecord: query.warrantyRecord,
+        })
+      : { records: [], unavailable: false };
+  const selectedInvoice = selectedRecords.records.find(
+    (record) => record.kind === "invoice",
+  );
+  const selectedWarranty = selectedRecords.records.find(
+    (record) => record.kind === "warranty",
+  );
   const declineFollowUp = caseData.nextAction.kind === "follow_up_decline";
   const unresolvedQuestion = caseData.customerQuestionContext.unresolved;
   const workspaceQuestionThread =
@@ -1681,6 +1697,11 @@ export default async function AdminCasePage({
         leadId={caseData.lead.id}
         reviewed={Boolean(caseData.lead.adminReviewedAt)}
       />
+      {selectedRecords.unavailable ? (
+        <p role="alert" className="rounded-xl border border-amber-400/40 p-4">
+          {getCaseRecordCopy(user.interfaceLanguage).unavailable}
+        </p>
+      ) : null}
       <Link
         className="text-muted-foreground hover:text-accent inline-flex min-h-10 items-center gap-2 text-sm font-semibold"
         href="/admin-v2/cases"
@@ -2061,6 +2082,12 @@ export default async function AdminCasePage({
           activeStageState={primaryState.blocker ? "blocked" : "current"}
           historyNavigation={{
             caseId: caseData.lead.id,
+            selectedRecords: {
+              invoiceRequested: query.invoiceRecord,
+              warrantyRequested: query.warrantyRecord,
+              invoiceId: selectedInvoice?.id,
+              warrantyId: selectedWarranty?.id,
+            },
             messages: {
               requested: query.messagePage,
               page: caseData.history.messages.page,
@@ -2146,6 +2173,19 @@ export default async function AdminCasePage({
           stagePanels={processStagePanels}
           inspectorContent={
             <div className="grid min-w-0 gap-6" data-case-inspector-registry>
+              {selectedRecords.records
+                .filter((record) =>
+                  record.kind === "invoice"
+                    ? record.id !== caseData.invoice?.id
+                    : record.id !== caseData.warranty?.id,
+                )
+                .map((record) => (
+                  <CaseSelectedRecordDetails
+                    key={`${record.kind}-${record.id}`}
+                    record={record}
+                    locale={user.interfaceLanguage}
+                  />
+                ))}
               <CaseVersionHistory
                 contracts={caseData.commercial.contractVersions}
                 copy={copy}
@@ -2584,7 +2624,16 @@ export default async function AdminCasePage({
                         locale={user.interfaceLanguage}
                         pageData={caseData.history.messages}
                         pageKey="messagePage"
-                        params={{ documentPage, messagePage }}
+                        params={{
+                          documentPage,
+                          messagePage,
+                          invoiceRecord: selectedInvoice
+                            ? String(selectedInvoice.id)
+                            : undefined,
+                          warrantyRecord: selectedWarranty
+                            ? String(selectedWarranty.id)
+                            : undefined,
+                        }}
                       />
                     ) : null}
                   </Section>
@@ -2870,7 +2919,14 @@ export default async function AdminCasePage({
                                   className="size-4"
                                 />
                               </a>
-                            ) : null}
+                            ) : (
+                              <p className="text-muted-foreground mt-3 text-sm">
+                                {
+                                  getCaseRecordCopy(user.interfaceLanguage)
+                                    .noPdf
+                                }
+                              </p>
+                            )}
                             {secondaryMutationsAllowed ? (
                               <>
                                 <InvoiceRecordPanel
@@ -2931,7 +2987,14 @@ export default async function AdminCasePage({
                                   className="size-4"
                                 />
                               </a>
-                            ) : null}
+                            ) : (
+                              <p className="text-muted-foreground mt-3 text-sm">
+                                {
+                                  getCaseRecordCopy(user.interfaceLanguage)
+                                    .noPdf
+                                }
+                              </p>
+                            )}
                           </div>
                         ) : null}
                       </div>
@@ -2967,7 +3030,16 @@ export default async function AdminCasePage({
                         locale={user.interfaceLanguage}
                         pageData={caseData.history.documents}
                         pageKey="documentPage"
-                        params={{ documentPage, messagePage }}
+                        params={{
+                          documentPage,
+                          messagePage,
+                          invoiceRecord: selectedInvoice
+                            ? String(selectedInvoice.id)
+                            : undefined,
+                          warrantyRecord: selectedWarranty
+                            ? String(selectedWarranty.id)
+                            : undefined,
+                        }}
                       />
                     ) : null}
                   </Section>
