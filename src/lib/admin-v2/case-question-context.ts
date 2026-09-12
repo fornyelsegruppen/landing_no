@@ -10,6 +10,7 @@ import { withAdminReadConnection, type AdminReadUser } from "./admin-read-db";
 const maxRequestedQuestionIds = 25;
 
 type QuestionRow = {
+  isUnresolved: boolean;
   q_aiAnalysis: unknown;
   q_aiAssisted: boolean | null;
   q_bodyText: string | null;
@@ -76,22 +77,24 @@ function selectedMessage(row: QuestionRow, prefix: "q" | "r") {
 }
 
 function contextFromRows(rows: QuestionRow[]): CustomerQuestionContext {
-  const threads: CustomerQuestionContextThread[] = rows
+  const selected = rows
     .map((row) => ({
-      question: selectedMessage(row, "q")!,
-      reply: selectedMessage(row, "r"),
+      isUnresolved: row.isUnresolved,
+      thread: {
+        question: selectedMessage(row, "q")!,
+        reply: selectedMessage(row, "r"),
+      } satisfies CustomerQuestionContextThread,
     }))
     .sort(
       (left, right) =>
-        String(right.question.createdAt || "").localeCompare(
-          String(left.question.createdAt || ""),
-        ) || right.question.id - left.question.id,
+        String(right.thread.question.createdAt || "").localeCompare(
+          String(left.thread.question.createdAt || ""),
+        ) || right.thread.question.id - left.thread.question.id,
     );
+  const threads = selected.map(({ thread }) => thread);
   const latest = threads[0] || null;
-  // A question is unresolved according to its latest non-cancelled reply.
-  // Older delivered replies must not resolve a newer failed/draft attempt.
   const unresolved =
-    threads.find((thread) => thread.reply?.status !== "delivered") || null;
+    selected.find(({ isUnresolved }) => isUnresolved)?.thread || null;
   return {
     latest,
     status: unresolved ? "pending" : latest ? "resolved" : "none",
@@ -126,7 +129,7 @@ export async function loadCaseQuestionContext(
   return withAdminReadConnection(payload, user, async (connection) => {
     const result = await connection.query<QuestionRow>(
       `WITH questions AS (
-         SELECT m.*
+         SELECT m.id, m.created_at
            FROM messages m
           WHERE m.lead_id = $1
             AND m.direction = 'inbound'
@@ -141,29 +144,33 @@ export async function loadCaseQuestionContext(
        unresolved_question AS (
          SELECT q.id
            FROM questions q
-          WHERE COALESCE((
-            SELECT r.status::text
+          WHERE NOT EXISTS (
+            SELECT 1
               FROM messages r
              WHERE r.lead_id = $1
                AND r.direction = 'outbound'
                AND r.reply_to_message_id = q.id
                AND r.status <> 'cancelled'
-             ORDER BY r.created_at DESC, r.id DESC
-             LIMIT 1
-          ), '') <> 'delivered'
+               AND r.status = 'delivered'
+          )
           ORDER BY q.created_at DESC, q.id DESC
           LIMIT 1
        ),
        selected_questions AS (
-         SELECT id FROM latest_question
-         UNION
-         SELECT id FROM unresolved_question
-         UNION
-         SELECT id
-           FROM questions
-          WHERE id = ANY($2::integer[])
+         SELECT id, bool_or(is_unresolved) AS is_unresolved
+           FROM (
+             SELECT id, FALSE AS is_unresolved FROM latest_question
+             UNION ALL
+             SELECT id, TRUE AS is_unresolved FROM unresolved_question
+             UNION ALL
+             SELECT id, FALSE AS is_unresolved
+               FROM questions
+              WHERE id = ANY($2::integer[])
+           ) candidates(id, is_unresolved)
+          GROUP BY id
        )
        SELECT
+         selected.is_unresolved AS "isUnresolved",
          q.id AS "q_id",
          q.ai_analysis AS "q_aiAnalysis",
          q.ai_assisted AS "q_aiAssisted",
@@ -195,7 +202,7 @@ export async function loadCaseQuestionContext(
          r.subject AS "r_subject",
          r.updated_at AS "r_updatedAt"
          FROM selected_questions selected
-         JOIN questions q ON q.id = selected.id
+         JOIN messages q ON q.id = selected.id AND q.lead_id = $1
          LEFT JOIN LATERAL (
            SELECT reply.*
              FROM messages reply

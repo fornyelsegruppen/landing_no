@@ -3,6 +3,7 @@ import type { Payload } from "payload";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import { loadCaseQuestionContext } from "./case-question-context";
+import { customerQuestionContext } from "@/lib/messages/customer-question-state";
 
 const admin = { id: 1, active: true, role: "admin" };
 
@@ -84,9 +85,40 @@ describe("bounded case question context", () => {
     expect(context.threads.length).toBeLessThanOrEqual(2);
   });
 
-  it("uses the latest non-cancelled reply and treats newer failure as unresolved", async () => {
+  it("keeps latest reply data while preserving any-delivered canonical resolution", async () => {
     const context = await loadCaseQuestionContext(payload, admin, 7, [202, 204, 208]);
-    expect(context.unresolved?.question.id).toBe(202);
+    const complete = await database.query<{
+      ai_analysis: unknown;
+      ai_assisted: boolean | null;
+      body_text: string | null;
+      category: string;
+      channel: string | null;
+      created_at: Date;
+      delivered_at: Date | null;
+      direction: string;
+      failure_code: string | null;
+      failure_message: string | null;
+      id: number;
+      reply_to_message_id: number | null;
+      status: string | null;
+      subject: string | null;
+      updated_at: Date;
+    }>("SELECT id, ai_analysis, ai_assisted, body_text, category, channel, created_at, delivered_at, direction, failure_code, failure_message, reply_to_message_id, status, subject, updated_at FROM messages WHERE lead_id = 7");
+    const expected = customerQuestionContext(complete.rows.map((row) => ({
+      ...row,
+      aiAnalysis: row.ai_analysis,
+      aiAssisted: row.ai_assisted,
+      bodyText: row.body_text,
+      createdAt: row.created_at.toISOString(),
+      deliveredAt: row.delivered_at?.toISOString(),
+      failureCode: row.failure_code,
+      failureMessage: row.failure_message,
+      replyToMessageId: row.reply_to_message_id,
+      updatedAt: row.updated_at.toISOString(),
+    })));
+    expect(context.latest?.question.id).toBe(expected.latest?.question.id);
+    expect(context.unresolved?.question.id).toBe(expected.unresolved?.question.id);
+    expect(context.status).toBe(expected.status);
     expect(context.threads.find((thread) => thread.question.id === 202)?.reply).toMatchObject({ id: 203, status: "failed" });
     expect(context.threads.find((thread) => thread.question.id === 208)?.reply).toMatchObject({ id: 209, status: "delivered" });
   });
