@@ -417,7 +417,7 @@ describe("blog stock images", () => {
     }
 
     expect(selectedIds).toEqual([101, 102, 103, 104]);
-    expect(new Set(selectedIds)).toHaveSize(4);
+    expect(new Set(selectedIds).size).toBe(4);
     expect(findVersions).toHaveBeenCalledTimes(4);
   });
 
@@ -464,6 +464,83 @@ describe("blog stock images", () => {
     expect(expectReplacement(result).selected.id).toBe(103);
     expect(searchPage).toHaveBeenCalledTimes(1);
     expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([1]);
+  });
+
+  it("advances through page two and page three before selecting an unused candidate", async () => {
+    const findVersions = vi.fn(async () => ({
+      docs: [
+        { version: { stockImage: { provider: "pexels", assetId: "100" } } },
+        { version: { stockImage: { provider: "pexels", assetId: "101" } } },
+      ],
+    }));
+    const update = vi.fn(async (input) => ({ id: 16, ...input.data }));
+    const searchPage = vi.fn(async (_query, { page }: { page: number }) => ({
+      photos: [photo(99 + page)],
+      hasMore: true,
+    }));
+
+    const result = await attachPexelsStockImageToPost({
+      payload: { findVersions, update, logger: { warn: vi.fn() } } as unknown as Payload,
+      post: {
+        id: 16,
+        titleNo: "Takfornying i Oslo",
+        stockImage: { provider: "pexels", assetId: "100" },
+      },
+      provider: { searchPage } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(expectReplacement(result).selected.id).toBe(102);
+    expect(searchPage.mock.calls.map(([, options]) => options)).toEqual([
+      { page: 1, perPage: 30 },
+      { page: 2, perPage: 30 },
+      { page: 3, perPage: 30 },
+    ]);
+    expect(findVersions).toHaveBeenCalledWith({
+      collection: "posts",
+      where: { parent: { equals: 16 } },
+      sort: "-updatedAt",
+      limit: 20,
+      pagination: false,
+      depth: 0,
+      overrideAccess: true,
+    });
+  });
+
+  it("caps an exhausted has-more result set at three pages without mutating the post", async () => {
+    const update = vi.fn();
+    const searchPage = vi.fn(async (_query, { page }: { page: number }) => ({
+      photos: [photo(99 + page)],
+      hasMore: true,
+    }));
+    const result = await attachPexelsStockImageToPost({
+      payload: {
+        findVersions: vi.fn(async () => ({
+          docs: [
+            { version: { stockImage: { provider: "pexels", assetId: "100" } } },
+            { version: { stockImage: { provider: "pexels", assetId: "101" } } },
+            { version: { stockImage: { provider: "pexels", assetId: "102" } } },
+          ],
+        })),
+        update,
+        logger: { warn: vi.fn() },
+      } as unknown as Payload,
+      post: {
+        id: 17,
+        titleNo: "Takfornying i Oslo",
+        stockImage: { provider: "pexels", assetId: "102" },
+      },
+      provider: { searchPage } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(result).toEqual({
+      outcome: "no_alternative",
+      query: "Norwegian house roof tiles exterior",
+      existingAssetId: "102",
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([1, 2, 3]);
   });
 
   it("keeps the post unchanged when all bounded-page candidates are exhausted", async () => {

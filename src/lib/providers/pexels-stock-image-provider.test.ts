@@ -63,6 +63,64 @@ describe("Pexels stock image provider", () => {
     });
   });
 
+  it("keeps hasMore from total results when landscape filtering leaves a page empty", async () => {
+    const request = vi.fn(async () =>
+      Response.json({
+        total_results: 31,
+        photos: [
+          {
+            id: 124,
+            width: 1000,
+            height: 1000,
+            url: "https://www.pexels.com/photo/square-roof-124/",
+            photographer: "Square Fixture",
+            photographer_url: "https://www.pexels.com/@square-fixture/",
+            alt: "Square roof image",
+            src: { original: "https://images.pexels.com/photos/124/roof.jpeg" },
+          },
+        ],
+      }),
+    );
+    const provider = new PexelsStockImageProvider(
+      { PEXELS_API_KEY: "test" },
+      request as typeof fetch,
+    );
+
+    await expect(provider.searchPage("house roof", { page: 1, perPage: 30 })).resolves.toEqual({
+      photos: [],
+      hasMore: true,
+    });
+  });
+
+  it("rejects invalid page and per-page bounds before making a request", async () => {
+    const request = vi.fn();
+    const provider = new PexelsStockImageProvider(
+      { PEXELS_API_KEY: "test" },
+      request as typeof fetch,
+    );
+
+    await expect(provider.searchPage("house roof", { page: 0 })).rejects.toThrow("Pexels-siden er ugyldig");
+    await expect(provider.searchPage("house roof", { page: 1.5 })).rejects.toThrow("Pexels-siden er ugyldig");
+    await expect(provider.searchPage("house roof", { perPage: 0 })).rejects.toThrow("Pexels sideantall er ugyldig");
+    await expect(provider.searchPage("house roof", { perPage: 81 })).rejects.toThrow("Pexels sideantall er ugyldig");
+    await expect(provider.searchPage("house roof", { perPage: 1.5 })).rejects.toThrow("Pexels sideantall er ugyldig");
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("never follows a response next_page URL", async () => {
+    const nextPage = "https://example.invalid/pexels-next-page";
+    const request = vi.fn(async () => Response.json({ ...photoResponse(), next_page: nextPage }));
+    const provider = new PexelsStockImageProvider(
+      { PEXELS_API_KEY: "test" },
+      request as typeof fetch,
+    );
+
+    await provider.searchPage("house roof", { page: 2, perPage: 30 });
+    expect(request).toHaveBeenCalledOnce();
+    expect(String(request.mock.calls[0]?.[0])).not.toContain(nextPage);
+    expect(String(request.mock.calls[0]?.[0])).toContain("api.pexels.com/v1/search");
+  });
+
   it("rejects image downloads outside the approved Pexels host", async () => {
     const request = vi.fn(async () =>
       Response.json(photoResponse("https://example.com/untrusted.jpg")),
