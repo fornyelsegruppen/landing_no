@@ -5,6 +5,18 @@ import {
 } from "./blog-quality-copy";
 describe("operator quality feedback", () => {
   it.each([
+    ["lt", "pastraipas"],
+    ["nb", "avsnitt"],
+    ["en", "paragraphs"],
+  ] as const)("explains the repetition blocker in %s", (locale, word) => {
+    const message = blogQualityIssueMessage(
+      { code: "repeated_meaningful_paragraph", message: "raw source" },
+      locale,
+    );
+    expect(message).toContain(word);
+    expect(message).not.toContain("raw source");
+  });
+  it.each([
     ["lt", "simbolių", "žodžių"],
     ["nb", "tegn", "ord"],
     ["en", "characters", "words"],

@@ -83,6 +83,12 @@ const copy = {
 
 /** Presentation only: preserve stored QA codes, scores and thresholds. */
 export function blogQualityIssueMessage(issue: Issue, locale: PanelLocale) {
+  if (issue.code === "repeated_meaningful_paragraph")
+    return {
+      lt: "Tas pats ilgas paragrafas kartojamas bent tris kartus. Pašalinkite pasikartojimus arba parašykite skirtingas prasmingas pastraipas, tada pakartokite kokybės patikrą.",
+      nb: "Samme lengre avsnitt gjentas minst tre ganger. Fjern gjentakelser eller skriv ulike meningsfulle avsnitt, og kjør kvalitetskontrollen på nytt.",
+      en: "The same long paragraph appears at least three times. Remove repetition or write distinct meaningful paragraphs, then run the quality check again.",
+    }[locale];
   if (issue.code === "content_too_short") return copy[locale].shortWords;
   if (issue.code === "invalid_output" || issue.gate === "schema") {
     // Support the stored schema field prefix, not Zod's unstable English text.

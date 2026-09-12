@@ -10,6 +10,7 @@ No Docker or production/provider secrets are needed.
 ```powershell
 node scripts/seo-local-browser.mjs seed
 node scripts/seo-local-browser.mjs repair-fixtures
+node scripts/seo-local-browser.mjs add-unique-fixture
 node scripts/seo-local-browser.mjs build
 node scripts/seo-local-browser.mjs start
 ```
@@ -29,6 +30,38 @@ overwrite existing fixture articles or delete database content.
 `start` uses the generated `.next/standalone/server.js`, copies static/public
 assets only into that generated output, and explicitly binds it to loopback.
 It does not use the incompatible `next start` command for a standalone build.
+
+Release constraint: this package has no intended schema/migration delta. The
+repository's `npm run build` invokes `build:migrate` first; even
+`PAYLOAD_BUILD_WITHOUT_DB=1` does not skip that script. Never use that entrypoint
+as this package's supposedly read-only build. This local runner invokes Next
+directly. Any later CONTROL-approved deployment requires an independently
+verified direct-Next build override, fresh rollback metadata, and confirmation of
+the actual production schema/migration ledger; no production DB mutation is
+authorized by these local test results.
+
+The repetition-guard follow-up blocks a normalized long prose paragraph repeated
+at least three times. Existing fixture3 is retained as the historical negative
+case. `add-unique-fixture` only creates `seo-local-unique-approval` if absent in the
+fixed existing database/account, verifies its synthetic author if present, and
+never updates existing post text/history. Its first execution created post4;
+read-only QA preflight passed with score93 and a visible moderate title/keyword
+overlap warning. This does not persist QA or human approval. Its content uses
+distinct meaningful paragraphs, not a repeated word-count filler.
+
+After the unpublish changes, a standalone fixture/CLI process may log a cache
+invalidation warning because it has no Next request store. Browser-path cache
+acceptance remains a separate gate. The corrected invalidation patterns include
+the `(site)` route group and are tested against the installed Next implicit tags.
+
+Rescheduling uses the existing schedule action for approved or scheduled posts,
+requires current QA/human review/source readiness and a future date, retains
+revision guards, and does not create a new version for an identical saved time.
+The LT/NB/EN editor shows Change time only for a scheduled article and disables
+it until a different future time is selected with no unsaved content edits.
+
+Final combined pre-build checks after these changes: 49 files / 317 Vitest tests,
+3 local fixture helper tests, full TypeScript, touched ESLint and diff-check PASS.
 
 Fixtures:
 

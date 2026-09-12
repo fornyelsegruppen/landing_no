@@ -23,9 +23,18 @@ const fixtureAccount = {
   password: "Synthetic-local-browser-only-20260912",
 };
 
-if (!["seed", "repair-fixtures", "build", "dev", "start"].includes(mode)) {
+if (
+  ![
+    "seed",
+    "repair-fixtures",
+    "add-unique-fixture",
+    "build",
+    "dev",
+    "start",
+  ].includes(mode)
+) {
   console.log(
-    "Usage: node scripts/seo-local-browser.mjs seed|repair-fixtures|build|dev|start|start-review-canary",
+    "Usage: node scripts/seo-local-browser.mjs seed|repair-fixtures|add-unique-fixture|build|dev|start|start-review-canary",
   );
   process.exit(mode ? 1 : 0);
 }
@@ -74,7 +83,7 @@ Object.assign(environment, {
 process.env = environment;
 process.chdir(root);
 
-if (mode !== "seed" && mode !== "repair-fixtures") {
+if (!["seed", "repair-fixtures", "add-unique-fixture"].includes(mode)) {
   if (reviewCanary)
     console.log(
       "LOCAL review-canary UI flags enabled for the fixed synthetic database only. AI remains OFF, no cron credential or executor is configured.",
@@ -134,7 +143,7 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
       "select 1 from pg_database where datname=$1",
       [database],
     );
-    if (!found.rowCount && mode === "repair-fixtures")
+    if (!found.rowCount && mode !== "seed")
       throw new Error(
         "Seed the fixed local fixture database before repairing fixtures",
       );
@@ -160,7 +169,7 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
       limit: 1,
       where: { email: { equals: fixtureAccount.email } },
     });
-    if (!users.docs.length && mode === "repair-fixtures")
+    if (!users.docs.length && mode !== "seed")
       throw new Error(
         "The isolated fixture administrator is missing; repair does not create accounts",
       );
@@ -180,14 +189,13 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
       path.join(root, "src/lib/blog/test-fixtures.ts"),
     );
     const article = validGeneratedArticle();
-    if (mode === "repair-fixtures") {
+    if (mode === "repair-fixtures" || mode === "add-unique-fixture") {
       const { postRevision } = await jiti.import(
         path.join(root, "src/lib/blog/post-revision.ts"),
       );
-      for (const slug of [
-        "seo-local-draft",
-        "seo-local-published-with-draft",
-      ]) {
+      for (const slug of mode === "repair-fixtures"
+        ? ["seo-local-draft", "seo-local-published-with-draft"]
+        : []) {
         const found = await payload.find({
           collection: "posts",
           draft: true,
@@ -231,7 +239,10 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
       }
       // A separate complete fixture avoids changing either operator-edited title
       // merely to eliminate their synthetic topic overlap. Never overwrite it.
-      const completeSlug = "seo-local-approval";
+      const completeSlug =
+        mode === "add-unique-fixture"
+          ? "seo-local-unique-approval"
+          : "seo-local-approval";
       const complete = await payload.find({
         collection: "posts",
         draft: true,
@@ -241,6 +252,10 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
         where: { slug: { equals: completeSlug } },
       });
       let approvalPost = complete.docs[0];
+      if (approvalPost && approvalPost.authorName !== "Synthetic local fixture")
+        throw new Error(
+          "The fixture slug belongs to a different author; no update is permitted",
+        );
       if (!complete.docs.length) {
         approvalPost = await payload.create({
           collection: "posts",
@@ -248,7 +263,10 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
           overrideAccess: true,
           data: {
             slug: completeSlug,
-            titleNo: "Syntetisk test – hva påvirker prisen på takvask?",
+            titleNo:
+              mode === "add-unique-fixture"
+                ? "Syntetisk test – trygg planlegging av takvask"
+                : "Syntetisk test – hva påvirker prisen på takvask?",
             contentNo: article.content,
             excerptNo: article.excerpt,
             seoTitleNo: article.seoTitle,
@@ -297,7 +315,7 @@ if (mode !== "seed" && mode !== "repair-fixtures") {
         }),
       );
       console.log(
-        "Local fixture metadata repaired without replacing saved text. Complete approval fixture exists as a review-required draft; no approval, publication or provider call was performed.",
+        "Requested local fixture is ready without replacing saved text. Complete approval fixture remains review-required; no approval, publication or provider call was performed.",
       );
     } else {
       for (const state of ["draft", "published-with-draft"]) {
