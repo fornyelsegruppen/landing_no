@@ -249,7 +249,10 @@ describe("blog stock images", () => {
       persistToMedia: false,
     });
 
-    expect(result).toMatchObject({ outcome: "replaced", selected: { id: 655 } });
+    expect(result).toMatchObject({
+      outcome: "replaced",
+      selected: { id: 655 },
+    });
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -258,6 +261,95 @@ describe("blog stock images", () => {
         }),
       }),
     );
+  });
+
+  it("skips explicit Bergen landmark metadata for an Oslo article but keeps a neutral roof alternative", async () => {
+    const update = vi.fn(async (input) => ({ id: 11, ...input.data }));
+    const result = await attachPexelsStockImageToPost({
+      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      post: {
+        id: 11,
+        titleNo: "Takfornying i Oslo",
+        primaryKeyword: "takfornying Oslo",
+        stockImage: { provider: "pexels", assetId: "29114658" },
+      },
+      provider: {
+        search: vi.fn(async () => [
+          {
+            id: 29525395,
+            width: 2400,
+            height: 1350,
+            pageUrl:
+              "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
+            photographer: "Fixture Photographer",
+            photographerUrl: "https://www.pexels.com/@fixture/",
+            alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
+            imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
+          },
+          {
+            id: 29525396,
+            width: 2400,
+            height: 1350,
+            pageUrl:
+              "https://www.pexels.com/photo/red-tiled-house-roof-29525396/",
+            photographer: "Roof Photographer",
+            photographerUrl: "https://www.pexels.com/@roof/",
+            alt: "Red tiled house roof under a clear sky",
+            imageUrl:
+              "https://images.pexels.com/photos/29525396/red-tiled-roof.jpeg",
+          },
+        ]),
+      } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(result).toMatchObject({
+      outcome: "replaced",
+      selected: { id: 29525396 },
+    });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stockImage: expect.objectContaining({ assetId: "29525396" }),
+        }),
+      }),
+    );
+  });
+
+  it("keeps NO_ALTERNATIVE when the only distinct candidate is an explicit wrong-city landmark", async () => {
+    const update = vi.fn();
+    const result = await attachPexelsStockImageToPost({
+      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      post: {
+        id: 11,
+        titleNo: "Takfornying i Oslo",
+        primaryKeyword: "takfornying Oslo",
+        stockImage: { provider: "pexels", assetId: "29114658" },
+      },
+      provider: {
+        search: vi.fn(async () => [
+          {
+            id: 29525395,
+            width: 2400,
+            height: 1350,
+            pageUrl:
+              "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
+            photographer: "Fixture Photographer",
+            photographerUrl: "https://www.pexels.com/@fixture/",
+            alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
+            imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
+          },
+        ]),
+      } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      outcome: "no_alternative",
+      query: "Norwegian house roof tiles exterior",
+      existingAssetId: "29114658",
+    });
   });
 
   it("invalidates scheduled review evidence when an uploaded hero overrides matching stock metadata", async () => {

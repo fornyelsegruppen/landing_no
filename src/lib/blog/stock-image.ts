@@ -26,10 +26,51 @@ const queryByVariant: Record<NonNullable<StockPost["ctaVariant"]>, string> = {
   new_roof: "new tiled roof house exterior",
 };
 
+// This is deliberately metadata-only. We do not infer a photo's location;
+// we reject only an explicit conflict between the article's stated location
+// and Pexels' supplied alt text or source-page slug.
+const norwegianLocationMetadata = [
+  { key: "oslo", terms: ["oslo", "akershus", "holmenkollen", "vigeland"] },
+  { key: "bergen", terms: ["bergen", "bryggen", "fløyen", "fløybanen"] },
+] as const;
+
+function knownNorwegianLocations(value: string) {
+  const normalized = value.toLocaleLowerCase("nb-NO");
+  return new Set(
+    norwegianLocationMetadata
+      .filter(({ terms }) =>
+        terms.some((term) => new RegExp(`\\b${term}\\b`, "i").test(normalized)),
+      )
+      .map(({ key }) => key),
+  );
+}
+
+function isGeographicallyCompatiblePexelsCandidate(
+  post: StockPost,
+  candidate: Awaited<ReturnType<PexelsStockImageProvider["search"]>>[number],
+) {
+  const articleLocations = knownNorwegianLocations(
+    `${post.titleNo} ${post.primaryKeyword || ""}`,
+  );
+  if (articleLocations.size === 0) return true;
+
+  const candidateLocations = knownNorwegianLocations(
+    `${candidate.alt} ${candidate.pageUrl}`,
+  );
+  return (
+    candidateLocations.size === 0 ||
+    [...candidateLocations].some((location) => articleLocations.has(location))
+  );
+}
+
 export function stockQueryForPost(post: StockPost, requestedQuery?: string) {
   const requested = requestedQuery?.trim().replace(/\s+/g, " ");
   if (requested && requested.length >= 3) return requested.slice(0, 120);
-  if (/\b(mose|lav|alger|begroing)\b/i.test(`${post.titleNo} ${post.primaryKeyword || ""}`)) {
+  if (
+    /\b(mose|lav|alger|begroing)\b/i.test(
+      `${post.titleNo} ${post.primaryKeyword || ""}`,
+    )
+  ) {
     return "mossy tiled roof house exterior";
   }
   return queryByVariant[post.ctaVariant || "assessment"];
@@ -97,7 +138,9 @@ export async function attachPexelsStockImageToPost(input: {
       ? input.post.stockImage.assetId?.trim()
       : undefined;
   const selected = candidates.find(
-    (candidate) => String(candidate.id) !== existingAssetId,
+    (candidate) =>
+      String(candidate.id) !== existingAssetId &&
+      isGeographicallyCompatiblePexelsCandidate(input.post, candidate),
   );
   if (!selected)
     return {
