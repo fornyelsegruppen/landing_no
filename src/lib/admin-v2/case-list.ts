@@ -5,10 +5,7 @@ import {
   type AdminListPagination,
   type AdminListPaginationMeta,
 } from "./pagination";
-import {
-  withAdminReadConnection,
-  type AdminReadUser,
-} from "./admin-read-db";
+import { withAdminReadConnection, type AdminReadUser } from "./admin-read-db";
 
 export const caseListStatusKeys = [
   "all",
@@ -155,7 +152,9 @@ function sqlCaseListQuery(filters: AdminCaseListFilters) {
   }
   if (filters.status === "open") predicates.push(`l.status::text <> 'closed'`);
   else if (filters.status && filters.status !== "all") {
-    predicates.push(`l.status::text = ${sqlParam(parameters, filters.status)}::text`);
+    predicates.push(
+      `l.status::text = ${sqlParam(parameters, filters.status)}::text`,
+    );
   }
   if (filters.dateFrom) {
     predicates.push(
@@ -189,7 +188,9 @@ function sqlCaseListQuery(filters: AdminCaseListFilters) {
     predicates.push(`(${identityPredicates.join(" OR ")})`);
   }
 
-  const stateWhere = predicates.length ? `WHERE ${predicates.join(" AND ")}` : "";
+  const stateWhere = predicates.length
+    ? `WHERE ${predicates.join(" AND ")}`
+    : "";
   const actionWhere: string[] = [];
   if (filters.action && filters.action !== "all") {
     actionWhere.push(
@@ -230,22 +231,31 @@ WITH state AS (
   LEFT JOIN LATERAL (
     SELECT id, status FROM "roof_measurements"
     WHERE lead_id = l.id
-    ORDER BY (status = 'superseded') ASC, created_at DESC, id DESC
+    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC
     LIMIT 1
   ) measurement ON TRUE
   LEFT JOIN LATERAL (
     SELECT id, status FROM "price_calculations"
     WHERE lead_id = l.id
-    ORDER BY (status = 'superseded') ASC, created_at DESC, id DESC
+    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC
     LIMIT 1
   ) price ON TRUE
   LEFT JOIN LATERAL (
     SELECT id, status, version FROM "quotes"
     WHERE lead_id = l.id
     ORDER BY
-      (status IN ('expired', 'revoked', 'superseded')) ASC,
-      version DESC NULLS LAST,
-      created_at DESC, id DESC
+      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,
+      COALESCE(version, 0) DESC,
+      CASE status
+        WHEN 'accepted' THEN 80
+        WHEN 'viewed' THEN 70
+        WHEN 'sent' THEN 60
+        WHEN 'approved' THEN 50
+        WHEN 'draft' THEN 40
+        WHEN 'declined' THEN 30
+        ELSE 0
+      END DESC,
+      id DESC
     LIMIT 1
   ) quote ON TRUE
   LEFT JOIN LATERAL (
@@ -257,22 +267,26 @@ WITH state AS (
        )
     ORDER BY
       CASE
-        WHEN status = 'signed' THEN 0
-        WHEN status IN ('revoked', 'superseded') THEN 2
-        ELSE 1
+        WHEN quote_id = quote.id
+          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0
+        WHEN status IS DISTINCT FROM 'superseded' THEN 1
+        ELSE 2
       END,
-      version DESC NULLS LAST, created_at DESC, id DESC
+      COALESCE(version, 0) DESC, id DESC
     LIMIT 1
   ) contract ON TRUE
   LEFT JOIN LATERAL (
     SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at
     FROM "messages"
     WHERE lead_id = l.id
-      AND status <> 'cancelled'
       AND NOT (
-        COALESCE(quote.status::text, 'draft') <> 'draft'
-        AND category::text = 'ai_reply'
-        AND status = 'draft'
+        COALESCE(category::text, '') = 'ai_reply'
+        AND status IS NOT DISTINCT FROM 'cancelled'
+      )
+      AND NOT (
+        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'
+        AND COALESCE(category::text, '') = 'ai_reply'
+        AND COALESCE(status::text, '') = 'draft'
         AND reply_to_message_id IS NULL
       )
     ORDER BY
@@ -280,8 +294,8 @@ WITH state AS (
         AND NOT EXISTS (
           SELECT 1 FROM "messages" newer
           WHERE newer.lead_id = "messages".lead_id
-            AND newer.subject = "messages".subject
-            AND newer.category = "messages".category
+            AND newer.subject IS NOT DISTINCT FROM "messages".subject
+            AND newer.category IS NOT DISTINCT FROM "messages".category
             AND newer.status IN ('approved', 'queued', 'sent', 'delivered')
             AND newer.created_at > "messages".created_at
         ) THEN 0 ELSE 1 END,
@@ -292,12 +306,7 @@ WITH state AS (
     SELECT id, status, assigned_worker_id, documentation_submitted_at
     FROM "work_orders"
     WHERE lead_id = l.id
-    ORDER BY
-      CASE
-        WHEN status IN ('cancelled', 'documented') THEN 2
-        WHEN status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 1
-        ELSE 0
-      END,
+    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,
       created_at DESC, id DESC
     LIMIT 1
   ) work_order ON TRUE
@@ -311,12 +320,13 @@ WITH state AS (
       WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'
       WHEN message_status IN ('failed', 'attention') THEN 'retry_message'
       WHEN message_status = 'draft'
-        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[0-9]+$'
+        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'
         AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')
         THEN 'send_closure_confirmation'
       WHEN message_status = 'draft' AND NOT (
-        message_category::text = 'ai_reply'
-        AND address IS NOT NULL AND address !~* '^ikke oppgitt$'
+        COALESCE(message_category::text, '') = 'ai_reply'
+        AND NULLIF(address, '') IS NOT NULL
+        AND address !~* '^ikke oppgitt$'
         AND inquiry_type IS DISTINCT FROM 'usikker'
       ) THEN 'approve_message'
       WHEN status = 'closed' THEN 'none'
@@ -417,7 +427,11 @@ async function loadAdminCaseListFromSql(
       parameters,
     );
     const totalDocs = Number(countResult.rows[0]?.total_docs || 0);
-    const dataParameters = [...parameters, page.limit, (page.page - 1) * page.limit];
+    const dataParameters = [
+      ...parameters,
+      page.limit,
+      (page.page - 1) * page.limit,
+    ];
     const rows = await connection.query<SqlCaseListRow>(
       `${cte}
 SELECT id, name, email, phone, address, house_number, postal, city,
@@ -447,6 +461,8 @@ export async function loadAdminCaseList(
   user: AdminReadUser = null,
 ): Promise<AdminCaseListPagedResult> {
   const filters = normalizeCaseListFilters(rawFilters);
-  const page = normalizeAdminListPagination(pagination) as Required<AdminListPagination>;
+  const page = normalizeAdminListPagination(
+    pagination,
+  ) as Required<AdminListPagination>;
   return loadAdminCaseListFromSql(payload, user, filters, page);
 }
