@@ -1,13 +1,14 @@
-import type { Payload, Where } from "payload";
-import {
-  deriveCaseNextAction,
-  type CaseNextActionKind,
-} from "./case-read-model";
+import type { Payload } from "payload";
+import type { CaseNextActionKind } from "./case-read-model";
 import {
   normalizeAdminListPagination,
   type AdminListPagination,
   type AdminListPaginationMeta,
 } from "./pagination";
+import {
+  withAdminReadConnection,
+  type AdminReadUser,
+} from "./admin-read-db";
 
 export const caseListStatusKeys = [
   "all",
@@ -17,8 +18,8 @@ export const caseListStatusKeys = [
   "converted",
   "closed",
 ] as const;
-
 export type CaseListStatus = (typeof caseListStatusKeys)[number];
+
 export const caseListRecordStateKeys = [
   "active",
   "archived",
@@ -64,42 +65,26 @@ export type AdminCaseListResult = {
 export type AdminCaseListPagedResult = AdminCaseListResult &
   AdminListPaginationMeta;
 
-function asRecord(value: unknown) {
-  return value as Record<string, unknown>;
-}
-
-function numberId(value: unknown) {
-  if (typeof value === "number") return value;
-  if (
-    value &&
-    typeof value === "object" &&
-    "id" in value &&
-    typeof (value as { id?: unknown }).id === "number"
-  ) {
-    return (value as { id: number }).id;
-  }
-  return undefined;
-}
-
-function text(value: unknown) {
-  return typeof value === "string" ? value : undefined;
-}
-
-function relationName(value: unknown) {
-  if (!value || typeof value !== "object") return undefined;
-  const record = asRecord(value);
-  return text(record.displayName) || text(record.name) || text(record.email);
-}
-
-function firstByRelation(docs: unknown[], field: string) {
-  const result = new Map<number, Record<string, unknown>>();
-  for (const raw of docs) {
-    const doc = asRecord(raw);
-    const relation = numberId(doc[field]);
-    if (relation && !result.has(relation)) result.set(relation, doc);
-  }
-  return result;
-}
+type SqlCaseListRow = {
+  id: number | string;
+  name?: unknown;
+  email?: unknown;
+  phone?: unknown;
+  address?: unknown;
+  house_number?: unknown;
+  postal?: unknown;
+  city?: unknown;
+  inquiry_type?: unknown;
+  status?: unknown;
+  record_state?: unknown;
+  archive_classification?: unknown;
+  created_at?: unknown;
+  next_action_at?: unknown;
+  purge_after?: unknown;
+  assigned_worker_name?: unknown;
+  work_status?: unknown;
+  next_action?: unknown;
+};
 
 function validDate(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
@@ -138,336 +123,330 @@ export function normalizeCaseListFilters(
   };
 }
 
-function leadWhere(
-  filters: AdminCaseListFilters,
-  referenceLeadIds: number[],
-): Where | undefined {
-  const and: Where[] = [];
-  if (filters.recordState && filters.recordState !== "all")
-    and.push({ recordState: { equals: filters.recordState } });
-  if (filters.status === "open") and.push({ status: { not_in: ["closed"] } });
-  else if (filters.status && filters.status !== "all")
-    and.push({ status: { equals: filters.status } });
-  if (filters.dateFrom)
-    and.push({
-      createdAt: { greater_than_equal: `${filters.dateFrom}T00:00:00.000Z` },
-    });
-  if (filters.dateTo)
-    and.push({
-      createdAt: { less_than_equal: `${filters.dateTo}T23:59:59.999Z` },
-    });
+function sqlParam(parameters: unknown[], value: unknown) {
+  parameters.push(value);
+  return `$${parameters.length}`;
+}
+
+function sqlText(value: unknown) {
+  if (value instanceof Date) return value.toISOString();
+  return typeof value === "string" ? value : undefined;
+}
+
+function sqlNumber(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim()) return Number(value);
+  return undefined;
+}
+
+/**
+ * Build the bounded registry query. All lead predicates are applied in the
+ * state CTE, while action and worker predicates are applied to the derived
+ * state before LIMIT/OFFSET. The count query and data query share this exact
+ * CTE, so filtered totals cannot be inferred from a capped source page.
+ */
+function sqlCaseListQuery(filters: AdminCaseListFilters) {
+  const parameters: unknown[] = [];
+  const predicates: string[] = [];
+  if (filters.recordState && filters.recordState !== "all") {
+    predicates.push(
+      `l.record_state::text = ${sqlParam(parameters, filters.recordState)}::text`,
+    );
+  }
+  if (filters.status === "open") predicates.push(`l.status::text <> 'closed'`);
+  else if (filters.status && filters.status !== "all") {
+    predicates.push(`l.status::text = ${sqlParam(parameters, filters.status)}::text`);
+  }
+  if (filters.dateFrom) {
+    predicates.push(
+      `l.created_at >= ${sqlParam(parameters, `${filters.dateFrom}T00:00:00.000Z`)}::timestamptz`,
+    );
+  }
+  if (filters.dateTo) {
+    predicates.push(
+      `l.created_at <= ${sqlParam(parameters, `${filters.dateTo}T23:59:59.999Z`)}::timestamptz`,
+    );
+  }
   if (filters.query) {
-    const or: Where[] = [
-      { name: { contains: filters.query } },
-      { email: { contains: filters.query } },
-      { phone: { contains: filters.query } },
-      { address: { contains: filters.query } },
-      { houseNumber: { contains: filters.query } },
-      { postal: { contains: filters.query } },
-      { city: { contains: filters.query } },
+    const query = sqlParam(parameters, `%${filters.query}%`);
+    const identityPredicates = [
+      `l.name ILIKE ${query}::text`,
+      `l.email ILIKE ${query}::text`,
+      `l.phone ILIKE ${query}::text`,
+      `l.address ILIKE ${query}::text`,
+      `l.house_number ILIKE ${query}::text`,
+      `l.postal ILIKE ${query}::text`,
+      `l.city ILIKE ${query}::text`,
+      `EXISTS (SELECT 1 FROM "quotes" reference_quote WHERE reference_quote.lead_id = l.id AND reference_quote.reference ILIKE ${query}::text)`,
+      `EXISTS (SELECT 1 FROM "contracts" reference_contract JOIN "quotes" contract_quote ON contract_quote.id = reference_contract.quote_id WHERE contract_quote.lead_id = l.id AND reference_contract.reference ILIKE ${query}::text)`,
+      `EXISTS (SELECT 1 FROM "work_orders" reference_work WHERE reference_work.lead_id = l.id AND reference_work.reference ILIKE ${query}::text)`,
     ];
-    if (/^\d+$/.test(filters.query))
-      or.push({ id: { equals: Number(filters.query) } });
-    if (referenceLeadIds.length) or.push({ id: { in: referenceLeadIds } });
-    and.push({ or });
-  }
-  return and.length ? { and } : undefined;
-}
-
-async function leadIdsFromReferences(
-  payload: Pick<Payload, "find">,
-  query?: string,
-) {
-  if (!query || query.length < 2) return [];
-  const common = { depth: 1, limit: 50, overrideAccess: true } as const;
-  const [quotes, contracts, workOrders] = await Promise.all([
-    payload.find({
-      ...common,
-      collection: "quotes",
-      where: { reference: { contains: query } },
-    }),
-    payload.find({
-      ...common,
-      collection: "contracts",
-      where: { reference: { contains: query } },
-    }),
-    payload.find({
-      ...common,
-      collection: "work-orders",
-      where: { reference: { contains: query } },
-    }),
-  ]);
-  const ids = new Set<number>();
-  for (const raw of quotes.docs) {
-    const leadId = numberId(asRecord(raw).lead);
-    if (leadId) ids.add(leadId);
-  }
-  for (const raw of contracts.docs) {
-    const quote = asRecord(raw).quote;
-    if (quote && typeof quote === "object") {
-      const leadId = numberId(asRecord(quote).lead);
-      if (leadId) ids.add(leadId);
+    if (/^\d+$/.test(filters.query)) {
+      identityPredicates.push(
+        `l.id = ${sqlParam(parameters, Number(filters.query))}::integer`,
+      );
     }
+    predicates.push(`(${identityPredicates.join(" OR ")})`);
   }
-  for (const raw of workOrders.docs) {
-    const leadId = numberId(asRecord(raw).lead);
-    if (leadId) ids.add(leadId);
+
+  const stateWhere = predicates.length ? `WHERE ${predicates.join(" AND ")}` : "";
+  const actionWhere: string[] = [];
+  if (filters.action && filters.action !== "all") {
+    actionWhere.push(
+      `derived.next_action = ${sqlParam(parameters, filters.action)}::text`,
+    );
   }
-  return [...ids];
+  if (filters.workerId) {
+    actionWhere.push(
+      `derived.assigned_worker_id = ${sqlParam(parameters, filters.workerId)}::integer`,
+    );
+  }
+  const derivedWhere = actionWhere.length
+    ? `WHERE ${actionWhere.join(" AND ")}`
+    : "";
+
+  const cte = `
+WITH state AS (
+  SELECT
+    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,
+    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,
+    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,
+    l.assigned_to_id,
+    measurement.id AS measurement_id, measurement.status AS measurement_status,
+    price.id AS price_id, price.status AS price_status,
+    quote.id AS quote_id, quote.status AS quote_status,
+    contract.id AS contract_id, contract.status AS contract_status,
+    contract.company_signed_at,
+    message.id AS message_id, message.status AS message_status,
+    message.category AS message_category, message.direction AS message_direction,
+    message.subject AS message_subject,
+    message.reply_to_message_id,
+    message.ai_analysis AS message_ai_analysis,
+    work_order.id AS work_order_id, work_order.status AS work_status,
+    work_order.assigned_worker_id AS work_assigned_worker_id,
+    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,
+    work_order.documentation_submitted_at
+  FROM "leads" l
+  LEFT JOIN LATERAL (
+    SELECT id, status FROM "roof_measurements"
+    WHERE lead_id = l.id
+    ORDER BY (status = 'superseded') ASC, created_at DESC, id DESC
+    LIMIT 1
+  ) measurement ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT id, status FROM "price_calculations"
+    WHERE lead_id = l.id
+    ORDER BY (status = 'superseded') ASC, created_at DESC, id DESC
+    LIMIT 1
+  ) price ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT id, status, version FROM "quotes"
+    WHERE lead_id = l.id
+    ORDER BY
+      (status IN ('expired', 'revoked', 'superseded')) ASC,
+      version DESC NULLS LAST,
+      created_at DESC, id DESC
+    LIMIT 1
+  ) quote ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT id, status, company_signed_at FROM "contracts"
+    WHERE quote_id = quote.id
+       OR quote_id IN (
+         SELECT related_quote.id FROM "quotes" related_quote
+         WHERE related_quote.lead_id = l.id
+       )
+    ORDER BY
+      CASE
+        WHEN status = 'signed' THEN 0
+        WHEN status IN ('revoked', 'superseded') THEN 2
+        ELSE 1
+      END,
+      version DESC NULLS LAST, created_at DESC, id DESC
+    LIMIT 1
+  ) contract ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at
+    FROM "messages"
+    WHERE lead_id = l.id
+      AND status <> 'cancelled'
+      AND NOT (
+        COALESCE(quote.status::text, 'draft') <> 'draft'
+        AND category::text = 'ai_reply'
+        AND status = 'draft'
+        AND reply_to_message_id IS NULL
+      )
+    ORDER BY
+      CASE WHEN status IN ('failed', 'attention', 'draft')
+        AND NOT EXISTS (
+          SELECT 1 FROM "messages" newer
+          WHERE newer.lead_id = "messages".lead_id
+            AND newer.subject = "messages".subject
+            AND newer.category = "messages".category
+            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')
+            AND newer.created_at > "messages".created_at
+        ) THEN 0 ELSE 1 END,
+      created_at DESC, id DESC
+    LIMIT 1
+  ) message ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT id, status, assigned_worker_id, documentation_submitted_at
+    FROM "work_orders"
+    WHERE lead_id = l.id
+    ORDER BY
+      CASE
+        WHEN status IN ('cancelled', 'documented') THEN 2
+        WHEN status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 1
+        ELSE 0
+      END,
+      created_at DESC, id DESC
+    LIMIT 1
+  ) work_order ON TRUE
+  LEFT JOIN "users" work_worker ON work_worker.id = work_order.assigned_worker_id
+  LEFT JOIN "users" assigned_worker ON assigned_worker.id = l.assigned_to_id
+  ${stateWhere}
+), derived AS (
+  SELECT state.*,
+    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,
+    CASE
+      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'
+      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'
+      WHEN message_status = 'draft'
+        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[0-9]+$'
+        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')
+        THEN 'send_closure_confirmation'
+      WHEN message_status = 'draft' AND NOT (
+        message_category::text = 'ai_reply'
+        AND address IS NOT NULL AND address !~* '^ikke oppgitt$'
+        AND inquiry_type IS DISTINCT FROM 'usikker'
+      ) THEN 'approve_message'
+      WHEN status = 'closed' THEN 'none'
+      WHEN quote_status = 'declined' THEN 'follow_up_decline'
+      WHEN work_status = 'unassigned' THEN 'assign_worker'
+      WHEN work_status = 'assigned' THEN 'schedule_work'
+      WHEN work_status = 'blocked' THEN 'resolve_work_block'
+      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'
+      WHEN work_status = 'completed' THEN 'wait_worker_documentation'
+      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'
+      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'
+      WHEN work_status = 'in_progress' THEN 'wait_work_completion'
+      WHEN work_status IN ('documented', 'cancelled') THEN 'none'
+      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'
+      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'
+      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'
+      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'
+      WHEN measurement_id IS NULL THEN 'prepare_package'
+      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'
+      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'
+      WHEN measurement_status = 'blocked' THEN 'measurement_required'
+      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'
+      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'
+      WHEN quote_status = 'draft' THEN 'approve_quote'
+      WHEN quote_status = 'approved' THEN 'issue_quote'
+      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'
+      ELSE 'none'
+    END AS next_action
+  FROM state
+), filtered AS (
+  SELECT * FROM derived
+  ${derivedWhere}
+)`;
+  return { cte, parameters };
 }
 
-export function loadAdminCaseList(
-  payload: Pick<Payload, "find">,
-  rawFilters?: AdminCaseListFilters,
-): Promise<AdminCaseListResult>;
-export function loadAdminCaseList(
-  payload: Pick<Payload, "find">,
-  rawFilters: AdminCaseListFilters,
-  pagination: AdminListPagination,
-): Promise<AdminCaseListPagedResult>;
-export async function loadAdminCaseList(
-  payload: Pick<Payload, "find">,
-  rawFilters: AdminCaseListFilters = {},
-  pagination?: AdminListPagination,
-): Promise<AdminCaseListResult | AdminCaseListPagedResult> {
-  const filters = normalizeCaseListFilters(rawFilters);
-  const page = normalizeAdminListPagination(pagination);
-  const loadedAt = Date.now();
-  const referenceLeadIds = await leadIdsFromReferences(payload, filters.query);
-  const [leadResult, workerResult] = await Promise.all([
-    payload.find({
-      collection: "leads",
-      depth: 1,
-      limit: page.limit,
-      page: page.page,
-      pagination: true,
-      overrideAccess: true,
-      sort: "-createdAt",
-      where: leadWhere(filters, referenceLeadIds),
-    }),
-    payload.find({
-      collection: "users",
-      depth: 0,
-      limit: 50,
-      overrideAccess: true,
-      sort: "displayName",
-      where: {
-        and: [{ role: { equals: "worker" } }, { active: { equals: true } }],
-      },
-    }),
-  ]);
-  const leadDocs = leadResult.docs;
-  const workerDocs = workerResult.docs;
-  const leadIds = leadDocs
-    .map((doc) => numberId(doc))
-    .filter((value): value is number => Boolean(value));
-  if (!leadIds.length) {
-    const empty = {
-      items: [],
-      workers: workerDocs
-        .map((worker) => ({
-          id: numberId(worker) || 0,
-          name: relationName(worker) || `#${numberId(worker)}`,
-        }))
-        .filter((worker) => worker.id > 0),
-    };
-    if (!pagination) return empty;
-    const totalDocs = leadResult.totalDocs ?? 0;
-    return {
-      ...empty,
-      hasNextPage: leadResult.hasNextPage ?? false,
-      hasPrevPage: leadResult.hasPrevPage ?? page.page > 1,
-      page: leadResult.page || page.page,
-      totalDocs,
-      totalPages:
-        leadResult.totalPages ?? Math.max(1, Math.ceil(totalDocs / page.limit)),
-    };
-  }
-
-  const relatedWhere = { lead: { in: leadIds } };
-  const common = {
-    depth: 1,
-    limit: 100,
-    overrideAccess: true,
-    sort: "-createdAt" as const,
+function mapCaseRow(row: SqlCaseListRow): AdminCaseListItem {
+  const id = sqlNumber(row.id) || 0;
+  const dueAt = sqlText(row.next_action_at);
+  return {
+    archiveClassification: sqlText(row.archive_classification),
+    assignedWorker: sqlText(row.assigned_worker_name),
+    createdAt: sqlText(row.created_at),
+    customer: sqlText(row.name) || `#${id}`,
+    dueAt,
+    email: sqlText(row.email),
+    href: `/admin-v2/cases/${id}`,
+    id,
+    inquiryType: sqlText(row.inquiry_type),
+    nextAction: (sqlText(row.next_action) || "none") as CaseNextActionKind,
+    overdue: Boolean(dueAt && new Date(dueAt).getTime() <= Date.now()),
+    phone: sqlText(row.phone),
+    postalAddress: [
+      sqlText(row.address),
+      sqlText(row.house_number),
+      sqlText(row.postal),
+      sqlText(row.city),
+    ]
+      .filter(Boolean)
+      .join(" "),
+    purgeAfter: sqlText(row.purge_after),
+    recordState: sqlText(row.record_state) || "active",
+    status: sqlText(row.status),
+    workStatus: sqlText(row.work_status),
   };
-  const [measurements, prices, quotes, messages, workOrders, workers] =
-    await Promise.all([
-      payload.find({
-        ...common,
-        collection: "roof-measurements",
-        where: relatedWhere,
-      }),
-      payload.find({
-        ...common,
-        collection: "price-calculations",
-        where: relatedWhere,
-      }),
-      payload.find({ ...common, collection: "quotes", where: relatedWhere }),
-      payload.find({
-        ...common,
-        collection: "messages",
-        where: { and: [relatedWhere, { status: { not_equals: "cancelled" } }] },
-      }),
-      payload.find({
-        ...common,
-        collection: "work-orders",
-        where: relatedWhere,
-      }),
-      Promise.resolve(workerDocs),
-    ]);
-  const quoteIds = quotes.docs
-    .map((doc) => numberId(doc))
-    .filter((value): value is number => Boolean(value));
-  const contracts = quoteIds.length
-    ? (
-        await payload.find({
-          ...common,
-          collection: "contracts",
-          where: { quote: { in: quoteIds } },
-        })
-      ).docs
-    : [];
+}
 
-  const measurementByLead = firstByRelation(measurements.docs, "lead");
-  const priceByLead = firstByRelation(prices.docs, "lead");
-  const quoteByLead = firstByRelation(quotes.docs, "lead");
-  const messageByLead = firstByRelation(messages.docs, "lead");
-  const workByLead = firstByRelation(workOrders.docs, "lead");
-  const contractByQuote = firstByRelation(contracts, "quote");
-
-  const items = leadDocs
-    .map((raw) => {
-      const lead = asRecord(raw);
-      const id = numberId(lead) || 0;
-      const measurement = measurementByLead.get(id);
-      const price = priceByLead.get(id);
-      const quote = quoteByLead.get(id);
-      const message = messageByLead.get(id);
-      const workOrder = workByLead.get(id);
-      const contract = quote
-        ? contractByQuote.get(numberId(quote) || 0)
-        : undefined;
-      const nextAction = deriveCaseNextAction({
-        canPreparePackage:
-          Boolean(
-            text(lead.address) &&
-            !/^ikke oppgitt$/i.test(text(lead.address) || ""),
-          ) && text(lead.inquiryType) !== "usikker",
-        contract: contract
-          ? {
-              id: numberId(contract) || 0,
-              status: text(contract.status),
-              companySignedAt: text(contract.companySignedAt),
-            }
-          : undefined,
-        leadStatus: text(lead.status),
-        measurement: measurement
-          ? { id: numberId(measurement) || 0, status: text(measurement.status) }
-          : undefined,
-        message: message
-          ? {
-              id: numberId(message) || 0,
-              status: text(message.status),
-              category: text(message.category),
-              direction: text(message.direction),
-            }
-          : undefined,
-        price: price
-          ? { id: numberId(price) || 0, status: text(price.status) }
-          : undefined,
-        quote: quote
-          ? { id: numberId(quote) || 0, status: text(quote.status) }
-          : undefined,
-        workOrder: workOrder
-          ? { id: numberId(workOrder) || 0, status: text(workOrder.status) }
-          : undefined,
-      });
-      const postalAddress = [
-        text(lead.address),
-        text(lead.houseNumber),
-        text(lead.postal),
-        text(lead.city),
-      ]
-        .filter(Boolean)
-        .join(" ");
-      return {
-        archiveClassification: text(lead.archiveClassification),
-        assignedWorker:
-          relationName(workOrder?.assignedWorker) ||
-          relationName(lead.assignedTo),
-        assignedWorkerId:
-          numberId(workOrder?.assignedWorker) || numberId(lead.assignedTo),
-        createdAt: text(lead.createdAt),
-        customer: text(lead.name) || `#${id}`,
-        dueAt: text(lead.nextActionAt),
-        email: text(lead.email),
-        href: `/admin-v2/cases/${id}`,
-        id,
-        inquiryType: text(lead.inquiryType),
-        nextAction: nextAction.kind,
-        overdue: Boolean(
-          text(lead.nextActionAt) &&
-          new Date(text(lead.nextActionAt) || 0).getTime() <= loadedAt,
-        ),
-        phone: text(lead.phone),
-        postalAddress,
-        purgeAfter: text(lead.purgeAfter),
-        recordState: text(lead.recordState) || "active",
-        status: text(lead.status),
-        workStatus: text(workOrder?.status),
-      };
-    })
-    .filter((item) => {
-      if (
-        filters.action &&
-        filters.action !== "all" &&
-        item.nextAction !== filters.action
-      )
-        return false;
-      if (filters.workerId && item.assignedWorkerId !== filters.workerId)
-        return false;
-      return true;
-    });
-
-  const mappedItems = items.map((item) => ({
-    archiveClassification: item.archiveClassification,
-    assignedWorker: item.assignedWorker,
-    createdAt: item.createdAt,
-    customer: item.customer,
-    dueAt: item.dueAt,
-    email: item.email,
-    href: item.href,
-    id: item.id,
-    inquiryType: item.inquiryType,
-    nextAction: item.nextAction,
-    overdue: item.overdue,
-    phone: item.phone,
-    postalAddress: item.postalAddress,
-    purgeAfter: item.purgeAfter,
-    recordState: item.recordState,
-    status: item.status,
-    workStatus: item.workStatus,
-  }));
-  const paginationMeta = pagination
-    ? {
-        hasNextPage: leadResult.hasNextPage ?? false,
-        hasPrevPage: leadResult.hasPrevPage ?? page.page > 1,
-        page: leadResult.page || page.page,
-        totalDocs: leadResult.totalDocs ?? mappedItems.length,
-        totalPages:
-          leadResult.totalPages ??
-          Math.max(1, Math.ceil(mappedItems.length / page.limit)),
-      }
-    : undefined;
-  const baseResult = {
-    items: mappedItems,
-    workers: workers
+async function loadAdminCaseListFromSql(
+  payload: Pick<Payload, "db">,
+  user: AdminReadUser,
+  filters: AdminCaseListFilters,
+  page: Required<AdminListPagination>,
+): Promise<AdminCaseListPagedResult> {
+  const { cte, parameters } = sqlCaseListQuery(filters);
+  return withAdminReadConnection(payload, user, async (connection) => {
+    const workerResult = await connection.query<{
+      id: number | string;
+      display_name?: unknown;
+      email?: unknown;
+    }>(
+      `SELECT id, display_name, email FROM "users"
+       WHERE role = 'worker' AND active = TRUE
+       ORDER BY display_name ASC NULLS LAST, id ASC
+       LIMIT 50`,
+    );
+    const workers = workerResult.rows
       .map((worker) => ({
-        id: numberId(worker) || 0,
-        name: relationName(worker) || `#${numberId(worker)}`,
+        id: sqlNumber(worker.id) || 0,
+        name:
+          sqlText(worker.display_name) ||
+          sqlText(worker.email) ||
+          `#${sqlNumber(worker.id)}`,
       }))
-      .filter((worker) => worker.id > 0),
-  };
-  return paginationMeta ? { ...baseResult, ...paginationMeta } : baseResult;
+      .filter((worker) => worker.id > 0);
+
+    const countResult = await connection.query<{ total_docs: number | string }>(
+      `${cte} SELECT count(*) AS total_docs FROM filtered`,
+      parameters,
+    );
+    const totalDocs = Number(countResult.rows[0]?.total_docs || 0);
+    const dataParameters = [...parameters, page.limit, (page.page - 1) * page.limit];
+    const rows = await connection.query<SqlCaseListRow>(
+      `${cte}
+SELECT id, name, email, phone, address, house_number, postal, city,
+  inquiry_type, status, record_state, archive_classification, created_at,
+  next_action_at, purge_after, assigned_worker_name, work_status, next_action
+FROM filtered
+ORDER BY created_at DESC NULLS LAST, id DESC
+LIMIT $${dataParameters.length - 1}::integer OFFSET $${dataParameters.length}::integer`,
+      dataParameters,
+    );
+    return {
+      items: rows.rows.map(mapCaseRow),
+      workers,
+      hasNextPage: page.page * page.limit < totalDocs,
+      hasPrevPage: page.page > 1,
+      page: page.page,
+      totalDocs,
+      totalPages: Math.max(1, Math.ceil(totalDocs / page.limit)),
+    };
+  });
+}
+
+export async function loadAdminCaseList(
+  payload: Pick<Payload, "db">,
+  rawFilters: AdminCaseListFilters = {},
+  pagination: AdminListPagination = {},
+  user: AdminReadUser = null,
+): Promise<AdminCaseListPagedResult> {
+  const filters = normalizeCaseListFilters(rawFilters);
+  const page = normalizeAdminListPagination(pagination) as Required<AdminListPagination>;
+  return loadAdminCaseListFromSql(payload, user, filters, page);
 }

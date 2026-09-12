@@ -1,8 +1,108 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Payload } from "payload";
+import { PGlite } from "@electric-sql/pglite";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
+const state = vi.hoisted(() => ({ database: null as PGlite | null }));
+vi.mock("./admin-read-db", () => ({
+  withAdminReadConnection: async (
+    _payload: unknown,
+    _user: unknown,
+    work: (connection: PGlite) => Promise<unknown>,
+  ) => {
+    if (!state.database) throw new Error("test database is not initialized");
+    return work(state.database);
+  },
+}));
+
 import { loadAdminCaseList, normalizeCaseListFilters } from "./case-list";
 
 describe("admin case list", () => {
+  let database: PGlite;
+
+  beforeEach(async () => {
+    database = new PGlite();
+    state.database = database;
+    await database.exec(`
+      CREATE TABLE users (
+        id integer PRIMARY KEY,
+        email text,
+        display_name text,
+        role text NOT NULL,
+        active boolean NOT NULL
+      );
+      CREATE TABLE leads (
+        id integer PRIMARY KEY,
+        name text,
+        email text,
+        phone text,
+        address text,
+        house_number text,
+        postal text,
+        city text,
+        inquiry_type text,
+        status text,
+        record_state text,
+        archive_classification text,
+        created_at timestamptz,
+        next_action_at timestamptz,
+        purge_after timestamptz,
+        next_action_blocker text,
+        assigned_to_id integer
+      );
+      CREATE TABLE roof_measurements (
+        id integer PRIMARY KEY, lead_id integer, status text, created_at timestamptz
+      );
+      CREATE TABLE price_calculations (
+        id integer PRIMARY KEY, lead_id integer, status text, created_at timestamptz
+      );
+      CREATE TABLE quotes (
+        id integer PRIMARY KEY, lead_id integer, reference text, status text,
+        version numeric, created_at timestamptz
+      );
+      CREATE TABLE contracts (
+        id integer PRIMARY KEY, quote_id integer, reference text, status text,
+        company_signed_at timestamptz, version numeric, created_at timestamptz
+      );
+      CREATE TABLE messages (
+        id integer PRIMARY KEY, lead_id integer, status text, category text,
+        direction text, subject text, reply_to_message_id integer,
+        ai_analysis jsonb, created_at timestamptz
+      );
+      CREATE TABLE work_orders (
+        id integer PRIMARY KEY, lead_id integer, status text, assigned_worker_id integer,
+        documentation_submitted_at timestamptz, reference text, created_at timestamptz
+      );
+      INSERT INTO users (id, email, display_name, role, active)
+      VALUES (31, 'worker31@example.no', 'Worker 31', 'worker', TRUE);
+    `);
+    for (let id = 1; id <= 26; id += 1) {
+      await database.query(
+        `INSERT INTO leads
+          (id, name, email, address, house_number, postal, city, inquiry_type,
+           status, record_state, created_at)
+         VALUES ($1, $2, $3, 'Testveien', '1', '0001', 'Oslo', 'takvask',
+           'new', 'active', $4::timestamptz)`,
+        [
+          id,
+          `Lead ${id}`,
+          `lead${id}@example.no`,
+          `2026-09-${String(27 - id).padStart(2, "0")}T08:00:00Z`,
+        ],
+      );
+    }
+    await database.query(
+      `INSERT INTO work_orders
+        (id, lead_id, status, assigned_worker_id, created_at)
+       VALUES (2601, 26, 'unassigned', 31, '2026-09-01T08:00:00Z')`,
+    );
+  });
+
+  afterEach(async () => {
+    state.database = null;
+    await database.close();
+  });
+
   it("normalizes filters without accepting invalid dates or workers", () => {
     expect(
       normalizeCaseListFilters({
@@ -23,173 +123,98 @@ describe("admin case list", () => {
     });
   });
 
-  it("assembles one searchable case with its real next action and worker", async () => {
-    const find = vi
-      .fn()
-      .mockImplementation(async (input: { collection: string }) => {
-        switch (input.collection) {
-          case "leads":
-            return {
-              docs: [
-                {
-                  id: 7,
-                  name: "Ola",
-                  email: "ola@example.no",
-                  address: "Testveien",
-                  houseNumber: "1",
-                  postal: "0001",
-                  city: "Oslo",
-                  inquiryType: "takvask",
-                  status: "converted",
-                  createdAt: "2026-08-25T08:00:00.000Z",
-                },
-              ],
-            };
-          case "roof-measurements":
-            return { docs: [{ id: 20, lead: 7, status: "approved" }] };
-          case "price-calculations":
-            return { docs: [{ id: 21, lead: 7, status: "ready" }] };
-          case "quotes":
-            return { docs: [{ id: 22, lead: 7, status: "accepted" }] };
-          case "messages":
-            return {
-              docs: [
-                {
-                  id: 23,
-                  lead: 7,
-                  direction: "outbound",
-                  category: "contract",
-                  status: "sent",
-                },
-              ],
-            };
-          case "work-orders":
-            return { docs: [{ id: 25, lead: 7, status: "unassigned" }] };
-          case "contracts":
-            return {
-              docs: [
-                {
-                  id: 24,
-                  quote: 22,
-                  status: "signed",
-                  companySignedAt: "2026-08-25T09:00:00.000Z",
-                },
-              ],
-            };
-          case "users":
-            return {
-              docs: [
-                {
-                  id: 8,
-                  displayName: "Ansatt Test",
-                  role: "worker",
-                  active: true,
-                },
-              ],
-            };
-          default:
-            return { docs: [] };
-        }
-      });
-
-    const result = await loadAdminCaseList({ find } as unknown as Pick<
-      Payload,
-      "find"
-    >);
-
-    expect(result.items).toEqual([
-      expect.objectContaining({
-        customer: "Ola",
-        href: "/admin-v2/cases/7",
-        nextAction: "assign_worker",
-        postalAddress: "Testveien 1 0001 Oslo",
-        workStatus: "unassigned",
-      }),
-    ]);
-    expect(result.workers).toEqual([{ id: 8, name: "Ansatt Test" }]);
-  });
-
-  it("filters the assembled case by next action", async () => {
-    const find = vi
-      .fn()
-      .mockImplementation(async (input: { collection: string }) => {
-        if (input.collection === "leads")
-          return {
-            docs: [
-              {
-                id: 7,
-                name: "Ola",
-                address: "Testveien",
-                inquiryType: "takvask",
-                status: "new",
-              },
-            ],
-          };
-        if (input.collection === "users") return { docs: [] };
-        return { docs: [] };
-      });
-
-    await expect(
-      loadAdminCaseList({ find } as unknown as Pick<Payload, "find">, {
-        action: "company_sign_contract",
-      }),
-    ).resolves.toEqual({ items: [], workers: [] });
-  });
-
-  it("reaches records beyond the first bounded source page", async () => {
-    const find = vi
-      .fn()
-      .mockImplementation(
-        async (input: { collection: string; page?: number }) => {
-          if (input.collection === "leads")
-            return input.page === 1
-              ? {
-                  docs: [
-                    {
-                      id: 1,
-                      name: "Side 1",
-                      status: "new",
-                      createdAt: "2026-08-27T08:00:00.000Z",
-                    },
-                  ],
-                  hasNextPage: true,
-                }
-              : {
-                  docs: [
-                    {
-                      id: 2,
-                      name: "Side 2",
-                      status: "new",
-                      createdAt: "2026-08-26T08:00:00.000Z",
-                    },
-                  ],
-                  hasNextPage: false,
-                  hasPrevPage: true,
-                  page: 2,
-                  totalDocs: 2,
-                  totalPages: 2,
-                };
-          if (input.collection === "users")
-            return { docs: [], hasNextPage: false };
-          return { docs: [], hasNextPage: false };
-        },
+  it.each([
+    ["action", { action: "assign_worker" as const }],
+    ["worker", { workerId: 31 }],
+  ])(
+    "filters %s before pagination so the older matching lead remains visible",
+    async (_label, filters) => {
+      const result = await loadAdminCaseList(
+        { db: { name: "postgres" } } as never,
+        filters,
+        { page: 1, limit: 25 },
+        { id: 1, active: true, role: "admin" },
       );
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        id: 26,
+        customer: "Lead 26",
+        href: "/admin-v2/cases/26",
+        nextAction: "assign_worker",
+        assignedWorker: "Worker 31",
+        workStatus: "unassigned",
+      });
+      expect(result.totalDocs).toBe(1);
+      expect(result.totalPages).toBe(1);
+      expect(result.hasNextPage).toBe(false);
+    },
+  );
+
+  it("keeps an older active work order ahead of a newer terminal snapshot", async () => {
+    await database.query(
+      `INSERT INTO leads
+        (id, name, email, address, house_number, postal, city, inquiry_type,
+         status, record_state, created_at)
+       VALUES (27, 'Lead 27', 'lead27@example.no', 'Testveien', '1', '0001',
+         'Oslo', 'takvask', 'converted', 'active', '2026-09-02T08:00:00Z')`,
+    );
+    await database.query(
+      `INSERT INTO work_orders
+        (id, lead_id, status, assigned_worker_id, created_at)
+       VALUES
+        (2701, 27, 'assigned', 31, '2026-08-20T08:00:00Z'),
+        (2702, 27, 'documented', NULL, '2026-09-02T09:00:00Z')`,
+    );
+
     const result = await loadAdminCaseList(
-      { find } as unknown as Pick<Payload, "find">,
-      {},
-      { page: 2 },
+      { db: { name: "postgres" } } as never,
+      { action: "schedule_work", workerId: 31 },
+      { page: 1, limit: 25 },
+      { id: 1, active: true, role: "admin" },
     );
+
     expect(result.items).toEqual([
-      expect.objectContaining({ id: 2, customer: "Side 2" }),
-    ]);
-    expect(result.totalDocs).toBe(2);
-    expect(find).toHaveBeenCalledWith(
       expect.objectContaining({
-        collection: "leads",
-        page: 2,
-        limit: 25,
-        pagination: true,
+        id: 27,
+        nextAction: "schedule_work",
+        assignedWorker: "Worker 31",
+        workStatus: "assigned",
       }),
+    ]);
+    expect(result.totalDocs).toBe(1);
+  });
+
+  it("keeps an effective signed contract when a later quote version is selected", async () => {
+    await database.query(
+      `INSERT INTO leads
+        (id, name, email, address, house_number, postal, city, inquiry_type,
+         status, record_state, created_at)
+       VALUES (28, 'Lead 28', 'lead28@example.no', 'Testveien', '1', '0001',
+         'Oslo', 'takvask', 'converted', 'active', '2026-09-03T08:00:00Z')`,
     );
+    await database.query(
+      `INSERT INTO quotes (id, lead_id, reference, status, version, created_at)
+       VALUES
+        (2801, 28, 'Q-28-1', 'accepted', 1, '2026-08-20T08:00:00Z'),
+        (2802, 28, 'Q-28-2', 'accepted', 2, '2026-09-03T09:00:00Z')`,
+    );
+    await database.query(
+      `INSERT INTO contracts
+        (id, quote_id, reference, status, version, created_at)
+       VALUES (2803, 2801, 'K-28-1', 'signed', 1, '2026-08-21T08:00:00Z')`,
+    );
+
+    const result = await loadAdminCaseList(
+      { db: { name: "postgres" } } as never,
+      { action: "company_sign_contract" },
+      { page: 1, limit: 25 },
+      { id: 1, active: true, role: "admin" },
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({ id: 28, nextAction: "company_sign_contract" }),
+    ]);
+    expect(result.totalDocs).toBe(1);
   });
 });
