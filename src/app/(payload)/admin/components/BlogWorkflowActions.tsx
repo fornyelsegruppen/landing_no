@@ -4,10 +4,15 @@ import { useState } from "react";
 import type { UIFieldClientComponent } from "payload";
 import { useDocumentInfo, useFormFields, useTranslation } from "@payloadcms/ui";
 import { getAdminBlogCopy } from "@/lib/admin-blog-i18n";
+import { blogHistoryCopy } from "@/lib/admin-v2/blog-history-copy";
 
 export const BlogWorkflowActions: UIFieldClientComponent = () => {
   const { i18n } = useTranslation();
   const copy = getAdminBlogCopy(i18n.language);
+  const history =
+    blogHistoryCopy[
+      i18n.language === "lt" ? "lt" : i18n.language === "en" ? "en" : "nb"
+    ];
   const { id } = useDocumentInfo();
   const status = useFormFields(([fields]) => fields.editorialStatus?.value);
   const [reviewerName, setReviewerName] = useState("");
@@ -62,9 +67,7 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
   }
 
   if (!id) {
-    return (
-      <p>{copy.saveFirst}</p>
-    );
+    return <p>{copy.saveFirst}</p>;
   }
 
   return (
@@ -74,7 +77,11 @@ export const BlogWorkflowActions: UIFieldClientComponent = () => {
     >
       <h3 id="blog-workflow-title">{copy.editorialActions}</h3>
       <p>
-        {copy.currentStatus}: <strong>{String(status || "draft")}</strong>. {copy.aiNeverPublishes}
+        <a href={`/admin-v2/blog/${id}`}>{history.returnToEditor}</a>
+      </p>
+      <p>
+        {copy.currentStatus}: <strong>{String(status || "draft")}</strong>.{" "}
+        {copy.aiNeverPublishes}
       </p>
       <p>{copy.reviewHelp}</p>
       <div className="blog-workflow-actions__inputs">

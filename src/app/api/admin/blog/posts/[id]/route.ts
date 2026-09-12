@@ -35,6 +35,7 @@ const actionSchema = z
       "reject",
       "schedule",
       "publish",
+      "unpublish",
       "regenerate",
       "stock-image",
       "save",
@@ -58,6 +59,12 @@ const actionSchema = z
     expectedUpdatedAt: z.string().datetime().optional(),
   })
   .superRefine((data, context) => {
+    if (data.action === "unpublish" && !data.expectedUpdatedAt)
+      context.addIssue({
+        code: "custom",
+        path: ["expectedUpdatedAt"],
+        message: "required",
+      });
     if (data.action === "save")
       for (const field of ["titleNo", "contentNo"] as const) {
         if (data[field] === undefined)
@@ -148,6 +155,49 @@ export async function POST(
       post.updatedAt !== parsed.data.expectedUpdatedAt
     ) {
       throw new BlogActionConflictError();
+    }
+    if (parsed.data.action === "unpublish") {
+      const data = {
+        _status: "draft" as const,
+        editorialStatus: "human_review" as const,
+        reviewerName: null,
+        reviewedAt: null,
+        scheduledAt: null,
+        qualityChecks: null,
+        qualityScore: null,
+      };
+      const updated = await payload.update({
+        collection: "posts",
+        id: post.id,
+        // This updates the base document, not merely a new draft revision.
+        draft: false,
+        overrideAccess: true,
+        context: {
+          expectedBlogUpdatedAt: post.updatedAt,
+          expectedBlogRevision: postRevision(post),
+        },
+        data,
+      });
+      await recordAuditEvent(createPayloadAuditWriter(payload), {
+        actorId: user.id,
+        action: "blog.unpublish",
+        entityType: "post",
+        entityId: post.id,
+        correlationId,
+        changedFields: Object.keys(data),
+        before: { editorialStatus: post.editorialStatus, status: post._status },
+        after: {
+          editorialStatus: updated.editorialStatus,
+          status: updated._status,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        postId: updated.id,
+        action,
+        outcome: "unpublished",
+        correlationId,
+      });
     }
     if (parsed.data.action === "stock-image") {
       const result = await attachPexelsStockImageToPost({

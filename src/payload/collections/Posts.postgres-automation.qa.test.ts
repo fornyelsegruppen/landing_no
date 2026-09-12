@@ -33,6 +33,10 @@ import {
 } from "../../lib/blog/payload-blog-engine";
 import { validGeneratedArticle } from "../../lib/blog/test-fixtures";
 import { restorePostVersionAsDraft } from "../../lib/blog/restore-post-version";
+const invalidate = vi.hoisted(() => vi.fn());
+vi.mock("../../lib/blog/invalidate-public-blog", () => ({
+  invalidatePublicBlog: invalidate,
+}));
 
 vi.mock("@/lib/ai/payload-usage-limit", () => ({
   assertPayloadAiUsageAvailable: async () => undefined,
@@ -331,6 +335,133 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
 
   beforeEach(async () => {
     postID = await createApprovedPublishedPost();
+    invalidate.mockClear();
+  });
+
+  it("invalidates public caches once after the outer real commit and never after rollback", async () => {
+    await withSeoTransaction(payload, async (req) => {
+      await payload.update({
+        collection: "posts",
+        id: postID,
+        req,
+        draft: true,
+        overrideAccess: true,
+        data: { contentNo: editedBody },
+      });
+      expect(invalidate).not.toHaveBeenCalled();
+      await payload.update({
+        collection: "posts",
+        id: postID,
+        req,
+        draft: true,
+        overrideAccess: true,
+        data: { contentNo: `${editedBody} Again.` },
+      });
+      expect(invalidate).not.toHaveBeenCalled();
+    });
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    invalidate.mockClear();
+    await expect(
+      withSeoTransaction(payload, async (req) => {
+        await payload.update({
+          collection: "posts",
+          id: postID,
+          req,
+          draft: false,
+          overrideAccess: true,
+          data: { _status: "draft" },
+        });
+        throw new Error("cache rollback fixture");
+      }),
+    ).rejects.toThrow("cache rollback fixture");
+    expect(invalidate).not.toHaveBeenCalled();
+    await expect(publicPost(postID)).resolves.toMatchObject({
+      _status: "published",
+    });
+  });
+
+  it("guarded unpublish rejects a same-timestamp revision change without removing public content", async () => {
+    const post = await payload.findByID({
+      collection: "posts",
+      id: postID,
+      draft: true,
+    });
+    const { postRevision } = await import("../../lib/blog/post-revision");
+    await expect(
+      payload.update({
+        collection: "posts",
+        id: postID,
+        draft: false,
+        overrideAccess: true,
+        context: {
+          expectedBlogUpdatedAt: post.updatedAt,
+          expectedBlogRevision: postRevision({
+            ...post,
+            contentNo: "Stale revision",
+          }),
+        },
+        data: {
+          _status: "draft",
+          editorialStatus: "human_review",
+          scheduledAt: null,
+          reviewerName: null,
+          reviewedAt: null,
+          qualityChecks: null,
+          qualityScore: null,
+        },
+      }),
+    ).rejects.toThrow(/changed/);
+    expect(invalidate).not.toHaveBeenCalled();
+    await expect(publicPost(postID)).resolves.toMatchObject({
+      _status: "published",
+    });
+  });
+
+  it("guarded base unpublish accepts the latest private draft revision and preserves its content", async () => {
+    await payload.update({
+      collection: "posts",
+      id: postID,
+      draft: true,
+      overrideAccess: true,
+      data: { contentNo: editedBody },
+    });
+    const post = await payload.findByID({
+      collection: "posts",
+      id: postID,
+      draft: true,
+      overrideAccess: true,
+    });
+    const { postRevision } = await import("../../lib/blog/post-revision");
+    const result = await payload.update({
+      collection: "posts",
+      id: postID,
+      draft: false,
+      overrideAccess: true,
+      context: {
+        expectedBlogUpdatedAt: post.updatedAt,
+        expectedBlogRevision: postRevision(post),
+      },
+      data: {
+        _status: "draft",
+        editorialStatus: "human_review",
+        scheduledAt: null,
+        reviewerName: null,
+        reviewedAt: null,
+        qualityChecks: null,
+        qualityScore: null,
+      },
+    });
+    expect(result).toMatchObject({ _status: "draft", contentNo: editedBody });
+    expect(
+      (
+        await payload.find({
+          collection: "posts",
+          draft: false,
+          overrideAccess: false,
+          where: { id: { equals: postID } },
+        })
+      ).docs,
+    ).toHaveLength(0);
   });
 
   it("restores a selected draft version through the native endpoint as review-required draft", async () => {
@@ -395,6 +526,123 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
       editorialStatus: "published",
       contentNo: newerBody,
     });
+  });
+
+  it("native unpublish removes the public document, preserves versions, and restore does not republish", async () => {
+    const selected = (await versionsFor(postID)).find(
+      (version) => version.version._status === "published",
+    );
+    expect(selected).toBeDefined();
+    await payload.update({
+      collection: "posts",
+      id: postID,
+      draft: true,
+      overrideAccess: true,
+      data: {
+        _status: "draft",
+        editorialStatus: "rejected",
+        scheduledAt: null,
+      },
+    });
+    // Reject applies to the working draft, not the existing public revision.
+    await expect(publicPost(postID)).resolves.toMatchObject({
+      _status: "published",
+    });
+    const response = await handleEndpoints({
+      config: payload.config,
+      payloadInstanceCacheKey: cacheKey,
+      request: new Request(
+        `https://example.invalid/api/posts/${postID}?draft=false`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `JWT ${adminToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ _status: "draft" }),
+        },
+      ),
+    });
+    expect(response.status).toBe(200);
+    const visible = () =>
+      payload.find({
+        collection: "posts",
+        draft: false,
+        overrideAccess: false,
+        where: { id: { equals: postID } },
+      });
+    expect((await visible()).docs).toHaveLength(0);
+    expect(
+      (await versionsFor(postID)).some(
+        (version) => version.id === selected!.id,
+      ),
+    ).toBe(true);
+    const restored = await restoreThroughNativeEndpoint(
+      selected!.id,
+      adminToken,
+    );
+    expect(restored.status).toBe(200);
+    await expect(restored.json()).resolves.toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      reviewerName: null,
+      reviewedAt: null,
+      qualityScore: null,
+      qualityChecks: null,
+      scheduledAt: null,
+    });
+    expect((await visible()).docs).toHaveLength(0);
+  });
+
+  it("native unpublish is authenticated and cancels a retained approved schedule", async () => {
+    const unpublish = (token?: string) =>
+      handleEndpoints({
+        config: payload.config,
+        payloadInstanceCacheKey: cacheKey,
+        request: new Request(`https://example.invalid/api/posts/${postID}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `JWT ${token}` } : {}),
+          },
+          body: JSON.stringify({ _status: "draft" }),
+        }),
+      });
+    expect((await unpublish()).status).toBeGreaterThanOrEqual(400);
+    expect((await unpublish(workerToken)).status).toBe(403);
+    await expect(publicPost(postID)).resolves.toMatchObject({
+      _status: "published",
+    });
+    await payload.update({
+      collection: "posts",
+      id: postID,
+      draft: true,
+      overrideAccess: true,
+      data: {
+        editorialStatus: "scheduled",
+        scheduledAt: "2026-01-01T09:00:00.000Z",
+      },
+    });
+    expect((await unpublish(adminToken)).status).toBe(200);
+    const latest = await payload.findByID({
+      collection: "posts",
+      id: postID,
+      draft: true,
+      overrideAccess: true,
+    });
+    expect(latest).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      scheduledAt: null,
+      reviewerName: null,
+      reviewedAt: null,
+      qualityScore: null,
+      qualityChecks: null,
+    });
+    const { localizedBlogPostEntries } = await import("../../lib/blog/sitemap");
+    expect(
+      localizedBlogPostEntries(latest, new Date(), "https://example.invalid"),
+    ).toEqual([]);
   });
 
   it("rejects anonymous and non-admin attempts to restore a version owned by a post", async () => {
@@ -823,6 +1071,7 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
       }),
     ).rejects.toThrow();
     expect(passedProbe).toBe(true);
+    expect(invalidate).not.toHaveBeenCalled();
     expect(Object.keys(db.sessions)).toHaveLength(before);
     expect(
       await payload.findByID({

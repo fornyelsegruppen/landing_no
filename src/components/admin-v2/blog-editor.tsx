@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { blogEditorCopies } from "@/lib/admin-v2/blog-editor-copy";
+import { blogHistoryCopy } from "@/lib/admin-v2/blog-history-copy";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import {
   blogEditorActionRequest,
@@ -65,6 +66,7 @@ type Props = {
   locale: PanelLocale;
   primaryKeyword?: string;
   publishEligible?: boolean;
+  hasPublicVersion?: boolean;
   qualityPassed?: boolean;
   qualityScore?: number | null;
   reviewerName: string;
@@ -90,6 +92,7 @@ function runHref(value: BlogActionResponse["runId"]) {
 
 export function BlogEditor(props: Props) {
   const copy = blogEditorCopies[props.locale];
+  const history = blogHistoryCopy[props.locale];
   const core = getAdminV2Copy(props.locale).blogAdmin;
   const router = useRouter();
   const incoming = useMemo(
@@ -281,6 +284,7 @@ export function BlogEditor(props: Props) {
   }
 
   function actionProgress(action: BlogEditorAction) {
+    if (action === "unpublish") return history.working;
     if (action === "save") return copy.saving;
     if (action === "stock-image") return copy.findingStock;
     if (action === "regenerate") return copy.regenerating;
@@ -291,6 +295,7 @@ export function BlogEditor(props: Props) {
   }
 
   function actionSuccess(action: BlogEditorAction, result: BlogActionResponse) {
+    if (action === "unpublish") return history.done;
     if (
       result.outcome === "NO_ALTERNATIVE" ||
       result.outcome === "no_alternative"
@@ -335,6 +340,7 @@ export function BlogEditor(props: Props) {
     }
     if (action === "regenerate" && !window.confirm(copy.regenerationConfirm))
       return;
+    if (action === "unpublish" && !window.confirm(history.confirm)) return;
     if (action === "save") {
       const issues = blogDraftFieldIssues(form);
       if (issues.length) {
@@ -628,6 +634,18 @@ export function BlogEditor(props: Props) {
             {actionLabel("reject", core.reject)}
           </button>
         </div>
+        {props.hasPublicVersion ? (
+          <button
+            className="border-danger/40 text-danger mt-4 min-h-11 rounded-xl border px-4 font-bold disabled:opacity-60"
+            disabled={
+              busy || dirty || serverUpdatedWhileDirty || !savedUpdatedAt
+            }
+            onClick={() => void act("unpublish")}
+            type="button"
+          >
+            {actionLabel("unpublish", history.unpublish)}
+          </button>
+        ) : null}
         {props.status !== "approved" ? (
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.scheduleNeedsApproval}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  auth: vi.fn(),
   attachStock: vi.fn(),
   captureException: vi.fn(),
   evaluateEdited: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/payload", () => ({
   getPayload: vi.fn(async () => ({
-    auth: vi.fn(async () => ({ user: { id: 4, role: "admin", name: "Kari" } })),
+    auth: mocks.auth,
     find: mocks.find,
     findByID: mocks.findByID,
     update: mocks.update,
@@ -22,7 +23,9 @@ vi.mock("@/lib/payload", () => ({
 vi.mock("@/lib/monitoring", () => ({
   captureException: mocks.captureException,
 }));
-vi.mock("@/payload/access/roles", () => ({ userIsAdmin: vi.fn(() => true) }));
+vi.mock("@/payload/access/roles", () => ({
+  userIsAdmin: (user: { role?: string }) => user.role === "admin",
+}));
 vi.mock("@/lib/audit/payload-audit-writer", () => ({
   createPayloadAuditWriter: vi.fn(() => ({})),
 }));
@@ -63,6 +66,63 @@ function request(body: Record<string, unknown>) {
 const context = { params: Promise.resolve({ id: "9" }) };
 
 describe("admin blog post actions", () => {
+  it("unpublishes the base document with review reset and both revision guards", async () => {
+    const post = await mocks.findByID();
+    const response = await POST(
+      request({ action: "unpublish", expectedUpdatedAt: post.updatedAt }),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: false,
+        context: {
+          expectedBlogUpdatedAt: post.updatedAt,
+          expectedBlogRevision: expect.any(String),
+        },
+        data: {
+          _status: "draft",
+          editorialStatus: "human_review",
+          scheduledAt: null,
+          reviewedAt: null,
+          reviewerName: null,
+          qualityScore: null,
+          qualityChecks: null,
+        },
+      }),
+    );
+  });
+  it("unpublish requires an explicit revision timestamp and rejects stale timestamps", async () => {
+    expect((await POST(request({ action: "unpublish" }), context)).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await POST(
+          request({
+            action: "unpublish",
+            expectedUpdatedAt: "2000-01-01T00:00:00.000Z",
+          }),
+          context,
+        )
+      ).status,
+    ).toBe(409);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it("anonymous callers cannot unpublish", async () => {
+    mocks.auth.mockResolvedValueOnce({ user: null });
+    expect((await POST(request({ action: "unpublish" }), context)).status).toBe(
+      401,
+    );
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it("non-admin callers cannot unpublish", async () => {
+    mocks.auth.mockResolvedValueOnce({ user: { id: 6, role: "worker" } });
+    expect((await POST(request({ action: "unpublish" }), context)).status).toBe(
+      403,
+    );
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
   it("saves a short draft with failed real QA and still blocks approval and publishing", async () => {
     const actual = await vi.importActual<
       typeof import("@/lib/blog/edited-draft-quality")
@@ -185,6 +245,9 @@ describe("admin blog post actions", () => {
     },
   );
   beforeEach(() => {
+    mocks.auth
+      .mockReset()
+      .mockResolvedValue({ user: { id: 4, role: "admin", name: "Kari" } });
     mocks.captureException.mockReset();
     mocks.evaluateEdited.mockReset().mockReturnValue({
       passed: false,
@@ -195,6 +258,7 @@ describe("admin blog post actions", () => {
     mocks.find.mockReset().mockResolvedValue({ docs: [] });
     mocks.findByID.mockReset().mockResolvedValue({
       id: 9,
+      updatedAt: "2026-09-12T10:00:00.000Z",
       slug: "takvask-pris",
       titleNo: "Tidligere kontrollert tittel",
       contentNo: "Tidligere kontrollert innhold",

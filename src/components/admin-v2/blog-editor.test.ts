@@ -31,6 +31,40 @@ const props = {
 };
 
 describe("blog editor", () => {
+  it("requires confirmation for explicit unpublish and submits only the revision guard", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(Response.json({ ok: true, outcome: "unpublished" }));
+    vi.stubGlobal("fetch", fetcher);
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirm);
+    try {
+      await renderedEditor(
+        async (container) => {
+          const button = Array.from(container.querySelectorAll("button")).find(
+            (item) => item.textContent === "Išjungti publikaciją",
+          )!;
+          expect(button.disabled).toBe(false);
+          await act(async () => button.click());
+          expect(fetcher).not.toHaveBeenCalled();
+          confirm.mockReturnValue(true);
+          await act(async () => button.click());
+          expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+            action: "unpublish",
+            expectedUpdatedAt: props.updatedAt,
+          });
+          expect(container.textContent).toContain("Publikacija išjungta");
+        },
+        { hasPublicVersion: true },
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("does not offer unpublish for a draft-only post", () => {
+    const html = renderToStaticMarkup(createElement(BlogEditor, props));
+    expect(html).not.toContain("Išjungti publikaciją");
+  });
   afterEach(() => vi.unstubAllGlobals());
   async function renderedEditor(
     run: (container: HTMLDivElement) => Promise<void>,
@@ -89,17 +123,15 @@ describe("blog editor", () => {
     },
   );
   it("allows short nonempty draft text to reach the save endpoint", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({
-          ok: true,
-          action: "save",
-          outcome: "saved",
-          qualityPassed: false,
-          qualityScore: 0,
-        }),
-      );
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        ok: true,
+        action: "save",
+        outcome: "saved",
+        qualityPassed: false,
+        qualityScore: 0,
+      }),
+    );
     vi.stubGlobal("fetch", fetcher);
     await renderedEditor(async (container) => {
       await act(async () =>
@@ -121,19 +153,17 @@ describe("blog editor", () => {
   it("maps server validation to a field without leaking the raw error or losing typed text", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json(
-            {
-              ok: false,
-              code: "VALIDATION_ERROR",
-              error: "Invalid action",
-              fieldIssues: [{ field: "contentNo", code: "too_long" }],
-            },
-            { status: 400 },
-          ),
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            ok: false,
+            code: "VALIDATION_ERROR",
+            error: "Invalid action",
+            fieldIssues: [{ field: "contentNo", code: "too_long" }],
+          },
+          { status: 400 },
         ),
+      ),
     );
     await renderedEditor(async (container) => {
       await act(async () =>
@@ -153,18 +183,16 @@ describe("blog editor", () => {
   it("shows localized blocked-approval feedback instead of the English backend message", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json(
-            {
-              ok: false,
-              code: "QUALITY_NOT_READY",
-              error: "The deterministic quality gate has not passed",
-            },
-            { status: 409 },
-          ),
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            ok: false,
+            code: "QUALITY_NOT_READY",
+            error: "The deterministic quality gate has not passed",
+          },
+          { status: 409 },
         ),
+      ),
     );
     await renderedEditor(async (container) => {
       const approve = [

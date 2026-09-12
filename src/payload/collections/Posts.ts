@@ -104,6 +104,24 @@ export const Posts: CollectionConfig = {
         ) {
           throw new TypeError("Posts versions can only be restored as drafts");
         }
+        if (
+          operation === "update" &&
+          "data" in args &&
+          args.draft !== true &&
+          args.data?._status === "draft"
+        ) {
+          // Native CMS Unpublish submits only _status:draft. Clear its retained
+          // approval/schedule before Payload merges fields from the latest draft.
+          args.data = {
+            ...args.data,
+            editorialStatus: "human_review",
+            scheduledAt: null,
+            qualityChecks: null,
+            qualityScore: null,
+            reviewerName: null,
+            reviewedAt: null,
+          };
+        }
         return args;
       },
       beginPostWrite,

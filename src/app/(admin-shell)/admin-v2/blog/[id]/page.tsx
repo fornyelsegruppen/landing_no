@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { BlogArticleViewLink } from "@/components/admin-v2/blog-article-view-link";
 import { BlogEditor } from "@/components/admin-v2/blog-editor";
+import { blogHistoryCopy } from "@/lib/admin-v2/blog-history-copy";
 import { BlogReviewPanel } from "@/components/admin-v2/blog-review-panel";
 import { blogPublishedArticleLabel, getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { blogPublishEligibility } from "@/lib/admin-v2/blog-review";
@@ -36,6 +37,16 @@ export default async function BlogArticleAdminPage({
     })
     .catch(() => null);
   if (!post) notFound();
+  const basePost = await (
+    await getPayload()
+  ).findByID({
+    collection: "posts",
+    id: post.id,
+    depth: 0,
+    draft: false,
+    overrideAccess: true,
+  });
+  const history = blogHistoryCopy[user.interfaceLanguage];
   const image =
     post.heroImage && typeof post.heroImage === "object"
       ? post.heroImage
@@ -111,6 +122,7 @@ export default async function BlogArticleAdminPage({
         ) : null}
       </header>
       <BlogEditor
+        hasPublicVersion={basePost._status === "published"}
         contentNo={post.contentNo}
         excerptNo={post.excerptNo || undefined}
         id={post.id}
@@ -133,6 +145,17 @@ export default async function BlogArticleAdminPage({
         updatedAt={post.updatedAt}
       />
       <BlogReviewPanel locale={user.interfaceLanguage} {...reviewInput} />
+      <section className="rounded-2xl border border-white/10 p-4 text-sm">
+        <a
+          className="text-accent inline-flex min-h-11 items-center font-bold"
+          href={`/admin/collections/posts/${post.id}/versions`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {history.versions}
+        </a>
+        <p className="text-muted-foreground mt-2">{history.help}</p>
+      </section>
       <details className="text-muted-foreground rounded-2xl border border-white/10 p-4 text-sm">
         <summary className="cursor-pointer font-bold">
           {copy.blogAdmin.technical}

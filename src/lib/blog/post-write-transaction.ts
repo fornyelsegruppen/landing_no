@@ -27,6 +27,7 @@ const ownedOperations = new WeakSet<object>();
 type Ownership = {
   id: string;
   poisoned: boolean;
+  postsChanged?: boolean;
   session?: Database["sessions"][string];
 };
 const requestOwnership = new WeakMap<PayloadRequest, Ownership>();
@@ -148,6 +149,20 @@ async function finish(req: PayloadRequest, commit: boolean) {
     delete db.sessions[String(id)];
     delete req.transactionID;
   }
+  if (commit && ownership?.postsChanged) {
+    // Nested native/bulk writes only mark the owner. Invalidation belongs after
+    // the outermost real COMMIT, never an afterChange hook within a transaction.
+    try {
+      const { invalidatePublicBlog } = await import("./invalidate-public-blog");
+      invalidatePublicBlog();
+    } catch {
+      // A cache failure cannot roll back an already committed publication or
+      // invite a second provider run. Surface it for operations; ISR is fallback.
+      req.payload.logger.warn(
+        "Public blog cache invalidation failed after commit",
+      );
+    }
+  }
 }
 
 export async function withSeoTransaction<T>(
@@ -238,6 +253,17 @@ export const finishPostWrite: CollectionAfterOperationHook = async ({
     throw new TypeError(
       "Blog bulk operation failed; all changes were rolled back",
     );
+  }
+  // Payload names single-document afterOperation hooks updateByID/deleteByID,
+  // although their beforeOperation hook names are update/delete.
+  if (
+    args.req &&
+    (writeOperations.has(operation) ||
+      operation === "updateByID" ||
+      operation === "deleteByID")
+  ) {
+    const owner = requestOwnership.get(args.req);
+    if (owner) owner.postsChanged = true;
   }
   if (args.req && ownedOperations.has(args)) {
     ownedOperations.delete(args);

@@ -6,6 +6,7 @@ export type { BlogEditorForm } from "./blog-editor-state";
 export type BlogEditorAction =
   | "approve"
   | "publish"
+  | "unpublish"
   | "regenerate"
   | "reject"
   | "save"

@@ -83,6 +83,7 @@ export function blogEditorActionIsBlocked(input: {
   action:
     | "approve"
     | "publish"
+    | "unpublish"
     | "regenerate"
     | "reject"
     | "save"

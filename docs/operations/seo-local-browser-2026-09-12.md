@@ -123,3 +123,28 @@ The PostgreSQL concurrency test now creates two test-owned eligible topics per
 run and retires only those candidates afterwards, retaining run evidence. This
 avoids exhausting the ten intentionally single-use manual seeds across repeated
 test executions; no production reservation rules were loosened.
+# Unpublish / restore follow-up after the frozen da512da browser batch
+
+- The explicit Admin V2 **Unpublish** action requires confirmation and an expected
+  timestamp, checks the server revision hash under the post-write lock, updates
+  the base document (`draft:false`), and clears QA, reviewer, and schedule. The
+  button uses the actual base publication state, not the latest draft status.
+- Reject remains a draft workflow decision. It must not be interpreted as removal
+  of a previously public revision. Native CMS base unpublish also clears retained
+  approval/schedule before Payload merges the latest draft fields.
+- Version history opens the existing native CMS history in a separate tab, with
+  LT/NB/EN guidance and a return-to-Admin-V2 link in the native article workflow.
+  Restoration reuses the existing authenticated draft-only handler. It never
+  copies historical approval to the restored draft or republishes an unpublished
+  article. Existing Payload retention remains 20 versions per document.
+- Public article/list/home and sitemap cache paths are invalidated only after the
+  owning PostgreSQL transaction actually commits. Nested writes defer to that
+  owner; rollback and deferred COMMIT failure cause no invalidation. A cache error
+  is logged after commit and cannot pretend that a successful DB write rolled
+  back; the existing ISR intervals remain its fallback.
+- The isolated PostgreSQL tests use `seo_automation_core_20260912`, not the running
+  browser fixture database. No source edit here changes the frozen standalone
+  da512da runtime or its current operator-created revisions.
+- The new source still needs its own build and real-browser verification of
+  immediate anonymous 404, sitemap removal, version-history navigation, and safe
+  restore. Earlier da512da browser acceptance is not acceptance of this follow-up.
