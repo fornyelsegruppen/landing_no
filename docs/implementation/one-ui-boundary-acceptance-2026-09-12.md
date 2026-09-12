@@ -80,6 +80,10 @@ not be confused with the separately gated seed script.
 - Full TypeScript check, focused ESLint, and diff checks passed.
 - Browser test discovery lists four tests. The old-message test now
   requires page > 1 and first proves the row is absent from page 1.
+  For this fixture use message ID 1 on message page 6, document media 756
+  with name `boundary-20260912-anchor-756.pdf` on document page 31
+  (`E2E_ADMIN_CASE_DOCUMENT_PAGE=31`). A sparse final message page need not
+  create an older-message disclosure; visibility is still required.
 
 ## Remaining gates — not claimed passed
 

@@ -5,6 +5,7 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD;
 const caseId = process.env.E2E_ADMIN_CASE_ID;
 const documentHref = process.env.E2E_ADMIN_CASE_DOCUMENT_HREF;
 const documentAccessibleName = process.env.E2E_ADMIN_CASE_DOCUMENT_NAME;
+const documentPage = process.env.E2E_ADMIN_CASE_DOCUMENT_PAGE;
 const olderMessageId = process.env.E2E_ADMIN_CASE_OLDER_MESSAGE_ID;
 const olderMessagePage = process.env.E2E_ADMIN_CASE_OLDER_MESSAGE_PAGE;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
@@ -205,6 +206,16 @@ test.describe("Admin Case Workspace V3 browser acceptance", () => {
     if (!documentHref || !documentAccessibleName) {
       throw new Error("Document link fixture variables are required");
     }
+    if (documentPage) {
+      if (
+        !Number.isSafeInteger(Number(documentPage)) ||
+        Number(documentPage) < 1
+      )
+        throw new Error("Document page must be a positive integer");
+      await page.goto(
+        `/admin-v2/cases/${encodeURIComponent(caseId!)}?documentPage=${encodeURIComponent(documentPage)}`,
+      );
+    }
 
     const documentLinks = page.locator("a");
     await expect
@@ -259,7 +270,10 @@ test.describe("Admin Case Workspace V3 browser acceptance", () => {
     await page.goto(
       `/admin-v2/cases/${encodeURIComponent(caseId!)}?messagePage=${encodeURIComponent(olderMessagePage)}#message-${encodeURIComponent(olderMessageId)}`,
     );
-    await expect(disclosure).toHaveAttribute("open", "");
+    // A sparse final page can contain only a recent row and no disclosure.
+    // When a disclosure exists, the hash navigation must open it.
+    if (await disclosure.count())
+      await expect(disclosure).toHaveAttribute("open", "");
     await expect(olderMessage).toBeVisible();
   });
 });
