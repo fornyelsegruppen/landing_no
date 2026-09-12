@@ -3,9 +3,11 @@ import { z } from "zod";
 const PEXELS_API_URL = "https://api.pexels.com/v1/search";
 const PEXELS_IMAGE_HOST = "images.pexels.com";
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_SEARCH_PER_PAGE = 80;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const pexelsResponseSchema = z.object({
+  total_results: z.number().int().nonnegative(),
   photos: z.array(
     z.object({
       id: z.number().int().positive(),
@@ -43,6 +45,16 @@ export type DownloadedStockImage = {
   size: number;
 };
 
+export type PexelsSearchOptions = {
+  page?: number;
+  perPage?: number;
+};
+
+export type PexelsStockSearchPage = {
+  photos: PexelsStockPhoto[];
+  hasMore: boolean;
+};
+
 function assertPexelsImageUrl(rawUrl: string): URL {
   const url = new URL(rawUrl);
   if (url.protocol !== "https:" || url.hostname !== PEXELS_IMAGE_HOST) {
@@ -71,18 +83,34 @@ export class PexelsStockImageProvider {
     return Boolean(this.apiKey);
   }
 
-  async search(query: string): Promise<PexelsStockPhoto[]> {
+  async search(
+    query: string,
+    { page = 1, perPage = 30 }: PexelsSearchOptions = {},
+  ): Promise<PexelsStockPhoto[]> {
+    return (await this.searchPage(query, { page, perPage })).photos;
+  }
+
+  async searchPage(
+    query: string,
+    { page = 1, perPage = 30 }: PexelsSearchOptions = {},
+  ): Promise<PexelsStockSearchPage> {
     if (!this.apiKey) {
       throw new TypeError("PEXELS_API_KEY mangler i Preview-miljøet");
     }
     const cleanQuery = query.trim().replace(/\s+/g, " ").slice(0, 120);
     if (cleanQuery.length < 3) throw new TypeError("Bildesøket er for kort");
+    if (!Number.isInteger(page) || page < 1) {
+      throw new TypeError("Pexels-siden er ugyldig");
+    }
+    if (!Number.isInteger(perPage) || perPage < 1 || perPage > MAX_SEARCH_PER_PAGE) {
+      throw new TypeError("Pexels sideantall er ugyldig");
+    }
 
     const url = new URL(PEXELS_API_URL);
     url.searchParams.set("query", cleanQuery);
     url.searchParams.set("orientation", "landscape");
-    url.searchParams.set("size", "large");
-    url.searchParams.set("per_page", "12");
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("per_page", String(perPage));
 
     const response = await this.request(url, {
       headers: { Authorization: this.apiKey },
@@ -94,7 +122,7 @@ export class PexelsStockImageProvider {
     const parsed = pexelsResponseSchema.safeParse(await response.json());
     if (!parsed.success) throw new Error("Pexels returned an invalid response");
 
-    return parsed.data.photos
+    const photos = parsed.data.photos
       .filter((photo) => photo.width / photo.height >= 1.3)
       .map((photo) => {
         const imageUrl =
@@ -114,6 +142,10 @@ export class PexelsStockImageProvider {
           imageUrl,
         };
       });
+    return {
+      photos,
+      hasMore: page * perPage < parsed.data.total_results,
+    };
   }
 
   async download(photo: PexelsStockPhoto): Promise<DownloadedStockImage> {

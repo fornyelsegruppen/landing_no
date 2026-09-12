@@ -3,8 +3,12 @@ import type { Media, Post } from "@/payload/payload-types";
 import {
   PexelsStockImageProvider,
   pexelsLicenseUrl,
+  type PexelsStockPhoto,
 } from "@/lib/providers/pexels-stock-image-provider";
 import { blogServiceAreas } from "./knowledge-base";
+
+const STOCK_ROTATION_MAX_PAGES = 3;
+const STOCK_ROTATION_PAGE_SIZE = 30;
 
 type StockPost = {
   id: number;
@@ -114,6 +118,59 @@ export type StockImageReplacementResult =
       existingAssetId: string;
     };
 
+type StoredPostVersion = {
+  version?: {
+    stockImage?: {
+      assetId?: string | null;
+      provider?: string | null;
+    } | null;
+  } | null;
+};
+
+async function recentPexelsAssetIds(payload: Payload, postId: number) {
+  // Payload versions are intentionally a recent rotation window, not a
+  // permanent gallery: the Posts collection retains only its configured
+  // bounded versions and ordinary saves can evict old assets.
+  const versions = (await payload.findVersions({
+    collection: "posts",
+    where: { parent: { equals: postId } },
+    sort: "-updatedAt",
+    limit: 20,
+    pagination: false,
+    depth: 0,
+    overrideAccess: true,
+  })) as { docs: StoredPostVersion[] };
+  return new Set(
+    versions.docs.flatMap((document) => {
+      const stockImage = document.version?.stockImage;
+      const assetId = stockImage?.assetId?.trim();
+      return stockImage?.provider === "pexels" && assetId ? [assetId] : [];
+    }),
+  );
+}
+
+async function selectStockRotationCandidate(
+  provider: PexelsStockImageProvider,
+  query: string,
+  usedAssetIds: Set<string>,
+  post: StockPost,
+): Promise<PexelsStockPhoto | undefined> {
+  for (let page = 1; page <= STOCK_ROTATION_MAX_PAGES; page += 1) {
+    const result = await provider.searchPage(query, {
+      page,
+      perPage: STOCK_ROTATION_PAGE_SIZE,
+    });
+    const selected = result.photos.find(
+      (candidate) =>
+        !usedAssetIds.has(String(candidate.id)) &&
+        isGeographicallyCompatiblePexelsCandidate(post, candidate),
+    );
+    if (selected) return selected;
+    if (!result.hasMore) break;
+  }
+  return undefined;
+}
+
 function isUnchangedPexelsImage(
   post: StockPost,
   assetId: string,
@@ -138,15 +195,17 @@ export async function attachPexelsStockImageToPost(input: {
 }): Promise<StockImageReplacementResult> {
   const provider = input.provider || new PexelsStockImageProvider();
   const query = stockQueryForPost(input.post, input.query);
-  const candidates = await provider.search(query);
   const existingAssetId =
     input.post.stockImage?.provider === "pexels"
       ? input.post.stockImage.assetId?.trim()
       : undefined;
-  const selected = candidates.find(
-    (candidate) =>
-      String(candidate.id) !== existingAssetId &&
-      isGeographicallyCompatiblePexelsCandidate(input.post, candidate),
+  const usedAssetIds = await recentPexelsAssetIds(input.payload, input.post.id);
+  if (existingAssetId) usedAssetIds.add(existingAssetId);
+  const selected = await selectStockRotationCandidate(
+    provider,
+    query,
+    usedAssetIds,
+    input.post,
   );
   if (!selected)
     return {

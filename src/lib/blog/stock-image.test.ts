@@ -19,6 +19,42 @@ describe("blog stock images", () => {
     return result;
   }
 
+  function photo(id: number, overrides: Record<string, string> = {}) {
+    return {
+      id,
+      width: 2400,
+      height: 1350,
+      pageUrl: `https://www.pexels.com/photo/roof-${id}/`,
+      photographer: "Rotation Fixture",
+      photographerUrl: "https://www.pexels.com/@rotation-fixture/",
+      alt: "Neutral tiled house roof",
+      imageUrl: `https://images.pexels.com/photos/${id}/roof.jpeg`,
+      ...overrides,
+    };
+  }
+
+  function payloadWithEmptyVersionHistory<T extends Record<string, unknown>>(
+    payload: T,
+  ) {
+    return {
+      findVersions: vi.fn(async () => ({ docs: [] })),
+      ...payload,
+    } as unknown as Payload;
+  }
+
+  function providerWithPage(
+    search: () => Promise<ReturnType<typeof photo>[]>,
+    download?: () => Promise<unknown>,
+  ) {
+    return {
+      searchPage: vi.fn(async () => ({
+        photos: await search(),
+        hasMore: false,
+      })),
+      ...(download ? { download } : {}),
+    } as unknown as PexelsStockImageProvider;
+  }
+
   it("uses a distinct public-media token in production", () => {
     expect(
       shouldPersistPexelsMedia({
@@ -82,7 +118,7 @@ describe("blog stock images", () => {
     const create = vi.fn(async () => ({ id: 41 }));
     const update = vi.fn(async () => ({ id: 9, heroImage: 41 }));
     const result = await attachPexelsStockImageToPost({
-      payload: { create, update } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ create, update }),
       post: {
         id: 9,
         titleNo: "Takvask etter vinteren",
@@ -90,7 +126,7 @@ describe("blog stock images", () => {
         imageAlt: "Tak med mose i Oslo før vask",
         editorialStatus: "ai_qa",
       },
-      provider: { search, download } as unknown as PexelsStockImageProvider,
+      provider: providerWithPage(search, download),
       persistToMedia: true,
       preserveInitialQuality: true,
     });
@@ -143,7 +179,7 @@ describe("blog stock images", () => {
     for (const editorialStatus of ["ai_qa", "approved"]) {
       const update = vi.fn(async (input) => ({ id: 22, ...input.data }));
       const result = await attachPexelsStockImageToPost({
-        payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+        payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
         post: {
           id: 22,
           titleNo: "Takfornying",
@@ -151,9 +187,7 @@ describe("blog stock images", () => {
           imageAlt: "Pexels-bilde",
           stockImage: { provider: "pexels", assetId: "111" },
         },
-        provider: {
-          search: vi.fn(async () => [selected]),
-        } as unknown as PexelsStockImageProvider,
+        provider: providerWithPage(async () => [selected]),
         persistToMedia: false,
       });
       expect(update.mock.calls[0]?.[0]).not.toHaveProperty("context");
@@ -179,7 +213,7 @@ describe("blog stock images", () => {
   it("returns an honest no-alternative outcome without updating when Pexels returns only the current asset", async () => {
     const update = vi.fn(async (input) => ({ id: 23, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
       post: {
         id: 23,
         titleNo: "Takfornying",
@@ -187,8 +221,7 @@ describe("blog stock images", () => {
         imageAlt: "Red tiled roof",
         stockImage: { provider: "pexels", assetId: "654" },
       },
-      provider: {
-        search: vi.fn(async () => [
+      provider: providerWithPage(async () => [
           {
             id: 654,
             width: 2400,
@@ -200,7 +233,6 @@ describe("blog stock images", () => {
             imageUrl: "https://images.pexels.com/photos/654/roof.jpeg",
           },
         ]),
-      } as unknown as PexelsStockImageProvider,
       persistToMedia: false,
     });
 
@@ -216,15 +248,14 @@ describe("blog stock images", () => {
   it("excludes the current Pexels asset and selects a genuine alternative", async () => {
     const update = vi.fn(async (input) => ({ id: 23, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
       post: {
         id: 23,
         titleNo: "Takfornying",
         imageAlt: "Current roof",
         stockImage: { provider: "pexels", assetId: "654" },
       },
-      provider: {
-        search: vi.fn(async () => [
+      provider: providerWithPage(async () => [
           {
             id: 654,
             width: 2400,
@@ -246,7 +277,6 @@ describe("blog stock images", () => {
             imageUrl: "https://images.pexels.com/photos/655/roof.jpeg",
           },
         ]),
-      } as unknown as PexelsStockImageProvider,
       persistToMedia: false,
     });
 
@@ -267,15 +297,14 @@ describe("blog stock images", () => {
   it("skips explicit Bergen landmark metadata for an Oslo article but keeps a neutral roof alternative", async () => {
     const update = vi.fn(async (input) => ({ id: 11, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
       post: {
         id: 11,
         titleNo: "Takfornying i Oslo",
         primaryKeyword: "takfornying Oslo",
         stockImage: { provider: "pexels", assetId: "29114658" },
       },
-      provider: {
-        search: vi.fn(async () => [
+      provider: providerWithPage(async () => [
           {
             id: 29525395,
             width: 2400,
@@ -300,7 +329,6 @@ describe("blog stock images", () => {
               "https://images.pexels.com/photos/29525396/red-tiled-roof.jpeg",
           },
         ]),
-      } as unknown as PexelsStockImageProvider,
       persistToMedia: false,
     });
 
@@ -320,15 +348,14 @@ describe("blog stock images", () => {
   it("keeps NO_ALTERNATIVE when the only distinct candidate is an explicit wrong-city landmark", async () => {
     const update = vi.fn();
     const result = await attachPexelsStockImageToPost({
-      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
       post: {
         id: 11,
         titleNo: "Takfornying i Oslo",
         primaryKeyword: "takfornying Oslo",
         stockImage: { provider: "pexels", assetId: "29114658" },
       },
-      provider: {
-        search: vi.fn(async () => [
+      provider: providerWithPage(async () => [
           {
             id: 29525395,
             width: 2400,
@@ -341,7 +368,6 @@ describe("blog stock images", () => {
             imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
           },
         ]),
-      } as unknown as PexelsStockImageProvider,
       persistToMedia: false,
     });
 
@@ -353,20 +379,158 @@ describe("blog stock images", () => {
     });
   });
 
+  it("rotates through four recent-version-aware stock assets across reload-shaped requests", async () => {
+    const versions = [
+      { version: { stockImage: { provider: "pexels", assetId: "100" } } },
+    ];
+    const findVersions = vi.fn(async () => ({ docs: versions }));
+    const update = vi.fn(async (input) => {
+      versions.push({ version: { stockImage: input.data.stockImage } });
+      return { id: 12, ...input.data };
+    });
+    const searchPage = vi.fn(async () => ({
+      photos: [100, 101, 102, 103, 104].map((id) => photo(id)),
+      hasMore: false,
+    }));
+    let post = {
+      id: 12,
+      titleNo: "Takfornying i Oslo",
+      stockImage: { provider: "pexels", assetId: "100" },
+    };
+    const selectedIds: number[] = [];
+
+    for (const expectedId of [101, 102, 103, 104]) {
+      const result = await attachPexelsStockImageToPost({
+        payload: { findVersions, update, logger: { warn: vi.fn() } } as unknown as Payload,
+        post,
+        provider: { searchPage } as unknown as PexelsStockImageProvider,
+        persistToMedia: false,
+      });
+      const replacement = expectReplacement(result);
+      selectedIds.push(replacement.selected.id);
+      post = {
+        ...post,
+        stockImage: replacement.post.stockImage!,
+      };
+      expect(replacement.reviewInvalidated).toBe(true);
+      expect(expectedId).toBe(replacement.selected.id);
+    }
+
+    expect(selectedIds).toEqual([101, 102, 103, 104]);
+    expect(new Set(selectedIds)).toHaveSize(4);
+    expect(findVersions).toHaveBeenCalledTimes(4);
+  });
+
+  it("uses one cheap first page when it already contains an unused valid candidate", async () => {
+    const update = vi.fn(async (input) => ({ id: 13, ...input.data }));
+    const searchPage = vi.fn(async (_query, { page }: { page: number }) => {
+      if (page === 1) {
+        return { photos: [photo(100), photo(101), photo(103)], hasMore: true };
+      }
+      if (page === 2) {
+        return {
+          photos: [
+            photo(101),
+            photo(102, {
+              alt: "Colorful historic buildings in Bryggen, Bergen",
+              pageUrl: "https://www.pexels.com/photo/bryggen-bergen-102/",
+            }),
+          ],
+          hasMore: true,
+        };
+      }
+      return { photos: [photo(103)], hasMore: true };
+    });
+    const result = await attachPexelsStockImageToPost({
+      payload: {
+        findVersions: vi.fn(async () => ({
+          docs: [
+            { version: { stockImage: { provider: "pexels", assetId: "100" } } },
+            { version: { stockImage: { provider: "pexels", assetId: "101" } } },
+          ],
+        })),
+        update,
+        logger: { warn: vi.fn() },
+      } as unknown as Payload,
+      post: {
+        id: 13,
+        titleNo: "Takfornying i Oslo",
+        stockImage: { provider: "pexels", assetId: "101" },
+      },
+      provider: { searchPage } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(expectReplacement(result).selected.id).toBe(103);
+    expect(searchPage).toHaveBeenCalledTimes(1);
+    expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([1]);
+  });
+
+  it("keeps the post unchanged when all bounded-page candidates are exhausted", async () => {
+    const update = vi.fn();
+    const searchPage = vi.fn(async (_query, { page }: { page: number }) => ({
+      photos: page === 1 ? [photo(100)] : [photo(101)],
+      hasMore: page === 1,
+    }));
+    const result = await attachPexelsStockImageToPost({
+      payload: {
+        findVersions: vi.fn(async () => ({
+          docs: [
+            { version: { stockImage: { provider: "pexels", assetId: "100" } } },
+            { version: { stockImage: { provider: "pexels", assetId: "101" } } },
+          ],
+        })),
+        update,
+        logger: { warn: vi.fn() },
+      } as unknown as Payload,
+      post: {
+        id: 14,
+        titleNo: "Takfornying i Oslo",
+        stockImage: { provider: "pexels", assetId: "101" },
+      },
+      provider: { searchPage } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(result).toMatchObject({ outcome: "no_alternative", existingAssetId: "101" });
+    expect(update).not.toHaveBeenCalled();
+    expect(searchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails before provider search when recent-version history cannot be read", async () => {
+    const searchPage = vi.fn();
+    const update = vi.fn();
+    await expect(
+      attachPexelsStockImageToPost({
+        payload: {
+          findVersions: vi.fn(async () => {
+            throw new Error("versions unavailable");
+          }),
+          update,
+          logger: { warn: vi.fn() },
+        } as unknown as Payload,
+        post: { id: 15, titleNo: "Takfornying i Oslo" },
+        provider: { searchPage } as unknown as PexelsStockImageProvider,
+        persistToMedia: false,
+      }),
+    ).rejects.toThrow("versions unavailable");
+    expect(searchPage).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it.each(blogServiceAreas)(
     "rejects the exact Bergen landmark fixture for the %s Oslo service area",
     async (location) => {
       const update = vi.fn();
       const result = await attachPexelsStockImageToPost({
-        payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+        payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
         post: {
           id: 11,
           titleNo: `Takfornying i ${location}`,
           primaryKeyword: `takfornying ${location}`,
           stockImage: { provider: "pexels", assetId: "29114658" },
         },
-        provider: {
-          search: vi.fn(async () => [
+        provider: providerWithPage(async () => [
             {
               id: 29525395,
               width: 2400,
@@ -380,7 +544,6 @@ describe("blog stock images", () => {
                 "https://images.pexels.com/photos/29525395/bryggen.jpeg",
             },
           ]),
-        } as unknown as PexelsStockImageProvider,
         persistToMedia: false,
       });
 
@@ -395,15 +558,14 @@ describe("blog stock images", () => {
   it("rejects mixed Oslo and Bergen metadata instead of accepting one matching location", async () => {
     const update = vi.fn();
     const result = await attachPexelsStockImageToPost({
-      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
       post: {
         id: 11,
         titleNo: "Takfornying i Oslo",
         primaryKeyword: "takfornying Oslo",
         stockImage: { provider: "pexels", assetId: "29114658" },
       },
-      provider: {
-        search: vi.fn(async () => [
+      provider: providerWithPage(async () => [
           {
             id: 29525397,
             width: 2400,
@@ -417,7 +579,6 @@ describe("blog stock images", () => {
               "https://images.pexels.com/photos/29525397/mixed-metadata.jpeg",
           },
         ]),
-      } as unknown as PexelsStockImageProvider,
       persistToMedia: false,
     });
 
@@ -431,7 +592,7 @@ describe("blog stock images", () => {
   it("invalidates scheduled review evidence when an uploaded hero overrides matching stock metadata", async () => {
     const update = vi.fn(async (input) => ({ id: 24, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
       post: {
         id: 24,
         titleNo: "Takfornying",
@@ -440,8 +601,7 @@ describe("blog stock images", () => {
         heroImage: 999,
         stockImage: { provider: "pexels", assetId: "222" },
       },
-      provider: {
-        search: vi.fn(async () => [
+      provider: providerWithPage(async () => [
           {
             id: 223,
             width: 2400,
@@ -453,7 +613,6 @@ describe("blog stock images", () => {
             imageUrl: "https://images.pexels.com/photos/223/roof.jpeg",
           },
         ]),
-      } as unknown as PexelsStockImageProvider,
       persistToMedia: false,
     });
 
@@ -499,13 +658,13 @@ describe("blog stock images", () => {
     const warn = vi.fn();
 
     const result = await attachPexelsStockImageToPost({
-      payload: { create, update, logger: { warn } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ create, update, logger: { warn } }),
       post: {
         id: 12,
         titleNo: "Sjekk taket etter vinteren",
         ctaVariant: "assessment",
       },
-      provider: { search, download } as unknown as PexelsStockImageProvider,
+      provider: providerWithPage(search, download),
       persistToMedia: true,
     });
 
@@ -549,12 +708,9 @@ describe("blog stock images", () => {
     }));
 
     const result = await attachPexelsStockImageToPost({
-      payload: { create, update, logger: { warn } } as unknown as Payload,
+      payload: payloadWithEmptyVersionHistory({ create, update, logger: { warn } }),
       post: { id: 13, titleNo: "Takmaling", ctaVariant: "assessment" },
-      provider: {
-        search: vi.fn(async () => [selected]),
-        download,
-      } as unknown as PexelsStockImageProvider,
+        provider: providerWithPage(async () => [selected], download),
       persistToMedia: false,
     });
 

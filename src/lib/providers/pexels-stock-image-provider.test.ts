@@ -5,6 +5,7 @@ function photoResponse(
   imageUrl = "https://images.pexels.com/photos/123/roof.jpeg",
 ) {
   return {
+    total_results: 61,
     photos: [
       {
         id: 123,
@@ -31,7 +32,7 @@ describe("Pexels stock image provider", () => {
     );
   });
 
-  it("keeps the API key in the authorization header", async () => {
+  it("keeps the API key in the authorization header and constructs bounded pages", async () => {
     const request = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         void input;
@@ -43,13 +44,20 @@ describe("Pexels stock image provider", () => {
       { PEXELS_API_KEY: "pexels-secret" },
       request as typeof fetch,
     );
-    const photos = await provider.search("mossy tiled roof");
+    const page = await provider.searchPage("mossy tiled roof", {
+      page: 2,
+      perPage: 30,
+    });
     const [url, options] = request.mock.calls[0]!;
     expect(String(url)).not.toContain("pexels-secret");
+    expect(String(url)).toContain("page=2");
+    expect(String(url)).toContain("per_page=30");
+    expect(String(url)).not.toContain("size=");
     expect((options?.headers as Record<string, string>).Authorization).toBe(
       "pexels-secret",
     );
-    expect(photos[0]).toMatchObject({
+    expect(page).toMatchObject({ hasMore: true });
+    expect(page.photos[0]).toMatchObject({
       id: 123,
       photographer: "Test Photographer",
     });
