@@ -46,13 +46,12 @@ export async function restorePostVersionAsDraft({
     throw new TypeError("Version does not belong to the requested post");
   }
 
-  const req = await createLocalReq({ overrideAccess: false, user }, payload);
+  const req = await createLocalReq({ user }, payload);
   return restoreVersionOperation({
     collection,
     draft: true,
     id: versionID,
     overrideAccess: false,
-    payload,
     req,
   });
 }
