@@ -1,6 +1,15 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { archiveClassifications } from "@/lib/leads/case-lifecycle-shared";
+
+// Client rendering must not evaluate lifecycle commands (or their Node imports).
+vi.mock("@/lib/leads/case-lifecycle", () => {
+  throw new Error("Client panel imported server lifecycle commands");
+});
+vi.mock("@/lib/cases/case-command", () => {
+  throw new Error("Client panel imported server case commands");
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
@@ -9,6 +18,17 @@ vi.mock("next/navigation", () => ({
 import { CaseLifecyclePanel } from "./case-lifecycle-panel";
 
 describe("case lifecycle panel", () => {
+  it("keeps the shared archive vocabulary unchanged", () => {
+    expect(archiveClassifications).toEqual([
+      "completed",
+      "declined",
+      "lost",
+      "invalid",
+      "spam",
+      "duplicate",
+      "other",
+    ]);
+  });
   it("keeps active-case archive and trash actions in a collapsed compact drawer", () => {
     const html = renderToStaticMarkup(
       createElement(CaseLifecyclePanel, {

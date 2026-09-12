@@ -7,7 +7,7 @@ import {
   archiveClassifications,
   type ArchiveClassification,
   type CaseRecordState,
-} from "@/lib/leads/case-lifecycle";
+} from "@/lib/leads/case-lifecycle-shared";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 export function CaseLifecyclePanel({

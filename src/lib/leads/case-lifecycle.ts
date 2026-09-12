@@ -1,18 +1,12 @@
 import type { Payload } from "payload";
 import { updateCaseState } from "@/lib/cases/case-command";
+import type { ArchiveClassification } from "./case-lifecycle-shared";
 
-export const archiveClassifications = [
-  "completed",
-  "declined",
-  "lost",
-  "invalid",
-  "spam",
-  "duplicate",
-  "other",
-] as const;
-
-export type ArchiveClassification = (typeof archiveClassifications)[number];
-export type CaseRecordState = "active" | "archived" | "trashed";
+export {
+  archiveClassifications,
+  type ArchiveClassification,
+  type CaseRecordState,
+} from "./case-lifecycle-shared";
 
 type LifecyclePayload = Pick<Payload, "delete" | "find" | "findByID" | "update">;
 
