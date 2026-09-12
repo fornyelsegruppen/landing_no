@@ -53,7 +53,7 @@ export function connectionOptions(raw) {
   if (!raw) throw new Error('DATABASE_CONFIG');
   const url = new URL(raw);
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname ||
-    !url.username || url.pathname.length < 2) throw new Error('DATABASE_CONFIG');
+    !url.username || !url.password || url.pathname.length < 2) throw new Error('DATABASE_CONFIG');
   const sslmode = url.searchParams.get('sslmode');
   if (sslmode && !['require', 'verify-ca', 'verify-full'].includes(sslmode)) throw new Error('DATABASE_TLS');
   for (const key of url.searchParams.keys()) {
@@ -61,11 +61,18 @@ export function connectionOptions(raw) {
     // alternate hosts, SSL files, timeouts, session options or credential sources.
     if (!['sslmode', 'channel_binding'].includes(key)) throw new Error('DATABASE_CONFIG');
   }
-  // pg URL sslmode parsing can override the explicit ssl object. Remove only
-  // that option and enforce certificate/hostname verification; retain channel_binding.
+  // Pinned pg supports opportunistic channel binding, not libpq's "require".
+  // Never silently weaken a URL that explicitly requires it.
+  const binding = url.searchParams.get('channel_binding');
+  if (binding && !['prefer', 'disable'].includes(binding)) throw new Error('DATABASE_CONFIG');
+  // Translate supported transport options explicitly; URL parser options must
+  // not override certificate/hostname verification or fixed timeouts.
   url.searchParams.delete('sslmode');
+  url.searchParams.delete('channel_binding');
+  if (!url.port) url.port = '5432';
   return { connectionString: url.toString(), ssl: { rejectUnauthorized: true },
     connectionTimeoutMillis: 5000, query_timeout: 6000,
+    enableChannelBinding: binding === 'prefer',
     application_name: 'seo-one-ui-compat-preflight' };
 }
 
@@ -106,6 +113,13 @@ export async function runPreflight({
     const manifest = await load();
     if (cancelled) throw new Error('DEADLINE');
     check = 'CONNECTION';
+    // These common integration aliases cannot override the complete URL and
+    // explicit client options. Other PG* settings can change session semantics.
+    // Never read or mutate their values; the URL password prevents pgpass lookup.
+    const ignoredAliases = ['PGHOST', 'PGPORT', 'PGUSER', 'PGDATABASE', 'PGPASSWORD',
+      'PGSSLMODE', 'PGAPPNAME', 'PGCONNECT_TIMEOUT'];
+    if (Object.keys(environment).some(key => /^PG/i.test(key) &&
+      !ignoredAliases.includes(key.toUpperCase()))) throw new Error('DATABASE_CONFIG');
     const options = connectionOptions(environment.DATABASE_URL);
     client = await createClient(options);
     if (cancelled) { await close(); throw new Error('DEADLINE'); }
@@ -127,9 +141,9 @@ export async function runPreflight({
     const names = [...new Set([...tables, 'leads', 'users', 'roof_measurements', 'price_calculations',
       'quotes', 'contracts', 'messages', 'work_orders', 'private_media', 'change_agreements',
       'invoice_records', 'official_invoices', 'warranties'])];
-    const resolution = await query(`SELECT bool_and(
+    const resolution = await query(`SELECT bool_and(COALESCE(
       to_regclass(format('%I',name)) IS NOT NULL AND
-      to_regclass(format('%I',name)) = to_regclass(format('public.%I',name))) AS ok
+      to_regclass(format('%I',name)) = to_regclass(format('public.%I',name)), false)) AS ok
       FROM unnest($1::text[]) AS name`, [names]);
     if (resolution.rows[0]?.ok !== true) throw new Error('SEARCH_PATH');
     check = 'SEO_COLUMNS';

@@ -1,6 +1,6 @@
 # Optional production database compatibility preflight
 
-Status: source candidate only. No database access, deployment, environment change,
+Status: source candidate only. No production database access, deployment, environment change,
 migration, or build-command integration was performed to create this package.
 This is a structure/permissions gate, not a production readiness certificate.
 The existing Vercel build command is unchanged. A normal build does not require
@@ -15,7 +15,8 @@ loading `pg`. Other values fail unless the flag is exactly `1` and the inherited
 `VERCEL_ENV` is exactly `production`.
 
 An actual check needs separate release-owner approval. It uses only the existing,
-inherited `DATABASE_URL`; there is no dotenv loading, URL export, migration URL,
+inherited `DATABASE_URL`, including a required nonempty URL password; there is no
+dotenv loading, URL export, migration URL,
 fallback database, new credential, or new privilege. Do not put credentials in
 arguments, files, command output, or documentation. Never run it through
 `npm run build`, Payload bootstrap, or a migration/status wrapper.
@@ -50,7 +51,10 @@ The offline capture helper uses Node built-ins and a fake query connection to
 capture actual committed ONE UI query text with fixed synthetic parameters. It
 does not evaluate application imports or contact a database. The regression test
 regenerates the artifact and compares every query/parameter and metadata item,
-including selected invoice/warranty records. Source or manifest drift fails
+including selected invoice/warranty records. A separate field-coverage test checks
+every current persisted Posts/SeoTopics/SeoRuns field, including post draft-version
+fields, nested arrays/groups, relationship columns and select labels, against the
+snapshot-derived manifest. Source or manifest drift fails
 before connecting; an intentional source change needs reviewed regeneration and
 resealing, not disabling the hash check. Node 24 is used for these offline tests
 because the helper uses the built-in TypeScript stripper; the production script
@@ -89,9 +93,25 @@ No ledger access or migration import occurs here.
 TLS always verifies certificates and hostname. Only URL query parameters
 `sslmode` and `channel_binding` are accepted; `sslmode` must be absent or
 `require`/`verify-ca`/`verify-full`, and is removed before passing the URL to `pg`
-so it cannot override strict TLS. All other URL options fail closed, including
+so it cannot override strict TLS. `channel_binding` may be absent, `prefer`, or
+`disable`; supported values map explicitly to the pinned driver's
+`enableChannelBinding` option. `channel_binding=require` is unsupported because
+this driver offers opportunistic binding, not libpq's mandatory-binding contract.
+This is an inconclusive transport/configuration failure, not missing DB schema.
+Do not remove or rewrite that requirement from the original production URL to
+force PASS. It needs a separately reviewed transport solution if present.
+All other URL options fail closed, including
 alternate-host, SSL-file and timeout overrides. A private-CA deployment may need
 a separately approved CA strategy; do not add `rejectUnauthorized: false`.
+
+The URL must contain username, password, host and database; an omitted port is
+explicitly fixed to 5432. This prevents pgpass and credential/port fallback.
+Common inherited `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`,
+`PGSSLMODE`, `PGAPPNAME` and `PGCONNECT_TIMEOUT` aliases are ignored by the complete
+URL/explicit options (verified with actual offline `pg.Client` construction).
+Other `PG*` settings, including session options, service files and pgpass files,
+fail closed without reading their values or modifying the environment. This too
+is unsupported configuration/inconclusive evidence, not a schema failure.
 
 Connection timeout is 5 seconds; client query timeout 6 seconds; transaction
 statement/lock/idle timeouts are 5/1/10 seconds. A 45-second overall deadline
@@ -116,10 +136,25 @@ Offline verification:
 node --test scripts/db-compat/preflight.test.mjs
 ```
 
-12 tests pass using fake clients only: disabled zero IO, exact opt-in/no fallback,
+16 offline tests pass using fake clients and unconnected real driver construction:
+disabled zero IO, exact opt-in/no fallback,
 strict TLS, actual-query/source recapture and drift, read-only sequence, safe
 success/failure output, missing metadata/privileges/indexes, asynchronous driver
-errors, deadline cancellation and bounded cleanup. No live check or build was run.
+errors, deadline cancellation and bounded cleanup. The tests also cover inherited
+alias behavior, source-field/snapshot coverage and missing-public-schema NULL
+handling. No production check or build was run.
+
+The separate `local-check.mjs` harness defaults OFF. Only its exact
+`--run-approved-local` argument enables the hardcoded synthetic loopback target
+`127.0.0.1:55432`, database `seo_automation_browser_20260912`, role `phase2b_qa`.
+It accepts no URL or target override, verifies database/server/role/read-only
+identity inside the transaction, and injects that local test client without
+changing production TLS. It performs the same catalogs and all 18 EXPLAINs, then
+rolls back/closes; it creates or changes no fixtures. Under the release owner's
+explicit local-only authorization, this harness returned `DB_COMPAT_PASS` on
+2026-09-13. It also verified the NULL-safe boolean aggregate on real PostgreSQL.
+That local PASS establishes query/catalog validity against this fixture only,
+not actual production compatibility.
 
 PASS proves only that the inherited build database/role accepted this fixed
 structural/permission check at that time. It does not prove runtime credentials

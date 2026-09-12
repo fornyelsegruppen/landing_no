@@ -2,11 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
+import { spawnSync } from 'node:child_process';
+import { stripTypeScriptTypes } from 'node:module';
+import { runInNewContext } from 'node:vm';
+import pg from 'pg';
 import { captureManifest, root } from './capture.mjs';
 import { connectionOptions, loadArtifact, runPreflight } from './preflight.mjs';
 
 const environment = { SEO_DB_COMPAT_PREFLIGHT: '1', VERCEL_ENV: 'production',
-  DATABASE_URL: 'postgresql://synthetic:never-real@example.invalid/synthetic?sslmode=require&channel_binding=require' };
+  DATABASE_URL: 'postgresql://synthetic:never-real@example.invalid/synthetic?sslmode=require&channel_binding=prefer' };
 const read = file => readFile(new URL(file, root), 'utf8');
 const manifest = JSON.parse(await read('scripts/db-compat/manifest.json'));
 const secretError = () => new Error('postgresql://secret:user@private.invalid/db CUSTOMER PRIVATE PLAN');
@@ -20,7 +24,7 @@ function fixture(fail = () => false) {
     calls.push(text);
     if (fail(text)) throw secretError();
     if (text.includes('bool_and')) return { rows: [{ ok: true }] };
-    if (text.includes('a.attname AS column_name')) return { rows: manifest.columns.map(c => ({
+    if (text.includes('t.typname AS type_name')) return { rows: manifest.columns.map(c => ({
       table_name: c.table, column_name: c.column, type_name: c.type,
       type_schema: c.type.startsWith('enum_') ? 'public' : 'pg_catalog',
     })) };
@@ -65,15 +69,64 @@ test('strict TLS cannot be overridden by URL ssl parameters or inherited PG defa
   const config = connectionOptions(environment.DATABASE_URL);
   assert.deepEqual(config.ssl, { rejectUnauthorized: true });
   assert.equal(new URL(config.connectionString).searchParams.has('sslmode'), false);
-  assert.equal(new URL(config.connectionString).searchParams.get('channel_binding'), 'require');
+  assert.equal(new URL(config.connectionString).searchParams.has('channel_binding'), false);
+  assert.equal(config.enableChannelBinding, true);
+  assert.equal(new URL(config.connectionString).port, '5432');
   assert.equal(config.connectionTimeoutMillis, 5000);
   assert.equal(config.query_timeout, 6000);
-  for (const raw of ['', 'file:./fallback.db', 'postgresql://x@host/db?sslmode=disable',
-    'postgresql://x@host/db?ssl=false', 'postgresql://x@host/db?sslrootcert=/secret',
-    'postgresql://x@host/db?query_timeout=0', 'postgresql://x@host/db?host=elsewhere',
-    'postgresql://x@host/db?options=-c%20statement_timeout%3D0']) {
+  for (const raw of ['', 'file:./fallback.db', 'postgresql://x@host/db',
+    'postgresql://x:y@host/db?sslmode=disable', 'postgresql://x:y@host/db?ssl=false',
+    'postgresql://x:y@host/db?sslrootcert=/secret', 'postgresql://x:y@host/db?query_timeout=0',
+    'postgresql://x:y@host/db?host=elsewhere', 'postgresql://x:y@host/db?options=-c%20statement_timeout%3D0',
+    'postgresql://x:y@host/db?channel_binding=require']) {
     assert.throws(() => connectionOptions(raw));
   }
+});
+
+test('inherited PG settings fail before driver creation and cannot select pgpass', async () => {
+  for (const key of ['PGOPTIONS', 'PGCLIENT_ENCODING', 'PGREPLICATION', 'PGPASSFILE', 'PGSERVICE', 'PGSERVICEFILE']) {
+    const f = fixture();
+    assert.equal(await runPreflight({ ...f.options, environment: { ...environment, [key]: 'never-log-this' } }), 1);
+    assert.deepEqual(f.calls, []);
+    assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_CONNECTION']);
+  }
+});
+
+test('common PG credential aliases are ignored by actual pg in an offline child process', async () => {
+  const aliases = { PGHOST: 'wrong.invalid', PGPORT: '6543', PGUSER: 'wrong',
+    PGDATABASE: 'wrong', PGPASSWORD: 'wrong', PGSSLMODE: 'no-verify',
+    PGAPPNAME: 'wrong', PGCONNECT_TIMEOUT: '999' };
+  const f = fixture();
+  assert.equal(await runPreflight({ ...f.options, environment: { ...environment, ...aliases } }), 0);
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import pg from 'pg';
+    import { connectionOptions } from './scripts/db-compat/preflight.mjs';
+    const c = new pg.Client(connectionOptions(${JSON.stringify(environment.DATABASE_URL)}));
+    const p = c.connectionParameters;
+    assert.equal(p.host, 'example.invalid'); assert.equal(p.port, 5432);
+    assert.equal(p.user, 'synthetic'); assert.equal(p.database, 'synthetic');
+    assert.equal(p.password, 'never-real');
+    assert.deepEqual(p.ssl, { rejectUnauthorized: true });
+    assert.equal(p.application_name, 'seo-one-ui-compat-preflight');
+    assert.equal(c._connectionTimeoutMillis, 5000);
+  `], { cwd: root, env: { ...process.env, ...aliases }, encoding: 'utf8' });
+  // Never forward child output, even an unexpected driver error.
+  assert.equal(child.status, 0, 'offline driver alias contract failed');
+});
+
+test('actual pinned pg construction preserves fixed TLS, credentials and timeouts without connecting', () => {
+  const client = new pg.Client(connectionOptions(environment.DATABASE_URL));
+  const p = client.connectionParameters;
+  assert.equal(p.host, 'example.invalid');
+  assert.equal(p.port, 5432);
+  assert.equal(p.user, 'synthetic');
+  assert.equal(p.password, 'never-real');
+  assert.equal(p.database, 'synthetic');
+  assert.deepEqual(p.ssl, { rejectUnauthorized: true });
+  assert.equal(p.query_timeout, 6000);
+  assert.equal(client._connectionTimeoutMillis, 5000);
+  assert.equal(client.enableChannelBinding, true);
 });
 
 test('sealed artifact exactly matches SQL captured from accepted source, including selected records', async () => {
@@ -85,6 +138,40 @@ test('sealed artifact exactly matches SQL captured from accepted source, includi
   for (const q of manifest.queries) {
     assert.match(q.text, /^(SELECT|WITH)\s/);
     assert.doesNotMatch(q.text, /\b(INSERT|UPDATE|DELETE|CALL|COPY|ANALYZE)\b/i);
+  }
+});
+
+test('snapshot covers every current persisted SEO collection field, including draft versions', async () => {
+  const snake = value => value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replaceAll('-', '_').toLowerCase();
+  const has = (table, column) => assert.ok(manifest.columns.some(c => c.table === table && c.column === column),
+    `missing source field: ${table}.${column}`);
+  function visit(fields, table, prefix = '') {
+    for (const field of fields) {
+      if (field.type === 'ui') continue;
+      const name = prefix + snake(field.name);
+      if (field.type === 'group') visit(field.fields, table, name + '_');
+      else if (field.type === 'array') visit(field.fields, table + '_' + name);
+      else if (field.type === 'relationship' && field.hasMany) {
+        has(table + '_rels', 'path'); has(table + '_rels', snake(field.relationTo) + '_id');
+      } else {
+        const relation = ['relationship', 'upload'].includes(field.type);
+        has(table, name + (relation ? '_id' : ''));
+        if (field.type === 'select') {
+          const column = manifest.columns.find(c => c.table === table && c.column === name);
+          const values = manifest.enums.find(e => e.name === column.type)?.values;
+          for (const option of field.options) assert.ok(values?.includes(typeof option === 'string' ? option : option.value));
+        }
+      }
+    }
+  }
+  for (const [file, table] of [['Posts', 'posts'], ['SeoTopics', 'seo_topics'], ['SeoRuns', 'seo_runs']]) {
+    const source = stripTypeScriptTypes(await read(`src/payload/collections/${file}.ts`));
+    // Evaluate only the literal fields array; no imports, hooks or validators run.
+    const fieldsSource = source.match(/\n  fields: (\[[\s\S]*\]),?\s*\};\s*$/)?.[1];
+    assert.ok(fieldsSource);
+    const fields = runInNewContext('(' + fieldsSource + ')', {}, { timeout: 1000 });
+    visit(fields, table);
+    if (table === 'posts') visit(fields, '_posts_v', 'version_');
   }
 });
 
@@ -104,6 +191,7 @@ test('success performs catalog reads + EXPLAIN only inside readonly transaction 
   assert.deepEqual(f.logs, ['DB_COMPAT_PASS']);
   assert.equal(f.calls[1], 'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
   assert.equal(f.calls.filter(s => s.startsWith('EXPLAIN (FORMAT JSON) ')).length, 18);
+  assert.match(f.calls.find(s => s.includes('bool_and')), /bool_and\(COALESCE\(/);
   assert.deepEqual(f.calls.slice(-2), ['ROLLBACK', 'end']);
   assert.equal(f.calls.filter(s => s === 'end').length, 1);
   for (const sql of f.calls.slice(1, -1)) {
