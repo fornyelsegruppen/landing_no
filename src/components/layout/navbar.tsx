@@ -21,7 +21,7 @@ const fallbackLinks = [
   { href: "/#kontakt", key: "contact" as const },
 ];
 
-export function Navbar() {
+export function Navbar({ inFlow = false }: { inFlow?: boolean }) {
   const copy = usePageCopy();
   const locale = useLocale();
   const pathname = usePathname();
@@ -51,7 +51,12 @@ export function Navbar() {
     : null;
 
   return (
-    <header className="bg-background/80 fixed inset-x-0 top-0 z-50 border-b border-white/5 backdrop-blur-xl">
+    <header
+      className={cn(
+        "bg-background/80 z-50 border-b border-white/5 backdrop-blur-xl",
+        inFlow ? "relative" : "fixed inset-x-0 top-0",
+      )}
+    >
       <div className="container-narrow flex h-14 items-center justify-between gap-3 px-4 sm:h-16 sm:gap-4 sm:px-6 lg:px-8">
         <Link
           href="/"

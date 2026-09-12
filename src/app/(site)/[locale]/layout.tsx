@@ -121,11 +121,12 @@ export default async function LocaleLayout({ children, params }: Props) {
       suppressHydrationWarning
     >
       <body className={`${manrope.variable} font-sans antialiased`}>
-        <DraftPreviewBoundary enabled={isDraftMode} locale={locale} />
         {isDraftMode && <LivePreviewRefresh />}
         <NextIntlClientProvider messages={messages}>
           <SiteSettingsProvider settings={content.settings} copy={content.copy}>
-            <Navbar />
+            <DraftPreviewBoundary enabled={isDraftMode} locale={locale}>
+              <Navbar inFlow={isDraftMode} />
+            </DraftPreviewBoundary>
             <main>{children}</main>
             <Footer />
             <StickyBottomCta />
