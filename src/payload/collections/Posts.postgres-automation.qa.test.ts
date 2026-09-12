@@ -616,37 +616,83 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
 
   it("different concurrent run keys reserve different topics before provider work", async () => {
     const keys = ["topic-a-" + randomUUID(), "topic-b-" + randomUUID()];
-    await Promise.allSettled(
-      keys.map((idempotencyKey) =>
-        generateNextPayloadBlogDraft({
-          payload,
-          idempotencyKey,
-          triggerSource: "manual",
-          correlationId: "local-only",
-          provider: {
-            health: () => ({ provider: "synthetic", status: "ready" }),
-            generate: async () => {
-              throw new Error("Synthetic provider stopped after reservation");
+    // The isolated database retains prior test evidence. Give this test its own
+    // topics instead of exhausting the ten intentionally single-use seed topics.
+    const fixtureTopics = await Promise.all(
+      keys.map((key) =>
+        payload.create({
+          collection: "seo-topics",
+          overrideAccess: true,
+          data: {
+            fingerprint: key,
+            topic: `Syntetisk takvask ${key}`,
+            primaryKeyword: `takvask ${key}`,
+            searchIntent: "informational",
+            source: "manual",
+            status: "candidate",
+            topicScore: 100,
+            overlapScore: 0,
+            reasonForSelection: "Isolated concurrency fixture only",
+            scoreBreakdown: {
+              serviceRelevance: 1,
+              demand: 1,
+              commercialValue: 1,
+              contentGap: 1,
+              seasonalRelevance: 1,
+              originalEvidence: 1,
+              localRelevance: 1,
             },
           },
         }),
       ),
     );
-    const runs = await payload.find({
-      collection: "seo-runs",
-      depth: 0,
-      overrideAccess: true,
-      where: { idempotencyKey: { in: keys } },
-    });
-    expect(runs.docs).toHaveLength(2);
-    expect(
-      runs.docs.every(
-        (run) => run.status === "attention" && run.selectedTopics?.length === 1,
-      ),
-    ).toBe(true);
-    expect(runs.docs[0].selectedTopics?.[0]).not.toBe(
-      runs.docs[1].selectedTopics?.[0],
-    );
+    try {
+      await Promise.allSettled(
+        keys.map((idempotencyKey) =>
+          generateNextPayloadBlogDraft({
+            payload,
+            idempotencyKey,
+            triggerSource: "manual",
+            correlationId: "local-only",
+            provider: {
+              health: () => ({ provider: "synthetic", status: "ready" }),
+              generate: async () => {
+                throw new Error("Synthetic provider stopped after reservation");
+              },
+            },
+          }),
+        ),
+      );
+      const runs = await payload.find({
+        collection: "seo-runs",
+        depth: 0,
+        overrideAccess: true,
+        where: { idempotencyKey: { in: keys } },
+      });
+      expect(runs.docs).toHaveLength(2);
+      expect(
+        runs.docs.every(
+          (run) =>
+            run.status === "attention" && run.selectedTopics?.length === 1,
+        ),
+      ).toBe(true);
+      expect(runs.docs[0].selectedTopics?.[0]).not.toBe(
+        runs.docs[1].selectedTopics?.[0],
+      );
+      expect(runs.docs.map((run) => run.selectedTopics?.[0]).sort()).toEqual(
+        fixtureTopics.map((topic) => topic.id).sort(),
+      );
+    } finally {
+      // Retain the evidence and relationships, but keep test-owned candidates
+      // out of later runs' bounded selection pool. No shared/user rows touched.
+      for (const topic of fixtureTopics)
+        await payload.update({
+          collection: "seo-topics",
+          id: topic.id,
+          overrideAccess: true,
+          data: { status: "rejected" },
+        });
+    }
   });
 
   it("rolls back native bulk writes after a caught SQL failure instead of reporting success", async () => {

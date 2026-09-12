@@ -9,6 +9,7 @@ No Docker or production/provider secrets are needed.
 
 ```powershell
 node scripts/seo-local-browser.mjs seed
+node scripts/seo-local-browser.mjs repair-fixtures
 node scripts/seo-local-browser.mjs build
 node scripts/seo-local-browser.mjs start
 ```
@@ -37,6 +38,27 @@ Fixtures:
   unreviewed draft. Only draft preview includes the heading “Bare i utkastet”.
 - Both fixtures have English fields for preview locale checks. Admin account
   language starts Lithuanian. ONE UI provides LT/NB/EN status copy.
+- `repair-fixtures` fills only missing structural metadata on these two named
+  synthetic fixtures, checks their author marker, and verifies that saved text
+  remains unchanged. Existing nonempty metadata is preserved. Normal draft
+  invalidation still applies; no approval or QA result is manufactured.
+- The explicit repair also creates `seo-local-approval` only if absent: a
+  complete, separately titled synthetic AI-assisted draft for recheck, approval
+  and scheduling tests. It remains human_review with no manufactured QA pass.
+  Use its editor's recheck action before approval. This avoids overwriting the
+  operator's existing fixture titles just to remove their artificial overlap.
+
+## Optional local review-canary
+
+Default `start` stays OFF. After the OFF browser batch, stop that local server
+and run `node scripts/seo-local-browser.mjs start-review-canary`. This is an
+explicit local-only UI mode against the same fixed synthetic database and
+loopback port. It sets the scheduler/approved-publisher runtime flags ON, while
+AI generation remains OFF and no provider/cron credentials or executor exist.
+No rebuild is needed solely for these server-runtime flags. The status must
+remain executor-unverified; do not describe manual local publication as proof
+of automated delivery. Never call production cron or weaken canonical/auth
+guards to complete this QA. Return to ordinary `start` after the review batch.
 
 Check preview banner, ordinary non-prefetch entry/exit links, restored public
 view, paused automation/no verified sources, pending review count, edit/reload
@@ -71,3 +93,33 @@ or normal browser Sec-Fetch-Site context (`same-origin`, `same-site`, `none`).
 The manually scripted local cookie test passed with the proper origin and
 reported paused automation and two pending articles; no production auth policy
 was weakened to make this check pass.
+
+## Browser batch fixes (local, 2026-09-12)
+
+CONTROL's real Chrome batch confirmed persisted auth. It found a covered preview
+exit link, raw/uninformative source status, rejected short draft saves, and raw
+quality errors. Accepted preview/status commits `62d95ff` and `04c4aa6` are now
+integrated. The next browser batch, not source tests, must confirm pointer exit
+and visible localized access/freshness/last-success values.
+
+Save validation now accepts a nonempty working title and 1–30000 characters of
+draft text, with localized inline field errors and stable API error codes.
+Empty, oversized and wrong-type fields remain rejected; malformed JSON is a
+safe 400. Saving re-runs the existing deterministic QA, keeps failed results,
+resets review/scheduling and never publishes. Revision and authorization checks
+are unchanged. Approval/publish gate errors have stable localized feedback.
+
+Presentation maps stored schema field prefixes to operator guidance instead
+of raw Zod messages. The publication schema still requires 700–15000 characters
+of body text; fewer than 700 words remains a separate completeness warning.
+Prompt targets and regeneration feedback are unchanged.
+
+Explicit fixture repair was run: existing fixture 1/2 text was preserved and
+missing structural metadata filled. Fixture 3 (`seo-local-approval`) passed a
+read-only deterministic preflight at 100 with no issues; QA/approval was NOT
+persisted by the repair. Use the UI recheck to begin its approval test.
+
+The PostgreSQL concurrency test now creates two test-owned eligible topics per
+run and retires only those candidates afterwards, retaining run evidence. This
+avoids exhausting the ten intentionally single-use manual seeds across repeated
+test executions; no production reservation rules were loosened.

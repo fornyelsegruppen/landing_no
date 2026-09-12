@@ -11,6 +11,10 @@ import {
   type PublicationBlocker,
 } from "@/lib/admin-v2/blog-review";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import {
+  blogQualityGateLabel,
+  blogQualityIssueMessage,
+} from "@/lib/admin-v2/blog-quality-copy";
 
 type Props = BlogReviewInput & {
   locale: PanelLocale;
@@ -126,11 +130,11 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" />
                     <div>
                       <p className="font-bold">
-                        {issue.message || issue.code || "Issue"}
+                        {blogQualityIssueMessage(issue, locale)}
                       </p>
                       {issue.gate ? (
                         <p className="mt-1 text-xs tracking-wide uppercase opacity-80">
-                          {issue.gate}
+                          {blogQualityGateLabel(issue.gate, locale)}
                         </p>
                       ) : null}
                     </div>
@@ -146,11 +150,11 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                     <div>
                       <p className="font-bold">
-                        {issue.message || issue.code || "Issue"}
+                        {blogQualityIssueMessage(issue, locale)}
                       </p>
                       {issue.gate ? (
                         <p className="mt-1 text-xs tracking-wide uppercase opacity-80">
-                          {issue.gate}
+                          {blogQualityGateLabel(issue.gate, locale)}
                         </p>
                       ) : null}
                     </div>

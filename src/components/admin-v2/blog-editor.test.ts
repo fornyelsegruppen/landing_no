@@ -3,7 +3,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -31,6 +31,154 @@ const props = {
 };
 
 describe("blog editor", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  async function renderedEditor(
+    run: (container: HTMLDivElement) => Promise<void>,
+    overrides: Partial<Parameters<typeof BlogEditor>[0]> = {},
+  ) {
+    const testEnvironment = globalThis as typeof globalThis & {
+      IS_REACT_ACT_ENVIRONMENT?: boolean;
+    };
+    testEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(createElement(BlogEditor, { ...props, ...overrides })),
+      );
+      await run(container);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      testEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
+    }
+  }
+  it.each([
+    ["lt", "Užpildykite šį laukelį."],
+    ["nb", "Fyll ut dette feltet."],
+    ["en", "Complete this field."],
+  ] as const)(
+    "focuses the invalid field and shows localized inline validation (%s)",
+    async (locale, message) => {
+      const fetcher = vi.fn();
+      vi.stubGlobal("fetch", fetcher);
+      await renderedEditor(
+        async (container) => {
+          await act(async () =>
+            container
+              .querySelector<HTMLButtonElement>("section button")!
+              .click(),
+          );
+          const text = container.querySelector<HTMLTextAreaElement>(
+            '[data-blog-field="contentNo"]',
+          )!;
+          expect(text.getAttribute("aria-invalid")).toBe("true");
+          expect(text.getAttribute("aria-describedby")).toBe(
+            "blog-field-error-3-contentNo",
+          );
+          expect(
+            container.querySelector("#blog-field-error-3-contentNo")
+              ?.textContent,
+          ).toBe(message);
+          expect(document.activeElement).toBe(text);
+          expect(fetcher).not.toHaveBeenCalled();
+        },
+        { locale, contentNo: " " },
+      );
+    },
+  );
+  it("allows short nonempty draft text to reach the save endpoint", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({
+          ok: true,
+          action: "save",
+          outcome: "saved",
+          qualityPassed: false,
+          qualityScore: 0,
+        }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    await renderedEditor(async (container) => {
+      await act(async () =>
+        container.querySelector<HTMLButtonElement>("section button")!.click(),
+      );
+      expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+        action: "save",
+        contentNo: props.contentNo,
+      });
+      expect(container.textContent).toContain(
+        "Kokybės patikra atlikta iš naujo",
+      );
+      const publish = [
+        ...container.querySelectorAll<HTMLButtonElement>("button"),
+      ].find((button) => button.textContent === "Publikuoti");
+      expect(publish?.disabled).toBe(true);
+    });
+  });
+  it("maps server validation to a field without leaking the raw error or losing typed text", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            {
+              ok: false,
+              code: "VALIDATION_ERROR",
+              error: "Invalid action",
+              fieldIssues: [{ field: "contentNo", code: "too_long" }],
+            },
+            { status: 400 },
+          ),
+        ),
+    );
+    await renderedEditor(async (container) => {
+      await act(async () =>
+        container.querySelector<HTMLButtonElement>("section button")!.click(),
+      );
+      expect(
+        container.querySelector("#blog-field-error-3-contentNo")?.textContent,
+      ).toContain("30000");
+      expect(
+        container.querySelector<HTMLTextAreaElement>(
+          '[data-blog-field="contentNo"]',
+        )?.value,
+      ).toBe(props.contentNo);
+      expect(container.textContent).not.toContain("Invalid action");
+    });
+  });
+  it("shows localized blocked-approval feedback instead of the English backend message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            {
+              ok: false,
+              code: "QUALITY_NOT_READY",
+              error: "The deterministic quality gate has not passed",
+            },
+            { status: 409 },
+          ),
+        ),
+    );
+    await renderedEditor(async (container) => {
+      const approve = [
+        ...container.querySelectorAll<HTMLButtonElement>("button"),
+      ].find((button) => button.textContent === "Patvirtinti")!;
+      await act(async () => approve.click());
+      expect(container.textContent).toContain(
+        "Straipsnis dar neišlaikė kokybės patikros.",
+      );
+      expect(container.textContent).not.toContain(
+        "The deterministic quality gate has not passed",
+      );
+    });
+  });
   it("renders the recheck action, visibly locked publish action, and narrow-safe action wrap", () => {
     const html = renderToStaticMarkup(createElement(BlogEditor, props));
 

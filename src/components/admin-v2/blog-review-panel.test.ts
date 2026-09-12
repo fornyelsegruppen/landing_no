@@ -4,6 +4,30 @@ import { describe, expect, it } from "vitest";
 import { BlogReviewPanel, blogReviewListKey } from "./blog-review-panel";
 
 describe("BlogReviewPanel", () => {
+  it("explains short-content and missing structural metadata without raw schema messages", () => {
+    const html = renderToStaticMarkup(
+      createElement(BlogReviewPanel, {
+        locale: "lt",
+        status: "human_review",
+        qualityScore: 0,
+        qualityChecks: {
+          passed: false,
+          issues: ["content", "faq", "imageBrief"].map((field) => ({
+            code: "invalid_output",
+            gate: "schema",
+            severity: "blocker" as const,
+            message: `${field}: Invalid input`,
+          })),
+        },
+      }),
+    );
+    expect(html).toContain("700–15000 simbolių");
+    expect(html).toContain("2–6 klausimų");
+    expect(html).toContain("20–500 simbolių");
+    expect(html).toContain("Turinio struktūra");
+    expect(html).not.toContain("Invalid input");
+    expect(html).not.toContain(">schema<");
+  });
   it("uses distinct list keys when QA returns repeated issue, flag, or source values", () => {
     const keys = [
       blogReviewListKey("blocker", "invalid_output", 0),

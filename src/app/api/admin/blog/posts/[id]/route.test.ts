@@ -63,6 +63,100 @@ function request(body: Record<string, unknown>) {
 const context = { params: Promise.resolve({ id: "9" }) };
 
 describe("admin blog post actions", () => {
+  it("saves a short draft with failed real QA and still blocks approval and publishing", async () => {
+    const actual = await vi.importActual<
+      typeof import("@/lib/blog/edited-draft-quality")
+    >("@/lib/blog/edited-draft-quality");
+    mocks.evaluateEdited.mockImplementation(actual.evaluateEditedBlogDraft);
+    const before = await mocks.findByID();
+    const contentNo =
+      "Dette er et kort, uferdig utkast som må bearbeides før det kan godkjennes. Det skal kunne lagres uten publisering.";
+    const saved = await POST(
+      request({ action: "save", titleNo: "Utkast", contentNo }),
+      context,
+    );
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toMatchObject({
+      qualityPassed: false,
+      outcome: "saved",
+      qualityScore: 0,
+    });
+    const update = mocks.update.mock.calls[0][0];
+    expect(update.data).toMatchObject({
+      contentNo,
+      editorialStatus: "human_review",
+      reviewerName: null,
+      reviewedAt: null,
+      scheduledAt: null,
+      _status: "draft",
+      qualityChecks: { passed: false },
+    });
+    expect(update.context.expectedBlogRevision).toEqual(expect.any(String));
+    mocks.findByID.mockResolvedValue({ ...before, ...update.data });
+    mocks.update.mockClear();
+    for (const [action, code] of [
+      ["approve", "QUALITY_NOT_READY"],
+      ["publish", "INVALID_TRANSITION"],
+    ]) {
+      const blocked = await POST(request({ action }), context);
+      expect(blocked.status).toBe(409);
+      expect(await blocked.json()).toMatchObject({ ok: false, code });
+    }
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ contentNo: " " }, "contentNo", "required"],
+    [{ contentNo: "x".repeat(30001) }, "contentNo", "too_long"],
+    [{ contentNo: 42 }, "contentNo", "invalid"],
+    [{ titleNo: "" }, "titleNo", "required"],
+    [{ titleNo: "x".repeat(161) }, "titleNo", "too_long"],
+    [{ excerptNo: "x".repeat(501) }, "excerptNo", "too_long"],
+  ])(
+    "rejects invalid draft input with a safe field error (%s)",
+    async (invalid, field, code) => {
+      const response = await POST(
+        request({
+          action: "save",
+          titleNo: "Valid title",
+          contentNo: "Valid short draft",
+          ...invalid,
+        }),
+        context,
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        ok: false,
+        code: "VALIDATION_ERROR",
+        fieldIssues: [{ field, code }],
+      });
+      expect(mocks.findByID).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+    },
+  );
+  it("handles malformed JSON and missing required fields as validation errors", async () => {
+    const malformed = await POST(
+      new Request("https://example.invalid/api/admin/blog/posts/9", {
+        method: "POST",
+        body: "{invalid",
+      }),
+      context,
+    );
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      fieldIssues: [{ field: "request", code: "invalid" }],
+    });
+    const missing = await POST(request({ action: "save" }), context);
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toMatchObject({
+      fieldIssues: [
+        { field: "titleNo", code: "required" },
+        { field: "contentNo", code: "required" },
+      ],
+    });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
   it.each(["approve", "reject", "schedule", "publish"])(
     "%s rejects a different revision even with the same timestamp",
     async (action) => {
@@ -361,7 +455,7 @@ describe("admin blog post actions", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
-      error: "Minst én presis kilde må være lagt inn før publisering",
+      code: "PUBLICATION_NOT_READY",
     });
     expect(mocks.update).not.toHaveBeenCalled();
   });

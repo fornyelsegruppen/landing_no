@@ -25,6 +25,15 @@ import {
   osloScheduleIso,
 } from "@/lib/admin-v2/blog-schedule-time";
 import type { PanelLocale } from "@/lib/panel-i18n";
+import { blogQualityIssueMessage } from "@/lib/admin-v2/blog-quality-copy";
+import {
+  blogDraftFieldIssues,
+  blogFieldIssueMessage,
+  blogGateErrorMessage,
+  blogValidationSummary,
+  parseBlogFieldIssues,
+  type BlogFieldIssue,
+} from "@/lib/admin-v2/blog-field-errors";
 
 type QualityIssue = {
   code?: string;
@@ -41,6 +50,7 @@ type BlogActionResponse = {
   photographer?: string;
   qualityIssues?: QualityIssue[];
   runId?: number | string;
+  fieldIssues?: unknown;
 };
 type Feedback = {
   kind: "error" | "info" | "success" | "warning";
@@ -115,6 +125,8 @@ export function BlogEditor(props: Props) {
   const [savedUpdatedAt, setSavedUpdatedAt] = useState(props.updatedAt);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [fieldIssues, setFieldIssues] = useState<BlogFieldIssue[]>([]);
+  const editorElement = useRef<HTMLDivElement>(null);
   const sourceVersion = useRef(incomingVersion);
   const dirty = blogEditorIsDirty(form, saved);
   const dirtyRef = useRef(dirty);
@@ -223,16 +235,49 @@ export function BlogEditor(props: Props) {
     "disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-white/35 disabled:opacity-100";
 
   function field(key: keyof BlogEditorForm) {
+    const issue = fieldIssues.find((item) => item.field === key);
     return {
+      "data-blog-field": key,
+      ...(issue
+        ? {
+            "aria-invalid": true,
+            "aria-describedby": `blog-field-error-${props.id}-${key}`,
+          }
+        : {}),
       value: form[key],
       disabled: busy,
       onChange: (
         event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
       ) => {
         if (key === "scheduledAt") setCurrentTime(Date.now());
+        setFieldIssues((current) =>
+          current.filter((item) => item.field !== key),
+        );
         setForm((current) => ({ ...current, [key]: event.target.value }));
       },
     };
+  }
+
+  function fieldError(key: keyof BlogEditorForm) {
+    const issue = fieldIssues.find((item) => item.field === key);
+    return issue ? (
+      <span
+        id={`blog-field-error-${props.id}-${key}`}
+        className="text-danger text-sm"
+        role="alert"
+      >
+        {blogFieldIssueMessage(issue, props.locale)}
+      </span>
+    ) : null;
+  }
+
+  function showFieldIssues(issues: BlogFieldIssue[]) {
+    setFieldIssues(issues);
+    const first = issues.find((issue) => issue.field !== "request");
+    if (first)
+      editorElement.current
+        ?.querySelector<HTMLElement>(`[data-blog-field="${first.field}"]`)
+        ?.focus();
   }
 
   function actionProgress(action: BlogEditorAction) {
@@ -261,11 +306,15 @@ export function BlogEditor(props: Props) {
   }
 
   function actionError(result: BlogActionResponse) {
+    if (result.code === "VALIDATION_ERROR")
+      return blogValidationSummary(props.locale);
+    const gateMessage = blogGateErrorMessage(result.code, props.locale);
+    if (gateMessage) return gateMessage;
     if (result.code === "NO_ALTERNATIVE") return copy.noAlternative;
     if (result.code === "QUALITY_BLOCKED") return copy.qualityBlocked;
     if (result.code === "PROVIDER_UNAVAILABLE") return copy.providerUnavailable;
     if (result.code === "CONFLICT") return copy.conflict;
-    return result.error || copy.actionFailed;
+    return copy.actionFailed;
   }
 
   async function act(action: BlogEditorAction) {
@@ -286,6 +335,18 @@ export function BlogEditor(props: Props) {
     }
     if (action === "regenerate" && !window.confirm(copy.regenerationConfirm))
       return;
+    if (action === "save") {
+      const issues = blogDraftFieldIssues(form);
+      if (issues.length) {
+        showFieldIssues(issues);
+        setFeedback({
+          kind: "error",
+          message: blogValidationSummary(props.locale),
+        });
+        return;
+      }
+    }
+    setFieldIssues([]);
     setBusyAction(action);
     setFeedback({ kind: "info", message: actionProgress(action) });
     try {
@@ -300,6 +361,8 @@ export function BlogEditor(props: Props) {
       });
       const result = safeResponse(await response.json().catch(() => undefined));
       if (!response.ok || result.ok !== true) {
+        if (result.code === "VALIDATION_ERROR")
+          showFieldIssues(parseBlogFieldIssues(result.fieldIssues));
         setFeedback({ kind: "error", message: actionError(result), result });
         return;
       }
@@ -325,6 +388,7 @@ export function BlogEditor(props: Props) {
   function discardChanges() {
     if (!dirty || busy || !window.confirm(copy.discardConfirm)) return;
     setForm((current) => ({ ...current, ...saved }));
+    setFieldIssues([]);
     setFeedback({ kind: "info", message: copy.discarded });
   }
 
@@ -342,6 +406,7 @@ export function BlogEditor(props: Props) {
 
   return (
     <div
+      ref={editorElement}
       className="space-y-5"
       data-blog-editor-dirty={dirty ? "true" : "false"}
     >
@@ -363,6 +428,7 @@ export function BlogEditor(props: Props) {
               className="min-h-12 rounded-xl border border-white/10 bg-black/15 px-3"
               {...field("titleNo")}
             />
+            {fieldError("titleNo")}
           </label>
           <label className="grid gap-1.5">
             <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -372,6 +438,7 @@ export function BlogEditor(props: Props) {
               className="min-h-24 rounded-xl border border-white/10 bg-black/15 p-3"
               {...field("excerptNo")}
             />
+            {fieldError("excerptNo")}
           </label>
           <label className="grid gap-1.5">
             <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -387,6 +454,7 @@ export function BlogEditor(props: Props) {
                 }
               }}
             />
+            {fieldError("contentNo")}
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5">
@@ -397,6 +465,7 @@ export function BlogEditor(props: Props) {
                 className="min-h-12 rounded-xl border border-white/10 bg-black/15 px-3"
                 {...field("seoTitleNo")}
               />
+              {fieldError("seoTitleNo")}
             </label>
             <label className="grid gap-1.5">
               <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -406,6 +475,7 @@ export function BlogEditor(props: Props) {
                 className="min-h-12 rounded-xl border border-white/10 bg-black/15 px-3"
                 {...field("primaryKeyword")}
               />
+              {fieldError("primaryKeyword")}
             </label>
           </div>
           <label className="grid gap-1.5">
@@ -416,6 +486,7 @@ export function BlogEditor(props: Props) {
               className="min-h-24 rounded-xl border border-white/10 bg-black/15 p-3"
               {...field("seoDescriptionNo")}
             />
+            {fieldError("seoDescriptionNo")}
           </label>
           <div className="flex flex-wrap gap-3">
             <button
@@ -452,6 +523,7 @@ export function BlogEditor(props: Props) {
               className="min-h-12 rounded-xl border border-white/10 bg-black/15 px-3"
               {...field("reviewerName")}
             />
+            {fieldError("reviewerName")}
           </label>
           <label className="grid gap-1.5">
             <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -464,6 +536,7 @@ export function BlogEditor(props: Props) {
               aria-invalid={Boolean(scheduleValidationMessage)}
               {...field("scheduledAt")}
             />
+            {fieldError("scheduledAt")}
             <span
               className="text-muted-foreground text-xs"
               id="blog-schedule-zone"
@@ -488,6 +561,7 @@ export function BlogEditor(props: Props) {
               className="min-h-12 rounded-xl border border-white/10 bg-black/15 px-3"
               {...field("query")}
             />
+            {fieldError("query")}
           </label>
           <label className="grid gap-1.5 sm:col-span-2">
             <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -498,6 +572,7 @@ export function BlogEditor(props: Props) {
               maxLength={2000}
               {...field("regenerationInstructions")}
             />
+            {fieldError("regenerationInstructions")}
             <span className="text-muted-foreground text-xs">
               {copy.regenerationInstructionsHint}
             </span>
@@ -613,7 +688,7 @@ export function BlogEditor(props: Props) {
                 <ul className="mt-1 list-disc pl-5">
                   {qualityIssues.map((issue, index) => (
                     <li key={`${issue.code || "issue"}-${index}`}>
-                      {issue.message || issue.code}
+                      {blogQualityIssueMessage(issue, props.locale)}
                     </li>
                   ))}
                 </ul>

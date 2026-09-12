@@ -6,6 +6,7 @@ import { getPayload } from "@/lib/payload";
 import { captureException } from "@/lib/monitoring";
 import {
   assertBlogAction,
+  BlogTransitionError,
   type BlogEditorialStatus,
 } from "@/lib/blog/transitions";
 import { assertPostPublishable } from "@/lib/blog/editorial-policy";
@@ -21,30 +22,52 @@ import { reviewerNameForUser } from "@/lib/blog/reviewer";
 import { evaluateEditedBlogDraft } from "@/lib/blog/edited-draft-quality";
 import { ArticleQualityBlockedError } from "@/lib/blog/draft-engine";
 import { ProviderUnavailableError } from "@/lib/providers/contracts";
+import {
+  blogInputLimits,
+  parseBlogFieldIssues,
+  type BlogFieldIssue,
+} from "@/lib/admin-v2/blog-field-errors";
 
-const actionSchema = z.object({
-  action: z.enum([
-    "approve",
-    "reject",
-    "schedule",
-    "publish",
-    "regenerate",
-    "stock-image",
-    "save",
-  ]),
-  reviewerName: z.string().trim().min(2).max(120).optional(),
-  scheduledAt: z.string().datetime().optional(),
-  reason: z.string().trim().max(500).optional(),
-  query: z.string().trim().min(3).max(120).optional(),
-  titleNo: z.string().trim().min(10).max(160).optional(),
-  excerptNo: z.string().trim().max(500).optional(),
-  contentNo: z.string().trim().min(300).max(30000).optional(),
-  seoTitleNo: z.string().trim().max(160).optional(),
-  seoDescriptionNo: z.string().trim().max(500).optional(),
-  primaryKeyword: z.string().trim().max(160).optional(),
-  regenerationInstructions: z.string().trim().max(2000).optional(),
-  expectedUpdatedAt: z.string().datetime().optional(),
-});
+const actionSchema = z
+  .object({
+    action: z.enum([
+      "approve",
+      "reject",
+      "schedule",
+      "publish",
+      "regenerate",
+      "stock-image",
+      "save",
+    ]),
+    reviewerName: z.string().trim().min(2).max(120).optional(),
+    scheduledAt: z.string().datetime().optional(),
+    reason: z.string().trim().max(500).optional(),
+    query: z.string().trim().min(3).max(120).optional(),
+    titleNo: z.string().trim().min(1).max(blogInputLimits.titleNo).optional(),
+    excerptNo: z.string().trim().max(500).optional(),
+    contentNo: z
+      .string()
+      .trim()
+      .min(1)
+      .max(blogInputLimits.contentNo)
+      .optional(),
+    seoTitleNo: z.string().trim().max(160).optional(),
+    seoDescriptionNo: z.string().trim().max(500).optional(),
+    primaryKeyword: z.string().trim().max(160).optional(),
+    regenerationInstructions: z.string().trim().max(2000).optional(),
+    expectedUpdatedAt: z.string().datetime().optional(),
+  })
+  .superRefine((data, context) => {
+    if (data.action === "save")
+      for (const field of ["titleNo", "contentNo"] as const) {
+        if (data[field] === undefined)
+          context.addIssue({
+            code: "custom",
+            path: [field],
+            message: "required",
+          });
+      }
+  });
 
 class BlogActionConflictError extends TypeError {
   constructor() {
@@ -79,9 +102,36 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!userIsAdmin(user))
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const parsed = actionSchema.safeParse(await request.json());
-    if (!parsed.success)
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    const parsed = actionSchema.safeParse(
+      await request.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((issue): BlogFieldIssue => ({
+        field: (typeof issue.path[0] === "string"
+          ? issue.path[0]
+          : "request") as BlogFieldIssue["field"],
+        code:
+          issue.code === "too_big"
+            ? "too_long"
+            : issue.code === "too_small" ||
+                (issue.code === "custom" && issue.message === "required")
+              ? "required"
+              : "invalid",
+      }));
+      const fieldIssues = parseBlogFieldIssues(issues);
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          error: "Check the highlighted fields",
+          fieldIssues: fieldIssues.length
+            ? fieldIssues
+            : [{ field: "request", code: "invalid" }],
+          correlationId,
+        },
+        { status: 400 },
+      );
+    }
     action = parsed.data.action;
     const { id } = await context.params;
     if (!/^\d+$/.test(id))
@@ -248,10 +298,14 @@ export async function POST(
       parsed.data.scheduledAt,
     );
     if (parsed.data.action === "publish") {
-      assertPostPublishable({
-        ...post,
-        reviewerName,
-      });
+      try {
+        assertPostPublishable({ ...post, reviewerName });
+      } catch {
+        throw new BlogTransitionError(
+          "PUBLICATION_NOT_READY",
+          "Publication review and quality requirements are not satisfied",
+        );
+      }
     }
 
     if (parsed.data.action === "regenerate") {
@@ -355,11 +409,13 @@ export async function POST(
         ...(action ? { action } : {}),
         code: qualityBlocked
           ? "QUALITY_BLOCKED"
-          : conflict
-            ? "CONFLICT"
-            : providerUnavailable
-              ? "PROVIDER_UNAVAILABLE"
-              : "ACTION_FAILED",
+          : error instanceof BlogTransitionError
+            ? error.code
+            : conflict
+              ? "CONFLICT"
+              : providerUnavailable
+                ? "PROVIDER_UNAVAILABLE"
+                : "ACTION_FAILED",
         error: qualityBlocked
           ? "Regenereringen ble stoppet av kvalitetskontrollen. Det lagrede utkastet er ikke endret."
           : error instanceof TypeError
