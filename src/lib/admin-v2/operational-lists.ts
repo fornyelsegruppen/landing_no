@@ -1,4 +1,5 @@
 import type { Payload, Where } from "payload";
+import { adminListPaginationMeta, normalizeAdminListPagination, type AdminListPagination, type AdminListPaginationMeta } from "./pagination";
 
 export type OperationalListKind = "contracts" | "offers" | "work";
 export type OperationalListItem = {
@@ -13,14 +14,18 @@ export type OperationalListItem = {
   status?: string;
   updatedAt?: string;
 };
+export type OperationalListResult = { items: OperationalListItem[] } & AdminListPaginationMeta;
 
 function record(value: unknown) { return value as Record<string, unknown>; }
 function id(value: unknown) { return typeof value === "number" ? value : value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number" ? (value as { id: number }).id : 0; }
 function text(value: unknown) { return typeof value === "string" ? value : undefined; }
 function relation(value: unknown) { return value && typeof value === "object" ? record(value) : undefined; }
 
-export async function loadOperationalList(payload: Pick<Payload, "find">, kind: OperationalListKind, state = "all"): Promise<OperationalListItem[]> {
-  const common = { depth: 2, limit: 300, overrideAccess: true, pagination: false, sort: "-updatedAt" as const };
+export async function loadOperationalList(payload: Pick<Payload, "find">, kind: OperationalListKind, state?: string): Promise<OperationalListItem[]>;
+export async function loadOperationalList(payload: Pick<Payload, "find">, kind: OperationalListKind, state: string, pagination: AdminListPagination): Promise<OperationalListResult>;
+export async function loadOperationalList(payload: Pick<Payload, "find">, kind: OperationalListKind, state = "all", pagination?: AdminListPagination): Promise<OperationalListItem[] | OperationalListResult> {
+  const page = normalizeAdminListPagination(pagination);
+  const common = { depth: 2, limit: page.limit, page: page.page, overrideAccess: true, sort: "-updatedAt" as const };
   let collection: "contracts" | "quotes" | "work-orders";
   let activeFilter: Where;
   if (kind === "offers") { collection = "quotes"; activeFilter = { and: [{ "lead.recordState": { equals: "active" } }, { status: { not_equals: "superseded" } }] }; }
@@ -31,7 +36,7 @@ export async function loadOperationalList(payload: Pick<Payload, "find">, kind: 
     : kind === "work" && state === "finished" ? { status: { in: ["completed", "documented", "cancelled"] } }
     : { status: { equals: state } };
   const result = await payload.find({ ...common, collection, where: statusFilter ? { and: [activeFilter, statusFilter] } : activeFilter });
-  return result.docs.map((raw) => {
+  const items = result.docs.map((raw) => {
     const item = record(raw);
     const quote = relation(item.quote);
     const lead = relation(item.lead) || relation(quote?.lead);
@@ -49,4 +54,7 @@ export async function loadOperationalList(payload: Pick<Payload, "find">, kind: 
       updatedAt: text(item.updatedAt),
     };
   });
+  if (!pagination) return items;
+  const totalDocs = typeof result.totalDocs === "number" ? result.totalDocs : items.length;
+  return { items, ...adminListPaginationMeta(totalDocs, page) };
 }

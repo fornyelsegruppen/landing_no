@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Filter, Search, UserRound } from "lucide-react";
+import { AdminListPagination } from "@/components/admin-v2/admin-list-pagination";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import {
   loadAdminCaseList,
@@ -12,6 +13,7 @@ import { statusLabel } from "@/lib/admin-v2/labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import { getPayload } from "@/lib/payload";
+import { parseAdminListPage } from "@/lib/admin-v2/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +78,7 @@ export default async function AdminCasesPage({ searchParams }: { searchParams: S
     status: selectedStatus(value(params.status)),
     workerId: Number(value(params.worker)) || undefined,
   };
-  const result = await loadAdminCaseList(await getPayload(), filters);
+  const result = await loadAdminCaseList(await getPayload(), filters, { page: parseAdminListPage(params.page) });
   const locale = panelDateLocale(user.interfaceLanguage);
   const formatDate = (date?: string) => date
     ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(date))
@@ -146,7 +148,7 @@ export default async function AdminCasesPage({ searchParams }: { searchParams: S
       </section>
 
       <section aria-live="polite">
-        <p className="mb-3 text-sm font-semibold text-muted-foreground"><span className="text-white">{result.items.length}</span> {copy.cases.found}</p>
+        <p className="mb-3 text-sm font-semibold text-muted-foreground"><span className="text-white">{result.totalDocs}</span> {copy.cases.found}</p>
         {result.items.length ? (
           <div className="grid gap-3">
             {result.items.map((item) => (
@@ -174,6 +176,7 @@ export default async function AdminCasesPage({ searchParams }: { searchParams: S
         ) : (
           <div className="rounded-3xl border border-dashed border-white/15 bg-background-elevated/45 p-8 text-center text-muted-foreground">{copy.cases.empty}</div>
         )}
+        <AdminListPagination locale={user.interfaceLanguage} meta={result} params={params} pathname="/admin-v2/cases" />
       </section>
     </div>
   );

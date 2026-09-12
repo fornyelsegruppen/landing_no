@@ -1,5 +1,6 @@
 import type { Payload, Where } from "payload";
 import { deriveCaseNextAction, type CaseNextActionKind } from "./case-read-model";
+import { adminListPaginationMeta, normalizeAdminListPagination, type AdminListPagination, type AdminListPaginationMeta } from "./pagination";
 
 export const caseListStatusKeys = [
   "all",
@@ -48,6 +49,7 @@ export type AdminCaseListResult = {
   items: AdminCaseListItem[];
   workers: Array<{ id: number; name: string }>;
 };
+export type AdminCaseListPagedResult = AdminCaseListResult & AdminListPaginationMeta;
 
 function asRecord(value: unknown) {
   return value as Record<string, unknown>;
@@ -127,7 +129,7 @@ function leadWhere(filters: AdminCaseListFilters, referenceLeadIds: number[]): W
 
 async function leadIdsFromReferences(payload: Pick<Payload, "find">, query?: string) {
   if (!query || query.length < 2) return [];
-  const common = { depth: 1, limit: 200, overrideAccess: true, pagination: false } as const;
+  const common = { depth: 1, limit: 50, overrideAccess: true } as const;
   const [quotes, contracts, workOrders] = await Promise.all([
     payload.find({ ...common, collection: "quotes", where: { reference: { contains: query } } }),
     payload.find({ ...common, collection: "contracts", where: { reference: { contains: query } } }),
@@ -152,63 +154,62 @@ async function leadIdsFromReferences(payload: Pick<Payload, "find">, query?: str
   return [...ids];
 }
 
+export function loadAdminCaseList(
+  payload: Pick<Payload, "find">,
+  rawFilters?: AdminCaseListFilters,
+): Promise<AdminCaseListResult>;
+export function loadAdminCaseList(
+  payload: Pick<Payload, "find">,
+  rawFilters: AdminCaseListFilters,
+  pagination: AdminListPagination,
+): Promise<AdminCaseListPagedResult>;
 export async function loadAdminCaseList(
   payload: Pick<Payload, "find">,
   rawFilters: AdminCaseListFilters = {},
-): Promise<AdminCaseListResult> {
+  pagination?: AdminListPagination,
+): Promise<AdminCaseListResult | AdminCaseListPagedResult> {
   const filters = normalizeCaseListFilters(rawFilters);
+  const page = normalizeAdminListPagination(pagination);
   const loadedAt = Date.now();
   const referenceLeadIds = await leadIdsFromReferences(payload, filters.query);
-  const leads = await payload.find({
-    collection: "leads",
-    depth: 1,
-    limit: 300,
-    overrideAccess: true,
-    pagination: false,
-    sort: "-createdAt",
-    where: leadWhere(filters, referenceLeadIds),
-  });
-  const leadIds = leads.docs.map((doc) => numberId(doc)).filter((value): value is number => Boolean(value));
-  const workersPromise = payload.find({
-    collection: "users",
-    depth: 0,
-    limit: 200,
-    overrideAccess: true,
-    pagination: false,
-    sort: "displayName",
-    where: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] },
-  });
+  const [leadResult, workerResult] = await Promise.all([
+    payload.find({ collection: "leads", depth: 1, limit: page.limit, page: page.page, overrideAccess: true, sort: "-createdAt", where: leadWhere(filters, referenceLeadIds) }),
+    payload.find({ collection: "users", depth: 0, limit: 50, overrideAccess: true, sort: "displayName", where: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] } }),
+  ]);
+  const leadDocs = leadResult.docs;
+  const workerDocs = workerResult.docs;
+  const leadIds = leadDocs.map((doc) => numberId(doc)).filter((value): value is number => Boolean(value));
   if (!leadIds.length) {
-    const workers = await workersPromise;
-    return {
+    const empty = {
       items: [],
-      workers: workers.docs.map((worker) => ({ id: numberId(worker) || 0, name: relationName(worker) || `#${numberId(worker)}` })).filter((worker) => worker.id > 0),
+      workers: workerDocs.map((worker) => ({ id: numberId(worker) || 0, name: relationName(worker) || `#${numberId(worker)}` })).filter((worker) => worker.id > 0),
     };
+    return pagination ? { ...empty, ...adminListPaginationMeta(0, page) } : empty;
   }
 
   const relatedWhere = { lead: { in: leadIds } };
-  const common = { depth: 1, limit: 1000, overrideAccess: true, pagination: false, sort: "-createdAt" as const };
+  const common = { depth: 1, limit: 100, overrideAccess: true, sort: "-createdAt" as const };
   const [measurements, prices, quotes, messages, workOrders, workers] = await Promise.all([
     payload.find({ ...common, collection: "roof-measurements", where: relatedWhere }),
     payload.find({ ...common, collection: "price-calculations", where: relatedWhere }),
     payload.find({ ...common, collection: "quotes", where: relatedWhere }),
     payload.find({ ...common, collection: "messages", where: { and: [relatedWhere, { status: { not_equals: "cancelled" } }] } }),
     payload.find({ ...common, collection: "work-orders", where: relatedWhere }),
-    workersPromise,
+    Promise.resolve(workerDocs),
   ]);
   const quoteIds = quotes.docs.map((doc) => numberId(doc)).filter((value): value is number => Boolean(value));
   const contracts = quoteIds.length
-    ? await payload.find({ ...common, collection: "contracts", where: { quote: { in: quoteIds } } })
-    : { docs: [] };
+    ? (await payload.find({ ...common, collection: "contracts", where: { quote: { in: quoteIds } } })).docs
+    : [];
 
   const measurementByLead = firstByRelation(measurements.docs, "lead");
   const priceByLead = firstByRelation(prices.docs, "lead");
   const quoteByLead = firstByRelation(quotes.docs, "lead");
   const messageByLead = firstByRelation(messages.docs, "lead");
   const workByLead = firstByRelation(workOrders.docs, "lead");
-  const contractByQuote = firstByRelation(contracts.docs, "quote");
+  const contractByQuote = firstByRelation(contracts, "quote");
 
-  const items = leads.docs.map((raw) => {
+  const items = leadDocs.map((raw) => {
     const lead = asRecord(raw);
     const id = numberId(lead) || 0;
     const measurement = measurementByLead.get(id);
@@ -254,8 +255,7 @@ export async function loadAdminCaseList(
     return true;
   });
 
-  return {
-    items: items.map((item) => ({
+  const mappedItems = items.map((item) => ({
       archiveClassification: item.archiveClassification,
       assignedWorker: item.assignedWorker,
       createdAt: item.createdAt,
@@ -273,7 +273,17 @@ export async function loadAdminCaseList(
       recordState: item.recordState,
       status: item.status,
       workStatus: item.workStatus,
-    })),
-    workers: workers.docs.map((worker) => ({ id: numberId(worker) || 0, name: relationName(worker) || `#${numberId(worker)}` })).filter((worker) => worker.id > 0),
+    }));
+  const paginationMeta = pagination ? {
+    hasNextPage: leadResult.hasNextPage ?? false,
+    hasPrevPage: leadResult.hasPrevPage ?? page.page > 1,
+    page: leadResult.page || page.page,
+    totalDocs: leadResult.totalDocs ?? mappedItems.length,
+    totalPages: leadResult.totalPages ?? Math.max(1, Math.ceil(mappedItems.length / page.limit)),
+  } : undefined;
+  const baseResult = {
+    items: mappedItems,
+    workers: workers.map((worker) => ({ id: numberId(worker) || 0, name: relationName(worker) || `#${numberId(worker)}` })).filter((worker) => worker.id > 0),
   };
+  return paginationMeta ? { ...baseResult, ...paginationMeta } : baseResult;
 }

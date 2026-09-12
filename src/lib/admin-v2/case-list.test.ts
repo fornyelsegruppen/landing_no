@@ -62,4 +62,18 @@ describe("admin case list", () => {
       { action: "company_sign_contract" },
     )).resolves.toEqual({ items: [], workers: [] });
   });
+
+  it("reaches records beyond the first bounded source page", async () => {
+    const find = vi.fn().mockImplementation(async (input: { collection: string; page?: number }) => {
+      if (input.collection === "leads") return input.page === 1
+        ? { docs: [{ id: 1, name: "Side 1", status: "new", createdAt: "2026-08-27T08:00:00.000Z" }], hasNextPage: true }
+        : { docs: [{ id: 2, name: "Side 2", status: "new", createdAt: "2026-08-26T08:00:00.000Z" }], hasNextPage: false, hasPrevPage: true, page: 2, totalDocs: 2, totalPages: 2 };
+      if (input.collection === "users") return { docs: [], hasNextPage: false };
+      return { docs: [], hasNextPage: false };
+    });
+    const result = await loadAdminCaseList({ find } as unknown as Pick<Payload, "find">, {}, { page: 2 });
+    expect(result.items).toEqual([expect.objectContaining({ id: 2, customer: "Side 2" })]);
+    expect(result.totalDocs).toBe(2);
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: "leads", page: 2, limit: 50, pagination: true }));
+  });
 });
