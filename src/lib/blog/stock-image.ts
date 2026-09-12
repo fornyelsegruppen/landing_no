@@ -1,4 +1,5 @@
 import type { Payload } from "payload";
+import type { Media, Post } from "@/payload/payload-types";
 import {
   PexelsStockImageProvider,
   pexelsLicenseUrl,
@@ -54,8 +55,8 @@ export function pexelsImageAlt(value?: string | null) {
 export type StockImageReplacementResult =
   | {
       outcome: "replaced";
-      post: Awaited<ReturnType<Payload["update"]>>;
-      media: Awaited<ReturnType<Payload["create"]>> | null;
+      post: Post;
+      media: Media | null;
       selected: Awaited<ReturnType<PexelsStockImageProvider["search"]>>[number];
       query: string;
       reviewInvalidated: boolean;
@@ -109,7 +110,7 @@ export async function attachPexelsStockImageToPost(input: {
   const reviewInvalidated =
     input.preserveInitialQuality !== true &&
     !isUnchangedPexelsImage(input.post, String(selected.id), imageAlt);
-  let media: Awaited<ReturnType<Payload["create"]>> | null = null;
+  let media: Media | null = null;
   const persistToMedia = input.persistToMedia ?? shouldPersistPexelsMedia();
   if (persistToMedia) {
     try {
@@ -140,7 +141,7 @@ export async function attachPexelsStockImageToPost(input: {
       `Pexels image ${selected.id} uses the approved remote asset with attribution because PUBLIC_MEDIA_BLOB_READ_WRITE_TOKEN is not configured.`,
     );
   }
-  const post = await input.payload.update({
+  const post: Post = await input.payload.update({
     collection: "posts",
     id: input.post.id,
     draft: true,

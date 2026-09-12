@@ -5,10 +5,19 @@ import {
   pexelsImageAlt,
   shouldPersistPexelsMedia,
   stockQueryForPost,
+  type StockImageReplacementResult,
 } from "./stock-image";
 import type { PexelsStockImageProvider } from "@/lib/providers/pexels-stock-image-provider";
 
 describe("blog stock images", () => {
+  function expectReplacement(result: StockImageReplacementResult) {
+    expect(result.outcome).toBe("replaced");
+    if (result.outcome !== "replaced") {
+      throw new Error("Expected a distinct Pexels replacement");
+    }
+    return result;
+  }
+
   it("uses a distinct public-media token in production", () => {
     expect(
       shouldPersistPexelsMedia({
@@ -115,7 +124,7 @@ describe("blog stock images", () => {
         }),
       }),
     );
-    expect(result.media?.id).toBe(41);
+    expect(expectReplacement(result).media?.id).toBe(41);
   });
 
   it("invalidates manual replacement for ai_qa and approved drafts even with a neutral unchanged alt", async () => {
@@ -162,7 +171,7 @@ describe("blog stock images", () => {
           }),
         }),
       );
-      expect(result.reviewInvalidated).toBe(true);
+      expect(expectReplacement(result).reviewInvalidated).toBe(true);
     }
   });
 
@@ -294,7 +303,7 @@ describe("blog stock images", () => {
         }),
       }),
     );
-    expect(result.reviewInvalidated).toBe(true);
+    expect(expectReplacement(result).reviewInvalidated).toBe(true);
   });
 
   it("keeps an approved remote Pexels image when media storage is unavailable", async () => {
@@ -347,7 +356,7 @@ describe("blog stock images", () => {
         }),
       }),
     );
-    expect(result.media).toBeNull();
+    expect(expectReplacement(result).media).toBeNull();
   });
 
   it("skips incompatible media persistence while preserving remote attribution", async () => {
@@ -399,6 +408,6 @@ describe("blog stock images", () => {
         }),
       }),
     );
-    expect(result.media).toBeNull();
+    expect(expectReplacement(result).media).toBeNull();
   });
 });
