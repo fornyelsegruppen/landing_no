@@ -40,5 +40,15 @@ describe("blog editor", () => {
       "Išsaugotas planas: 2026-09-12T10:30 (Europe/Oslo).",
     );
     expect(html).toContain("Planavimas sustabdytas funkcijos nustatymu.");
+    expect(html).toContain("Laikas visada interpretuojamas kaip Europe/Oslo.");
+  });
+
+  it("keeps the Oslo time-zone label when no saved plan exists", () => {
+    const html = renderToStaticMarkup(
+      createElement(BlogEditor, { ...props, scheduledAt: undefined }),
+    );
+
+    expect(html).toContain("Laikas visada interpretuojamas kaip Europe/Oslo.");
+    expect(html).not.toContain("Išsaugotas planas:");
   });
 });

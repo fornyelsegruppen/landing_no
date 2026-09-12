@@ -37,6 +37,7 @@ type BlogEditorCopy = {
   regenerationConfirm: string;
   scheduleNeedsApproval: string;
   scheduleNeedsFutureDate: string;
+  scheduleTimeZone: string;
   scheduleInvalidTime: string;
   scheduleNonexistentTime: string;
   scheduleAmbiguousTime: string;
@@ -98,6 +99,7 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
       "Et nytt AI-utkast erstatter det nåværende upubliserte utkastet og nullstiller kontroll og planlegging. Fortsette?",
     scheduleNeedsApproval: "Planlegging åpnes etter faglig godkjenning.",
     scheduleNeedsFutureDate: "Velg et fremtidig tidspunkt før planlegging.",
+    scheduleTimeZone: "Tid tolkes alltid som Europe/Oslo.",
     scheduleInvalidTime: "Oppgi et gyldig Oslo-tidspunkt før planlegging.",
     scheduleNonexistentTime:
       "Det valgte Oslo-tidspunktet finnes ikke på grunn av sommertid. Velg et annet tidspunkt.",
@@ -161,6 +163,7 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     scheduleNeedsApproval:
       "Planavimas bus galimas po specialisto patvirtinimo.",
     scheduleNeedsFutureDate: "Prieš planuodami pasirinkite būsimą laiką.",
+    scheduleTimeZone: "Laikas visada interpretuojamas kaip Europe/Oslo.",
     scheduleInvalidTime: "Prieš planuodami įveskite tinkamą Oslo laiką.",
     scheduleNonexistentTime:
       "Pasirinktas Oslo laikas neegzistuoja dėl vasaros laiko. Pasirinkite kitą laiką.",
@@ -226,6 +229,7 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
       "A new AI draft replaces the current unpublished draft and resets review and scheduling. Continue?",
     scheduleNeedsApproval: "Scheduling opens after expert approval.",
     scheduleNeedsFutureDate: "Choose a future time before scheduling.",
+    scheduleTimeZone: "Time is always interpreted as Europe/Oslo.",
     scheduleInvalidTime: "Enter a valid Oslo time before scheduling.",
     scheduleNonexistentTime:
       "The selected Oslo time does not exist because of daylight saving time. Choose another time.",

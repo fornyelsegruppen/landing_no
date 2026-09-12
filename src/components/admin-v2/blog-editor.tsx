@@ -23,6 +23,7 @@ import {
 import {
   osloLocalDateTime,
   osloScheduleIso,
+  osloScheduleValidationReason,
 } from "@/lib/admin-v2/blog-schedule-time";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
@@ -204,6 +205,16 @@ export function BlogEditor(props: Props) {
     new Date(scheduleConversion.iso).getTime() > currentTime;
   const scheduleDisabled =
     busy || props.status !== "approved" || !scheduleDateIsFuture;
+  const scheduleValidationReason = osloScheduleValidationReason(
+    form.scheduledAt,
+  );
+  const scheduleValidationMessage = scheduleValidationReason
+    ? scheduleValidationReason === "ambiguous"
+      ? copy.scheduleAmbiguousTime
+      : scheduleValidationReason === "nonexistent"
+        ? copy.scheduleNonexistentTime
+        : copy.scheduleInvalidTime
+    : null;
   const savedScheduledAt = osloLocalDateTime(props.scheduledAt);
   const hasUnsavedSchedulePlan = form.scheduledAt !== savedScheduledAt;
   const publishDisabled = busy || !props.publishEligible;
@@ -268,12 +279,7 @@ export function BlogEditor(props: Props) {
     if (action === "schedule" && !scheduleConversion.ok) {
       setFeedback({
         kind: "warning",
-        message:
-          scheduleConversion.reason === "ambiguous"
-            ? copy.scheduleAmbiguousTime
-            : scheduleConversion.reason === "nonexistent"
-              ? copy.scheduleNonexistentTime
-              : copy.scheduleInvalidTime,
+        message: scheduleValidationMessage || copy.scheduleInvalidTime,
       });
       return;
     }
@@ -453,8 +459,16 @@ export function BlogEditor(props: Props) {
             <input
               className="min-h-12 rounded-xl border border-white/10 bg-black/15 px-3"
               type="datetime-local"
+              aria-describedby={`blog-schedule-zone${scheduleValidationMessage ? " blog-schedule-validation" : ""}`}
+              aria-invalid={Boolean(scheduleValidationMessage)}
               {...field("scheduledAt")}
             />
+            <span
+              className="text-muted-foreground text-xs"
+              id="blog-schedule-zone"
+            >
+              {copy.scheduleTimeZone}
+            </span>
           </label>
           <label className="grid gap-1.5 sm:col-span-2">
             <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -532,6 +546,14 @@ export function BlogEditor(props: Props) {
         {props.status !== "approved" ? (
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.scheduleNeedsApproval}
+          </p>
+        ) : scheduleValidationMessage ? (
+          <p
+            className="mt-3 text-sm text-amber-300"
+            id="blog-schedule-validation"
+            role="status"
+          >
+            {scheduleValidationMessage}
           </p>
         ) : !scheduleDateIsFuture ? (
           <p className="text-muted-foreground mt-3 text-sm">

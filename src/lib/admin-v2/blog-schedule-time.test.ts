@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { osloLocalDateTime, osloScheduleIso } from "./blog-schedule-time";
+import {
+  osloLocalDateTime,
+  osloScheduleIso,
+  osloScheduleValidationReason,
+} from "./blog-schedule-time";
 
 describe("Oslo blog schedule time", () => {
   it("formats a saved UTC value as Oslo local time without using the browser zone", () => {
@@ -27,5 +31,9 @@ describe("Oslo blog schedule time", () => {
       ok: false,
       reason: "ambiguous",
     });
+    expect(osloScheduleValidationReason("2026-03-29T02:30")).toBe(
+      "nonexistent",
+    );
+    expect(osloScheduleValidationReason("2026-10-25T02:30")).toBe("ambiguous");
   });
 });

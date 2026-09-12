@@ -12,6 +12,12 @@ export type OsloScheduleConversion =
   | { ok: true; iso: string }
   | { ok: false; reason: "ambiguous" | "invalid" | "nonexistent" };
 
+export function osloScheduleValidationReason(localDateTime: string) {
+  if (!localDateTime) return null;
+  const conversion = osloScheduleIso(localDateTime);
+  return conversion.ok ? null : conversion.reason;
+}
+
 const localDateTimePattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 const osloFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: BLOG_SCHEDULE_TIME_ZONE,
