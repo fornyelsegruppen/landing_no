@@ -72,6 +72,8 @@ export default async function BlogArticleAdminPage({
         : null,
   };
   const preview = `/api/preview?locale=no&path=${encodeURIComponent(`/no/blogg/${post.slug}`)}`;
+  const articleHref = post._status === "draft" ? preview : `/no/blogg/${post.slug}`;
+  const articleLabel = post._status === "draft" ? copy.blogAdmin.preview : "Open published article";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -95,10 +97,10 @@ export default async function BlogArticleAdminPage({
           </div>
           <a
             className="hover:border-accent/50 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 px-4 font-bold"
-            href={preview}
+            href={articleHref}
             target="_blank"
           >
-            {copy.blogAdmin.preview}
+            {articleLabel}
             <ExternalLink className="size-4" />
           </a>
         </div>

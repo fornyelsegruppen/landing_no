@@ -15,6 +15,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { StickyBottomCta } from "@/components/layout/sticky-cta";
 import { LivePreviewRefresh } from "@/components/live-preview-refresh";
+import { DraftPreviewBanner } from "@/components/site/draft-preview-banner";
 import { MarketingAnalytics } from "@/components/analytics/marketing-analytics";
 import "../../globals.css";
 
@@ -120,6 +121,7 @@ export default async function LocaleLayout({ children, params }: Props) {
       suppressHydrationWarning
     >
       <body className={`${manrope.variable} font-sans antialiased`}>
+        {isDraftMode && <DraftPreviewBanner locale={locale} />}
         {isDraftMode && <LivePreviewRefresh />}
         <NextIntlClientProvider messages={messages}>
           <SiteSettingsProvider settings={content.settings} copy={content.copy}>
