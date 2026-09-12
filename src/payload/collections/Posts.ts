@@ -4,6 +4,7 @@ import {
   prepareAdminPublication,
   prepareEditorialPost,
 } from "../../lib/blog/editorial-policy";
+import { restorePostVersionAsDraft } from "../../lib/blog/restore-post-version";
 import { reviewerNameForUser } from "../../lib/blog/reviewer";
 import {
   adminOnly,
@@ -18,6 +19,8 @@ export const Posts: CollectionConfig = {
   admin: {
     group: "Blogg",
     useAsTitle: "titleNo",
+    description:
+      "Versjoner gjenopprettes alltid som utkast og må kontrolleres før publisering.",
     defaultColumns: [
       "titleNo",
       "primaryKeyword",
@@ -48,6 +51,42 @@ export const Posts: CollectionConfig = {
     drafts: { autosave: true },
     maxPerDoc: 20,
   },
+  endpoints: [
+    {
+      method: "post",
+      path: "/versions/:id",
+      handler: async (req) => {
+        if (!req.user) {
+          return Response.json(
+            { message: "Authentication is required to restore a post version" },
+            { status: 401 },
+          );
+        }
+        if (!userIsAdmin(req.user)) {
+          return Response.json(
+            { message: "Only administrators can restore a post version" },
+            { status: 403 },
+          );
+        }
+
+        const versionID = req.routeParams?.id;
+        if (typeof versionID !== "string" || versionID.length === 0) {
+          return Response.json({ message: "A version ID is required" }, { status: 400 });
+        }
+
+        const result = await restorePostVersionAsDraft({
+          payload: req.payload,
+          req,
+          versionID,
+        });
+        return Response.json({
+          ...result,
+          message:
+            "Version restored as a draft. Review and approve it before publishing.",
+        });
+      },
+    },
+  ],
   hooks: {
     beforeOperation: [
       ({ args, operation }) => {

@@ -1,52 +1,47 @@
 import {
-  createLocalReq,
   restoreVersionOperation,
-  type Document,
   type Payload,
+  type PayloadRequest,
 } from "payload";
 
 type RestorePostVersionAsDraftInput = {
   payload: Payload;
-  postID: number | string;
-  user: Document;
+  req: PayloadRequest;
   versionID: string;
 };
 
 /**
- * Server-only contract for a future authenticated AdminV2 restore action.
+ * Server-only contract for an authenticated restore endpoint.
  *
  * Payload's installed Local API wrapper drops the `draft` argument before it
- * reaches `restoreVersionOperation`. This helper uses Payload's exported
- * operation and local-request builder directly, preserves access control, and
- * rejects a version that does not belong to the requested post.
+ * reaches `restoreVersionOperation`. The REST endpoint receives the normal
+ * authenticated Payload request, and this helper preserves that request while
+ * explicitly restoring only a draft. `restoreVersionOperation` then performs
+ * the collection update-access check against the version's actual parent.
  */
 export async function restorePostVersionAsDraft({
   payload,
-  postID,
-  user,
+  req,
   versionID,
 }: RestorePostVersionAsDraftInput) {
   const collection = payload.collections.posts;
   if (!collection) throw new TypeError("Posts collection is unavailable");
 
+  // Resolve through the public local API before restoring. This avoids ever
+  // passing an arbitrary parent ID into the operation; the operation itself
+  // verifies update access against the selected version's real parent.
   const matchingVersion = await payload.findVersions({
     collection: "posts",
     overrideAccess: false,
-    user,
+    user: req.user,
     limit: 1,
     pagination: false,
-    where: {
-      and: [
-        { id: { equals: versionID } },
-        { parent: { equals: postID } },
-      ],
-    },
+    where: { id: { equals: versionID } },
   });
   if (matchingVersion.docs.length !== 1) {
-    throw new TypeError("Version does not belong to the requested post");
+    throw new TypeError("Post version is unavailable");
   }
 
-  const req = await createLocalReq({ user }, payload);
   return restoreVersionOperation({
     collection,
     draft: true,
