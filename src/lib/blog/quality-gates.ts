@@ -2,7 +2,10 @@ import {
   generatedArticleSchema,
   type GeneratedArticle,
 } from "./article-schema";
-import { approvedBlogKnowledge } from "./knowledge-base";
+import {
+  approvedBlogKnowledge,
+  approvedPackagePriceStatements,
+} from "./knowledge-base";
 import {
   isPreciseSourceUrl,
   isSubstantiveBlogSourceUrl,
@@ -27,11 +30,11 @@ export type ArticleQualityResult = {
   checkedAt: string;
 };
 
-const allowedPriceFragments = [
-  "99 kr/m² + mva",
-  "138 kr/m² + mva",
-  "337 kr/m² + mva",
-];
+const allowedPriceStatements = new Set(
+  approvedPackagePriceStatements.map((price) =>
+    price.toLocaleLowerCase("nb-NO").replace(/\s+/g, " "),
+  ),
+);
 
 const allowedInternalPaths = new Set<string>(
   approvedBlogKnowledge.internalPaths,
@@ -52,14 +55,13 @@ function add(
 }
 
 function unapprovedPrices(content: string) {
-  const matches =
-    content.match(/\b\d[\d ]{0,8}\s*kr(?:\/m(?:2|²))?(?:\s*\+\s*mva)?/gi) || [];
-  return matches.filter(
+  const matches = content.match(
+    /\b\d+(?:[ \u00a0]\d{3})*(?:[,.]\d{1,2})?\s*kr(?:\s*\/\s*m(?:2|²))?(?:\s*(?:inkl\.?|ekskl\.?|\+)\s*mva)?/giu,
+  );
+  return (matches || []).filter(
     (match) =>
-      !allowedPriceFragments.some((approved) =>
-        approved
-          .toLowerCase()
-          .includes(match.toLowerCase().replace(/\s+/g, " ")),
+      !allowedPriceStatements.has(
+        match.toLocaleLowerCase("nb-NO").replace(/\s+/g, " "),
       ),
   );
 }

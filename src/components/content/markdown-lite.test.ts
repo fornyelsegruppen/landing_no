@@ -5,7 +5,27 @@ import { parseMarkdownBlocks } from "./markdown-lite";
 describe("safe Markdown links", () => {
   it("localizes internal routes", () => {
     expect(safeContentHref("/takvask", "no")).toBe("/no/takvask");
+    expect(safeContentHref("/no#kontakt", "no")).toBe("/no#kontakt");
+    expect(safeContentHref("/no/takvask?source=blog#tilbud", "en")).toBe(
+      "/no/takvask?source=blog#tilbud",
+    );
     expect(safeContentHref("/en/takvask", "no")).toBe("/en/takvask");
+    expect(safeContentHref("#kontakt", "en")).toBe("#kontakt");
+  });
+
+  it("normalizes same-origin absolute links without making them external", () => {
+    expect(
+      safeContentHref(
+        "https://takfornyelsenorge.no/no#kontakt",
+        "no",
+      ),
+    ).toBe("/no#kontakt");
+    expect(
+      safeContentHref(
+        "https://takfornyelsenorge.no/takvask?source=blog#tilbud",
+        "en",
+      ),
+    ).toBe("/en/takvask?source=blog#tilbud");
   });
 
   it("allows web links and rejects executable schemes", () => {
@@ -14,6 +34,8 @@ describe("safe Markdown links", () => {
     );
     expect(safeContentHref("javascript:alert(1)", "no")).toBeNull();
     expect(safeContentHref("data:text/html,test", "no")).toBeNull();
+    expect(safeContentHref("//example.test/path", "no")).toBeNull();
+    expect(safeContentHref("/\\example.test/path", "no")).toBeNull();
   });
 });
 

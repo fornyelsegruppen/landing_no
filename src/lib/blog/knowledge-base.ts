@@ -1,24 +1,41 @@
-export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-11-oslo-v6";
+export const blogKnowledgeVersion = "takfornyelse-blog-2026-09-12-oslo-v7";
 export const blogServiceAreas = ["Oslo", "Bærum", "Asker", "Lillestrøm", "Lørenskog", "Ski"];
+
+// The base prices remain unchanged. The displayed consumer prices apply the
+// ordinary 25% VAT rate; verify the applicable rate before changing these facts.
+export const approvedPackagePrices = {
+  Basic: {
+    excludingVat: "99 kr/m² ekskl. mva",
+    includingVat: "123,75 kr/m² inkl. mva",
+  },
+  Standard: {
+    excludingVat: "138 kr/m² ekskl. mva",
+    includingVat: "172,50 kr/m² inkl. mva",
+  },
+  Premium: {
+    excludingVat: "337 kr/m² ekskl. mva",
+    includingVat: "421,25 kr/m² inkl. mva",
+  },
+} as const;
+
+export const approvedPackagePriceStatements = Object.values(
+  approvedPackagePrices,
+).flatMap((price) => [price.includingVat, price.excludingVat]);
 
 export const approvedPackageDefinitions = {
   Basic:
-    "Basic fra 99 kr/m² + mva: taksjekk, mosebehandling og skånsom takvask.",
+    "Basic takvask fra 123,75 kr/m² inkl. mva (99 kr/m² ekskl. mva): taksjekk, mosebehandling og skånsom takvask.",
   Standard:
-    "Standard fra 138 kr/m² + mva: alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
+    "Standard fra 172,50 kr/m² inkl. mva (138 kr/m² ekskl. mva): alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
   Premium:
-    "Premium fra 337 kr/m² + mva: alt i Standard, samt profesjonell takmaling og valg av passende takfarge.",
+    "Premium fra 421,25 kr/m² inkl. mva (337 kr/m² ekskl. mva): alt i Standard, samt profesjonell takmaling og valg av passende takfarge.",
 } as const;
 
 export const approvedBlogKnowledge = {
   company: "Takfornyelse, en del av Fornyelse Gruppen AS",
   voice: ["rolig", "konkret", "ryddig", "hjelpsom", "faglig ydmyk"],
   services: ["takvask", "impregnering", "takmaling", "takfornying", "nytt tak"],
-  packagePrices: [
-    "Basic fra 99 kr/m² + mva",
-    "Standard fra 138 kr/m² + mva",
-    "Premium fra 337 kr/m² + mva",
-  ],
+  packagePrices: approvedPackagePriceStatements,
   packageDefinitions: Object.values(approvedPackageDefinitions),
   internalPaths: [
     "/takvask",
@@ -30,7 +47,7 @@ export const approvedBlogKnowledge = {
     "/blogg",
   ],
   priceDisclaimer:
-    "Prisene er veiledende fra-priser. Endelig pris avhenger av takets størrelse, tilstand, hellingsgrad, adkomst, materialtype og geografisk beliggenhet. Kunden får et skriftlig tilbud før arbeidet starter.",
+    "Prisene er veiledende fra-priser inkludert mva. Endelig pris avhenger av takets størrelse, tilstand, hellingsgrad, adkomst, materialtype og geografisk beliggenhet. Kunden får et skriftlig tilbud før arbeidet starter.",
   treatmentClaims: [
     "På egnet takstein kan impregnering redusere fuktopptak.",
     "Når taket er teknisk egnet, kan riktig behandling bidra til å forlenge takets levetid.",

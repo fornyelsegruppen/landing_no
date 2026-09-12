@@ -29,6 +29,28 @@ describe("blog quality gates", () => {
     );
   });
 
+  it("accepts only the shared VAT-inclusive package price statements", () => {
+    const approved = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}\n\nBasic takvask fra 123,75 kr/m² inkl. mva (99 kr/m² ekskl. mva).`,
+      }),
+      validTopic,
+    );
+    const ambiguous = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}\n\nBasic fra 99 kr/m² + mva.`,
+      }),
+      validTopic,
+    );
+
+    expect(approved.issues).not.toContainEqual(
+      expect.objectContaining({ code: "unapproved_price" }),
+    );
+    expect(ambiguous.issues).toContainEqual(
+      expect.objectContaining({ code: "unapproved_price" }),
+    );
+  });
+
   it("blocks high semantic overlap", () => {
     const result = evaluateArticleQuality(validGeneratedArticle(), validTopic, [
       {

@@ -22,13 +22,13 @@ For å forberede vurderingen kan kunden oppgi postnummer, valgfri adresse og gje
     >;
 
     expect(result.content).toContain(
-      "- Basic fra 99 kr/m² + mva: taksjekk, mosebehandling og skånsom takvask.",
+      "- Basic takvask fra 123,75 kr/m² inkl. mva (99 kr/m² ekskl. mva): taksjekk, mosebehandling og skånsom takvask.",
     );
     expect(result.content).toContain(
-      "- Standard fra 138 kr/m² + mva: alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
+      "- Standard fra 172,50 kr/m² inkl. mva (138 kr/m² ekskl. mva): alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
     );
     expect(result.content).toContain(
-      "- Premium fra 337 kr/m² + mva: alt i Standard, samt profesjonell takmaling",
+      "- Premium fra 421,25 kr/m² inkl. mva (337 kr/m² ekskl. mva): alt i Standard, samt profesjonell takmaling",
     );
     expect(result.content).toContain("vanskelig tilgjengelige takflater");
     expect(result.content).toContain("ekstra sikkerhetstiltak");
