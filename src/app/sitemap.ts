@@ -9,7 +9,9 @@ import { siteConfig } from "@/lib/site";
 import { seoLandingSlugs } from "@/content/seo-landing-pages";
 import { localizedBlogPostEntries } from "@/lib/blog/sitemap";
 
-export const revalidate = 300;
+// A DB-independent build must not freeze its CMS fallback into the first index.
+// Generate on request; the existing bounded CMS reads and failure fallback remain.
+export const dynamic = "force-dynamic";
 
 async function getLastModified(): Promise<Date> {
   const fallback = new Date();
