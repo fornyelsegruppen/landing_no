@@ -18,6 +18,24 @@ import { blogServiceAreas } from "./knowledge-base";
 
 type TriggerSource = "manual" | "cron" | "regenerate";
 
+function blogWordCount(value: string | null | undefined) {
+  return value?.toLocaleLowerCase("nb-NO").match(/[a-zæøå0-9]+/g)?.length || 0;
+}
+
+function priorQualityIssues(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const issues = (value as { issues?: unknown }).issues;
+  if (!Array.isArray(issues)) return [];
+  return issues.flatMap((issue) => {
+    if (!issue || typeof issue !== "object") return [];
+    const item = issue as Record<string, unknown>;
+    const code = typeof item.code === "string" ? item.code.slice(0, 120) : "quality_issue";
+    const severity = typeof item.severity === "string" ? item.severity.slice(0, 40) : "warning";
+    const message = typeof item.message === "string" ? item.message.slice(0, 500) : "";
+    return message ? [{ code, severity, message }] : [];
+  });
+}
+
 function fingerprint(
   candidate: Pick<
     TopicCandidate,
@@ -412,6 +430,7 @@ export async function regeneratePayloadBlogPost(input: {
   postId: number;
   idempotencyKey: string;
   correlationId: string;
+  regenerationInstructions?: string;
 }) {
   await assertPayloadAiUsageAvailable(input.payload, { reserve: 1 });
   const post = await input.payload.findByID({
@@ -464,6 +483,14 @@ export async function regeneratePayloadBlogPost(input: {
       topic,
       existing,
       correlationId: input.correlationId,
+      regenerationFeedback: {
+        savedContent: post.contentNo || "",
+        previousWordCount: blogWordCount(post.contentNo),
+        previousQualityIssues: priorQualityIssues(post.qualityChecks),
+        ...(input.regenerationInstructions
+          ? { regenerationInstructions: input.regenerationInstructions }
+          : {}),
+      },
     });
     const updated = await input.payload.update({
       collection: "posts",
@@ -500,7 +527,9 @@ export async function regeneratePayloadBlogPost(input: {
           answerNo: item.answer,
         })),
         imageBrief: generated.article.imageBrief,
-        imageAlt: generated.article.imageAlt,
+        ...(post.stockImage?.provider === "pexels"
+          ? {}
+          : { imageAlt: generated.article.imageAlt }),
         _status: "draft",
       },
     });
@@ -520,6 +549,7 @@ export async function regeneratePayloadBlogPost(input: {
     });
     return { run, post: updated, generated };
   } catch (error) {
+    if (error instanceof ArticleQualityBlockedError) error.runId = run.id;
     const sanitized = sanitizeJobError(error);
     await input.payload.update({
       collection: "seo-runs",
@@ -532,7 +562,16 @@ export async function regeneratePayloadBlogPost(input: {
         errorCode: sanitized.code,
         errorMessage: sanitized.message,
         ...(error instanceof ArticleQualityBlockedError
-          ? { qualityResult: error.quality }
+          ? {
+              qualityResult: error.quality,
+              ...(error.provenance
+                ? {
+                    modelVersion: error.provenance.model,
+                    promptVersion: error.provenance.promptVersion,
+                    knowledgeVersion: error.provenance.knowledgeVersion,
+                  }
+                : {}),
+            }
           : {}),
       },
     });

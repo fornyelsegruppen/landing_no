@@ -18,6 +18,8 @@ import { recordAuditEvent } from "@/lib/audit/audit-event";
 import { attachPexelsStockImageToPost } from "@/lib/blog/stock-image";
 import { reviewerNameForUser } from "@/lib/blog/reviewer";
 import { evaluateEditedBlogDraft } from "@/lib/blog/edited-draft-quality";
+import { ArticleQualityBlockedError } from "@/lib/blog/draft-engine";
+import { ProviderUnavailableError } from "@/lib/providers/contracts";
 
 const actionSchema = z.object({
   action: z.enum([
@@ -39,7 +41,24 @@ const actionSchema = z.object({
   seoTitleNo: z.string().trim().max(160).optional(),
   seoDescriptionNo: z.string().trim().max(500).optional(),
   primaryKeyword: z.string().trim().max(160).optional(),
+  regenerationInstructions: z.string().trim().max(2000).optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
 });
+
+class BlogActionConflictError extends TypeError {
+  constructor() {
+    super("Artikkelen er endret av en annen økt. Last siden på nytt før du fortsetter.");
+    this.name = "BlogActionConflictError";
+  }
+}
+
+function safeQualityIssues(error: ArticleQualityBlockedError) {
+  return error.quality.issues.map((issue) => ({
+    code: issue.code,
+    severity: issue.severity,
+    message: issue.message,
+  }));
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -49,6 +68,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const correlationId = correlationIdFromHeaders(request.headers);
+  let action: string | undefined;
   try {
     const payload = await getPayload();
     const { user } = await payload.auth({ headers: request.headers });
@@ -59,6 +79,7 @@ export async function POST(
     const parsed = actionSchema.safeParse(await request.json());
     if (!parsed.success)
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    action = parsed.data.action;
     const { id } = await context.params;
     if (!/^\d+$/.test(id))
       return NextResponse.json({ error: "Invalid article" }, { status: 400 });
@@ -69,12 +90,31 @@ export async function POST(
       draft: true,
       overrideAccess: true,
     });
+    if (
+      parsed.data.expectedUpdatedAt &&
+      post.updatedAt !== parsed.data.expectedUpdatedAt
+    ) {
+      throw new BlogActionConflictError();
+    }
     if (parsed.data.action === "stock-image") {
       const result = await attachPexelsStockImageToPost({
         payload,
         post,
         query: parsed.data.query,
       });
+      if (result.outcome === "no_alternative") {
+        return NextResponse.json(
+          {
+            ok: false,
+            action,
+            code: "NO_ALTERNATIVE",
+            error: "Fant ingen annen egnet Pexels-bilde for dette søket.",
+            correlationId,
+            outcome: result.outcome,
+          },
+          { status: 409 },
+        );
+      }
       await recordAuditEvent(createPayloadAuditWriter(payload), {
         actorId: user.id,
         action: "blog.stock-image.replace",
@@ -91,10 +131,13 @@ export async function POST(
       });
       return NextResponse.json({
         ok: true,
+        action,
         postId: result.post.id,
         mediaId: result.media?.id || null,
         query: result.query,
         photographer: result.selected.photographer,
+        correlationId,
+        outcome: result.outcome,
       });
     }
     if (parsed.data.action === "save") {
@@ -172,6 +215,8 @@ export async function POST(
         action: "save",
         qualityPassed: quality.passed,
         qualityScore: quality.score,
+        correlationId,
+        outcome: "saved",
       });
     }
     const quality =
@@ -210,6 +255,7 @@ export async function POST(
         postId: post.id,
         idempotencyKey: `seo-regenerate:${post.id}:${randomUUID()}`,
         correlationId,
+        regenerationInstructions: parsed.data.regenerationInstructions,
       });
       await recordAuditEvent(createPayloadAuditWriter(payload), {
         actorId: user.id,
@@ -221,8 +267,11 @@ export async function POST(
       });
       return NextResponse.json({
         ok: true,
+        action,
         postId: result.post.id,
         runId: result.run.id,
+        correlationId,
+        outcome: "regenerated",
       });
     }
 
@@ -278,19 +327,39 @@ export async function POST(
       ok: true,
       postId: updated.id,
       action: parsed.data.action,
+      correlationId,
+      outcome: parsed.data.action,
     });
   } catch (error) {
     captureException(error, {
       route: "POST /api/admin/blog/posts/[id]",
       correlationId,
     });
+    const qualityBlocked = error instanceof ArticleQualityBlockedError;
+    const conflict = error instanceof BlogActionConflictError;
+    const providerUnavailable = error instanceof ProviderUnavailableError;
     return NextResponse.json(
       {
-        error:
-          error instanceof TypeError ? error.message : "Article action failed",
+        ok: false,
+        ...(action ? { action } : {}),
+        code: qualityBlocked
+          ? "QUALITY_BLOCKED"
+          : conflict
+            ? "CONFLICT"
+            : providerUnavailable
+              ? "PROVIDER_UNAVAILABLE"
+              : "ACTION_FAILED",
+        error: qualityBlocked
+          ? "Regenereringen ble stoppet av kvalitetskontrollen. Det lagrede utkastet er ikke endret."
+          : error instanceof TypeError
+            ? error.message
+            : "Article action failed",
         correlationId,
+        ...(qualityBlocked && error.runId ? { runId: error.runId } : {}),
+        ...(qualityBlocked ? { qualityIssues: safeQualityIssues(error) } : {}),
+        ...(qualityBlocked ? { outcome: "retained_draft" } : {}),
       },
-      { status: error instanceof TypeError ? 409 : 500 },
+      { status: error instanceof TypeError || qualityBlocked ? 409 : 500 },
     );
   }
 }

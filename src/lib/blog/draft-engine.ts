@@ -1,4 +1,7 @@
-import type { AiProvider } from "@/lib/providers/contracts";
+import {
+  ProviderUnavailableError,
+  type AiProvider,
+} from "@/lib/providers/contracts";
 import {
   generatedArticleSchema,
   type GeneratedArticle,
@@ -8,6 +11,7 @@ import {
   buildBlogArticlePrompt,
   buildBlogSystemPrompt,
   blogPromptVersion,
+  type RegenerationFeedback,
 } from "./prompt";
 import {
   evaluateArticleQuality,
@@ -17,7 +21,15 @@ import type { ExistingTopic, TopicCandidate } from "./topic-engine";
 import { normalizeGeneratedArticleDraft } from "./draft-normalizer";
 
 export class ArticleQualityBlockedError extends Error {
-  constructor(readonly quality: ArticleQualityResult) {
+  runId?: string | number;
+
+  constructor(
+    readonly quality: ArticleQualityResult,
+    readonly provenance?: Pick<
+      GeneratedDraftResult,
+      "provider" | "model" | "promptVersion" | "knowledgeVersion"
+    >,
+  ) {
     super("Generated article did not pass deterministic quality gates");
     this.name = "ArticleQualityBlockedError";
   }
@@ -38,17 +50,24 @@ export async function generateBlogDraft(input: {
   existing: ExistingTopic[];
   correlationId: string;
   now?: Date;
+  regenerationFeedback?: RegenerationFeedback;
 }): Promise<GeneratedDraftResult> {
-  const generated = await input.provider.generate({
-    task: "blog.article.draft",
-    system: buildBlogSystemPrompt(),
-    prompt: buildBlogArticlePrompt(
-      input.topic,
-      input.existing.map((item) => item.title),
-    ),
-    schemaName: blogPromptVersion,
-    correlationId: input.correlationId,
-  });
+  let generated: Awaited<ReturnType<AiProvider["generate"]>>;
+  try {
+    generated = await input.provider.generate({
+      task: "blog.article.draft",
+      system: buildBlogSystemPrompt(),
+      prompt: buildBlogArticlePrompt(
+        input.topic,
+        input.existing.map((item) => item.title),
+        input.regenerationFeedback,
+      ),
+      schemaName: blogPromptVersion,
+      correlationId: input.correlationId,
+    });
+  } catch {
+    throw new ProviderUnavailableError(input.provider.health().provider, "degraded");
+  }
   const normalized = normalizeGeneratedArticleDraft(generated.data);
   const parsed = generatedArticleSchema.safeParse(normalized);
   const quality = evaluateArticleQuality(
@@ -58,7 +77,12 @@ export async function generateBlogDraft(input: {
     input.now,
   );
   if (!parsed.success || !quality.passed) {
-    throw new ArticleQualityBlockedError(quality);
+    throw new ArticleQualityBlockedError(quality, {
+      provider: generated.provider,
+      model: generated.model,
+      promptVersion: generated.promptVersion || blogPromptVersion,
+      knowledgeVersion: blogKnowledgeVersion,
+    });
   }
   return {
     article: parsed.data,

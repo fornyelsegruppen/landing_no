@@ -51,6 +51,21 @@ export function pexelsImageAlt(value?: string | null) {
   return description ? description.slice(0, 180) : "Pexels-bilde";
 }
 
+export type StockImageReplacementResult =
+  | {
+      outcome: "replaced";
+      post: Awaited<ReturnType<Payload["update"]>>;
+      media: Awaited<ReturnType<Payload["create"]>> | null;
+      selected: Awaited<ReturnType<PexelsStockImageProvider["search"]>>[number];
+      query: string;
+      reviewInvalidated: boolean;
+    }
+  | {
+      outcome: "no_alternative";
+      query: string;
+      existingAssetId: string;
+    };
+
 function isUnchangedPexelsImage(
   post: StockPost,
   assetId: string,
@@ -72,13 +87,23 @@ export async function attachPexelsStockImageToPost(input: {
   persistToMedia?: boolean;
   /** Only the generator's server-side initial enrichment may set this. */
   preserveInitialQuality?: boolean;
-}) {
+}): Promise<StockImageReplacementResult> {
   const provider = input.provider || new PexelsStockImageProvider();
   const query = stockQueryForPost(input.post, input.query);
   const candidates = await provider.search(query);
-  const selected = candidates[0];
+  const existingAssetId =
+    input.post.stockImage?.provider === "pexels"
+      ? input.post.stockImage.assetId?.trim()
+      : undefined;
+  const selected = candidates.find(
+    (candidate) => String(candidate.id) !== existingAssetId,
+  );
   if (!selected)
-    throw new TypeError("Fant ingen egnet Pexels-bilde for dette søket");
+    return {
+      outcome: "no_alternative",
+      query,
+      existingAssetId: existingAssetId || "",
+    };
   const selectedAt = new Date().toISOString();
   const imageAlt = pexelsImageAlt(selected.alt);
   const reviewInvalidated =
@@ -152,5 +177,12 @@ export async function attachPexelsStockImageToPost(input: {
       },
     },
   });
-  return { post, media, selected, query, reviewInvalidated };
+  return {
+    outcome: "replaced",
+    post,
+    media,
+    selected,
+    query,
+    reviewInvalidated,
+  };
 }

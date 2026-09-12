@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   findByID: vi.fn(),
   recordAudit: vi.fn(),
+  regenerate: vi.fn(),
   update: vi.fn(),
 }));
 
@@ -37,14 +38,18 @@ vi.mock("@/lib/blog/reviewer", () => ({
 vi.mock("@/lib/blog/edited-draft-quality", () => ({
   evaluateEditedBlogDraft: mocks.evaluateEdited,
 }));
+vi.mock("@/lib/platform/features", () => ({
+  assertFeatureReady: vi.fn(),
+}));
 vi.mock("@/lib/providers/gemini-ai-provider", () => ({
   GeminiAiProvider: class GeminiAiProvider {},
 }));
 vi.mock("@/lib/blog/payload-blog-engine", () => ({
-  regeneratePayloadBlogPost: vi.fn(),
+  regeneratePayloadBlogPost: mocks.regenerate,
 }));
 
 import { POST } from "./route";
+import { ArticleQualityBlockedError } from "@/lib/blog/draft-engine";
 
 function request(body: Record<string, unknown>) {
   return new Request("https://www.takfornyelse.as/api/admin/blog/posts/9", {
@@ -91,6 +96,7 @@ describe("admin blog post actions", () => {
       .mockReset()
       .mockImplementation(async ({ data }) => ({ id: 9, ...data }));
     mocks.recordAudit.mockReset().mockResolvedValue(undefined);
+    mocks.regenerate.mockReset();
   });
 
   it("replaces stale QA and review evidence after text or SEO edits", async () => {
@@ -162,6 +168,81 @@ describe("admin blog post actions", () => {
         data: expect.objectContaining({ primaryKeyword: null }),
       }),
     );
+  });
+
+  it("returns a safe no-alternative result instead of claiming a stock replacement", async () => {
+    mocks.attachStock.mockResolvedValue({
+      outcome: "no_alternative",
+      query: "mossy roof",
+      existingAssetId: "17490212",
+    });
+
+    const response = await POST(request({ action: "stock-image" }), context);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      action: "stock-image",
+      code: "NO_ALTERNATIVE",
+      outcome: "no_alternative",
+    });
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
+  });
+
+  it("returns sanitized quality feedback and retains the draft when regeneration is blocked", async () => {
+    const blocked = new ArticleQualityBlockedError(
+      {
+        passed: false,
+        score: 63,
+        checkedAt: "2026-09-12T05:45:11.417Z",
+        issues: [
+          {
+            code: "content_too_short",
+            severity: "warning",
+            message: "Artikkelen har bare 547 ord.",
+            gate: "seo",
+          },
+        ],
+      },
+      {
+        provider: "gemini",
+        model: "test-model",
+        promptVersion: "test-prompt",
+        knowledgeVersion: "test-knowledge",
+      },
+    );
+    blocked.runId = 5;
+    mocks.regenerate.mockRejectedValue(blocked);
+
+    const response = await POST(
+      request({
+        action: "regenerate",
+        regenerationInstructions: "Retain the edited introduction.",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      action: "regenerate",
+      code: "QUALITY_BLOCKED",
+      runId: 5,
+      outcome: "retained_draft",
+      qualityIssues: [
+        {
+          code: "content_too_short",
+          severity: "warning",
+          message: "Artikkelen har bare 547 ord.",
+        },
+      ],
+    });
+    expect(mocks.regenerate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        regenerationInstructions: "Retain the edited introduction.",
+      }),
+    );
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("preserves explicit manual administrator publication", async () => {

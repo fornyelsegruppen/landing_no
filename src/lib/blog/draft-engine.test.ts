@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DeterministicAiProvider } from "@/lib/providers/safe-providers";
+import type { AiProvider } from "@/lib/providers/contracts";
 import { ArticleQualityBlockedError, generateBlogDraft } from "./draft-engine";
 import { validGeneratedArticle, validTopic } from "./test-fixtures";
 
@@ -38,6 +39,45 @@ describe("AI blog draft engine", () => {
         correlationId: "phase4-test-blocked",
       }),
     ).rejects.toBeInstanceOf(ArticleQualityBlockedError);
+  });
+
+  it("passes 587-word repair feedback to the provider and still blocks a bad replacement", async () => {
+    const provider: AiProvider = {
+      health: () => ({ status: "ready", provider: "test" }),
+      generate: async (request) => {
+        expect(request.prompt).toContain("Tidligere ordantall: 587");
+        expect(request.prompt).toContain("content_too_short");
+        return {
+          data: { title: "For kort" },
+          provider: "test",
+          model: "test-model",
+          promptVersion: "test-prompt",
+        };
+      },
+    };
+
+    await expect(
+      generateBlogDraft({
+        provider,
+        topic: validTopic,
+        existing: [],
+        correlationId: "phase1-regeneration-feedback",
+        regenerationFeedback: {
+          savedContent: "Tidligere redigert innhold.",
+          previousWordCount: 587,
+          previousQualityIssues: [
+            {
+              code: "content_too_short",
+              severity: "warning",
+              message: "Artikkelen har bare 587 ord.",
+            },
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: "ArticleQualityBlockedError",
+      provenance: expect.objectContaining({ model: "test-model" }),
+    });
   });
 
   it("normalizes approved Norwegian and package copy before deterministic QA", async () => {

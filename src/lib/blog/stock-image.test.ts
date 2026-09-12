@@ -166,7 +166,7 @@ describe("blog stock images", () => {
     }
   });
 
-  it("does not reset review evidence when an administrator selects the same stock asset and alt", async () => {
+  it("returns an honest no-alternative outcome without updating when Pexels returns only the current asset", async () => {
     const update = vi.fn(async (input) => ({ id: 23, ...input.data }));
     const result = await attachPexelsStockImageToPost({
       payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
@@ -194,13 +194,61 @@ describe("blog stock images", () => {
       persistToMedia: false,
     });
 
-    expect(update.mock.calls[0]?.[0]).not.toHaveProperty("context");
-    expect(update).toHaveBeenCalledWith(
+    expect(update).not.toHaveBeenCalled();
+    expect(result).toEqual(
       expect.objectContaining({
-        data: expect.not.objectContaining({ editorialStatus: "human_review" }),
+        outcome: "no_alternative",
+        existingAssetId: "654",
       }),
     );
-    expect(result.reviewInvalidated).toBe(false);
+  });
+
+  it("excludes the current Pexels asset and selects a genuine alternative", async () => {
+    const update = vi.fn(async (input) => ({ id: 23, ...input.data }));
+    const result = await attachPexelsStockImageToPost({
+      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      post: {
+        id: 23,
+        titleNo: "Takfornying",
+        imageAlt: "Current roof",
+        stockImage: { provider: "pexels", assetId: "654" },
+      },
+      provider: {
+        search: vi.fn(async () => [
+          {
+            id: 654,
+            width: 2400,
+            height: 1350,
+            pageUrl: "https://www.pexels.com/photo/roof-654/",
+            photographer: "Current Asset",
+            photographerUrl: "https://www.pexels.com/@current/",
+            alt: "Current roof",
+            imageUrl: "https://images.pexels.com/photos/654/roof.jpeg",
+          },
+          {
+            id: 655,
+            width: 2400,
+            height: 1350,
+            pageUrl: "https://www.pexels.com/photo/roof-655/",
+            photographer: "Alternative Asset",
+            photographerUrl: "https://www.pexels.com/@alternative/",
+            alt: "Alternative roof",
+            imageUrl: "https://images.pexels.com/photos/655/roof.jpeg",
+          },
+        ]),
+      } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(result).toMatchObject({ outcome: "replaced", selected: { id: 655 } });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          imageAlt: "Alternative roof",
+          stockImage: expect.objectContaining({ assetId: "655" }),
+        }),
+      }),
+    );
   });
 
   it("invalidates scheduled review evidence when an uploaded hero overrides matching stock metadata", async () => {
@@ -218,14 +266,14 @@ describe("blog stock images", () => {
       provider: {
         search: vi.fn(async () => [
           {
-            id: 222,
+            id: 223,
             width: 2400,
             height: 1350,
-            pageUrl: "https://www.pexels.com/photo/roof-222/",
+            pageUrl: "https://www.pexels.com/photo/roof-223/",
             photographer: "Matching Metadata",
             photographerUrl: "https://www.pexels.com/@matching/",
             alt: "",
-            imageUrl: "https://images.pexels.com/photos/222/roof.jpeg",
+            imageUrl: "https://images.pexels.com/photos/223/roof.jpeg",
           },
         ]),
       } as unknown as PexelsStockImageProvider,
