@@ -19,6 +19,14 @@ describe("one-ui local boundary fixture guard", () => {
       selectiveFilterLeads: 26,
       messagesOnAnchorLead: 126,
       ownerVersions: 126,
+      measurements: 126,
+      quotes: 126,
+      contracts: 126,
+      workOrders: 126,
+      invoiceRecords: 126,
+      warranties: 126,
+      officialInvoices: 126,
+      contractRequests: 126,
       privateMediaDecoys: 501,
     });
     expect(output).not.toMatch(/@(?!(example\.invalid))/i);
