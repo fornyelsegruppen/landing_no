@@ -34,10 +34,10 @@ export type EditorialTarget = "Oslo" | "Bærum" | "Asker" | "Lillestrøm" | "Lø
 
 const serviceMatchers: Array<{ key: string; pattern: RegExp }> = [
   { key: "nytt-tak", pattern: /\b(nytt\s+tak|takbytte|bytte\s+tak|legge\s+nytt\s+tak)\b/i },
-  { key: "takmaling", pattern: /\b(takmaling|male\s+tak|maling\s+av\s+tak)\b/i },
-  { key: "impregnering", pattern: /\b(impregnering|impregnere)\b/i },
+  { key: "takmaling", pattern: /\b(takmaling|taksteinmaling|male\s+tak(?:et|stein(?:en)?)?|maling\s+(?:av\s+)?tak(?:et|stein(?:en)?)?)\b/i },
+  { key: "impregnering", pattern: /\b(takimpregnering|impregner(?:ing|e)\s+(?:av\s+)?tak(?:et|stein(?:en)?)?)\b/i },
   { key: "takfornying", pattern: /\b(takfornying|takfornyelse)\b/i },
-  { key: "takvask", pattern: /\b(takvask|vaske\s+tak|vask\s+av\s+tak|mose\s+(på|av)\s+tak|alger\s+(på|av)\s+tak|lav\s+(på|av)\s+tak)\b/i },
+  { key: "takvask", pattern: /\b(takvask|taksteinvask|vask(?:e|ing)?\s+(?:av\s+)?tak(?:et|stein(?:en)?)?|høytrykksvask\s+(?:av\s+)?tak(?:et|stein(?:en)?)?|mose\s+(?:på|av)\s+tak(?:et|stein(?:en)?)?|alger\s+(?:på|av)\s+tak(?:et|stein(?:en)?)?|lav\s+(?:på|av)\s+tak(?:et|stein(?:en)?)?)\b/i },
 ];
 
 const editorialTargetMatchers: Array<{ target: EditorialTarget; pattern: RegExp }> = [
@@ -47,6 +47,16 @@ const editorialTargetMatchers: Array<{ target: EditorialTarget; pattern: RegExp 
   { target: "Lillestrøm", pattern: /\blillestrøm\b/i },
   { target: "Lørenskog", pattern: /\blørenskog\b/i },
   { target: "Ski", pattern: /\bski\b/i },
+];
+
+// Deliberately bounded. This rejects only explicit known out-of-area city
+// terms; it is not a parser or proof of a searcher's physical location.
+const unsupportedEditorialTargetMatchers = [
+  /(^|[^\p{L}])ålesund(?=$|[^\p{L}])/iu,
+  /(^|[^\p{L}])bergen(?=$|[^\p{L}])/iu,
+  /(^|[^\p{L}])trondheim(?=$|[^\p{L}])/iu,
+  /(^|[^\p{L}])stavanger(?=$|[^\p{L}])/iu,
+  /(^|[^\p{L}])tromsø(?=$|[^\p{L}])/iu,
 ];
 
 const weights: Record<keyof TopicFactors, number> = {
@@ -142,7 +152,7 @@ export function seasonalRelevanceForTopic(value: string, now = new Date()) {
   const month = osloMonth(now);
   const topic = value.toLocaleLowerCase("nb-NO");
   const winter = /\b(vinter(?:en)?|snø|frost|is)\b/.test(topic);
-  const spring = /\b(vår|etter vinteren)\b/.test(topic);
+  const spring = /\b(vår|etter vinter(?:en)?)\b/.test(topic);
   const autumn = /\b(høst|høstregn|løv)\b/.test(topic);
   const roofCare = /\b(takvask|impregner|takmaling|takfornying|takfornyelse)\b/.test(topic);
 
@@ -161,6 +171,10 @@ export function editorialTargetForSignal(query: string): EditorialTarget | undef
   return editorialTargetMatchers.find(({ pattern }) => pattern.test(query))?.target;
 }
 
+export function hasUnsupportedEditorialTarget(query: string) {
+  return unsupportedEditorialTargetMatchers.some((pattern) => pattern.test(query));
+}
+
 export function candidateFromSignal(signal: SearchSignal, now = new Date()): TopicCandidate | null {
   if (containsPersonalData(signal.query)) return null;
   const sourceMap = {
@@ -172,6 +186,7 @@ export function candidateFromSignal(signal: SearchSignal, now = new Date()): Top
   } as const;
   const query = signal.query.trim();
   if (query.length < 5 || query.length > 140) return null;
+  if (hasUnsupportedEditorialTarget(query)) return null;
   const serviceKey = serviceKeyForSignal(query);
   if (!serviceKey) return null;
   const editorialTarget = editorialTargetForSignal(query);
@@ -239,7 +254,7 @@ export function sourceMetricsFromSignal(signal: SearchSignal, importedAt: string
   };
 }
 
-export const manualTopicSeeds: TopicCandidate[] = [
+const manualTopicSeedDefinitions = [
   ["Hva koster takvask per m2?", "takvask pris", "commercial", "takvask"],
   ["Takfornying eller nytt tak – hva bør vurderes?", "takfornying eller nytt tak", "comparison", "takfornying"],
   ["Hva påvirker prisen på takmaling?", "takmaling pris", "commercial", "takmaling"],
@@ -250,7 +265,14 @@ export const manualTopicSeeds: TopicCandidate[] = [
   ["Slik vurderes taket etter vinteren", "sjekk tak etter vinter", "informational", "takfornying"],
   ["Når på året er det best å vaske taket?", "beste tid for takvask", "informational", "takvask"],
   ["Takfornying i Oslo: hva bør boligeiere vurdere?", "takfornying Oslo", "local", "takfornying"],
-].map(([topic, keyword, intent, serviceKey]) => ({
+];
+
+/**
+ * Inject `now` for seasonal ranking. The legacy constant remains for callers
+ * that only need the seed list; scheduled generation should call this factory.
+ */
+export function getManualTopicSeeds(now = new Date()): TopicCandidate[] {
+  return manualTopicSeedDefinitions.map(([topic, keyword, intent, serviceKey]) => ({
   topic,
   primaryKeyword: keyword,
   secondaryKeywords: [],
@@ -263,9 +285,12 @@ export const manualTopicSeeds: TopicCandidate[] = [
     demand: 0.55,
     commercialValue: intent === "commercial" ? 0.9 : 0.65,
     contentGap: 0.8,
-    seasonalRelevance: topic.includes("vinter") ? 1 : 0.5,
+    seasonalRelevance: seasonalRelevanceForTopic(`${topic} ${keyword}`, now),
     originalEvidence: 0.5,
     localRelevance: intent === "local" ? 1 : 0,
   },
   reason: "Godkjent manuell fagplan for Takfornyelse.",
-}));
+  }));
+}
+
+export const manualTopicSeeds = getManualTopicSeeds();

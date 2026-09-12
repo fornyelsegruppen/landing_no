@@ -3,6 +3,8 @@ import { blogServiceAreas, approvedBlogKnowledge } from "./knowledge-base";
 import {
   candidateFromSignal,
   containsPersonalData,
+  getManualTopicSeeds,
+  hasUnsupportedEditorialTarget,
   manualTopicSeeds,
   seasonalRelevanceForTopic,
   sourceMetricsFromSignal,
@@ -79,6 +81,30 @@ describe("SEO topic engine", () => {
     expect(candidateFromSignal({ source: "search-console", query: "billig kjøkkenmaling" })).toBeNull();
   });
 
+  it.each([
+    ["mose på taket", "takvask"],
+    ["vaske taket", "takvask"],
+    ["impregnering av takstein", "impregnering"],
+    ["male takstein", "takmaling"],
+  ])("accepts the Norwegian roof-service variant %s", (query, serviceKey) => {
+    expect(candidateFromSignal({ source: "search-console", query })?.serviceKey).toBe(serviceKey);
+  });
+
+  it.each(["impregnering sko", "impregnering av sofa", "maling av stue"]) (
+    "rejects non-roof indoor or footwear query %s",
+    (query) => {
+      expect(candidateFromSignal({ source: "search-console", query })).toBeNull();
+    },
+  );
+
+  it.each(["takvask Ålesund", "takmaling Bergen", "takbytte Trondheim", "takvask Stavanger", "takfornying Tromsø"]) (
+    "fails closed for known out-of-area local target %s",
+    (query) => {
+      expect(hasUnsupportedEditorialTarget(query)).toBe(true);
+      expect(candidateFromSignal({ source: "search-console", query })).toBeNull();
+    },
+  );
+
   it("prioritizes an Oslo editorial target without claiming measured city geography", () => {
     const candidate = candidateFromSignal(
       { source: "search-console", query: "takmaling oslo" },
@@ -96,5 +122,13 @@ describe("SEO topic engine", () => {
     expect(seasonalRelevanceForTopic("takvask etter vinteren", new Date("2026-04-15T12:00:00Z"))).toBe(1);
     expect(seasonalRelevanceForTopic("takvask etter vinteren", new Date("2026-10-15T12:00:00Z"))).toBe(0.3);
     expect(seasonalRelevanceForTopic("takvask om vinteren", new Date("2026-10-15T12:00:00Z"))).toBe(0.25);
+  });
+
+  it("creates manual seeds with injected current-season relevance", () => {
+    const spring = getManualTopicSeeds(new Date("2026-04-15T12:00:00Z"));
+    const autumn = getManualTopicSeeds(new Date("2026-10-15T12:00:00Z"));
+    const index = spring.findIndex((topic) => topic.primaryKeyword === "sjekk tak etter vinter");
+    expect(spring[index]?.factors.seasonalRelevance).toBe(1);
+    expect(autumn[index]?.factors.seasonalRelevance).toBe(0.3);
   });
 });
