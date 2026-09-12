@@ -23,7 +23,6 @@ import {
 import {
   osloLocalDateTime,
   osloScheduleIso,
-  osloScheduleValidationReason,
 } from "@/lib/admin-v2/blog-schedule-time";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
@@ -205,9 +204,11 @@ export function BlogEditor(props: Props) {
     new Date(scheduleConversion.iso).getTime() > currentTime;
   const scheduleDisabled =
     busy || props.status !== "approved" || !scheduleDateIsFuture;
-  const scheduleValidationReason = osloScheduleValidationReason(
-    form.scheduledAt,
-  );
+  const scheduleValidationReason = form.scheduledAt
+    ? scheduleConversion.ok
+      ? null
+      : scheduleConversion.reason
+    : null;
   const scheduleValidationMessage = scheduleValidationReason
     ? scheduleValidationReason === "ambiguous"
       ? copy.scheduleAmbiguousTime
@@ -469,6 +470,15 @@ export function BlogEditor(props: Props) {
             >
               {copy.scheduleTimeZone}
             </span>
+            {scheduleValidationMessage ? (
+              <span
+                className="text-sm text-amber-300"
+                id="blog-schedule-validation"
+                role="status"
+              >
+                {scheduleValidationMessage}
+              </span>
+            ) : null}
           </label>
           <label className="grid gap-1.5 sm:col-span-2">
             <span className="text-muted-foreground text-xs font-bold uppercase">
@@ -547,15 +557,7 @@ export function BlogEditor(props: Props) {
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.scheduleNeedsApproval}
           </p>
-        ) : scheduleValidationMessage ? (
-          <p
-            className="mt-3 text-sm text-amber-300"
-            id="blog-schedule-validation"
-            role="status"
-          >
-            {scheduleValidationMessage}
-          </p>
-        ) : !scheduleDateIsFuture ? (
+        ) : !scheduleValidationMessage && !scheduleDateIsFuture ? (
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.scheduleNeedsFutureDate}
           </p>
