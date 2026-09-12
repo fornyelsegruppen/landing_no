@@ -8,7 +8,53 @@ describe("search signal imports", () => {
       "ads",
     );
     expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject({ source: "ads", query: "takvask pris", impressions: 150, clicks: 10 });
+    expect(result[0]).toMatchObject({
+      source: "ads",
+      origin: "csv-import",
+      query: "takvask pris",
+      impressions: 150,
+      clicks: 10,
+    });
+  });
+
+  it("preserves zero metrics and explicit, valid observation periods", () => {
+    const result = parseSearchSignalCsv(
+      "Query,Impressions,Clicks,Start date,End date\ntakvask pris,0,0,2026-06-01,2026-08-31",
+      "search-console",
+    );
+    expect(result).toEqual([{
+      source: "search-console",
+      origin: "csv-import",
+      query: "takvask pris",
+      impressions: 0,
+      clicks: 0,
+      periodStart: "2026-06-01",
+      periodEnd: "2026-08-31",
+    }]);
+  });
+
+  it("rejects impossible or reversed explicit observation dates", () => {
+    expect(() => parseSearchSignalCsv(
+      "Query,Start date,End date\ntakvask pris,2026-02-30,2026-03-01",
+      "ads",
+    )).toThrow(/umulig/);
+    expect(() => parseSearchSignalCsv(
+      "Query,Start date,End date\ntakvask pris,2026-09-01,2026-08-31",
+      "ads",
+    )).toThrow(/feil rekkefølge/);
+  });
+
+  it("does not claim one observation period after aggregating mismatched rows", () => {
+    const result = parseSearchSignalCsv(
+      "Query,Impressions,Start date,End date\ntakvask pris,0,2026-06-01,2026-06-30\ntakvask pris,0,2026-07-01,2026-07-31",
+      "ads",
+    );
+    expect(result).toEqual([{
+      source: "ads",
+      origin: "csv-import",
+      query: "takvask pris",
+      impressions: 0,
+    }]);
   });
 
   it("removes personal data and does not expose one-off lead text", () => {

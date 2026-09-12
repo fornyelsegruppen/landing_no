@@ -28,7 +28,11 @@ vi.mock("@/lib/providers/pexels-stock-image-provider", () => ({
   },
 }));
 
-import { generateNextPayloadBlogDraft } from "./payload-blog-engine";
+import {
+  ensureManualBlogTopics,
+  generateNextPayloadBlogDraft,
+  importSearchSignals,
+} from "./payload-blog-engine";
 
 describe("payload blog draft generation", () => {
   beforeEach(() => {
@@ -83,6 +87,41 @@ describe("payload blog draft generation", () => {
       query: "Norwegian house roof tiles exterior",
       existingAssetId: "",
     });
+  });
+
+  it("persists signal provenance while leaving manual seeds without fabricated metrics", async () => {
+    const payload = {
+      find: mocks.find,
+      create: mocks.create,
+      update: mocks.update,
+      logger: { warn: mocks.warn },
+    } as never;
+    await importSearchSignals(payload, [{
+      source: "search-console",
+      origin: "api",
+      query: "takvask pris",
+      impressions: 0,
+      clicks: 0,
+      periodStart: "2026-06-01",
+      periodEnd: "2026-08-31",
+    }]);
+
+    const imported = mocks.create.mock.calls.find(([input]) => input.collection === "seo-topics")?.[0];
+    expect(imported?.data.sourceMetrics).toMatchObject({
+      kind: "aggregated-search-signal",
+      source: "search-console",
+      origin: "api",
+      metrics: { impressions: 0, clicks: 0 },
+      observationPeriod: { start: "2026-06-01", end: "2026-08-31" },
+      provenanceCoverage: { observationPeriod: "known", geography: "unknown" },
+    });
+    expect(imported?.data.sourceMetrics.importedAt).toEqual(expect.any(String));
+
+    mocks.create.mockClear();
+    await ensureManualBlogTopics(payload);
+    const manualCreates = mocks.create.mock.calls.filter(([input]) => input.collection === "seo-topics");
+    expect(manualCreates).toHaveLength(10);
+    expect(manualCreates.every(([input]) => input.data.sourceMetrics === undefined)).toBe(true);
   });
 
   it("retains the already-created initial draft when configured Pexels returns no image", async () => {

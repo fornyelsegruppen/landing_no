@@ -21,10 +21,23 @@ function normalizedHeader(value: string) {
 }
 
 function parseNumber(value: string | undefined) {
-  if (!value) return undefined;
+  if (value === undefined || !value.trim()) return undefined;
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function parseObservationDate(value: string | undefined) {
+  if (value === undefined || !value.trim()) return undefined;
+  const date = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new TypeError("CSV-filen har en ugyldig observasjonsdato (bruk YYYY-MM-DD)");
+  }
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new TypeError("CSV-filen har en umulig observasjonsdato");
+  }
+  return date;
 }
 
 function parseRows(input: string) {
@@ -66,6 +79,9 @@ const aliases = {
   impressions: ["impressions", "impr", "visninger"],
   clicks: ["clicks", "klikk"],
   score: ["score", "interest", "interesse", "value", "verdi"],
+  // Deliberately only accept explicit range endpoints, never an ambiguous "Date" column.
+  periodStart: ["periodstart", "startdate", "datefrom", "fromdate"],
+  periodEnd: ["periodend", "enddate", "dateto", "todate"],
 } as const;
 
 function columnIndex(headers: string[], options: readonly string[]) {
@@ -87,25 +103,50 @@ export function parseSearchSignalCsv(input: string, sourceInput: string): Search
   const impressionsIndex = columnIndex(headers, aliases.impressions);
   const clicksIndex = columnIndex(headers, aliases.clicks);
   const scoreIndex = columnIndex(headers, aliases.score);
+  const periodStartIndex = columnIndex(headers, aliases.periodStart);
+  const periodEndIndex = columnIndex(headers, aliases.periodEnd);
 
   const unique = new Map<string, SearchSignal>();
   for (const row of rows.slice(1)) {
     const query = row[queryIndex]?.trim().replace(/\s+/g, " ") || "";
     if (query.length < 5 || query.length > 140 || containsPersonalData(query)) continue;
     const key = query.toLocaleLowerCase("nb-NO");
+    const periodStart = periodStartIndex >= 0 ? parseObservationDate(row[periodStartIndex]) : undefined;
+    const periodEnd = periodEndIndex >= 0 ? parseObservationDate(row[periodEndIndex]) : undefined;
+    if (periodStart && periodEnd && periodStart > periodEnd) {
+      throw new TypeError("CSV-filen har observasjonsdatoer i feil rekkefølge");
+    }
     const signal: SearchSignal = {
       source,
+      origin: "csv-import",
       query,
       ...(impressionsIndex >= 0 ? { impressions: parseNumber(row[impressionsIndex]) } : {}),
       ...(clicksIndex >= 0 ? { clicks: parseNumber(row[clicksIndex]) } : {}),
       ...(scoreIndex >= 0 ? { score: parseNumber(row[scoreIndex]) } : {}),
+      ...(periodStart ? { periodStart } : {}),
+      ...(periodEnd ? { periodEnd } : {}),
     };
     const previous = unique.get(key);
+    if (!previous) {
+      unique.set(key, signal);
+      continue;
+    }
+    const sameObservationPeriod =
+      previous.periodStart === signal.periodStart && previous.periodEnd === signal.periodEnd;
+    const { periodStart: currentPeriodStart, periodEnd: currentPeriodEnd, ...signalWithoutPeriod } = signal;
     unique.set(key, {
-      ...signal,
-      impressions: (previous?.impressions || 0) + (signal.impressions || 0) || undefined,
-      clicks: (previous?.clicks || 0) + (signal.clicks || 0) || undefined,
-      score: Math.max(previous?.score || 0, signal.score || 0) || undefined,
+      ...signalWithoutPeriod,
+      ...(previous.impressions !== undefined || signal.impressions !== undefined
+        ? { impressions: (previous.impressions ?? 0) + (signal.impressions ?? 0) }
+        : {}),
+      ...(previous.clicks !== undefined || signal.clicks !== undefined
+        ? { clicks: (previous.clicks ?? 0) + (signal.clicks ?? 0) }
+        : {}),
+      ...(previous.score !== undefined || signal.score !== undefined
+        ? { score: Math.max(previous.score ?? 0, signal.score ?? 0) }
+        : {}),
+      ...(sameObservationPeriod && currentPeriodStart ? { periodStart: currentPeriodStart } : {}),
+      ...(sameObservationPeriod && currentPeriodEnd ? { periodEnd: currentPeriodEnd } : {}),
     });
   }
   return [...unique.values()];

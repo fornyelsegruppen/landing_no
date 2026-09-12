@@ -9,6 +9,7 @@ import {
   manualTopicSeeds,
   topicScore,
   candidateFromSignal,
+  sourceMetricsFromSignal,
   type ExistingTopic,
   type TopicCandidate,
 } from "./topic-engine";
@@ -124,12 +125,9 @@ async function createTopicCandidate(
       ...(candidate.location ? { location: candidate.location } : {}),
       ...(candidate.season ? { season: candidate.season } : {}),
       source: candidate.source,
-      sourceMetrics: {
-        kind:
-          candidate.source === "manual"
-            ? "approved-manual-seed"
-            : "aggregated-signal",
-      },
+      ...(candidate.sourceSignal
+        ? { sourceMetrics: sourceMetricsFromSignal(candidate.sourceSignal, new Date().toISOString()) }
+        : {}),
       proposedBrief: suggestedBrief(candidate),
       topicScore: topicScore(candidate.factors),
       overlapScore: overlap,

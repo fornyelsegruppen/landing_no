@@ -99,6 +99,7 @@ export class GoogleSearchConsoleProvider implements SearchDataProvider {
       if (!query) return [];
       return [{
         source: "search-console" as const,
+        origin: "api" as const,
         query,
         clicks: row.clicks,
         impressions: row.impressions,

@@ -98,6 +98,8 @@ export interface SignatureProvider {
 
 export type SearchSignal = {
   source: "search-console" | "ads" | "trends" | "lead" | "manual";
+  /** How this aggregated signal entered the topic pipeline, when known. */
+  origin?: "api" | "csv-import" | "manual";
   query: string;
   impressions?: number;
   clicks?: number;

@@ -4,6 +4,7 @@ import {
   candidateFromSignal,
   containsPersonalData,
   manualTopicSeeds,
+  sourceMetricsFromSignal,
   topicOverlap,
   topicScore,
 } from "./topic-engine";
@@ -49,5 +50,27 @@ describe("SEO topic engine", () => {
         query: "Ring 47 73 58 88 om takvask",
       }),
     ).toBeNull();
+  });
+
+  it("retains aggregated signal evidence without inferring geographic coverage", () => {
+    const candidate = candidateFromSignal({
+      source: "search-console",
+      origin: "api",
+      query: "takvask pris",
+      impressions: 0,
+      clicks: 0,
+      periodStart: "2026-06-01",
+      periodEnd: "2026-08-31",
+    });
+    expect(candidate?.sourceSignal).toMatchObject({ impressions: 0, clicks: 0 });
+    expect(sourceMetricsFromSignal(candidate!.sourceSignal!, "2026-09-12T10:00:00.000Z")).toEqual({
+      kind: "aggregated-search-signal",
+      source: "search-console",
+      origin: "api",
+      importedAt: "2026-09-12T10:00:00.000Z",
+      metrics: { impressions: 0, clicks: 0 },
+      observationPeriod: { start: "2026-06-01", end: "2026-08-31" },
+      provenanceCoverage: { observationPeriod: "known", geography: "unknown" },
+    });
   });
 });

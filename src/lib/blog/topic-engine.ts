@@ -26,6 +26,8 @@ export type TopicCandidate = {
   season?: string;
   factors: TopicFactors;
   reason: string;
+  /** Aggregated evidence only; omitted for manually curated topics. */
+  sourceSignal?: SearchSignal;
 };
 
 const weights: Record<keyof TopicFactors, number> = {
@@ -145,6 +147,40 @@ export function candidateFromSignal(signal: SearchSignal): TopicCandidate | null
       localRelevance: 0,
     },
     reason: `Aggregert signal fra ${signal.source}; ingen kundeidentitet er brukt.`,
+    sourceSignal: signal,
+  };
+}
+
+/**
+ * Keeps evidence in the schema-free sourceMetrics JSON without inferring data
+ * that a query alone cannot establish (notably geographic coverage).
+ */
+export function sourceMetricsFromSignal(signal: SearchSignal, importedAt: string) {
+  const metrics = {
+    ...(signal.impressions !== undefined ? { impressions: signal.impressions } : {}),
+    ...(signal.clicks !== undefined ? { clicks: signal.clicks } : {}),
+    ...(signal.score !== undefined ? { score: signal.score } : {}),
+  };
+  const hasCompletePeriod = Boolean(signal.periodStart && signal.periodEnd);
+
+  return {
+    kind: "aggregated-search-signal",
+    source: signal.source,
+    origin: signal.origin || "unknown",
+    importedAt,
+    ...(Object.keys(metrics).length ? { metrics } : {}),
+    ...(signal.periodStart || signal.periodEnd
+      ? {
+          observationPeriod: {
+            ...(signal.periodStart ? { start: signal.periodStart } : {}),
+            ...(signal.periodEnd ? { end: signal.periodEnd } : {}),
+          },
+        }
+      : {}),
+    provenanceCoverage: {
+      observationPeriod: hasCompletePeriod ? "known" : "unknown",
+      geography: "unknown",
+    },
   };
 }
 
