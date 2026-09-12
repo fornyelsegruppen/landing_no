@@ -6,6 +6,7 @@ const caseId = process.env.E2E_ADMIN_CASE_ID;
 const documentHref = process.env.E2E_ADMIN_CASE_DOCUMENT_HREF;
 const documentAccessibleName = process.env.E2E_ADMIN_CASE_DOCUMENT_NAME;
 const olderMessageId = process.env.E2E_ADMIN_CASE_OLDER_MESSAGE_ID;
+const olderMessagePage = process.env.E2E_ADMIN_CASE_OLDER_MESSAGE_PAGE;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 
 const requiredFixtureVariables = [
@@ -249,7 +250,7 @@ test.describe("Admin Case Workspace V3 browser acceptance", () => {
     await expect(disclosure).not.toHaveAttribute("open", "");
 
     await page.goto(
-      `/admin-v2/cases/${encodeURIComponent(caseId!)}#message-${encodeURIComponent(olderMessageId)}`,
+      `/admin-v2/cases/${encodeURIComponent(caseId!)}${olderMessagePage ? `?messagePage=${encodeURIComponent(olderMessagePage)}` : ""}#message-${encodeURIComponent(olderMessageId)}`,
     );
     await expect(disclosure).toHaveAttribute("open", "");
     await expect(olderMessage).toBeVisible();

@@ -22,6 +22,8 @@ import { InformationRequestButton } from "@/components/admin-v2/information-requ
 import { CaseViewedMarker } from "@/components/admin-v2/case-viewed-marker";
 import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CaseMessageHistory } from "@/components/admin-v2/case-message-history";
+import { CaseMessageFailureNotice } from "@/components/admin-v2/case-message-failure-notice";
+import { CaseHistoryPagination } from "@/components/admin-v2/case-history-pagination";
 import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
@@ -726,16 +728,28 @@ function deliveryRecipient(value: unknown) {
 
 export default async function AdminCasePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireAdminUser();
   const copy = getAdminCaseCopy(user.interfaceLanguage);
   const { id } = await params;
+  const query = await searchParams;
+  const messagePage = Array.isArray(query.messagePage)
+    ? query.messagePage[0]
+    : query.messagePage;
+  const documentPage = Array.isArray(query.documentPage)
+    ? query.documentPage[0]
+    : query.documentPage;
   if (!/^\d+$/.test(id)) notFound();
   const payload = await getPayload();
   const [caseData, workersResult, rulesResult] = await Promise.all([
-    loadAdminCaseWorkspace(payload, Number(id)),
+    loadAdminCaseWorkspace(payload, Number(id), {
+      documentPage,
+      messagePage,
+    }),
     payload.find({
       collection: "users",
       depth: 0,
@@ -1173,7 +1187,9 @@ export default async function AdminCasePage({
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
               {workspaceCopy.sections.messages}
             </dt>
-            <dd className="mt-1 font-semibold">{caseData.messages.length}</dd>
+            <dd className="mt-1 font-semibold">
+              {caseData.history.messages.totalDocs}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
@@ -1407,10 +1423,7 @@ export default async function AdminCasePage({
       </p>
     ),
     completion: (
-      <div
-        className="grid gap-3 sm:grid-cols-2"
-        key="process-stage-completion"
-      >
+      <div className="grid gap-3 sm:grid-cols-2" key="process-stage-completion">
         <div className="rounded-xl border border-white/10 bg-black/15 p-3 text-sm">
           <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
             {copy.invoiceDraft}
@@ -1448,7 +1461,7 @@ export default async function AdminCasePage({
           </div>
         </div>
         <p className="text-muted-foreground text-sm sm:col-span-2">
-          {workspaceCopy.sections.documents}: {caseData.documents.length}
+          {workspaceCopy.sections.documents}: {caseData.history.documents.totalDocs}
         </p>
       </div>
     ),
@@ -1628,8 +1641,11 @@ export default async function AdminCasePage({
         <p className="mt-3 max-h-40 min-w-0 overflow-auto text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-white/80">
           {message.bodyText}
         </p>
-        {message.failureMessage ? (
-          <p className="text-danger mt-3 text-sm">{message.failureMessage}</p>
+        {message.failureCode || message.failureMessage ? (
+          <CaseMessageFailureNotice
+            failureCode={message.failureCode}
+            locale={user.interfaceLanguage}
+          />
         ) : null}
         {secondaryMutationsAllowed &&
         message.direction === "outbound" &&
@@ -2525,18 +2541,27 @@ export default async function AdminCasePage({
                     id="messages-section"
                     title={workspaceCopy.sections.messages}
                   >
-                    {caseData.messages.length ? (
+                    {caseData.history.messages.items.length ? (
                       <CaseMessageHistory
                         excludedMessageId={
                           primaryQuestionActive ? displayedReply?.id : undefined
                         }
-                        messages={caseData.messages}
+                        messages={caseData.history.messages.items}
                         olderLabel={workspaceCopy.messageHistoryOlder}
                         renderMessage={renderMessage}
                       />
                     ) : (
                       <p className="text-muted-foreground">{copy.noMessages}</p>
                     )}
+                    {caseData.history.messages.totalDocs ? (
+                      <CaseHistoryPagination
+                        basePath={`/admin-v2/cases/${caseData.lead.id}`}
+                        locale={user.interfaceLanguage}
+                        pageData={caseData.history.messages}
+                        pageKey="messagePage"
+                        params={{ documentPage, messagePage }}
+                      />
+                    ) : null}
                   </Section>
                   {!primaryCancellationAction &&
                   caseData.lead.nextActionBlocker ===
@@ -2886,9 +2911,9 @@ export default async function AdminCasePage({
                         ) : null}
                       </div>
                     ) : null}
-                    {caseData.documents.length ? (
+                    {caseData.history.documents.items.length ? (
                       <div className="grid min-w-0 gap-2">
-                        {caseData.documents.map((document) => (
+                        {caseData.history.documents.items.map((document) => (
                           <a
                             className="hover:border-accent/50 hover:text-accent flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xl border border-white/10 px-3 text-sm font-semibold"
                             href={document.href}
@@ -2911,6 +2936,15 @@ export default async function AdminCasePage({
                         {copy.noDocuments}
                       </p>
                     )}
+                    {caseData.history.documents.totalDocs ? (
+                      <CaseHistoryPagination
+                        basePath={`/admin-v2/cases/${caseData.lead.id}`}
+                        locale={user.interfaceLanguage}
+                        pageData={caseData.history.documents}
+                        pageKey="documentPage"
+                        params={{ documentPage, messagePage }}
+                      />
+                    ) : null}
                   </Section>
                 </aside>
               </div>

@@ -235,6 +235,34 @@ export type CaseDocument = {
   ownerType?: string;
 };
 
+export const caseHistoryPageSize = 25;
+
+export type CaseHistoryPage<T> = {
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  items: T[];
+  page: number;
+  totalDocs: number;
+  totalPages: number;
+};
+
+export type CaseWorkspaceHistory = {
+  documents: CaseHistoryPage<CaseDocument>;
+  messages: CaseHistoryPage<CaseMessage>;
+};
+
+export function normalizeCaseHistoryPage(value: unknown) {
+  const parsed =
+    typeof value === "string" && /^\d+$/.test(value)
+      ? Number(value)
+      : typeof value === "number"
+        ? value
+        : Number.NaN;
+  return Number.isSafeInteger(parsed) && parsed > 0
+    ? Math.min(parsed, 10_000)
+    : 1;
+}
+
 export type CasePriceCalculation = CaseEntity & {
   adjustmentReason?: string;
   discountOre?: number;
@@ -702,10 +730,7 @@ function makeTimeline(
   const record = asRecord(raw);
   const id = numericId(record.id);
   return {
-    id:
-      type === "invoice"
-        ? `${type}-${collection}-${id}`
-        : `${type}-${id}`,
+    id: type === "invoice" ? `${type}-${collection}-${id}` : `${type}-${id}`,
     sourceCollection: collection,
     sourceId: id,
     type,
@@ -1637,8 +1662,162 @@ export async function loadAdminCase(
   };
 }
 
+type HistoryResult = {
+  docs: unknown[];
+  hasNextPage?: boolean;
+  hasPrevPage?: boolean;
+  page?: number;
+  totalDocs?: number;
+  totalPages?: number;
+};
+
+function toHistoryPage<T>(
+  result: HistoryResult,
+  items: T[],
+): CaseHistoryPage<T> {
+  const page =
+    typeof result.page === "number" && result.page > 0 ? result.page : 1;
+  const totalDocs =
+    typeof result.totalDocs === "number" ? result.totalDocs : items.length;
+  const totalPages =
+    typeof result.totalPages === "number"
+      ? result.totalPages
+      : totalDocs
+        ? 1
+        : 0;
+  return {
+    hasNextPage: result.hasNextPage === true,
+    hasPrevPage: result.hasPrevPage === true,
+    items,
+    page,
+    totalDocs,
+    totalPages,
+  };
+}
+
+function caseHistoryOwnerPairs(caseData: AdminCase) {
+  const pairs = [
+    { ownerType: "lead", ids: [caseData.lead.id] },
+    {
+      ownerType: "roof-measurement",
+      ids: caseData.measurement ? [caseData.measurement.id] : [],
+    },
+    {
+      ownerType: "quote",
+      ids: caseData.commercial.quoteVersions.map((item) => item.id),
+    },
+    {
+      ownerType: "contract",
+      ids: caseData.commercial.contractVersions.map((item) => item.id),
+    },
+    {
+      ownerType: "work-order",
+      ids: caseData.workOrder ? [caseData.workOrder.id] : [],
+    },
+    {
+      ownerType: "work",
+      ids: caseData.workOrder ? [caseData.workOrder.id] : [],
+    },
+    {
+      ownerType: "completion-certificate",
+      ids: caseData.workOrder ? [caseData.workOrder.id] : [],
+    },
+    {
+      ownerType: "change-agreement",
+      ids: caseData.changes.map((item) => item.id),
+    },
+    {
+      ownerType: "invoice-record",
+      ids: caseData.invoice ? [caseData.invoice.id] : [],
+    },
+    {
+      ownerType: "warranty",
+      ids: caseData.warranty ? [caseData.warranty.id] : [],
+    },
+  ];
+  return pairs.filter((pair) => pair.ids.length);
+}
+
+export async function loadCaseWorkspaceHistory(
+  payload: Payload,
+  caseData: AdminCase,
+  pages: { documentPage?: unknown; messagePage?: unknown } = {},
+): Promise<CaseWorkspaceHistory> {
+  const messagePage = normalizeCaseHistoryPage(pages.messagePage);
+  const documentPage = normalizeCaseHistoryPage(pages.documentPage);
+  const ownerPairs = caseHistoryOwnerPairs(caseData);
+  const [messagesResult, documentsResult] = await Promise.all([
+    payload.find({
+      collection: "messages",
+      depth: 1,
+      limit: caseHistoryPageSize,
+      page: messagePage,
+      overrideAccess: true,
+      sort: "-createdAt",
+      where: { lead: { equals: caseData.lead.id } },
+    }),
+    ownerPairs.length
+      ? payload.find({
+          collection: "private-media",
+          depth: 0,
+          limit: caseHistoryPageSize,
+          page: documentPage,
+          overrideAccess: true,
+          sort: "-createdAt",
+          where: {
+            or: ownerPairs.map((pair) => ({
+              and: [
+                { ownerType: { equals: pair.ownerType } },
+                { ownerId: { in: pair.ids.map(String) } },
+              ],
+            })),
+          } as unknown as Where,
+        })
+      : Promise.resolve({ docs: [], page: 1, totalDocs: 0, totalPages: 0 }),
+  ]);
+  const messages = messagesResult.docs.map((raw) => {
+    const message = asRecord(raw);
+    return {
+      ...entity("messages", message),
+      reference: stringValue(message.subject) || `#${numericId(message.id)}`,
+      subject: stringValue(message.subject) || "",
+      bodyText: stringValue(message.bodyText) || "",
+      direction: stringValue(message.direction) || "outbound",
+      category: stringValue(message.category) || "",
+      channel: stringValue(message.channel) || "",
+      deliveredAt: stringValue(message.deliveredAt),
+      sentAt: stringValue(message.sentAt),
+      failureCode: stringValue(message.failureCode),
+      failureMessage: stringValue(message.failureMessage),
+      manualRecovery: messageManualRecovery(message.aiAnalysis),
+      aiAssisted: Boolean(message.aiAssisted),
+      aiAnalysis: message.aiAnalysis,
+      replyToMessageId: relationId(message.replyToMessage) || undefined,
+    } satisfies CaseMessage;
+  });
+  const documents = documentsResult.docs.map((raw) => {
+    const document = asRecord(raw);
+    const id = numericId(document.id);
+    return {
+      id,
+      filename: stringValue(document.filename) || `#${id}`,
+      classification: stringValue(document.classification),
+      createdAt: stringValue(document.createdAt),
+      mimeType: stringValue(document.mimeType),
+      ownerId: stringValue(document.ownerId),
+      ownerType: stringValue(document.ownerType),
+      href: `/api/admin/media/${id}`,
+    } satisfies CaseDocument;
+  });
+  return {
+    messages: toHistoryPage(messagesResult, messages),
+    documents: toHistoryPage(documentsResult, documents),
+  };
+}
+
 export type AdminCaseWorkspace = AdminCase & {
   customerQuestionContext: CustomerQuestionContext;
+  history: CaseWorkspaceHistory;
 };
 
 /**
@@ -1648,10 +1827,13 @@ export type AdminCaseWorkspace = AdminCase & {
 export async function loadAdminCaseWorkspace(
   payload: Payload,
   leadId: number,
+  pages: { documentPage?: unknown; messagePage?: unknown } = {},
 ): Promise<AdminCaseWorkspace | null> {
   const [caseData, customerQuestionContext] = await Promise.all([
     loadAdminCase(payload, leadId),
     loadCustomerQuestionContext(payload, leadId),
   ]);
-  return caseData ? { ...caseData, customerQuestionContext } : null;
+  if (!caseData) return null;
+  const history = await loadCaseWorkspaceHistory(payload, caseData, pages);
+  return { ...caseData, customerQuestionContext, history };
 }
