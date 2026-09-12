@@ -49,6 +49,28 @@ const stageContent = {
 };
 
 describe("case process timeline", () => {
+  it("keeps SSR and first hydration closed even with explicit history navigation", () => {
+    const html = renderToStaticMarkup(
+      createElement(CaseProcessTimeline, {
+        activeStageId: "agreement",
+        locale: "lt",
+        stageContent,
+        historyNavigation: {
+          caseId: 1,
+          messages: { requested: "6", page: 6, totalPages: 6, ids: [1] },
+          documents: { page: 1, totalPages: 31 },
+        },
+        inspectorContent: createElement(
+          "article",
+          { id: "message-1" },
+          "Old message",
+        ),
+      }),
+    );
+    expect(html).not.toContain("data-case-inspector=");
+    expect(html).not.toContain('id="message-1"');
+    expect(html.match(/data-process-stage=/g)).toHaveLength(6);
+  });
   it("filters one chronological stream without creating a second document timeline", () => {
     const items = [
       {

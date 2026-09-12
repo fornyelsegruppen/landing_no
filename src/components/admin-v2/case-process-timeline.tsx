@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { CaseInspector } from "@/components/admin-v2/case-inspector";
 import { getCaseWorkspaceCopy } from "@/lib/admin-v2/case-workspace-i18n";
+import {
+  createCaseHistoryNavigationGate,
+  type CaseHistoryNavigationContext,
+} from "@/lib/admin-v2/case-history-navigation";
 import type { PanelLocale } from "@/lib/panel-i18n";
 import {
   resolveCaseProcessStages,
@@ -64,6 +68,7 @@ export function filterCaseProcessHistoryItems(
 export type CaseProcessInspectorSelection =
   | {
       kind: "stage";
+      navigationKey?: string;
       targetId: string;
       title: string;
     }
@@ -101,6 +106,7 @@ export type CaseProcessTimelineProps = {
   historyItems?: readonly CaseProcessHistoryItem[];
   historyId?: string;
   inspectorContent?: ReactNode;
+  historyNavigation?: CaseHistoryNavigationContext;
   locale: PanelLocale;
   sectionId?: string;
   stageContent?: Partial<Record<CaseProcessStageId, CaseProcessStageContent>>;
@@ -171,6 +177,7 @@ export function CaseProcessTimeline({
   historyItems = [],
   historyId = "case-history",
   inspectorContent,
+  historyNavigation,
   locale,
   sectionId = "case-process-title",
   stageContent = {},
@@ -190,14 +197,55 @@ export function CaseProcessTimeline({
   const [inspectorSelection, setInspectorSelection] =
     useState<CaseProcessInspectorSelection | null>(null);
   const inspectorTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [consumeHistoryNavigation] = useState(createCaseHistoryNavigationGate);
+  useEffect(() => {
+    if (!historyNavigation || !inspectorContent) return;
+    let frame = 0;
+    const activateNavigation = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const target = consumeHistoryNavigation(
+          historyNavigation,
+          window.location,
+        );
+        if (!target) return;
+        inspectorTriggerRef.current = null;
+        setInspectorSelection({
+          kind: "stage",
+          navigationKey: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+          targetId: target.targetId,
+          title: workspaceLabels.sections[target.section],
+        });
+      });
+    };
+    // Hash is unavailable to SSR. Keep SSR/first hydration closed, then open
+    // only validated navigation intent. Prop changes cover Next page transitions.
+    activateNavigation();
+    window.addEventListener("hashchange", activateNavigation);
+    window.addEventListener("popstate", activateNavigation);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", activateNavigation);
+      window.removeEventListener("popstate", activateNavigation);
+    };
+  }, [
+    historyNavigation,
+    inspectorContent,
+    consumeHistoryNavigation,
+    workspaceLabels.sections,
+  ]);
   const openInspector = (
     selection: CaseProcessInspectorSelection,
     trigger: HTMLButtonElement,
   ) => {
+    if (historyNavigation)
+      consumeHistoryNavigation(historyNavigation, window.location);
     inspectorTriggerRef.current = trigger;
     setInspectorSelection(selection);
   };
   const closeInspector = () => {
+    if (historyNavigation)
+      consumeHistoryNavigation(historyNavigation, window.location);
     setInspectorSelection(null);
     restoreInspectorTriggerFocus(inspectorTriggerRef.current);
   };
@@ -472,6 +520,11 @@ export function CaseProcessTimeline({
       {inspectorSelection &&
       (inspectorSelection.kind === "history" || inspectorContent) ? (
         <CaseInspector
+          key={
+            inspectorSelection.kind === "stage"
+              ? inspectorSelection.navigationKey
+              : undefined
+          }
           busyCloseMessage={labels.waitForAction}
           closeLabel={labels.closeInspector}
           description={

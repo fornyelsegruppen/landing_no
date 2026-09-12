@@ -2059,6 +2059,20 @@ export default async function AdminCasePage({
         <CaseProcessTimeline
           activeStageId={processActiveStage}
           activeStageState={primaryState.blocker ? "blocked" : "current"}
+          historyNavigation={{
+            caseId: caseData.lead.id,
+            messages: {
+              requested: query.messagePage,
+              page: caseData.history.messages.page,
+              totalPages: caseData.history.messages.totalPages,
+              ids: caseData.history.messages.items.map((message) => message.id),
+            },
+            documents: {
+              requested: query.documentPage,
+              page: caseData.history.documents.page,
+              totalPages: caseData.history.documents.totalPages,
+            },
+          }}
           historyItems={caseData.timeline.map((item) => {
             const entityId = timelineEntityId(item);
             const eventType = timelineTypeLabel(
