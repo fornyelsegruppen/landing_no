@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
+  "buildCommand": "PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack",
   "regions": ["arn1"],
   "functions": {
     "src/app/(payload)/admin/[[...segments]]/page.tsx": {
