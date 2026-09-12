@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 
 type AutomationSourceFreshness = "unknown" | "stale" | "fresh" | "no-data";
+type AutomationSourceAccess =
+  "configuration_required" | "unverified" | "verified" | "failed";
+type AutomationRunStatus = "running" | "completed" | "failed" | "attention";
+
+export const BLOG_AUTOMATION_STATUS_TIMEOUT_MS = 8_000;
 
 export type BlogAutomationStatusDto = {
   features: { draftsEnabled: boolean; approvedPublisherEnabled: boolean };
@@ -14,7 +19,7 @@ export type BlogAutomationStatusDto = {
   timeZone: "Europe/Oslo";
   lastRun: null | {
     id: number;
-    status: "running" | "completed" | "failed" | "attention";
+    status: AutomationRunStatus;
     startedAt: string;
     finishedAt: string | null;
     errorCode: string | null;
@@ -23,7 +28,7 @@ export type BlogAutomationStatusDto = {
   pendingApprovalCount: number;
   sources: {
     searchConsole: {
-      access: "configuration_required" | "unverified" | "verified" | "failed";
+      access: AutomationSourceAccess;
       freshness: AutomationSourceFreshness;
       lastSuccessAt: string | null;
     };
@@ -54,6 +59,9 @@ const copy = {
     searchConsole: "Search Console",
     trends: "Trender",
     approval: "Menneskelig godkjenning er fortsatt påkrevd.",
+    lastSuccess: "Siste vellykkede oppdatering",
+    invalidDate: "Ikke tilgjengelig",
+    runError: "Kjøringen trenger manuell oppfølging.",
   },
   lt: {
     title: "Tinklaraščio automatizavimas",
@@ -70,6 +78,9 @@ const copy = {
     searchConsole: "Search Console",
     trends: "Tendencijos",
     approval: "Žmogaus patvirtinimas vis dar būtinas.",
+    lastSuccess: "Paskutinis sėkmingas atnaujinimas",
+    invalidDate: "Nepasiekiama",
+    runError: "Vykdymą reikia peržiūrėti rankiniu būdu.",
   },
   en: {
     title: "Blog automation",
@@ -86,8 +97,74 @@ const copy = {
     searchConsole: "Search Console",
     trends: "Trends",
     approval: "Human approval remains required.",
+    lastSuccess: "Last successful update",
+    invalidDate: "Unavailable",
+    runError: "The run needs manual review.",
   },
 } satisfies Record<Locale, Record<string, string>>;
+
+const sourceAccessCopy = {
+  nb: {
+    configuration_required: "Konfigurasjon kreves",
+    unverified: "Ikke verifisert",
+    verified: "Verifisert",
+    failed: "Kontroll mislyktes",
+  },
+  lt: {
+    configuration_required: "Reikalinga konfigūracija",
+    unverified: "Nepatvirtinta",
+    verified: "Patvirtinta",
+    failed: "Patikra nepavyko",
+  },
+  en: {
+    configuration_required: "Configuration required",
+    unverified: "Unverified",
+    verified: "Verified",
+    failed: "Check failed",
+  },
+} satisfies Record<Locale, Record<AutomationSourceAccess, string>>;
+
+const freshnessCopy = {
+  nb: {
+    unknown: "Ukjent",
+    stale: "Utdatert",
+    fresh: "Oppdatert",
+    "no-data": "Ingen data",
+  },
+  lt: {
+    unknown: "Nežinoma",
+    stale: "Pasenę",
+    fresh: "Švieži",
+    "no-data": "Nėra duomenų",
+  },
+  en: {
+    unknown: "Unknown",
+    stale: "Stale",
+    fresh: "Fresh",
+    "no-data": "No data",
+  },
+} satisfies Record<Locale, Record<AutomationSourceFreshness, string>>;
+
+const runStatusCopy = {
+  nb: {
+    running: "Pågår",
+    completed: "Fullført",
+    failed: "Mislyktes",
+    attention: "Krever oppfølging",
+  },
+  lt: {
+    running: "Vykdoma",
+    completed: "Baigta",
+    failed: "Nepavyko",
+    attention: "Reikia peržiūros",
+  },
+  en: {
+    running: "Running",
+    completed: "Completed",
+    failed: "Failed",
+    attention: "Needs review",
+  },
+} satisfies Record<Locale, Record<AutomationRunStatus, string>>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -99,6 +176,21 @@ function isNullableString(value: unknown): value is string | null {
 
 function isFreshness(value: unknown): value is AutomationSourceFreshness {
   return ["unknown", "stale", "fresh", "no-data"].includes(String(value));
+}
+
+function isValidIsoDate(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      value,
+    )
+  )
+    return false;
+  return !Number.isNaN(new Date(value).valueOf());
+}
+
+function isNullableIsoDate(value: unknown): value is string | null {
+  return value === null || isValidIsoDate(value);
 }
 
 export function parseBlogAutomationStatus(
@@ -127,8 +219,10 @@ export function parseBlogAutomationStatus(
     return null;
   if (
     value.timeZone !== "Europe/Oslo" ||
-    typeof value.nextConfiguredRunAt !== "string" ||
-    typeof value.pendingApprovalCount !== "number"
+    !isValidIsoDate(value.nextConfiguredRunAt) ||
+    typeof value.pendingApprovalCount !== "number" ||
+    !Number.isFinite(value.pendingApprovalCount) ||
+    value.pendingApprovalCount < 0
   )
     return null;
   if (
@@ -136,7 +230,7 @@ export function parseBlogAutomationStatus(
       String(searchConsole.access),
     ) ||
     !isFreshness(searchConsole.freshness) ||
-    !isNullableString(searchConsole.lastSuccessAt)
+    !isNullableIsoDate(searchConsole.lastSuccessAt)
   )
     return null;
   if (
@@ -152,8 +246,8 @@ export function parseBlogAutomationStatus(
       !["running", "completed", "failed", "attention"].includes(
         String(value.lastRun.status),
       ) ||
-      typeof value.lastRun.startedAt !== "string" ||
-      !isNullableString(value.lastRun.finishedAt) ||
+      !isValidIsoDate(value.lastRun.startedAt) ||
+      !isNullableIsoDate(value.lastRun.finishedAt) ||
       !isNullableString(value.lastRun.errorCode)
     )
       return null;
@@ -163,22 +257,35 @@ export function parseBlogAutomationStatus(
 
 export async function fetchBlogAutomationStatus(
   fetcher: typeof fetch = fetch,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<BlogAutomationStatusDto | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? BLOG_AUTOMATION_STATUS_TIMEOUT_MS,
+  );
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) abort();
+  else options.signal?.addEventListener("abort", abort, { once: true });
   try {
     const response = await fetcher("/api/admin/blog/automation", {
       cache: "no-store",
       credentials: "same-origin",
+      signal: controller.signal,
     });
     if (!response.ok) return null;
     return parseBlogAutomationStatus(await response.json());
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abort);
   }
 }
 
 function formatDate(value: string, locale: Locale) {
   const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
+  if (Number.isNaN(date.valueOf())) return copy[locale].invalidDate;
   return new Intl.DateTimeFormat(
     locale === "lt" ? "lt-LT" : locale === "nb" ? "nb-NO" : "en-GB",
     {
@@ -243,13 +350,20 @@ export function AutomationStatusPanel({
           </p>
           <p className="mt-2 font-semibold">
             {data.lastRun
-              ? `${data.lastRun.status} · #${data.lastRun.id}`
+              ? `${runStatusCopy[locale][data.lastRun.status]} · #${data.lastRun.id}`
               : text.noRun}
           </p>
           {data.lastRun ? (
-            <p className="text-muted-foreground mt-1 text-xs">
-              {formatDate(data.lastRun.startedAt, locale)}
-            </p>
+            <>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {formatDate(data.lastRun.startedAt, locale)}
+              </p>
+              {data.lastRun.errorCode ? (
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {text.runError}
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
         <div className="rounded-2xl border border-white/10 p-4">
@@ -258,10 +372,23 @@ export function AutomationStatusPanel({
           </p>
           <p className="mt-2 text-sm">
             {text.searchConsole}:{" "}
-            <strong>{data.sources.searchConsole.freshness}</strong>
+            <strong>
+              {sourceAccessCopy[locale][data.sources.searchConsole.access]} ·{" "}
+              {freshnessCopy[locale][data.sources.searchConsole.freshness]}
+            </strong>
           </p>
+          {data.sources.searchConsole.lastSuccessAt ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              {text.lastSuccess}:{" "}
+              {formatDate(data.sources.searchConsole.lastSuccessAt, locale)}
+            </p>
+          ) : null}
           <p className="mt-1 text-sm">
-            {text.trends}: <strong>{data.sources.trends.freshness}</strong>
+            {text.trends}:{" "}
+            <strong>
+              {sourceAccessCopy[locale][data.sources.trends.access]} ·{" "}
+              {freshnessCopy[locale][data.sources.trends.freshness]}
+            </strong>
           </p>
         </div>
       </div>
@@ -279,13 +406,17 @@ export function BlogAutomationStatusLoader({
 }) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   useEffect(() => {
+    const controller = new AbortController();
     let active = true;
-    void fetchBlogAutomationStatus().then((data) => {
-      if (active)
-        setState(data ? { kind: "loaded", data } : { kind: "unavailable" });
-    });
+    void fetchBlogAutomationStatus(fetch, { signal: controller.signal }).then(
+      (data) => {
+        if (active)
+          setState(data ? { kind: "loaded", data } : { kind: "unavailable" });
+      },
+    );
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
   return <AutomationStatusPanel locale={locale} state={state} />;
