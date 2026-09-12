@@ -1,5 +1,11 @@
 import { createSign } from "node:crypto";
-import type { ProviderHealth, SearchDataProvider, SearchSignal } from "./contracts";
+import type {
+  ProviderHealth,
+  SearchDataProvider,
+  SearchSignal,
+  SearchSignalObservationWindow,
+  SearchSignalRefresh,
+} from "./contracts";
 
 type ServiceAccount = {
   client_email: string;
@@ -21,6 +27,39 @@ function credentials(environment: NodeJS.ProcessEnv = process.env): ServiceAccou
   } catch {
     return null;
   }
+}
+
+type SearchConsoleWindow = { periodStart: string; periodEnd: string };
+
+function isoDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function daysBefore(value: Date, days: number) {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() - days);
+  return result;
+}
+
+/**
+ * Uses a three-day lag for finalized Search Console data, then compares two
+ * equal 28-day windows. It is a pure contract so a scheduled importer can be
+ * tested without calling Google.
+ */
+export function searchConsoleRefreshWindows(now = new Date()) {
+  const currentEnd = daysBefore(now, 3);
+  const currentStart = daysBefore(currentEnd, 27);
+  const baselineEnd = daysBefore(currentStart, 1);
+  const baselineStart = daysBefore(baselineEnd, 27);
+  return {
+    current: { periodStart: isoDate(currentStart), periodEnd: isoDate(currentEnd) },
+    baseline: { periodStart: isoDate(baselineStart), periodEnd: isoDate(baselineEnd) },
+  } satisfies { current: SearchConsoleWindow; baseline: SearchConsoleWindow };
+}
+
+function historicalSearchConsoleWindow(now = new Date()): SearchConsoleWindow {
+  const periodEnd = daysBefore(now, 3);
+  return { periodStart: isoDate(daysBefore(periodEnd, 89)), periodEnd: isoDate(periodEnd) };
 }
 
 async function accessToken(account: ServiceAccount) {
@@ -61,17 +100,42 @@ export class GoogleSearchConsoleProvider implements SearchDataProvider {
     if (!credentials(this.environment) || !this.environment.GOOGLE_SEARCH_CONSOLE_SITE_URL?.trim()) {
       return { status: "configuration_required", provider: "google-search-console", detail: "Credentials and site URL are required" };
     }
-    return { status: "ready", provider: "google-search-console" };
+    return {
+      status: "ready",
+      provider: "google-search-console",
+      detail: "Configured; access is verified only by a successful read.",
+    };
   }
 
   async listSignals(): Promise<SearchSignal[]> {
+    return this.listSignalsForWindow(historicalSearchConsoleWindow());
+  }
+
+  async listSignalRefresh(now = new Date()): Promise<SearchSignalRefresh> {
+    const windows = searchConsoleRefreshWindows(now);
+    const [currentSignals, baselineSignals] = await Promise.all([
+      this.listSignalsForWindow(windows.current),
+      this.listSignalsForWindow(windows.baseline),
+    ]);
+    const observation = (
+      window: SearchConsoleWindow,
+      signals: SearchSignal[],
+    ): SearchSignalObservationWindow => ({
+      ...window,
+      status: signals.length ? "available" : "no-data",
+      signals,
+    });
+    return {
+      current: observation(windows.current, currentSignals),
+      baseline: observation(windows.baseline, baselineSignals),
+      geography: "unknown",
+    };
+  }
+
+  private async listSignalsForWindow(window: SearchConsoleWindow): Promise<SearchSignal[]> {
     const account = credentials(this.environment);
     const siteUrl = this.environment.GOOGLE_SEARCH_CONSOLE_SITE_URL?.trim();
     if (!account || !siteUrl) return [];
-    const end = new Date();
-    end.setUTCDate(end.getUTCDate() - 3);
-    const start = new Date(end);
-    start.setUTCDate(start.getUTCDate() - 89);
     const response = await fetch(
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
       {
@@ -81,8 +145,8 @@ export class GoogleSearchConsoleProvider implements SearchDataProvider {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          startDate: start.toISOString().slice(0, 10),
-          endDate: end.toISOString().slice(0, 10),
+          startDate: window.periodStart,
+          endDate: window.periodEnd,
           dimensions: ["query"],
           rowLimit: 1000,
           dataState: "final",
@@ -103,8 +167,8 @@ export class GoogleSearchConsoleProvider implements SearchDataProvider {
         query,
         clicks: row.clicks,
         impressions: row.impressions,
-        periodStart: start.toISOString().slice(0, 10),
-        periodEnd: end.toISOString().slice(0, 10),
+        periodStart: window.periodStart,
+        periodEnd: window.periodEnd,
       }];
     });
   }

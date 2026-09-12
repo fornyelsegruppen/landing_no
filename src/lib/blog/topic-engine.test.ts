@@ -4,6 +4,7 @@ import {
   candidateFromSignal,
   containsPersonalData,
   manualTopicSeeds,
+  seasonalRelevanceForTopic,
   sourceMetricsFromSignal,
   topicOverlap,
   topicScore,
@@ -72,5 +73,28 @@ describe("SEO topic engine", () => {
       observationPeriod: { start: "2026-06-01", end: "2026-08-31" },
       provenanceCoverage: { observationPeriod: "known", geography: "unknown" },
     });
+  });
+
+  it("rejects signals unrelated to a delivered roof service", () => {
+    expect(candidateFromSignal({ source: "search-console", query: "billig kjøkkenmaling" })).toBeNull();
+  });
+
+  it("prioritizes an Oslo editorial target without claiming measured city geography", () => {
+    const candidate = candidateFromSignal(
+      { source: "search-console", query: "takmaling oslo" },
+      new Date("2026-09-12T12:00:00Z"),
+    );
+    expect(candidate).toMatchObject({
+      serviceKey: "takmaling",
+      factors: { localRelevance: 1 },
+    });
+    expect(candidate?.location).toBeUndefined();
+    expect(candidate?.reason).toContain("søkesignalets geografi er ikke målt");
+  });
+
+  it("uses the injected Oslo date for seasonal relevance", () => {
+    expect(seasonalRelevanceForTopic("takvask etter vinteren", new Date("2026-04-15T12:00:00Z"))).toBe(1);
+    expect(seasonalRelevanceForTopic("takvask etter vinteren", new Date("2026-10-15T12:00:00Z"))).toBe(0.3);
+    expect(seasonalRelevanceForTopic("takvask om vinteren", new Date("2026-10-15T12:00:00Z"))).toBe(0.25);
   });
 });

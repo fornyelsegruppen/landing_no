@@ -30,6 +30,25 @@ export type TopicCandidate = {
   sourceSignal?: SearchSignal;
 };
 
+export type EditorialTarget = "Oslo" | "Bærum" | "Asker" | "Lillestrøm" | "Lørenskog" | "Ski";
+
+const serviceMatchers: Array<{ key: string; pattern: RegExp }> = [
+  { key: "nytt-tak", pattern: /\b(nytt\s+tak|takbytte|bytte\s+tak|legge\s+nytt\s+tak)\b/i },
+  { key: "takmaling", pattern: /\b(takmaling|male\s+tak|maling\s+av\s+tak)\b/i },
+  { key: "impregnering", pattern: /\b(impregnering|impregnere)\b/i },
+  { key: "takfornying", pattern: /\b(takfornying|takfornyelse)\b/i },
+  { key: "takvask", pattern: /\b(takvask|vaske\s+tak|vask\s+av\s+tak|mose\s+(på|av)\s+tak|alger\s+(på|av)\s+tak|lav\s+(på|av)\s+tak)\b/i },
+];
+
+const editorialTargetMatchers: Array<{ target: EditorialTarget; pattern: RegExp }> = [
+  { target: "Oslo", pattern: /\boslo\b/i },
+  { target: "Bærum", pattern: /\bbærum\b/i },
+  { target: "Asker", pattern: /\basker\b/i },
+  { target: "Lillestrøm", pattern: /\blillestrøm\b/i },
+  { target: "Lørenskog", pattern: /\blørenskog\b/i },
+  { target: "Ski", pattern: /\bski\b/i },
+];
+
 const weights: Record<keyof TopicFactors, number> = {
   serviceRelevance: 25,
   demand: 20,
@@ -111,7 +130,38 @@ export function containsPersonalData(value: string) {
   );
 }
 
-export function candidateFromSignal(signal: SearchSignal): TopicCandidate | null {
+function osloMonth(now: Date) {
+  const month = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Oslo",
+    month: "numeric",
+  }).formatToParts(now).find((part) => part.type === "month")?.value;
+  return Number(month || 0);
+}
+
+export function seasonalRelevanceForTopic(value: string, now = new Date()) {
+  const month = osloMonth(now);
+  const topic = value.toLocaleLowerCase("nb-NO");
+  const winter = /\b(vinter(?:en)?|snø|frost|is)\b/.test(topic);
+  const spring = /\b(vår|etter vinteren)\b/.test(topic);
+  const autumn = /\b(høst|høstregn|løv)\b/.test(topic);
+  const roofCare = /\b(takvask|impregner|takmaling|takfornying|takfornyelse)\b/.test(topic);
+
+  if (spring) return month >= 3 && month <= 5 ? 1 : 0.3;
+  if (winter) return month === 11 || month === 12 || month <= 2 ? 1 : 0.25;
+  if (autumn) return month >= 8 && month <= 10 ? 1 : 0.3;
+  if (roofCare) return month >= 4 && month <= 10 ? 0.75 : 0.45;
+  return 0.5;
+}
+
+export function serviceKeyForSignal(query: string) {
+  return serviceMatchers.find(({ pattern }) => pattern.test(query))?.key;
+}
+
+export function editorialTargetForSignal(query: string): EditorialTarget | undefined {
+  return editorialTargetMatchers.find(({ pattern }) => pattern.test(query))?.target;
+}
+
+export function candidateFromSignal(signal: SearchSignal, now = new Date()): TopicCandidate | null {
   if (containsPersonalData(signal.query)) return null;
   const sourceMap = {
     "search-console": "search_console",
@@ -122,6 +172,9 @@ export function candidateFromSignal(signal: SearchSignal): TopicCandidate | null
   } as const;
   const query = signal.query.trim();
   if (query.length < 5 || query.length > 140) return null;
+  const serviceKey = serviceKeyForSignal(query);
+  if (!serviceKey) return null;
+  const editorialTarget = editorialTargetForSignal(query);
   const commercial = /pris|kost|tilbud|befaring|m2/.test(query.toLowerCase());
   return {
     topic: query.charAt(0).toUpperCase() + query.slice(1),
@@ -129,7 +182,7 @@ export function candidateFromSignal(signal: SearchSignal): TopicCandidate | null
     secondaryKeywords: [],
     searchIntent: commercial ? "commercial" : "informational",
     source: sourceMap[signal.source],
-    serviceKey: /maling/.test(query) ? "takmaling" : /nytt tak|takbytte/.test(query) ? "nytt-tak" : "takvask",
+    serviceKey,
     factors: {
       serviceRelevance: 1,
       demand: Math.min(
@@ -142,11 +195,13 @@ export function candidateFromSignal(signal: SearchSignal): TopicCandidate | null
       ),
       commercialValue: commercial ? 0.9 : 0.55,
       contentGap: 0.8,
-      seasonalRelevance: 0.5,
+      seasonalRelevance: seasonalRelevanceForTopic(query, now),
       originalEvidence: 0.5,
-      localRelevance: 0,
+      // This is only a curated editorial priority; it does not claim that the
+      // source measured demand in this city or that the searcher was local.
+      localRelevance: editorialTarget ? 1 : 0.35,
     },
-    reason: `Aggregert signal fra ${signal.source}; ingen kundeidentitet er brukt.`,
+    reason: `Aggregert signal fra ${signal.source}; ingen kundeidentitet er brukt.${editorialTarget ? ` Redaksjonelt prioritert for ${editorialTarget}; søkesignalets geografi er ikke målt.` : ""}`,
     sourceSignal: signal,
   };
 }

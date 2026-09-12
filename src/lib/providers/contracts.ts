@@ -108,9 +108,25 @@ export type SearchSignal = {
   periodEnd?: string;
 };
 
+export type SearchSignalObservationWindow = {
+  periodStart: string;
+  periodEnd: string;
+  /** Empty is explicitly no observed data, never a synthetic zero-popularity row. */
+  status: "available" | "no-data";
+  signals: SearchSignal[];
+};
+
+export type SearchSignalRefresh = {
+  current: SearchSignalObservationWindow;
+  baseline: SearchSignalObservationWindow;
+  /** No city or demographic claim is made unless a provider explicitly proves it. */
+  geography: "unknown";
+};
+
 export interface SearchDataProvider {
   health(): ProviderHealth;
   listSignals(): Promise<SearchSignal[]>;
+  listSignalRefresh?(): Promise<SearchSignalRefresh>;
 }
 
 export class ProviderUnavailableError extends Error {
