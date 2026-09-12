@@ -84,6 +84,10 @@ not be confused with the separately gated seed script.
   with name `boundary-20260912-anchor-756.pdf` on document page 31
   (`E2E_ADMIN_CASE_DOCUMENT_PAGE=31`). A sparse final message page need not
   create an older-message disclosure; visibility is still required.
+- Use `playwright.one-ui-local.config.ts` for that browser run. It accepts
+  only loopback port 3217 and has no `webServer` launcher, no retries, and no
+  external bypass headers. The default repository config can auto-start
+  another server/database and must not be used for this frozen-runtime gate.
 
 ## Remaining gates — not claimed passed
 
