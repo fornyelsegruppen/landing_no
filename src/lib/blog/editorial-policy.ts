@@ -114,7 +114,9 @@ function publicContentChanged(
   // metadata. It is not itself an editorial content change; compare all other
   // public fields normally so a changed draft still cannot bypass review.
   const originalForComparison =
-    original._status !== "published" && merged._status === "published"
+    original._status !== "published" &&
+    !original.publishedAt &&
+    merged._status === "published"
       ? {
           ...original,
           authorName: merged.authorName,

@@ -278,6 +278,77 @@ describe("Posts technical editor quality policy", () => {
     expect(result).toEqual({ titleNo: original.titleNo });
   });
 
+  it("allows the initial draft-to-published author metadata fill", () => {
+    const result = beforeChangeHook()({
+      context: {},
+      data: {
+        _status: "published",
+        editorialStatus: "approved",
+        authorName: "Takfornyelse",
+        reviewerName: "Synthetic Reviewer",
+        reviewedAt: "2026-09-12T10:00:00.000Z",
+      },
+      operation: "update",
+      originalDoc: {
+        ...original,
+        authorName: null,
+        reviewerName: null,
+        reviewedAt: null,
+        _status: "draft",
+      },
+      req: { user: null },
+    } as never);
+
+    expect(result).toMatchObject({ _status: "published" });
+    expect(result).not.toMatchObject({ editorialStatus: "human_review" });
+  });
+
+  it("does not let a simultaneous first-publication content edit reuse approval", () => {
+    const result = beforeChangeHook()({
+      context: {},
+      data: {
+        _status: "published",
+        authorName: "Takfornyelse",
+        contentNo: "Changed while attempting first publication",
+      },
+      operation: "update",
+      originalDoc: { ...original, _status: "draft" },
+      req: { user: null },
+    } as never);
+
+    expect(result).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      qualityScore: null,
+      qualityChecks: null,
+    });
+  });
+
+  it("invalidates author and date changes for a previously published revision", () => {
+    const result = beforeChangeHook()({
+      context: {},
+      data: {
+        _status: "published",
+        authorName: "Different public author",
+        publishedAt: "2026-09-12T11:00:00.000Z",
+      },
+      operation: "update",
+      originalDoc: {
+        ...original,
+        _status: "draft",
+        publishedAt: "2026-09-01T10:00:00.000Z",
+      },
+      req: { user: null },
+    } as never);
+
+    expect(result).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      qualityScore: null,
+      qualityChecks: null,
+    });
+  });
+
   it("uses one stable public-content fingerprint definition for later immutable approval", () => {
     expect(publicPostContentFields).toEqual(
       expect.arrayContaining([
