@@ -130,6 +130,7 @@ export default async function BlogArticleAdminPage({
         seoTitleNo={post.seoTitleNo || undefined}
         status={post.editorialStatus}
         titleNo={post.titleNo}
+        updatedAt={post.updatedAt}
       />
       <BlogReviewPanel locale={user.interfaceLanguage} {...reviewInput} />
       <details className="text-muted-foreground rounded-2xl border border-white/10 p-4 text-sm">
