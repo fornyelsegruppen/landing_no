@@ -13,6 +13,7 @@ const copy = {
     enabled: "aktive funksjoner",
     disabled: "fortsatt deaktivert",
     paused: "Automatiske kommersielle og operative utsendelser er satt på pause",
+    notEnabled: "Automatiske kommersielle og operative utsendelser er ikke aktivert",
     running: "Automatiske utsendelser er aktivert for godkjent bølge",
     details: "Vis funksjonsstatus",
   },
@@ -23,6 +24,7 @@ const copy = {
     enabled: "aktyvios funkcijos",
     disabled: "dar išjungta",
     paused: "Automatiniai komerciniai ir operaciniai siuntimai pristabdyti",
+    notEnabled: "Automatiniai komerciniai ir operaciniai siuntimai neįjungti",
     running: "Automatiniai siuntimai įjungti patvirtintai bangai",
     details: "Rodyti funkcijų būseną",
   },
@@ -33,6 +35,7 @@ const copy = {
     enabled: "active features",
     disabled: "still disabled",
     paused: "Automated commercial and operational sends are paused",
+    notEnabled: "Automated commercial and operational sends are not enabled",
     running: "Automated sends are enabled for the approved wave",
     details: "Show feature status",
   },
@@ -63,6 +66,15 @@ export function ControlledPilotBanner({
 }) {
   const t = copy[locale];
   const controlled = status.mode === "controlled_pilot";
+  const automaticSendsEnabled = status.enabledFeatures.some(
+    (feature) =>
+      feature === "automatedReminders" || feature === "communicationRoutingV2",
+  );
+  const sendStatus = status.automaticCommunicationPaused
+    ? t.paused
+    : automaticSendsEnabled
+      ? t.running
+      : t.notEnabled;
 
   return (
     <section
@@ -81,7 +93,7 @@ export function ControlledPilotBanner({
       </div>
       <p className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
         <PauseCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        {status.automaticCommunicationPaused ? t.paused : t.running}
+        {sendStatus}
       </p>
       {status.disabledFeatures.length ? (
         <details className="mt-2 text-xs text-muted-foreground">
