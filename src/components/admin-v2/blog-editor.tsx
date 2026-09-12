@@ -217,8 +217,6 @@ export function BlogEditor(props: Props) {
   const scheduleDateIsFuture =
     scheduleConversion.ok &&
     new Date(scheduleConversion.iso).getTime() > currentTime;
-  const scheduleDisabled =
-    busy || props.status !== "approved" || !scheduleDateIsFuture;
   const scheduleValidationReason = form.scheduledAt
     ? scheduleConversion.ok
       ? null
@@ -233,6 +231,15 @@ export function BlogEditor(props: Props) {
     : null;
   const savedScheduledAt = osloLocalDateTime(props.scheduledAt);
   const hasUnsavedSchedulePlan = form.scheduledAt !== savedScheduledAt;
+  const hasSchedulingApproval =
+    props.status === "approved" || props.status === "scheduled";
+  const scheduleDisabled =
+    busy ||
+    dirty ||
+    serverUpdatedWhileDirty ||
+    !hasSchedulingApproval ||
+    !scheduleDateIsFuture ||
+    (props.status === "scheduled" && !hasUnsavedSchedulePlan);
   const publishDisabled = busy || !props.publishEligible;
   const mutedActionClass =
     "disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-white/35 disabled:opacity-100";
@@ -305,7 +312,10 @@ export function BlogEditor(props: Props) {
     if (action === "stock-image") return copy.stockUpdated;
     if (action === "regenerate") return copy.regenerated;
     if (action === "approve") return copy.approved;
-    if (action === "schedule") return copy.scheduled;
+    if (action === "schedule")
+      return result.outcome === "unchanged"
+        ? copy.scheduleUnchanged
+        : copy.scheduled;
     if (action === "publish") return copy.published;
     return copy.rejected;
   }
@@ -615,7 +625,10 @@ export function BlogEditor(props: Props) {
             onClick={() => void act("schedule")}
             type="button"
           >
-            {actionLabel("schedule", core.schedule)}
+            {actionLabel(
+              "schedule",
+              props.status === "scheduled" ? copy.reschedule : core.schedule,
+            )}
           </button>
           <button
             className={`bg-accent text-accent-foreground min-h-11 rounded-xl px-4 font-bold ${mutedActionClass}`}
@@ -646,7 +659,7 @@ export function BlogEditor(props: Props) {
             {actionLabel("unpublish", history.unpublish)}
           </button>
         ) : null}
-        {props.status !== "approved" ? (
+        {!hasSchedulingApproval ? (
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.scheduleNeedsApproval}
           </p>

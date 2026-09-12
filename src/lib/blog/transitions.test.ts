@@ -2,6 +2,38 @@ import { describe, expect, it } from "vitest";
 import { assertBlogAction } from "./transitions";
 
 describe("editorial admin actions", () => {
+  const reviewed = {
+    status: "scheduled" as const,
+    qualityPassed: true,
+    qualityScore: 90,
+    reviewerName: "Kari",
+    reviewedAt: "2026-09-12T10:00:00.000Z",
+  };
+  it("allows a reviewed scheduled article to move to another future time", () => {
+    expect(
+      assertBlogAction(reviewed, "schedule", "2099-09-14T07:00:00.000Z"),
+    ).toBe(true);
+  });
+  it.each([
+    { status: "human_review" as const },
+    { qualityPassed: false },
+    { qualityScore: 74 },
+    { reviewerName: null },
+    { reviewedAt: null },
+  ])("rescheduling cannot bypass current approval or QA: %j", (patch) => {
+    expect(() =>
+      assertBlogAction(
+        { ...reviewed, ...patch },
+        "schedule",
+        "2099-09-14T07:00:00.000Z",
+      ),
+    ).toThrow();
+  });
+  it("rescheduling rejects a past date", () => {
+    expect(() =>
+      assertBlogAction(reviewed, "schedule", "2000-01-01T09:00:00.000Z"),
+    ).toThrow(/future/);
+  });
   it("requires passed QA and a named reviewer before approval", () => {
     expect(() =>
       assertBlogAction(

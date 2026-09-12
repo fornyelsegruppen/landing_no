@@ -63,10 +63,22 @@ export function assertBlogAction(
     }
   }
   if (action === "schedule") {
-    if (input.status !== "approved") {
+    if (!["approved", "scheduled"].includes(input.status)) {
       throw new BlogTransitionError(
         "INVALID_TRANSITION",
         "Only approved articles can be scheduled",
+      );
+    }
+    if (!input.qualityPassed || (input.qualityScore || 0) < 75) {
+      throw new BlogTransitionError(
+        "QUALITY_NOT_READY",
+        "The deterministic quality gate has not passed",
+      );
+    }
+    if (!input.reviewerName?.trim() || !input.reviewedAt) {
+      throw new BlogTransitionError(
+        "REVIEWER_REQUIRED",
+        "Recorded human review is required",
       );
     }
     const date = scheduledAt ? new Date(scheduledAt) : null;

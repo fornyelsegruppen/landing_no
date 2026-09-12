@@ -31,6 +31,47 @@ const props = {
 };
 
 describe("blog editor", () => {
+  it("offers rescheduling only after the saved future time changes", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(Response.json({ ok: true, action: "schedule" }));
+    vi.stubGlobal("fetch", fetcher);
+    await renderedEditor(
+      async (container) => {
+        const button = Array.from(container.querySelectorAll("button")).find(
+          (item) => item.textContent === "Pakeisti laiką",
+        )!;
+        expect(button.disabled).toBe(true);
+        expect(container.textContent).not.toContain(
+          "Planavimas bus galimas po specialisto patvirtinimo.",
+        );
+        expect(container.textContent).toContain("2099-09-14");
+        const input = container.querySelector<HTMLInputElement>(
+          'input[type="datetime-local"]',
+        )!;
+        await act(async () => {
+          Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+          )!.set!.call(input, "2099-09-15T09:00");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        expect(button.disabled).toBe(false);
+        await act(async () => button.click());
+        expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+          action: "schedule",
+          scheduledAt: "2099-09-15T07:00:00.000Z",
+          expectedUpdatedAt: props.updatedAt,
+        });
+      },
+      {
+        status: "scheduled",
+        scheduledAt: "2099-09-14T07:00:00.000Z",
+        qualityPassed: true,
+        qualityScore: 100,
+      },
+    );
+  });
   it("requires confirmation for explicit unpublish and submits only the revision guard", async () => {
     const fetcher = vi
       .fn()

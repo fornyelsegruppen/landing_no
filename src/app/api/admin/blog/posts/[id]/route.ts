@@ -347,7 +347,7 @@ export async function POST(
       parsed.data.action,
       parsed.data.scheduledAt,
     );
-    if (parsed.data.action === "publish") {
+    if (parsed.data.action === "publish" || parsed.data.action === "schedule") {
       try {
         assertPostPublishable({ ...post, reviewerName });
       } catch {
@@ -356,6 +356,22 @@ export async function POST(
           "Publication review and quality requirements are not satisfied",
         );
       }
+    }
+
+    if (
+      parsed.data.action === "schedule" &&
+      post.editorialStatus === "scheduled" &&
+      post.scheduledAt &&
+      new Date(post.scheduledAt).getTime() ===
+        new Date(parsed.data.scheduledAt!).getTime()
+    ) {
+      return NextResponse.json({
+        ok: true,
+        postId: post.id,
+        action,
+        outcome: "unchanged",
+        correlationId,
+      });
     }
 
     if (parsed.data.action === "regenerate") {

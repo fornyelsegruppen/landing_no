@@ -36,6 +36,8 @@ type BlogEditorCopy = {
   regenerationInstructionsHint: string;
   regenerationConfirm: string;
   scheduleNeedsApproval: string;
+  reschedule: string;
+  scheduleUnchanged: string;
   scheduleNeedsFutureDate: string;
   scheduleTimeZone: string;
   scheduleInvalidTime: string;
@@ -98,6 +100,8 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     regenerationConfirm:
       "Et nytt AI-utkast erstatter det nåværende upubliserte utkastet og nullstiller kontroll og planlegging. Fortsette?",
     scheduleNeedsApproval: "Planlegging åpnes etter faglig godkjenning.",
+    reschedule: "Endre tidspunkt",
+    scheduleUnchanged: "Det valgte tidspunktet er allerede lagret.",
     scheduleNeedsFutureDate: "Velg et fremtidig tidspunkt før planlegging.",
     scheduleTimeZone: "Tid tolkes alltid som Europe/Oslo.",
     scheduleInvalidTime: "Oppgi et gyldig Oslo-tidspunkt før planlegging.",
@@ -162,6 +166,8 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
       "Naujas DI juodraštis pakeis dabartinį neviešą juodraštį ir iš naujo nustatys peržiūrą bei planavimą. Tęsti?",
     scheduleNeedsApproval:
       "Planavimas bus galimas po specialisto patvirtinimo.",
+    reschedule: "Pakeisti laiką",
+    scheduleUnchanged: "Pasirinktas laikas jau išsaugotas.",
     scheduleNeedsFutureDate: "Prieš planuodami pasirinkite būsimą laiką.",
     scheduleTimeZone: "Laikas visada interpretuojamas kaip Europe/Oslo.",
     scheduleInvalidTime: "Prieš planuodami įveskite tinkamą Oslo laiką.",
@@ -228,6 +234,8 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     regenerationConfirm:
       "A new AI draft replaces the current unpublished draft and resets review and scheduling. Continue?",
     scheduleNeedsApproval: "Scheduling opens after expert approval.",
+    reschedule: "Change time",
+    scheduleUnchanged: "The selected time is already saved.",
     scheduleNeedsFutureDate: "Choose a future time before scheduling.",
     scheduleTimeZone: "Time is always interpreted as Europe/Oslo.",
     scheduleInvalidTime: "Enter a valid Oslo time before scheduling.",

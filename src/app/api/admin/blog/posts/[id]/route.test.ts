@@ -66,6 +66,66 @@ function request(body: Record<string, unknown>) {
 const context = { params: Promise.resolve({ id: "9" }) };
 
 describe("admin blog post actions", () => {
+  it("reschedules unchanged reviewed content with revision guards and no new approval", async () => {
+    const post = {
+      ...(await mocks.findByID()),
+      editorialStatus: "scheduled",
+      scheduledAt: "2099-09-14T07:00:00.000Z",
+    };
+    mocks.findByID.mockResolvedValue(post);
+    const response = await POST(
+      request({
+        action: "schedule",
+        scheduledAt: "2099-09-15T07:00:00.000Z",
+        expectedUpdatedAt: post.updatedAt,
+      }),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: true,
+        data: {
+          editorialStatus: "scheduled",
+          scheduledAt: "2099-09-15T07:00:00.000Z",
+        },
+        context: {
+          expectedBlogUpdatedAt: post.updatedAt,
+          expectedBlogRevision: expect.any(String),
+        },
+      }),
+    );
+  });
+  it("a repeated schedule request is a no-op without another version or audit event", async () => {
+    const scheduledAt = "2099-09-14T07:00:00.000Z";
+    mocks.findByID.mockResolvedValue({
+      ...(await mocks.findByID()),
+      editorialStatus: "scheduled",
+      scheduledAt,
+    });
+    const response = await POST(
+      request({ action: "schedule", scheduledAt }),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ outcome: "unchanged" });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
+  });
+  it("a damaged scheduled review cannot be rescheduled even to the same date", async () => {
+    const scheduledAt = "2099-09-14T07:00:00.000Z";
+    mocks.findByID.mockResolvedValue({
+      ...(await mocks.findByID()),
+      editorialStatus: "scheduled",
+      scheduledAt,
+      reviewedAt: null,
+    });
+    expect(
+      (await POST(request({ action: "schedule", scheduledAt }), context))
+        .status,
+    ).toBe(409);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
   it("unpublishes the base document with review reset and both revision guards", async () => {
     const post = await mocks.findByID();
     const response = await POST(
