@@ -49,6 +49,20 @@ const stageContent = {
 };
 
 describe("case process timeline", () => {
+  it("does not present bounded related links as a total document badge", () => {
+    const html = renderToStaticMarkup(
+      createElement(CaseProcessTimeline, {
+        activeStageId: "agreement",
+        locale: "lt",
+        stageContent,
+      }),
+    );
+    expect(html).toContain("/api/admin/quotes/17/T-17-V1.pdf");
+    expect(html).not.toContain('class="sr-only">Dokumentai</span>');
+    expect(html).not.toContain(
+      "rounded-full border border-current/20 px-1.5 py-0.5",
+    );
+  });
   it("keeps SSR and first hydration closed even with explicit history navigation", () => {
     const html = renderToStaticMarkup(
       createElement(CaseProcessTimeline, {

@@ -317,13 +317,6 @@ export function CaseProcessTimeline({
                       {content.timestamp}
                     </time>
                   ) : null}
-                  {relatedLinks.length ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 normal-case">
-                      <FileText aria-hidden="true" className="size-3" />
-                      {relatedLinks.length}
-                      <span className="sr-only">{labels.historyArtifacts}</span>
-                    </span>
-                  ) : null}
                 </span>
                 <span className="mt-1 block text-[.95rem] leading-snug font-bold [overflow-wrap:anywhere] break-words sm:text-base">
                   {stageLabel}
