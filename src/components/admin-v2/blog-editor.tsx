@@ -16,6 +16,10 @@ import {
   savedBlogEditorFields,
   type BlogEditorForm,
 } from "@/lib/admin-v2/blog-editor-state";
+import {
+  blogEditorRefreshState,
+  BLOG_EDITOR_REFRESH_RECOVERY_MS,
+} from "@/lib/admin-v2/blog-editor-refresh-state";
 import type { PanelLocale } from "@/lib/panel-i18n";
 
 type QualityIssue = {
@@ -98,6 +102,7 @@ export function BlogEditor(props: Props) {
   const [saved, setSaved] = useState(() => savedBlogEditorFields(incoming));
   const [busyAction, setBusyAction] = useState<BlogEditorAction | null>(null);
   const [awaitingRefresh, setAwaitingRefresh] = useState(false);
+  const [refreshRecoveryVisible, setRefreshRecoveryVisible] = useState(false);
   const [serverUpdatedWhileDirty, setServerUpdatedWhileDirty] = useState(false);
   const [savedUpdatedAt, setSavedUpdatedAt] = useState(props.updatedAt);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
@@ -124,6 +129,7 @@ export function BlogEditor(props: Props) {
     setSavedUpdatedAt(props.updatedAt);
     setServerUpdatedWhileDirty(false);
     setAwaitingRefresh(false);
+    setRefreshRecoveryVisible(false);
     sourceVersion.current = incomingVersion;
   }, [
     copy.serverUpdated,
@@ -168,7 +174,20 @@ export function BlogEditor(props: Props) {
     };
   }, [copy.discardConfirm]);
 
-  const busy = busyAction !== null || awaitingRefresh;
+  useEffect(() => {
+    if (!awaitingRefresh) return;
+    const timeout = window.setTimeout(
+      () => setRefreshRecoveryVisible(true),
+      BLOG_EDITOR_REFRESH_RECOVERY_MS,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [awaitingRefresh]);
+
+  const refreshState = blogEditorRefreshState({
+    awaitingRefresh,
+    refreshRecoveryVisible,
+  });
+  const busy = busyAction !== null || refreshState.freezeEditor;
   const needsQualityRecheck =
     props.qualityPassed !== true || typeof props.qualityScore !== "number";
   const scheduleDateIsFuture =
@@ -263,6 +282,7 @@ export function BlogEditor(props: Props) {
             : actionSuccess(action, result),
         result,
       });
+      setRefreshRecoveryVisible(false);
       setAwaitingRefresh(true);
       router.refresh();
     } catch {
@@ -276,6 +296,11 @@ export function BlogEditor(props: Props) {
     if (!dirty || busy || !window.confirm(copy.discardConfirm)) return;
     setForm((current) => ({ ...current, ...saved }));
     setFeedback({ kind: "info", message: copy.discarded });
+  }
+
+  function reloadLatestArticle() {
+    // This only navigates to a fresh server render; it never repeats a mutation.
+    window.location.reload();
   }
 
   const feedbackRunHref = feedback?.result
@@ -494,6 +519,28 @@ export function BlogEditor(props: Props) {
           <p className="text-muted-foreground mt-3 text-sm">
             {copy.publishLocked}
           </p>
+        ) : null}
+        {refreshState.freezeEditor ? (
+          <div
+            className="mt-4 rounded-xl border border-white/10 bg-black/15 p-3 text-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <p>
+              {refreshState.showSafeReload
+                ? copy.refreshDelayed
+                : copy.refreshPending}
+            </p>
+            {refreshState.showSafeReload ? (
+              <button
+                className="mt-3 min-h-10 rounded-xl border border-white/15 px-4 font-bold"
+                onClick={reloadLatestArticle}
+                type="button"
+              >
+                {copy.reloadLatest}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {feedback ? (
           <div

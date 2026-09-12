@@ -38,6 +38,9 @@ type BlogEditorCopy = {
   scheduleNeedsApproval: string;
   scheduleNeedsFutureDate: string;
   publishLocked: string;
+  refreshPending: string;
+  refreshDelayed: string;
+  reloadLatest: string;
 };
 
 export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
@@ -89,6 +92,10 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     scheduleNeedsApproval: "Planlegging åpnes etter faglig godkjenning.",
     scheduleNeedsFutureDate: "Velg et fremtidig tidspunkt før planlegging.",
     publishLocked: "Publisering er låst til alle kontrollkrav er oppfylt.",
+    refreshPending: "Henter de nyeste artikkelopplysningene …",
+    refreshDelayed:
+      "De nyeste opplysningene kom ikke tilbake ennå. Last inn siden på nytt før du fortsetter.",
+    reloadLatest: "Last inn siste versjon",
   },
   lt: {
     unsaved: "Turite neišsaugotų straipsnio pakeitimų.",
@@ -138,6 +145,10 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     scheduleNeedsFutureDate: "Prieš planuodami pasirinkite būsimą laiką.",
     publishLocked:
       "Publikavimas užrakintas, kol neįvykdyti visi patikros reikalavimai.",
+    refreshPending: "Įkeliama naujausia straipsnio informacija …",
+    refreshDelayed:
+      "Naujausia informacija dar negrįžo. Prieš tęsdami iš naujo įkelkite puslapį.",
+    reloadLatest: "Įkelti naujausią versiją",
   },
   en: {
     unsaved: "You have unsaved article changes.",
@@ -188,5 +199,9 @@ export const blogEditorCopies: Record<PanelLocale, BlogEditorCopy> = {
     scheduleNeedsFutureDate: "Choose a future time before scheduling.",
     publishLocked:
       "Publishing stays locked until every review requirement is met.",
+    refreshPending: "Loading the latest article details …",
+    refreshDelayed:
+      "The latest details have not returned yet. Reload the page before continuing.",
+    reloadLatest: "Reload latest version",
   },
 };
