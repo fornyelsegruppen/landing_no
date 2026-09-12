@@ -12,6 +12,79 @@ describe("blog quality gates", () => {
     });
   });
 
+  it("blocks repeated substantive prose even when repeated words exceed 700", () => {
+    const paragraph =
+      "En faglig vurdering av taket tar utgangspunkt i materiale, alder, synlige flater og trygg adkomst før et tiltak anbefales. Boligeieren får forklart hvilke observasjoner som er relevante, hvilke spørsmål som bør avklares, og hvorfor endelig omfang må beskrives i et skriftlig tilbud før arbeidet planlegges.";
+    const variants = Array.from({ length: 10 }, (_, index) => {
+      if (index % 3 === 0) return paragraph;
+      if (index % 3 === 1)
+        return paragraph
+          .toUpperCase()
+          .replaceAll(" ", "  ")
+          .replace(".", "!!!");
+      return paragraph.replaceAll(" ", "\n").replace(".", ",");
+    });
+    const content = `${validGeneratedArticle().content}\n\n${variants.join("\n\n")}`;
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({ content }),
+      validTopic,
+    );
+
+    expect(content.match(/[a-zæøå0-9]+/gi)?.length).toBeGreaterThanOrEqual(700);
+    expect(result.passed).toBe(false);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        gate: "originality",
+        code: "repeated_meaningful_paragraph",
+        severity: "blocker",
+      }),
+    );
+  });
+
+  it("allows two substantial repeats and ignores headings, short CTAs, and list-only blocks", () => {
+    const paragraph =
+      "En faglig vurdering av taket tar utgangspunkt i materiale, alder, synlige flater og trygg adkomst før et tiltak anbefales. Boligeieren får forklart hvilke observasjoner som er relevante, hvilke spørsmål som bør avklares, og hvorfor endelig omfang må beskrives i et skriftlig tilbud før arbeidet planlegges.";
+    const ignoredBlocks = [
+      "## Praktisk informasjon",
+      "Be om en gratis og uforpliktende vurdering når du er klar.",
+      "- Taksjekk av synlige flater fra trygg avstand\n- Spørsmål om tilstand, helling og forsvarlig adkomst\n- Avklaring av omfang før en mulig behandling\n- Skriftlig tilbud med relevante forutsetninger og neste steg",
+    ];
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}\n\n${paragraph}\n\n${paragraph}\n\n${ignoredBlocks.join("\n\n")}\n\n${ignoredBlocks.join("\n\n")}\n\n${ignoredBlocks.join("\n\n")}`,
+      }),
+      validTopic,
+    );
+
+    expect(result.issues).not.toContainEqual(
+      expect.objectContaining({ code: "repeated_meaningful_paragraph" }),
+    );
+  });
+
+  it("keeps numbered prose in scope instead of mistaking it for a list", () => {
+    const numberedParagraph =
+      "1. En faglig vurdering av taket tar utgangspunkt i materiale, alder, synlige flater og trygg adkomst før et tiltak anbefales. Boligeieren får forklart hvilke observasjoner som er relevante, hvilke spørsmål som bør avklares, og hvorfor endelig omfang må beskrives i et skriftlig tilbud før arbeidet planlegges.";
+    const result = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}\n\n${Array.from({ length: 3 }, () => numberedParagraph).join("\n\n")}`,
+      }),
+      validTopic,
+    );
+
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: "repeated_meaningful_paragraph" }),
+    );
+  });
+
+  it("accepts a complete draft with distinct substantive paragraphs", () => {
+    const result = evaluateArticleQuality(validGeneratedArticle(), validTopic);
+
+    expect(result.passed).toBe(true);
+    expect(result.issues).not.toContainEqual(
+      expect.objectContaining({ code: "repeated_meaningful_paragraph" }),
+    );
+  });
+
   it("blocks invented prices, guarantees and dangerous roof advice", () => {
     const result = evaluateArticleQuality(
       validGeneratedArticle({

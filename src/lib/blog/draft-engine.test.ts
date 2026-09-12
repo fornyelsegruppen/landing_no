@@ -41,6 +41,30 @@ describe("AI blog draft engine", () => {
     ).rejects.toBeInstanceOf(ArticleQualityBlockedError);
   });
 
+  it("returns the repeated-prose issue through the normal draft-quality pipeline", async () => {
+    const paragraph =
+      "En faglig vurdering av taket tar utgangspunkt i materiale, alder, synlige flater og trygg adkomst før et tiltak anbefales. Boligeieren får forklart hvilke observasjoner som er relevante, hvilke spørsmål som bør avklares, og hvorfor endelig omfang må beskrives i et skriftlig tilbud før arbeidet planlegges.";
+    const content = `${validGeneratedArticle().content}\n\n${Array.from({ length: 3 }, () => paragraph).join("\n\n")}`;
+
+    await expect(
+      generateBlogDraft({
+        provider: new DeterministicAiProvider(
+          validGeneratedArticle({ content }),
+        ),
+        topic: validTopic,
+        existing: [],
+        correlationId: "repeated-prose-quality-block",
+      }),
+    ).rejects.toMatchObject({
+      name: "ArticleQualityBlockedError",
+      quality: expect.objectContaining({
+        issues: expect.arrayContaining([
+          expect.objectContaining({ code: "repeated_meaningful_paragraph" }),
+        ]),
+      }),
+    });
+  });
+
   it("passes 587-word repair feedback to the provider and still blocks a bad replacement", async () => {
     const provider: AiProvider = {
       health: () => ({ status: "ready", provider: "test" }),

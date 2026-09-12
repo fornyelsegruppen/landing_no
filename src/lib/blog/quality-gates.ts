@@ -38,6 +38,30 @@ function words(value: string): string[] {
   return value.toLocaleLowerCase("nb-NO").match(/[a-zæøå0-9]+/g) || [];
 }
 
+function repeatedMeaningfulParagraphCount(content: string) {
+  const counts = new Map<string, number>();
+
+  for (const block of content.replace(/\r\n?/g, "\n").split(/\n\s*\n/)) {
+    const lines = block
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) => !/^#{1,6}\s+/.test(line));
+    if (!lines.length) continue;
+
+    const unorderedList = lines.every((line) => /^[-*+]\s+/.test(line));
+    const orderedList =
+      lines.length > 1 && lines.every((line) => /^\d+[.)]\s+/.test(line));
+    if (unorderedList || orderedList) continue;
+
+    const normalized = words(lines.join(" ")).join(" ");
+    if (normalized.split(" ").length < 25) continue;
+    counts.set(normalized, (counts.get(normalized) || 0) + 1);
+  }
+
+  return Math.max(0, ...counts.values());
+}
+
 function add(
   issues: QualityIssue[],
   gate: QualityIssue["gate"],
@@ -353,6 +377,15 @@ export function evaluateArticleQuality(
       "content_too_long",
       "warning",
       `Artikkelen har ${contentWords.length} ord og bør strammes inn.`,
+    );
+  }
+  if (repeatedMeaningfulParagraphCount(article.content) >= 3) {
+    add(
+      issues,
+      "originality",
+      "repeated_meaningful_paragraph",
+      "blocker",
+      "Teksten gjentar samme lengre avsnitt flere ganger. Skriv om eller fjern gjentatt fyllinnhold før ny kvalitetskontroll.",
     );
   }
   const keywordWords = words(article.primaryKeyword);
