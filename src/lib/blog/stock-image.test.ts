@@ -408,9 +408,19 @@ describe("blog stock images", () => {
       });
       const replacement = expectReplacement(result);
       selectedIds.push(replacement.selected.id);
+      const nextStockImage = replacement.post.stockImage;
+      if (
+        nextStockImage?.provider !== "pexels" ||
+        typeof nextStockImage.assetId !== "string"
+      ) {
+        throw new Error("Expected the replacement post to retain a Pexels asset ID");
+      }
       post = {
         ...post,
-        stockImage: replacement.post.stockImage!,
+        stockImage: {
+          provider: nextStockImage.provider,
+          assetId: nextStockImage.assetId,
+        },
       };
       expect(replacement.reviewInvalidated).toBe(true);
       expect(expectedId).toBe(replacement.selected.id);

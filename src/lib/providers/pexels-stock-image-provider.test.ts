@@ -109,7 +109,10 @@ describe("Pexels stock image provider", () => {
 
   it("never follows a response next_page URL", async () => {
     const nextPage = "https://example.invalid/pexels-next-page";
-    const request = vi.fn(async () => Response.json({ ...photoResponse(), next_page: nextPage }));
+    const request = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Response.json({ ...photoResponse(), next_page: nextPage }),
+    );
     const provider = new PexelsStockImageProvider(
       { PEXELS_API_KEY: "test" },
       request as typeof fetch,
