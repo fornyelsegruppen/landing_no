@@ -54,3 +54,17 @@ pre-existing non-SEO client import chain `case-lifecycle-panel.tsx` →
 of that boundary fix; until it is integrated and the build passes, `start` is
 not ready. A separately identified development server can support scoped blog
 QA, but is not a passing production-build gate.
+
+Follow-up: boundary fix `d207fb2` was integrated as `eec75ae`; its focused ten
+tests passed. The subsequent local production build completed with exit 0,
+including TypeScript and all 73 static pages, using only the isolated full app
+database. Runtime source is `eec75ae` plus documentation-only follow-up. Native
+dev import-map regeneration changed only three binding aliases/order; this
+non-functional generated churn was restored to the committed mapping.
+
+Persisted native browser login remains a CONTROL QA gate, not a PASS inferred
+from HTTP. The installed Payload cookie strategy requires a configured Origin
+or normal browser Sec-Fetch-Site context (`same-origin`, `same-site`, `none`).
+The manually scripted local cookie test passed with the proper origin and
+reported paused automation and two pending articles; no production auth policy
+was weakened to make this check pass.
