@@ -1,8 +1,50 @@
 import { describe, expect, it } from "vitest";
 import {
+  caseMessageHistoryDeliveryFailureMessage,
   initialCaseMessageHistoryLimit,
   splitCaseMessageHistory,
 } from "./case-message-history";
+
+describe("caseMessageHistoryDeliveryFailureMessage", () => {
+  it("localizes known provider failures in each supported locale", () => {
+    expect(
+      caseMessageHistoryDeliveryFailureMessage("lt", "EMAIL_BOUNCED"),
+    ).toBe(
+      "El. pašto paslaugų teikėjas atmetė arba sustabdė laišką. Prieš bandydami dar kartą patikrinkite gavėjo adresą ir pristatymo žurnalą.",
+    );
+    expect(
+      caseMessageHistoryDeliveryFailureMessage("nb", "EMAIL_SUPPRESSED"),
+    ).toBe(
+      "E-postleverandøren avviste eller stoppet meldingen. Kontroller mottakeradressen og leveringsloggen før du prøver igjen.",
+    );
+    expect(
+      caseMessageHistoryDeliveryFailureMessage("en", "EMAIL_FAILED"),
+    ).toBe(
+      "The email provider rejected or stopped the message. Check the recipient address and delivery log before trying again.",
+    );
+  });
+
+  it("uses generic localized copy for unknown codes and never returns provider text", () => {
+    const rawProviderFailure = "Resend secret and internal recipient details";
+
+    expect(
+      caseMessageHistoryDeliveryFailureMessage("lt", "UNKNOWN_FAILURE"),
+    ).toBe(
+      "Pristatymo užbaigti nepavyko. Prieš bandydami dar kartą patikrinkite gavėjo adresą ir pristatymo žurnalą.",
+    );
+    expect(
+      caseMessageHistoryDeliveryFailureMessage("nb", "EMAIL_UNKNOWN"),
+    ).not.toContain(rawProviderFailure);
+    expect(
+      caseMessageHistoryDeliveryFailureMessage(
+        "en",
+        "UNRECOGNIZED_PROVIDER_CODE",
+      ),
+    ).toBe(
+      "Delivery could not be completed. Check the recipient address and delivery log before trying again.",
+    );
+  });
+});
 
 describe("splitCaseMessageHistory", () => {
   it("keeps the five newest loaded messages visible and groups older messages separately", () => {
