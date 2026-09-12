@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Posts } from "./Posts";
+import {
+  publicPostContentFields,
+  publicPostContentFingerprint,
+} from "../../lib/blog/editorial-policy";
 
 function beforeChangeHook() {
   const hook = Posts.hooks?.beforeChange?.[0];
@@ -152,6 +156,120 @@ describe("Posts technical editor quality policy", () => {
       qualityScore: 91,
       qualityChecks: { passed: true },
     });
+  });
+
+  it("resets review evidence for a Payload version restore even when the content is identical", () => {
+    const result = beforeChangeHook()({
+      context: { isRestoringVersion: true },
+      data: {
+        ...original,
+        _status: "published",
+        editorialStatus: "published",
+      },
+      operation: "update",
+      originalDoc: {
+        ...original,
+        _status: "published",
+        editorialStatus: "published",
+      },
+      req: {
+        user: {
+          active: true,
+          displayName: "Administrator",
+          role: "admin",
+        },
+      },
+    } as never);
+
+    expect(result).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      qualityScore: null,
+      qualityChecks: null,
+      reviewerName: null,
+      reviewedAt: null,
+      scheduledAt: null,
+    });
+  });
+
+  it.each([
+    ["uploaded hero", { heroImage: 44 }],
+    [
+      "stock attribution",
+      {
+        stockImage: {
+          provider: "pexels",
+          assetId: "new-stock-asset",
+          imageUrl: "https://images.pexels.com/photos/1/new-image.jpeg",
+        },
+      },
+    ],
+    [
+      "English public content",
+      {
+        titleEn: "Reviewed English title",
+        excerptEn: "Reviewed English excerpt",
+        contentEn: "New English public article content",
+        seoTitleEn: "Reviewed English SEO title",
+        seoDescriptionEn: "Reviewed English SEO description",
+      },
+    ],
+  ])("invalidates review evidence when only %s changes", (_label, data) => {
+    const result = beforeChangeHook()({
+      context: {},
+      data,
+      operation: "update",
+      originalDoc: original,
+      req: {
+        user: {
+          active: true,
+          displayName: "Administrator",
+          role: "admin",
+        },
+      },
+    } as never);
+
+    expect(result).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      qualityScore: null,
+      qualityChecks: null,
+      reviewerName: null,
+      reviewedAt: null,
+      scheduledAt: null,
+    });
+  });
+
+  it("does not reset approval for an unchanged public-content save", () => {
+    const result = beforeChangeHook()({
+      context: {},
+      data: { titleNo: original.titleNo },
+      operation: "update",
+      originalDoc: original,
+      req: { user: null },
+    } as never);
+
+    expect(result).toEqual({ titleNo: original.titleNo });
+  });
+
+  it("uses one stable public-content fingerprint definition for later immutable approval", () => {
+    expect(publicPostContentFields).toEqual(
+      expect.arrayContaining([
+        "heroImage",
+        "stockImage",
+        "contentEn",
+        "seoDescriptionEn",
+        "faqItems",
+      ]),
+    );
+    expect(
+      publicPostContentFingerprint(original),
+    ).not.toBe(
+      publicPostContentFingerprint({
+        ...original,
+        contentEn: "Changed public English content",
+      }),
+    );
   });
 
   it("blocks direct published writes until the article has been explicitly approved", () => {

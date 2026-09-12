@@ -2,8 +2,10 @@ export type EditorialPost = {
   _status?: "draft" | "published" | null;
   aiAssisted?: boolean | null;
   authorName?: string | null;
+  category?: string | null;
   contentEn?: string | null;
   contentNo?: string | null;
+  ctaVariant?: string | null;
   editorialStatus?:
     | "draft"
     | "ai_qa"
@@ -19,6 +21,13 @@ export type EditorialPost = {
   titleEn?: string | null;
   titleNo?: string | null;
   publishedAt?: string | null;
+  excerptEn?: string | null;
+  excerptNo?: string | null;
+  faqItems?: unknown;
+  heroImage?: unknown;
+  imageAlt?: string | null;
+  primaryKeyword?: string | null;
+  proposedInternalLinks?: unknown;
   qualityChecks?:
     | { passed?: boolean | null; [key: string]: unknown }
     | string
@@ -30,45 +39,86 @@ export type EditorialPost = {
   sources?: Array<{
     url?: string | null;
   }> | null;
+  relatedPosts?: unknown;
+  relatedServices?: unknown;
+  reviewFlags?: unknown;
+  searchIntent?: string | null;
+  seoDescriptionEn?: string | null;
+  seoDescriptionNo?: string | null;
+  seoTitleEn?: string | null;
+  seoTitleNo?: string | null;
+  secondaryKeywords?: unknown;
+  stockImage?: unknown;
 };
 
 type EditorialPreparationOptions = {
+  forceReviewReset?: boolean;
   qualityRevalidated?: boolean;
 };
 
-const qualityInputFields = [
+// These fields feed the public blog renderer, its localized metadata/schema, image
+// attribution, FAQ/related/CTA sections, or public guide listing. The stable field
+// ordering makes this serializable fingerprint suitable for a later immutable
+// approval record, without persisting one in this Phase 2A change.
+export const publicPostContentFields = [
   "slug",
   "titleNo",
+  "titleEn",
   "excerptNo",
+  "excerptEn",
   "contentNo",
+  "contentEn",
   "seoTitleNo",
+  "seoTitleEn",
   "seoDescriptionNo",
+  "seoDescriptionEn",
+  "heroImage",
+  "stockImage",
+  "imageAlt",
+  "authorName",
+  "publishedAt",
+  "sources",
+  "faqItems",
+  "relatedPosts",
+  "relatedServices",
+  "ctaVariant",
+  "category",
   "primaryKeyword",
   "secondaryKeywords",
   "searchIntent",
-  "locationText",
-  "sources",
   "reviewFlags",
   "proposedInternalLinks",
-  "ctaVariant",
-  "faqItems",
-  "imageBrief",
-  "imageAlt",
   "aiAssisted",
 ] as const;
 
-function qualityInputChanged(
+export function publicPostContentFingerprint(
+  fields: Readonly<Record<string, unknown>>,
+): string {
+  return JSON.stringify(
+    publicPostContentFields.map((field) => [field, fields[field] ?? null]),
+  );
+}
+
+function publicContentChanged(
   original: EditorialPost | null | undefined,
   incoming: EditorialPost,
 ) {
-  if (!original) return false;
-  const originalFields = original as Record<string, unknown>;
-  const incomingFields = incoming as Record<string, unknown>;
-  return qualityInputFields.some(
-    (field) =>
-      Object.prototype.hasOwnProperty.call(incomingFields, field) &&
-      JSON.stringify(incomingFields[field]) !==
-        JSON.stringify(originalFields[field]),
+  if (!original || Object.keys(original).length === 0) return false;
+  const merged = { ...original, ...incoming };
+  // The first draft -> published transition necessarily supplies public author
+  // metadata. It is not itself an editorial content change; compare all other
+  // public fields normally so a changed draft still cannot bypass review.
+  const originalForComparison =
+    original._status !== "published" && merged._status === "published"
+      ? {
+          ...original,
+          authorName: merged.authorName,
+          publishedAt: merged.publishedAt,
+        }
+      : original;
+  return (
+    publicPostContentFingerprint(originalForComparison as Record<string, unknown>) !==
+    publicPostContentFingerprint(merged as Record<string, unknown>)
   );
 }
 
@@ -86,7 +136,10 @@ function invalidateStaleReview(
   incoming: EditorialPost,
   options: EditorialPreparationOptions,
 ) {
-  if (options.qualityRevalidated || !qualityInputChanged(original, incoming)) {
+  if (
+    !options.forceReviewReset &&
+    (options.qualityRevalidated || !publicContentChanged(original, incoming))
+  ) {
     return incoming;
   }
   return {
@@ -267,6 +320,7 @@ export function prepareAdminPublication(
   };
 
   return prepareEditorialPost(original, reviewed, now, {
+    ...options,
     qualityRevalidated: true,
   });
 }

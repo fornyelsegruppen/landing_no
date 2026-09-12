@@ -60,11 +60,13 @@ export const Posts: CollectionConfig = {
               {
                 qualityRevalidated:
                   context?.trustedBlogQualityRevalidation === true,
+                forceReviewReset: context?.isRestoringVersion === true,
               },
             )
           : prepareEditorialPost(originalDoc, data, undefined, {
               qualityRevalidated:
                 context?.trustedBlogQualityRevalidation === true,
+              forceReviewReset: context?.isRestoringVersion === true,
             })) as typeof data,
     ],
   },
