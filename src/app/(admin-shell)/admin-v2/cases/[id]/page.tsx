@@ -2071,6 +2071,8 @@ export default async function AdminCasePage({
               requested: query.documentPage,
               page: caseData.history.documents.page,
               totalPages: caseData.history.documents.totalPages,
+              invoiceId: caseData.invoice?.id,
+              warrantyId: caseData.warranty?.id,
             },
           }}
           historyItems={caseData.timeline.map((item) => {

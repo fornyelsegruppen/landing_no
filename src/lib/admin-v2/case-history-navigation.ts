@@ -10,6 +10,8 @@ export type CaseHistoryNavigationContext = {
     requested?: string | string[];
     page: number;
     totalPages: number;
+    invoiceId?: number;
+    warrantyId?: number;
   };
 };
 
@@ -60,6 +62,18 @@ export function resolveCaseHistoryNavigation(
     return Number.isSafeInteger(id) && context.messages.ids.includes(id)
       ? { section: "messages", targetId: fragment }
       : null;
+  }
+  for (const [kind, id] of [
+    ["invoice", context.documents.invoiceId],
+    ["warranty", context.documents.warrantyId],
+  ] as const) {
+    if (
+      id &&
+      Number.isSafeInteger(id) &&
+      id > 0 &&
+      fragment === `${kind}-${id}`
+    )
+      return { section: "documents", targetId: fragment };
   }
   // Do not reinterpret unknown fragments or ambiguous dual-page URLs.
   if (fragment) return null;

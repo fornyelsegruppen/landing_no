@@ -28,6 +28,38 @@ function context(
 const location = (path: string) => new URL(path, "http://localhost:3217");
 
 describe("validated case history navigation", () => {
+  it("activates canonical invoice/warranty links only for rendered case-owned targets", () => {
+    const input = context();
+    input.documents.invoiceId = 31;
+    input.documents.warrantyId = 126;
+    for (const id of ["invoice-31", "warranty-126"]) {
+      expect(
+        resolveCaseHistoryNavigation(
+          input,
+          location(`/admin-v2/cases/1#${id}`),
+        ),
+      ).toEqual({ section: "documents", targetId: id });
+    }
+    for (const id of [
+      "invoice-32",
+      "warranty-125",
+      "invoice-031",
+      "warranty-0",
+    ]) {
+      expect(
+        resolveCaseHistoryNavigation(
+          input,
+          location(`/admin-v2/cases/1#${id}`),
+        ),
+      ).toBeNull();
+    }
+    expect(
+      resolveCaseHistoryNavigation(
+        context(),
+        location("/admin-v2/cases/1#invoice-31"),
+      ),
+    ).toBeNull();
+  });
   it("opens an exact old message in the current server page, including reload", () => {
     const target = { section: "messages", targetId: "message-1" };
     const url = location("/admin-v2/cases/1?messagePage=6#message-1");

@@ -23,6 +23,20 @@ export type CaseInspectorProps = {
   title: string;
 };
 
+export function findCaseInspectorTarget(
+  container: HTMLElement,
+  targetId: string,
+) {
+  if (!targetId) return null;
+  // The workspace and registry can intentionally show the same record ID.
+  // Resolve inside this portal, never against the earlier page-level record.
+  return (
+    Array.from(container.querySelectorAll<HTMLElement>("[id]")).find(
+      (element) => element.id === targetId,
+    ) ?? null
+  );
+}
+
 function serializeInspectorFormState(container: HTMLDivElement | null) {
   if (!container) return "";
   return JSON.stringify(
@@ -105,8 +119,9 @@ export function CaseInspector({
 
     const frame = window.requestAnimationFrame(() => {
       const container = scrollContainerRef.current;
-      const target = document.getElementById(initialTargetId);
-      if (!container || !target || !container.contains(target)) return;
+      if (!container) return;
+      const target = findCaseInspectorTarget(container, initialTargetId);
+      if (!target) return;
 
       const containerRect = container.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
