@@ -1,7 +1,9 @@
 # ONE UI local boundary fixture
 
-Status: source prepared; seed has not run. CONTROL review of the exact commit
-is required before invoking seed. This does not restart or rebuild local3217.
+Status: exact commit `95be932` was approved by CONTROL and seeded once
+successfully. Do not rerun seed: marker collisions intentionally fail closed.
+See `one-ui-boundary-acceptance-2026-09-12.md` for actual read-only results.
+No local3217 restart or rebuild was performed by the seed.
 
 ## Exact target and safety
 
