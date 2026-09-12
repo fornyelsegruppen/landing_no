@@ -73,7 +73,7 @@ export default async function BlogArticleAdminPage({
   };
   const preview = `/api/preview?locale=no&path=${encodeURIComponent(`/no/blogg/${post.slug}`)}`;
   const articleHref = post._status === "draft" ? preview : `/no/blogg/${post.slug}`;
-  const articleLabel = post._status === "draft" ? copy.blogAdmin.preview : "Open published article";
+  const articleLabel = post._status === "draft" ? copy.blogAdmin.preview : copy.blogAdmin.open;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
