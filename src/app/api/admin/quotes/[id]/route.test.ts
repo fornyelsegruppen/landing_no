@@ -68,7 +68,7 @@ describe("admin quote action version guard", () => {
     }), { params: Promise.resolve({ id: "12" }) });
 
     expect(response.status).toBe(200);
-    expect(mocks.assertCurrent).toHaveBeenCalledWith(expect.anything(), { leadId: 15, quoteId: 12, expectedVersion: 2 });
+    expect(mocks.assertCurrent).toHaveBeenCalledWith(expect.anything(), { id: 9, role: "admin" }, { leadId: 15, quoteId: 12, expectedVersion: 2 });
     expect(mocks.assertHash).toHaveBeenCalledWith(expect.objectContaining({ expectedDocumentHash: "a".repeat(64), currentReference: "T-15-V2" }));
   });
 

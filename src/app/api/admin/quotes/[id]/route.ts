@@ -40,7 +40,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const quote = await payload.findByID({ collection: "quotes", id: Number(id), depth: 0, overrideAccess: true });
     const leadId = relationId(quote.lead);
     if (!leadId) throw new TypeError("Quote customer case is missing");
-    await assertCurrentQuoteTarget(payload, {
+    await assertCurrentQuoteTarget(payload, user, {
       leadId,
       quoteId: quote.id,
       expectedVersion: parsed.data.expectedVersion,

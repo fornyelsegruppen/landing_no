@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const quote = await payload.findByID({ collection: "quotes", id: quoteId, depth: 0, overrideAccess: true });
     const leadId = typeof quote.lead === "number" ? quote.lead : quote.lead?.id;
     if (!leadId) return NextResponse.json({ error: "Contract customer case is missing" }, { status: 409 });
-    await assertWorkOrderContractTarget(payload, { leadId, contractId: parsed.data.contractId, expectedVersion: parsed.data.expectedVersion });
+    await assertWorkOrderContractTarget(payload, user, { leadId, contractId: parsed.data.contractId, expectedVersion: parsed.data.expectedVersion });
     assertExpectedDocumentHash({
       expectedDocumentHash: parsed.data.expectedDocumentHash,
       currentDocumentHash: typeof contract.documentHash === "string" ? contract.documentHash : undefined,
