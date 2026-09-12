@@ -14,6 +14,8 @@ if (
 ) {
   throw new Error("ONE UI browser acceptance requires the frozen local3217 runtime");
 }
+// Keep the spec's login Origin header aligned with this approved default.
+process.env.PLAYWRIGHT_BASE_URL = baseURL;
 
 export default defineConfig({
   testDir: "./e2e",
