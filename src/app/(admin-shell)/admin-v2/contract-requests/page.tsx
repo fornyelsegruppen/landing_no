@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarClock, ShieldAlert } from "lucide-react";
 import type { Where } from "payload";
+import { AdminListPagination } from "@/components/admin-v2/admin-list-pagination";
 import {
   contractRequestReasonLabel,
   contractRequestRecoveryLabel,
@@ -9,6 +10,7 @@ import {
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import { getPayload } from "@/lib/payload";
+import { parseAdminListPage } from "@/lib/admin-v2/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -27,17 +29,19 @@ function relationName(input: unknown) { return input && typeof input === "object
 export default async function ContractRequestsPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireAdminUser();
   const labels = copy[user.interfaceLanguage];
-  const mode = value((await searchParams).status) || "active";
+  const params = await searchParams;
+  const mode = value(params.status) || "active";
   const where: Where = mode === "active" ? { status: { in: ["received", "admin_review", "alternative_requested", "follow_up_scheduled"] } }
     : mode === "closed" ? { status: { equals: "closed" } }
       : mode === "recovered" ? { status: { equals: "recovered" } }
         : mode === "do_not_contact" ? { status: { equals: "do_not_contact" } }
           : {};
-  const result = await (await getPayload()).find({ collection: "customer-contract-requests", depth: 1, limit: 100, sort: "-receivedAt", overrideAccess: true, where });
+  const result = await (await getPayload()).find({ collection: "customer-contract-requests", depth: 1, limit: 25, page: parseAdminListPage(params.page), sort: "-receivedAt", overrideAccess: true, where });
   const dateLocale = panelDateLocale(user.interfaceLanguage);
   return <div className="mx-auto max-w-7xl space-y-6">
     <header><p className="text-xs font-bold uppercase tracking-[.2em] text-accent">{labels.eyebrow}</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{labels.title}</h1><p className="mt-2 max-w-3xl text-muted-foreground">{labels.intro}</p></header>
     <nav aria-label={labels.title} className="flex flex-wrap gap-2">{[["all", labels.all], ["active", labels.active], ["closed", labels.closed], ["recovered", labels.recovered], ["do_not_contact", labels.noContact]].map(([key, label]) => <Link className={`rounded-xl border px-4 py-2 text-sm font-bold ${mode === key ? "border-accent bg-accent text-black" : "border-white/10 hover:border-accent/40"}`} href={`/admin-v2/contract-requests?status=${key}`} key={key}>{label}</Link>)}</nav>
+    <p className="text-sm font-semibold text-muted-foreground"><span className="text-white">{result.totalDocs}</span> {labels.received}</p>
     {result.docs.length ? <div className="grid gap-3">{result.docs.map((item) => {
       const leadId = relationId(item.lead); const potential = item.recoveryPotential;
       const formatter = new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" });
@@ -47,5 +51,6 @@ export default async function ContractRequestsPage({ searchParams }: { searchPar
         <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-4 font-bold text-black" href={`/admin-v2/cases/${leadId}#contract-request-section`}>{labels.open}<ArrowRight className="size-4" /></Link>
       </article>;
     })}</div> : <div className="rounded-3xl border border-dashed border-white/15 p-8 text-center text-muted-foreground">{labels.empty}</div>}
+    <AdminListPagination locale={user.interfaceLanguage} meta={{ hasNextPage: result.hasNextPage, hasPrevPage: result.hasPrevPage, page: result.page || 1, totalDocs: result.totalDocs, totalPages: result.totalPages }} params={params} pathname="/admin-v2/contract-requests" />
   </div>;
 }

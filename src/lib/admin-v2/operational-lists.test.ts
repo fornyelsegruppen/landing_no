@@ -38,4 +38,18 @@ describe("admin operational lists", () => {
       }),
     ]);
   });
+
+  it("makes every filtered record reachable through bounded server pages", async () => {
+    const find = vi.fn().mockResolvedValue({
+      docs: [{ id: 26, reference: "Q-26", status: "sent", lead: { id: 8, name: "Side 2" } }],
+      page: 2,
+      totalDocs: 26,
+      totalPages: 2,
+      hasPrevPage: true,
+      hasNextPage: false,
+    });
+    const result = await loadOperationalList({ find } as unknown as Pick<Payload, "find">, "offers", "sent", { page: 2 });
+    expect(result).toEqual(expect.objectContaining({ items: [expect.objectContaining({ id: 26 })], totalDocs: 26, page: 2, totalPages: 2 }));
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({ collection: "quotes", limit: 25, page: 2 }));
+  });
 });

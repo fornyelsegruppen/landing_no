@@ -79,6 +79,12 @@ const activeWorkLead: Where = { "workOrder.lead.recordState": { equals: "active"
 const activeWarrantyLead: Where = { "lead.recordState": { equals: "active" } };
 const newLeadWhere: Where = { and: [{ recordState: { equals: "active" } }, { adminReviewedAt: { exists: false } }] };
 const activeWorkWhere: Where = { and: [activeLead, { status: { in: ["scheduled", "on_way", "arrived", "precheck", "ready", "in_progress"] } }] };
+const blogReviewWhere: Where = {
+  and: [
+    { _status: { equals: "draft" } },
+    { editorialStatus: { in: ["draft", "ai_qa", "human_review"] } },
+  ],
+};
 
 async function loadSignedContractsWithoutWork(payload: Pick<Payload, "find">) {
   const [contracts, workOrders] = await Promise.all([
@@ -140,7 +146,15 @@ export async function loadAdminDashboard(
       signedWithoutWork,
     ] = await Promise.all([
       payload.count({ collection: "leads", where: newLeadWhere }),
-      payload.count({ collection: "posts", where: { editorialStatus: { in: ["ai_qa", "human_review"] } } }),
+      payload.find({
+        collection: "posts",
+        draft: true,
+        depth: 0,
+        limit: 1,
+        overrideAccess: true,
+        select: { titleNo: true },
+        where: blogReviewWhere,
+      }),
       payload.count({ collection: "messages", where: { and: [activeLead, { status: { equals: "draft" } }] } }),
       payload.count({ collection: "operational-jobs", where: { status: { in: ["failed", "attention"] } } }),
       payload.count({ collection: "seo-runs", where: { status: { in: ["failed", "attention"] } } }),
@@ -344,7 +358,12 @@ export async function loadAdminQueue(
       return result.docs.map((doc) => genericItem("change-agreements", doc));
     }
     case "blog-review": {
-      const result = await payload.find({ ...common, collection: "posts", where: { editorialStatus: { in: ["ai_qa", "human_review"] } } });
+      const result = await payload.find({
+        ...common,
+        collection: "posts",
+        draft: true,
+        where: blogReviewWhere,
+      });
       return result.docs.map((doc) => genericItem("posts", doc));
     }
     case "quote-review": {

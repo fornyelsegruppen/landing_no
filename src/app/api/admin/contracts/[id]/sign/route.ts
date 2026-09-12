@@ -107,7 +107,7 @@ export async function POST(
     });
     const leadId = relationId(quote.lead);
     if (!leadId) throw new TypeError("Contract lead is missing");
-    await assertCurrentContractTarget(payload, {
+    await assertCurrentContractTarget(payload, user, {
       leadId,
       contractId: contract.id,
       expectedVersion: parsed.data.expectedVersion,

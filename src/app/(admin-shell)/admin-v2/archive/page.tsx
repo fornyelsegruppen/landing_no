@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, Search } from "lucide-react";
+import { AdminListPagination } from "@/components/admin-v2/admin-list-pagination";
 import { getAdminCaseCopy } from "@/lib/admin-v2/case-i18n";
 import { loadAdminCaseList, type CaseListRecordState } from "@/lib/admin-v2/case-list";
 import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { requireAdminUser } from "@/lib/auth/internal-session";
 import { panelDateLocale } from "@/lib/panel-i18n";
 import { getPayload } from "@/lib/payload";
+import { parseAdminListPage } from "@/lib/admin-v2/pagination";
 
 export const dynamic = "force-dynamic";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -19,7 +21,7 @@ export default async function AdminArchivePage({ searchParams }: { searchParams:
   const params = await searchParams;
   const state: CaseListRecordState = first(params.state) === "trashed" ? "trashed" : "archived";
   const query = first(params.q);
-  const result = await loadAdminCaseList(await getPayload(), { query, recordState: state, status: "all" });
+  const result = await loadAdminCaseList(await getPayload(), { query, recordState: state, status: "all" }, { page: parseAdminListPage(params.page) }, user);
   const locale = panelDateLocale(user.interfaceLanguage);
   const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : "—";
   return <div className="mx-auto max-w-7xl space-y-6">
@@ -31,6 +33,6 @@ export default async function AdminArchivePage({ searchParams }: { searchParams:
         <button className="min-h-12 rounded-xl bg-accent px-5 font-bold text-accent-foreground" type="submit">{copy.cases.apply}</button>
       </form>
     </section>
-    <section><p className="mb-3 text-sm text-muted-foreground"><strong className="text-white">{result.items.length}</strong> {copy.cases.found}</p>{result.items.length ? <div className="grid gap-3">{result.items.map((item) => <Link className="group grid gap-3 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 transition hover:border-accent/45 sm:grid-cols-[1fr_auto] sm:items-center" href={item.href} key={item.id}><span><span className="text-xs font-bold uppercase tracking-wider text-accent">{caseCopy.case} #{item.id}</span><strong className="mt-1 block text-lg">{item.customer}</strong><span className="mt-1 block text-sm text-muted-foreground">{item.postalAddress || item.email || item.phone || "—"}</span><span className="mt-2 block text-xs text-muted-foreground">{copy.archive.classification}: {item.archiveClassification ? caseCopy.archiveClasses[item.archiveClassification as keyof typeof caseCopy.archiveClasses] : "—"} · {copy.cases.created}: {formatDate(item.createdAt)}</span>{item.purgeAfter ? <span className="mt-1 block text-xs text-muted-foreground">{copy.archive.purgeAfter}: {formatDate(item.purgeAfter)}</span> : null}</span><span className="inline-flex items-center gap-2 font-bold text-accent">{copy.cases.openCase}<ArrowRight aria-hidden="true" className="size-4 transition group-hover:translate-x-1"/></span></Link>)}</div> : <div className="rounded-3xl border border-dashed border-white/15 p-8 text-center text-muted-foreground">{copy.cases.empty}</div>}</section>
+    <section><p className="mb-3 text-sm text-muted-foreground"><strong className="text-white">{result.totalDocs}</strong> {copy.cases.found}</p>{result.items.length ? <div className="grid gap-3">{result.items.map((item) => <Link className="group grid gap-3 rounded-3xl border border-white/10 bg-background-elevated/75 p-5 transition hover:border-accent/45 sm:grid-cols-[1fr_auto] sm:items-center" href={item.href} key={item.id}><span><span className="text-xs font-bold uppercase tracking-wider text-accent">{caseCopy.case} #{item.id}</span><strong className="mt-1 block text-lg">{item.customer}</strong><span className="mt-1 block text-sm text-muted-foreground">{item.postalAddress || item.email || item.phone || "—"}</span><span className="mt-2 block text-xs text-muted-foreground">{copy.archive.classification}: {item.archiveClassification ? caseCopy.archiveClasses[item.archiveClassification as keyof typeof caseCopy.archiveClasses] : "—"} · {copy.cases.created}: {formatDate(item.createdAt)}</span>{item.purgeAfter ? <span className="mt-1 block text-xs text-muted-foreground">{copy.archive.purgeAfter}: {formatDate(item.purgeAfter)}</span> : null}</span><span className="inline-flex items-center gap-2 font-bold text-accent">{copy.cases.openCase}<ArrowRight aria-hidden="true" className="size-4 transition group-hover:translate-x-1"/></span></Link>)}</div> : <div className="rounded-3xl border border-dashed border-white/15 p-8 text-center text-muted-foreground">{copy.cases.empty}</div>}<AdminListPagination locale={user.interfaceLanguage} meta={result} params={params} pathname="/admin-v2/archive"/></section>
   </div>;
 }

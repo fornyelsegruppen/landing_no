@@ -25,9 +25,10 @@ describe("admin v2 dashboard", () => {
   });
 
   it("loads deterministic dashboard counts", async () => {
-    const totals = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67];
+    const totals = [2, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67];
     const count = vi.fn().mockImplementation(async () => ({ totalDocs: totals.shift() }));
     const find = vi.fn().mockImplementation(async (input: { collection: string }) => {
+      if (input.collection === "posts") return { docs: [], totalDocs: 3 };
       if (input.collection === "contracts") return { docs: [{ id: 101 }, { id: 102 }] };
       if (input.collection === "work-orders") return { docs: [{ id: 201, contract: 101 }] };
       return { docs: [] };
@@ -56,8 +57,19 @@ describe("admin v2 dashboard", () => {
         signedWithoutWork: 1,
       },
     });
-    expect(count).toHaveBeenCalledTimes(19);
-    expect(find).toHaveBeenCalledTimes(2);
+    expect(count).toHaveBeenCalledTimes(18);
+    expect(find).toHaveBeenCalledTimes(3);
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "posts",
+      draft: true,
+      limit: 1,
+      where: {
+        and: [
+          { _status: { equals: "draft" } },
+          { editorialStatus: { in: ["draft", "ai_qa", "human_review"] } },
+        ],
+      },
+    }));
   });
 
   it("does not disguise database failures as zero counts", async () => {
@@ -158,6 +170,26 @@ describe("admin v2 dashboard", () => {
     const find = vi.fn();
     await expect(searchAdminRecords({ find } as unknown as Pick<Payload, "find">, "a")).resolves.toEqual([]);
     expect(find).not.toHaveBeenCalled();
+  });
+
+  it("loads unpublished revisions of published posts into blog review", async () => {
+    const find = vi.fn().mockResolvedValue({ docs: [] });
+
+    await loadAdminQueue(
+      { find } as unknown as Pick<Payload, "find">,
+      "blog-review",
+    );
+
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({
+      collection: "posts",
+      draft: true,
+      where: {
+        and: [
+          { _status: { equals: "draft" } },
+          { editorialStatus: { in: ["draft", "ai_qa", "human_review"] } },
+        ],
+      },
+    }));
   });
 
   it("searches customer identity, address and operational references", async () => {

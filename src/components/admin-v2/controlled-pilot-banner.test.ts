@@ -21,4 +21,54 @@ describe("controlled pilot banner", () => {
     expect(html).toContain("13 dar išjungta");
     expect(html).toContain("siuntimai pristabdyti");
   });
+
+  it("does not claim automated sends are enabled when all send flags are off", () => {
+    const html = renderToStaticMarkup(
+      createElement(ControlledPilotBanner, {
+        locale: "en",
+        status: buildOperatingMode({
+          AUTOMATION_EMERGENCY_PAUSE: "false",
+          VERCEL_ENV: "preview",
+        }),
+      }),
+    );
+
+    expect(html).toContain(
+      "Automated commercial and operational sends are not enabled",
+    );
+    expect(html).not.toContain("Automated sends are enabled");
+  });
+
+  it("does not treat unrelated active flags as automated send enablement", () => {
+    const html = renderToStaticMarkup(
+      createElement(ControlledPilotBanner, {
+        locale: "en",
+        status: buildOperatingMode({
+          AUTOMATION_EMERGENCY_PAUSE: "false",
+          FEATURE_AI_DRAFTS: "true",
+          VERCEL_ENV: "preview",
+        }),
+      }),
+    );
+
+    expect(html).toContain(
+      "Automated commercial and operational sends are not enabled",
+    );
+    expect(html).not.toContain("Automated sends are enabled");
+  });
+
+  it("reflects an enabled send flag when the emergency pause is off", () => {
+    const html = renderToStaticMarkup(
+      createElement(ControlledPilotBanner, {
+        locale: "en",
+        status: buildOperatingMode({
+          AUTOMATION_EMERGENCY_PAUSE: "false",
+          FEATURE_AUTOMATED_REMINDERS: "true",
+          VERCEL_ENV: "preview",
+        }),
+      }),
+    );
+
+    expect(html).toContain("Automated sends are enabled for the approved wave");
+  });
 });
