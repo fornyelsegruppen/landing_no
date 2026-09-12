@@ -1695,57 +1695,19 @@ function toHistoryPage<T>(
   };
 }
 
-function caseHistoryOwnerPairs(caseData: AdminCase) {
-  const pairs = [
-    { ownerType: "lead", ids: [caseData.lead.id] },
-    {
-      ownerType: "roof-measurement",
-      ids: caseData.measurement ? [caseData.measurement.id] : [],
-    },
-    {
-      ownerType: "quote",
-      ids: caseData.commercial.quoteVersions.map((item) => item.id),
-    },
-    {
-      ownerType: "contract",
-      ids: caseData.commercial.contractVersions.map((item) => item.id),
-    },
-    {
-      ownerType: "work-order",
-      ids: caseData.workOrder ? [caseData.workOrder.id] : [],
-    },
-    {
-      ownerType: "work",
-      ids: caseData.workOrder ? [caseData.workOrder.id] : [],
-    },
-    {
-      ownerType: "completion-certificate",
-      ids: caseData.workOrder ? [caseData.workOrder.id] : [],
-    },
-    {
-      ownerType: "change-agreement",
-      ids: caseData.changes.map((item) => item.id),
-    },
-    {
-      ownerType: "invoice-record",
-      ids: caseData.invoice ? [caseData.invoice.id] : [],
-    },
-    {
-      ownerType: "warranty",
-      ids: caseData.warranty ? [caseData.warranty.id] : [],
-    },
-  ];
-  return pairs.filter((pair) => pair.ids.length);
-}
+export type CaseDocumentHistoryLoader = (
+  leadId: number,
+  page: number,
+) => Promise<CaseHistoryPage<CaseDocument>>;
 
 export async function loadCaseWorkspaceHistory(
   payload: Payload,
   caseData: AdminCase,
-  pages: { documentPage?: unknown; messagePage?: unknown } = {},
+  pages: { documentPage?: unknown; messagePage?: unknown },
+  loadDocuments: CaseDocumentHistoryLoader,
 ): Promise<CaseWorkspaceHistory> {
   const messagePage = normalizeCaseHistoryPage(pages.messagePage);
   const documentPage = normalizeCaseHistoryPage(pages.documentPage);
-  const ownerPairs = caseHistoryOwnerPairs(caseData);
   const [messagesResult, documentsResult] = await Promise.all([
     payload.find({
       collection: "messages",
@@ -1753,27 +1715,10 @@ export async function loadCaseWorkspaceHistory(
       limit: caseHistoryPageSize,
       page: messagePage,
       overrideAccess: true,
-      sort: "-createdAt",
+      sort: ["-createdAt", "-id"],
       where: { lead: { equals: caseData.lead.id } },
     }),
-    ownerPairs.length
-      ? payload.find({
-          collection: "private-media",
-          depth: 0,
-          limit: caseHistoryPageSize,
-          page: documentPage,
-          overrideAccess: true,
-          sort: "-createdAt",
-          where: {
-            or: ownerPairs.map((pair) => ({
-              and: [
-                { ownerType: { equals: pair.ownerType } },
-                { ownerId: { in: pair.ids.map(String) } },
-              ],
-            })),
-          } as unknown as Where,
-        })
-      : Promise.resolve({ docs: [], page: 1, totalDocs: 0, totalPages: 0 }),
+    loadDocuments(caseData.lead.id, documentPage),
   ]);
   const messages = messagesResult.docs.map((raw) => {
     const message = asRecord(raw);
@@ -1795,23 +1740,9 @@ export async function loadCaseWorkspaceHistory(
       replyToMessageId: relationId(message.replyToMessage) || undefined,
     } satisfies CaseMessage;
   });
-  const documents = documentsResult.docs.map((raw) => {
-    const document = asRecord(raw);
-    const id = numericId(document.id);
-    return {
-      id,
-      filename: stringValue(document.filename) || `#${id}`,
-      classification: stringValue(document.classification),
-      createdAt: stringValue(document.createdAt),
-      mimeType: stringValue(document.mimeType),
-      ownerId: stringValue(document.ownerId),
-      ownerType: stringValue(document.ownerType),
-      href: `/api/admin/media/${id}`,
-    } satisfies CaseDocument;
-  });
   return {
     messages: toHistoryPage(messagesResult, messages),
-    documents: toHistoryPage(documentsResult, documents),
+    documents: documentsResult,
   };
 }
 
@@ -1827,13 +1758,19 @@ export type AdminCaseWorkspace = AdminCase & {
 export async function loadAdminCaseWorkspace(
   payload: Payload,
   leadId: number,
-  pages: { documentPage?: unknown; messagePage?: unknown } = {},
+  pages: { documentPage?: unknown; messagePage?: unknown },
+  loadDocuments: CaseDocumentHistoryLoader,
 ): Promise<AdminCaseWorkspace | null> {
   const [caseData, customerQuestionContext] = await Promise.all([
     loadAdminCase(payload, leadId),
     loadCustomerQuestionContext(payload, leadId),
   ]);
   if (!caseData) return null;
-  const history = await loadCaseWorkspaceHistory(payload, caseData, pages);
+  const history = await loadCaseWorkspaceHistory(
+    payload,
+    caseData,
+    pages,
+    loadDocuments,
+  );
   return { ...caseData, customerQuestionContext, history };
 }

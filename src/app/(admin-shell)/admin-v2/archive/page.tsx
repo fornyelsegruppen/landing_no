@@ -21,7 +21,7 @@ export default async function AdminArchivePage({ searchParams }: { searchParams:
   const params = await searchParams;
   const state: CaseListRecordState = first(params.state) === "trashed" ? "trashed" : "archived";
   const query = first(params.q);
-  const result = await loadAdminCaseList(await getPayload(), { query, recordState: state, status: "all" }, { page: parseAdminListPage(params.page) });
+  const result = await loadAdminCaseList(await getPayload(), { query, recordState: state, status: "all" }, { page: parseAdminListPage(params.page) }, user);
   const locale = panelDateLocale(user.interfaceLanguage);
   const formatDate = (value?: string) => value ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(value)) : "—";
   return <div className="mx-auto max-w-7xl space-y-6">

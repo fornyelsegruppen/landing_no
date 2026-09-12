@@ -24,6 +24,7 @@ import { MessageDraftEditor } from "@/components/admin-v2/message-draft-editor";
 import { CaseMessageHistory } from "@/components/admin-v2/case-message-history";
 import { CaseMessageFailureNotice } from "@/components/admin-v2/case-message-failure-notice";
 import { CaseHistoryPagination } from "@/components/admin-v2/case-history-pagination";
+import { loadCaseDocumentHistory } from "@/lib/admin-v2/case-document-history";
 import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
@@ -746,10 +747,12 @@ export default async function AdminCasePage({
   if (!/^\d+$/.test(id)) notFound();
   const payload = await getPayload();
   const [caseData, workersResult, rulesResult] = await Promise.all([
-    loadAdminCaseWorkspace(payload, Number(id), {
-      documentPage,
-      messagePage,
-    }),
+    loadAdminCaseWorkspace(
+      payload,
+      Number(id),
+      { documentPage, messagePage },
+      (leadId, page) => loadCaseDocumentHistory(payload, user, leadId, page),
+    ),
     payload.find({
       collection: "users",
       depth: 0,
@@ -1461,7 +1464,8 @@ export default async function AdminCasePage({
           </div>
         </div>
         <p className="text-muted-foreground text-sm sm:col-span-2">
-          {workspaceCopy.sections.documents}: {caseData.history.documents.totalDocs}
+          {workspaceCopy.sections.documents}:{" "}
+          {caseData.history.documents.totalDocs}
         </p>
       </div>
     ),

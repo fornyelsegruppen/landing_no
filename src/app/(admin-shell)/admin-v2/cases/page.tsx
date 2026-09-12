@@ -78,7 +78,7 @@ export default async function AdminCasesPage({ searchParams }: { searchParams: S
     status: selectedStatus(value(params.status)),
     workerId: Number(value(params.worker)) || undefined,
   };
-  const result = await loadAdminCaseList(await getPayload(), filters, { page: parseAdminListPage(params.page) });
+  const result = await loadAdminCaseList(await getPayload(), filters, { page: parseAdminListPage(params.page) }, user);
   const locale = panelDateLocale(user.interfaceLanguage);
   const formatDate = (date?: string) => date
     ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Oslo" }).format(new Date(date))
