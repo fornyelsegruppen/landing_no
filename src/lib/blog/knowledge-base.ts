@@ -18,24 +18,26 @@ export const approvedPackagePrices = {
   },
 } as const;
 
-export const approvedPackagePriceStatements = Object.values(
-  approvedPackagePrices,
-).flatMap((price) => [price.includingVat, price.excludingVat]);
+export const approvedPackageConsumerPricePhrases = {
+  Basic: `Basic takvask fra ${approvedPackagePrices.Basic.includingVat} (${approvedPackagePrices.Basic.excludingVat})`,
+  Standard: `Standard fra ${approvedPackagePrices.Standard.includingVat} (${approvedPackagePrices.Standard.excludingVat})`,
+  Premium: `Premium fra ${approvedPackagePrices.Premium.includingVat} (${approvedPackagePrices.Premium.excludingVat})`,
+} as const;
 
 export const approvedPackageDefinitions = {
   Basic:
-    "Basic takvask fra 123,75 kr/m² inkl. mva (99 kr/m² ekskl. mva): taksjekk, mosebehandling og skånsom takvask.",
+    `${approvedPackageConsumerPricePhrases.Basic}: taksjekk, mosebehandling og skånsom takvask.`,
   Standard:
-    "Standard fra 172,50 kr/m² inkl. mva (138 kr/m² ekskl. mva): alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.",
+    `${approvedPackageConsumerPricePhrases.Standard}: alt i Basic, samt beskyttende impregnering som reduserer fuktopptak på egnet takstein.`,
   Premium:
-    "Premium fra 421,25 kr/m² inkl. mva (337 kr/m² ekskl. mva): alt i Standard, samt profesjonell takmaling og valg av passende takfarge.",
+    `${approvedPackageConsumerPricePhrases.Premium}: alt i Standard, samt profesjonell takmaling og valg av passende takfarge.`,
 } as const;
 
 export const approvedBlogKnowledge = {
   company: "Takfornyelse, en del av Fornyelse Gruppen AS",
   voice: ["rolig", "konkret", "ryddig", "hjelpsom", "faglig ydmyk"],
   services: ["takvask", "impregnering", "takmaling", "takfornying", "nytt tak"],
-  packagePrices: approvedPackagePriceStatements,
+  packagePrices: Object.values(approvedPackageConsumerPricePhrases),
   packageDefinitions: Object.values(approvedPackageDefinitions),
   internalPaths: [
     "/takvask",

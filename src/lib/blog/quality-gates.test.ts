@@ -29,7 +29,7 @@ describe("blog quality gates", () => {
     );
   });
 
-  it("accepts only the shared VAT-inclusive package price statements", () => {
+  it("accepts only a canonical package-linked VAT-inclusive price phrase", () => {
     const approved = evaluateArticleQuality(
       validGeneratedArticle({
         content: `${validGeneratedArticle().content}\n\nBasic takvask fra 123,75 kr/m² inkl. mva (99 kr/m² ekskl. mva).`,
@@ -42,11 +42,29 @@ describe("blog quality gates", () => {
       }),
       validTopic,
     );
+    const standaloneExVat = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}\n\nBasic fra 99 kr/m² ekskl. mva.`,
+      }),
+      validTopic,
+    );
+    const wrongPackage = evaluateArticleQuality(
+      validGeneratedArticle({
+        content: `${validGeneratedArticle().content}\n\nBasic takvask fra 421,25 kr/m² inkl. mva (337 kr/m² ekskl. mva).`,
+      }),
+      validTopic,
+    );
 
     expect(approved.issues).not.toContainEqual(
       expect.objectContaining({ code: "unapproved_price" }),
     );
     expect(ambiguous.issues).toContainEqual(
+      expect.objectContaining({ code: "unapproved_price" }),
+    );
+    expect(standaloneExVat.issues).toContainEqual(
+      expect.objectContaining({ code: "unapproved_price" }),
+    );
+    expect(wrongPackage.issues).toContainEqual(
       expect.objectContaining({ code: "unapproved_price" }),
     );
   });

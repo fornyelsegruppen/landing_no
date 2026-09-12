@@ -4,7 +4,7 @@ import {
 } from "./article-schema";
 import {
   approvedBlogKnowledge,
-  approvedPackagePriceStatements,
+  approvedPackageConsumerPricePhrases,
 } from "./knowledge-base";
 import {
   isPreciseSourceUrl,
@@ -30,12 +30,6 @@ export type ArticleQualityResult = {
   checkedAt: string;
 };
 
-const allowedPriceStatements = new Set(
-  approvedPackagePriceStatements.map((price) =>
-    price.toLocaleLowerCase("nb-NO").replace(/\s+/g, " "),
-  ),
-);
-
 const allowedInternalPaths = new Set<string>(
   approvedBlogKnowledge.internalPaths,
 );
@@ -54,15 +48,22 @@ function add(
   issues.push({ gate, code, severity, message });
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function unapprovedPrices(content: string) {
-  const matches = content.match(
-    /\b\d+(?:[ \u00a0]\d{3})*(?:[,.]\d{1,2})?\s*kr(?:\s*\/\s*m(?:2|²))?(?:\s*(?:inkl\.?|ekskl\.?|\+)\s*mva)?/giu,
+  const withoutApprovedPackagePricePhrases = Object.values(
+    approvedPackageConsumerPricePhrases,
+  ).reduce(
+    (remaining, phrase) =>
+      remaining.replace(new RegExp(escapeRegExp(phrase), "giu"), ""),
+    content,
   );
-  return (matches || []).filter(
-    (match) =>
-      !allowedPriceStatements.has(
-        match.toLocaleLowerCase("nb-NO").replace(/\s+/g, " "),
-      ),
+  return (
+    withoutApprovedPackagePricePhrases.match(
+      /\b\d+(?:[ \u00a0]\d{3})*(?:[,.]\d{1,2})?\s*kr(?:\s*\/\s*m(?:2|²))?(?:\s*(?:inkl\.?|ekskl\.?|\+)\s*mva)?/giu,
+    ) || []
   );
 }
 
