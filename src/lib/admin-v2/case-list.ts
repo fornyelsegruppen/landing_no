@@ -1,6 +1,13 @@
 import type { Payload, Where } from "payload";
-import { deriveCaseNextAction, type CaseNextActionKind } from "./case-read-model";
-import { adminListPaginationMeta, normalizeAdminListPagination, type AdminListPagination, type AdminListPaginationMeta } from "./pagination";
+import {
+  deriveCaseNextAction,
+  type CaseNextActionKind,
+} from "./case-read-model";
+import {
+  normalizeAdminListPagination,
+  type AdminListPagination,
+  type AdminListPaginationMeta,
+} from "./pagination";
 
 export const caseListStatusKeys = [
   "all",
@@ -12,7 +19,12 @@ export const caseListStatusKeys = [
 ] as const;
 
 export type CaseListStatus = (typeof caseListStatusKeys)[number];
-export const caseListRecordStateKeys = ["active", "archived", "trashed", "all"] as const;
+export const caseListRecordStateKeys = [
+  "active",
+  "archived",
+  "trashed",
+  "all",
+] as const;
 export type CaseListRecordState = (typeof caseListRecordStateKeys)[number];
 
 export type AdminCaseListFilters = {
@@ -49,7 +61,8 @@ export type AdminCaseListResult = {
   items: AdminCaseListItem[];
   workers: Array<{ id: number; name: string }>;
 };
-export type AdminCaseListPagedResult = AdminCaseListResult & AdminListPaginationMeta;
+export type AdminCaseListPagedResult = AdminCaseListResult &
+  AdminListPaginationMeta;
 
 function asRecord(value: unknown) {
   return value as Record<string, unknown>;
@@ -57,7 +70,12 @@ function asRecord(value: unknown) {
 
 function numberId(value: unknown) {
   if (typeof value === "number") return value;
-  if (value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "number") {
+  if (
+    value &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof (value as { id?: unknown }).id === "number"
+  ) {
     return (value as { id: number }).id;
   }
   return undefined;
@@ -84,14 +102,28 @@ function firstByRelation(docs: unknown[], field: string) {
 }
 
 function validDate(value: unknown) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+    return undefined;
   return value;
 }
 
-export function normalizeCaseListFilters(input: AdminCaseListFilters): AdminCaseListFilters {
-  const query = typeof input.query === "string" ? input.query.replace(/\s+/g, " ").trim().slice(0, 80) : undefined;
-  const status = input.status && (caseListStatusKeys as readonly string[]).includes(input.status) ? input.status : "all";
-  const recordState = input.recordState && (caseListRecordStateKeys as readonly string[]).includes(input.recordState) ? input.recordState : "active";
+export function normalizeCaseListFilters(
+  input: AdminCaseListFilters,
+): AdminCaseListFilters {
+  const query =
+    typeof input.query === "string"
+      ? input.query.replace(/\s+/g, " ").trim().slice(0, 80)
+      : undefined;
+  const status =
+    input.status &&
+    (caseListStatusKeys as readonly string[]).includes(input.status)
+      ? input.status
+      : "all";
+  const recordState =
+    input.recordState &&
+    (caseListRecordStateKeys as readonly string[]).includes(input.recordState)
+      ? input.recordState
+      : "active";
   return {
     action: input.action || "all",
     dateFrom: validDate(input.dateFrom),
@@ -99,17 +131,31 @@ export function normalizeCaseListFilters(input: AdminCaseListFilters): AdminCase
     query: query || undefined,
     recordState,
     status,
-    workerId: Number.isInteger(input.workerId) && Number(input.workerId) > 0 ? Number(input.workerId) : undefined,
+    workerId:
+      Number.isInteger(input.workerId) && Number(input.workerId) > 0
+        ? Number(input.workerId)
+        : undefined,
   };
 }
 
-function leadWhere(filters: AdminCaseListFilters, referenceLeadIds: number[]): Where | undefined {
+function leadWhere(
+  filters: AdminCaseListFilters,
+  referenceLeadIds: number[],
+): Where | undefined {
   const and: Where[] = [];
-  if (filters.recordState && filters.recordState !== "all") and.push({ recordState: { equals: filters.recordState } });
+  if (filters.recordState && filters.recordState !== "all")
+    and.push({ recordState: { equals: filters.recordState } });
   if (filters.status === "open") and.push({ status: { not_in: ["closed"] } });
-  else if (filters.status && filters.status !== "all") and.push({ status: { equals: filters.status } });
-  if (filters.dateFrom) and.push({ createdAt: { greater_than_equal: `${filters.dateFrom}T00:00:00.000Z` } });
-  if (filters.dateTo) and.push({ createdAt: { less_than_equal: `${filters.dateTo}T23:59:59.999Z` } });
+  else if (filters.status && filters.status !== "all")
+    and.push({ status: { equals: filters.status } });
+  if (filters.dateFrom)
+    and.push({
+      createdAt: { greater_than_equal: `${filters.dateFrom}T00:00:00.000Z` },
+    });
+  if (filters.dateTo)
+    and.push({
+      createdAt: { less_than_equal: `${filters.dateTo}T23:59:59.999Z` },
+    });
   if (filters.query) {
     const or: Where[] = [
       { name: { contains: filters.query } },
@@ -120,20 +166,36 @@ function leadWhere(filters: AdminCaseListFilters, referenceLeadIds: number[]): W
       { postal: { contains: filters.query } },
       { city: { contains: filters.query } },
     ];
-    if (/^\d+$/.test(filters.query)) or.push({ id: { equals: Number(filters.query) } });
+    if (/^\d+$/.test(filters.query))
+      or.push({ id: { equals: Number(filters.query) } });
     if (referenceLeadIds.length) or.push({ id: { in: referenceLeadIds } });
     and.push({ or });
   }
   return and.length ? { and } : undefined;
 }
 
-async function leadIdsFromReferences(payload: Pick<Payload, "find">, query?: string) {
+async function leadIdsFromReferences(
+  payload: Pick<Payload, "find">,
+  query?: string,
+) {
   if (!query || query.length < 2) return [];
   const common = { depth: 1, limit: 50, overrideAccess: true } as const;
   const [quotes, contracts, workOrders] = await Promise.all([
-    payload.find({ ...common, collection: "quotes", where: { reference: { contains: query } } }),
-    payload.find({ ...common, collection: "contracts", where: { reference: { contains: query } } }),
-    payload.find({ ...common, collection: "work-orders", where: { reference: { contains: query } } }),
+    payload.find({
+      ...common,
+      collection: "quotes",
+      where: { reference: { contains: query } },
+    }),
+    payload.find({
+      ...common,
+      collection: "contracts",
+      where: { reference: { contains: query } },
+    }),
+    payload.find({
+      ...common,
+      collection: "work-orders",
+      where: { reference: { contains: query } },
+    }),
   ]);
   const ids = new Set<number>();
   for (const raw of quotes.docs) {
@@ -173,33 +235,98 @@ export async function loadAdminCaseList(
   const loadedAt = Date.now();
   const referenceLeadIds = await leadIdsFromReferences(payload, filters.query);
   const [leadResult, workerResult] = await Promise.all([
-    payload.find({ collection: "leads", depth: 1, limit: page.limit, page: page.page, overrideAccess: true, sort: "-createdAt", where: leadWhere(filters, referenceLeadIds) }),
-    payload.find({ collection: "users", depth: 0, limit: 50, overrideAccess: true, sort: "displayName", where: { and: [{ role: { equals: "worker" } }, { active: { equals: true } }] } }),
+    payload.find({
+      collection: "leads",
+      depth: 1,
+      limit: page.limit,
+      page: page.page,
+      pagination: true,
+      overrideAccess: true,
+      sort: "-createdAt",
+      where: leadWhere(filters, referenceLeadIds),
+    }),
+    payload.find({
+      collection: "users",
+      depth: 0,
+      limit: 50,
+      overrideAccess: true,
+      sort: "displayName",
+      where: {
+        and: [{ role: { equals: "worker" } }, { active: { equals: true } }],
+      },
+    }),
   ]);
   const leadDocs = leadResult.docs;
   const workerDocs = workerResult.docs;
-  const leadIds = leadDocs.map((doc) => numberId(doc)).filter((value): value is number => Boolean(value));
+  const leadIds = leadDocs
+    .map((doc) => numberId(doc))
+    .filter((value): value is number => Boolean(value));
   if (!leadIds.length) {
     const empty = {
       items: [],
-      workers: workerDocs.map((worker) => ({ id: numberId(worker) || 0, name: relationName(worker) || `#${numberId(worker)}` })).filter((worker) => worker.id > 0),
+      workers: workerDocs
+        .map((worker) => ({
+          id: numberId(worker) || 0,
+          name: relationName(worker) || `#${numberId(worker)}`,
+        }))
+        .filter((worker) => worker.id > 0),
     };
-    return pagination ? { ...empty, ...adminListPaginationMeta(0, page) } : empty;
+    if (!pagination) return empty;
+    const totalDocs = leadResult.totalDocs ?? 0;
+    return {
+      ...empty,
+      hasNextPage: leadResult.hasNextPage ?? false,
+      hasPrevPage: leadResult.hasPrevPage ?? page.page > 1,
+      page: leadResult.page || page.page,
+      totalDocs,
+      totalPages:
+        leadResult.totalPages ?? Math.max(1, Math.ceil(totalDocs / page.limit)),
+    };
   }
 
   const relatedWhere = { lead: { in: leadIds } };
-  const common = { depth: 1, limit: 100, overrideAccess: true, sort: "-createdAt" as const };
-  const [measurements, prices, quotes, messages, workOrders, workers] = await Promise.all([
-    payload.find({ ...common, collection: "roof-measurements", where: relatedWhere }),
-    payload.find({ ...common, collection: "price-calculations", where: relatedWhere }),
-    payload.find({ ...common, collection: "quotes", where: relatedWhere }),
-    payload.find({ ...common, collection: "messages", where: { and: [relatedWhere, { status: { not_equals: "cancelled" } }] } }),
-    payload.find({ ...common, collection: "work-orders", where: relatedWhere }),
-    Promise.resolve(workerDocs),
-  ]);
-  const quoteIds = quotes.docs.map((doc) => numberId(doc)).filter((value): value is number => Boolean(value));
+  const common = {
+    depth: 1,
+    limit: 100,
+    overrideAccess: true,
+    sort: "-createdAt" as const,
+  };
+  const [measurements, prices, quotes, messages, workOrders, workers] =
+    await Promise.all([
+      payload.find({
+        ...common,
+        collection: "roof-measurements",
+        where: relatedWhere,
+      }),
+      payload.find({
+        ...common,
+        collection: "price-calculations",
+        where: relatedWhere,
+      }),
+      payload.find({ ...common, collection: "quotes", where: relatedWhere }),
+      payload.find({
+        ...common,
+        collection: "messages",
+        where: { and: [relatedWhere, { status: { not_equals: "cancelled" } }] },
+      }),
+      payload.find({
+        ...common,
+        collection: "work-orders",
+        where: relatedWhere,
+      }),
+      Promise.resolve(workerDocs),
+    ]);
+  const quoteIds = quotes.docs
+    .map((doc) => numberId(doc))
+    .filter((value): value is number => Boolean(value));
   const contracts = quoteIds.length
-    ? (await payload.find({ ...common, collection: "contracts", where: { quote: { in: quoteIds } } })).docs
+    ? (
+        await payload.find({
+          ...common,
+          collection: "contracts",
+          where: { quote: { in: quoteIds } },
+        })
+      ).docs
     : [];
 
   const measurementByLead = firstByRelation(measurements.docs, "lead");
@@ -209,81 +336,138 @@ export async function loadAdminCaseList(
   const workByLead = firstByRelation(workOrders.docs, "lead");
   const contractByQuote = firstByRelation(contracts, "quote");
 
-  const items = leadDocs.map((raw) => {
-    const lead = asRecord(raw);
-    const id = numberId(lead) || 0;
-    const measurement = measurementByLead.get(id);
-    const price = priceByLead.get(id);
-    const quote = quoteByLead.get(id);
-    const message = messageByLead.get(id);
-    const workOrder = workByLead.get(id);
-    const contract = quote ? contractByQuote.get(numberId(quote) || 0) : undefined;
-    const nextAction = deriveCaseNextAction({
-      canPreparePackage: Boolean(text(lead.address) && !/^ikke oppgitt$/i.test(text(lead.address) || "")) && text(lead.inquiryType) !== "usikker",
-      contract: contract ? { id: numberId(contract) || 0, status: text(contract.status), companySignedAt: text(contract.companySignedAt) } : undefined,
-      leadStatus: text(lead.status),
-      measurement: measurement ? { id: numberId(measurement) || 0, status: text(measurement.status) } : undefined,
-      message: message ? { id: numberId(message) || 0, status: text(message.status), category: text(message.category), direction: text(message.direction) } : undefined,
-      price: price ? { id: numberId(price) || 0, status: text(price.status) } : undefined,
-      quote: quote ? { id: numberId(quote) || 0, status: text(quote.status) } : undefined,
-      workOrder: workOrder ? { id: numberId(workOrder) || 0, status: text(workOrder.status) } : undefined,
+  const items = leadDocs
+    .map((raw) => {
+      const lead = asRecord(raw);
+      const id = numberId(lead) || 0;
+      const measurement = measurementByLead.get(id);
+      const price = priceByLead.get(id);
+      const quote = quoteByLead.get(id);
+      const message = messageByLead.get(id);
+      const workOrder = workByLead.get(id);
+      const contract = quote
+        ? contractByQuote.get(numberId(quote) || 0)
+        : undefined;
+      const nextAction = deriveCaseNextAction({
+        canPreparePackage:
+          Boolean(
+            text(lead.address) &&
+            !/^ikke oppgitt$/i.test(text(lead.address) || ""),
+          ) && text(lead.inquiryType) !== "usikker",
+        contract: contract
+          ? {
+              id: numberId(contract) || 0,
+              status: text(contract.status),
+              companySignedAt: text(contract.companySignedAt),
+            }
+          : undefined,
+        leadStatus: text(lead.status),
+        measurement: measurement
+          ? { id: numberId(measurement) || 0, status: text(measurement.status) }
+          : undefined,
+        message: message
+          ? {
+              id: numberId(message) || 0,
+              status: text(message.status),
+              category: text(message.category),
+              direction: text(message.direction),
+            }
+          : undefined,
+        price: price
+          ? { id: numberId(price) || 0, status: text(price.status) }
+          : undefined,
+        quote: quote
+          ? { id: numberId(quote) || 0, status: text(quote.status) }
+          : undefined,
+        workOrder: workOrder
+          ? { id: numberId(workOrder) || 0, status: text(workOrder.status) }
+          : undefined,
+      });
+      const postalAddress = [
+        text(lead.address),
+        text(lead.houseNumber),
+        text(lead.postal),
+        text(lead.city),
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return {
+        archiveClassification: text(lead.archiveClassification),
+        assignedWorker:
+          relationName(workOrder?.assignedWorker) ||
+          relationName(lead.assignedTo),
+        assignedWorkerId:
+          numberId(workOrder?.assignedWorker) || numberId(lead.assignedTo),
+        createdAt: text(lead.createdAt),
+        customer: text(lead.name) || `#${id}`,
+        dueAt: text(lead.nextActionAt),
+        email: text(lead.email),
+        href: `/admin-v2/cases/${id}`,
+        id,
+        inquiryType: text(lead.inquiryType),
+        nextAction: nextAction.kind,
+        overdue: Boolean(
+          text(lead.nextActionAt) &&
+          new Date(text(lead.nextActionAt) || 0).getTime() <= loadedAt,
+        ),
+        phone: text(lead.phone),
+        postalAddress,
+        purgeAfter: text(lead.purgeAfter),
+        recordState: text(lead.recordState) || "active",
+        status: text(lead.status),
+        workStatus: text(workOrder?.status),
+      };
+    })
+    .filter((item) => {
+      if (
+        filters.action &&
+        filters.action !== "all" &&
+        item.nextAction !== filters.action
+      )
+        return false;
+      if (filters.workerId && item.assignedWorkerId !== filters.workerId)
+        return false;
+      return true;
     });
-    const postalAddress = [text(lead.address), text(lead.houseNumber), text(lead.postal), text(lead.city)].filter(Boolean).join(" ");
-    return {
-      archiveClassification: text(lead.archiveClassification),
-      assignedWorker: relationName(workOrder?.assignedWorker) || relationName(lead.assignedTo),
-      assignedWorkerId: numberId(workOrder?.assignedWorker) || numberId(lead.assignedTo),
-      createdAt: text(lead.createdAt),
-      customer: text(lead.name) || `#${id}`,
-      dueAt: text(lead.nextActionAt),
-      email: text(lead.email),
-      href: `/admin-v2/cases/${id}`,
-      id,
-      inquiryType: text(lead.inquiryType),
-      nextAction: nextAction.kind,
-      overdue: Boolean(text(lead.nextActionAt) && new Date(text(lead.nextActionAt) || 0).getTime() <= loadedAt),
-      phone: text(lead.phone),
-      postalAddress,
-      purgeAfter: text(lead.purgeAfter),
-      recordState: text(lead.recordState) || "active",
-      status: text(lead.status),
-      workStatus: text(workOrder?.status),
-    };
-  }).filter((item) => {
-    if (filters.action && filters.action !== "all" && item.nextAction !== filters.action) return false;
-    if (filters.workerId && item.assignedWorkerId !== filters.workerId) return false;
-    return true;
-  });
 
   const mappedItems = items.map((item) => ({
-      archiveClassification: item.archiveClassification,
-      assignedWorker: item.assignedWorker,
-      createdAt: item.createdAt,
-      customer: item.customer,
-      dueAt: item.dueAt,
-      email: item.email,
-      href: item.href,
-      id: item.id,
-      inquiryType: item.inquiryType,
-      nextAction: item.nextAction,
-      overdue: item.overdue,
-      phone: item.phone,
-      postalAddress: item.postalAddress,
-      purgeAfter: item.purgeAfter,
-      recordState: item.recordState,
-      status: item.status,
-      workStatus: item.workStatus,
-    }));
-  const paginationMeta = pagination ? {
-    hasNextPage: leadResult.hasNextPage ?? false,
-    hasPrevPage: leadResult.hasPrevPage ?? page.page > 1,
-    page: leadResult.page || page.page,
-    totalDocs: leadResult.totalDocs ?? mappedItems.length,
-    totalPages: leadResult.totalPages ?? Math.max(1, Math.ceil(mappedItems.length / page.limit)),
-  } : undefined;
+    archiveClassification: item.archiveClassification,
+    assignedWorker: item.assignedWorker,
+    createdAt: item.createdAt,
+    customer: item.customer,
+    dueAt: item.dueAt,
+    email: item.email,
+    href: item.href,
+    id: item.id,
+    inquiryType: item.inquiryType,
+    nextAction: item.nextAction,
+    overdue: item.overdue,
+    phone: item.phone,
+    postalAddress: item.postalAddress,
+    purgeAfter: item.purgeAfter,
+    recordState: item.recordState,
+    status: item.status,
+    workStatus: item.workStatus,
+  }));
+  const paginationMeta = pagination
+    ? {
+        hasNextPage: leadResult.hasNextPage ?? false,
+        hasPrevPage: leadResult.hasPrevPage ?? page.page > 1,
+        page: leadResult.page || page.page,
+        totalDocs: leadResult.totalDocs ?? mappedItems.length,
+        totalPages:
+          leadResult.totalPages ??
+          Math.max(1, Math.ceil(mappedItems.length / page.limit)),
+      }
+    : undefined;
   const baseResult = {
     items: mappedItems,
-    workers: workers.map((worker) => ({ id: numberId(worker) || 0, name: relationName(worker) || `#${numberId(worker)}` })).filter((worker) => worker.id > 0),
+    workers: workers
+      .map((worker) => ({
+        id: numberId(worker) || 0,
+        name: relationName(worker) || `#${numberId(worker)}`,
+      }))
+      .filter((worker) => worker.id > 0),
   };
   return paginationMeta ? { ...baseResult, ...paginationMeta } : baseResult;
 }
