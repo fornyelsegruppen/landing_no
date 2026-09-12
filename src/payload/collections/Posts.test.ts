@@ -238,6 +238,8 @@ describe("Posts technical editor quality policy", () => {
         seoDescriptionEn: "Reviewed English SEO description",
       },
     ],
+    ["location context", { locationText: "Drammen" }],
+    ["image brief", { imageBrief: "A freshly cleaned tiled roof" }],
   ])("invalidates review evidence when only %s changes", (_label, data) => {
     const result = beforeChangeHook()({
       context: {},
@@ -284,6 +286,8 @@ describe("Posts technical editor quality policy", () => {
         "contentEn",
         "seoDescriptionEn",
         "faqItems",
+        "locationText",
+        "imageBrief",
       ]),
     );
     expect(

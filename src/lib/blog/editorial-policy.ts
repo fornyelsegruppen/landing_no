@@ -26,6 +26,8 @@ export type EditorialPost = {
   faqItems?: unknown;
   heroImage?: unknown;
   imageAlt?: string | null;
+  imageBrief?: string | null;
+  locationText?: string | null;
   primaryKeyword?: string | null;
   proposedInternalLinks?: unknown;
   qualityChecks?:
@@ -58,8 +60,9 @@ type EditorialPreparationOptions = {
 
 // These fields feed the public blog renderer, its localized metadata/schema, image
 // attribution, FAQ/related/CTA sections, or public guide listing. The stable field
-// ordering makes this serializable fingerprint suitable for a later immutable
-// approval record, without persisting one in this Phase 2A change.
+// ordering gives one central invalidation fingerprint. It is not a canonical
+// immutable approval identity: nested/relation values need normalization before a
+// later persisted approval token can rely on it.
 export const publicPostContentFields = [
   "slug",
   "titleNo",
@@ -83,6 +86,8 @@ export const publicPostContentFields = [
   "relatedServices",
   "ctaVariant",
   "category",
+  "locationText",
+  "imageBrief",
   "primaryKeyword",
   "secondaryKeywords",
   "searchIntent",
