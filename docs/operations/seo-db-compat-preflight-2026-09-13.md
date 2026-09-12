@@ -1,5 +1,45 @@
 # Optional production database compatibility preflight
 
+## Diagnostic-only refinement after the tracked-gate attempt
+
+The actual 523fe868 build invoked the gate but reported only
+`DB_COMPAT_FAIL_CONNECTION`; that earlier code does not identify its cause.
+This isolated source refinement changes diagnostics only. URL/environment
+acceptance, strict TLS, SQL/manifest, timeouts, cleanup, default-OFF behavior and
+tracked build command are unchanged. It authorizes no remote retry or bypass.
+
+New failure suffixes (each is prefixed `DB_COMPAT_FAIL_`):
+
+| Fixed suffix | Meaning, without identifying any secret/key/value |
+| --- | --- |
+| `ENV_OVERRIDE` | A non-allowlisted inherited PG setting was rejected. |
+| `URL_MISSING` | The sole permitted database URL was absent or empty. |
+| `URL_PARSE` | URL parsing failed. |
+| `URL_SCHEME` | URL scheme was not PostgreSQL. |
+| `URL_REQUIRED_FIELDS` | A required URL component was absent. |
+| `URL_OPTIONS` | A URL option was not allowlisted. |
+| `TLS_MODE` | The explicit URL TLS mode was not accepted. |
+| `CHANNEL_BINDING_REQUIRED_UNSUPPORTED` | Explicit mandatory channel binding remains unsupported. |
+| `CHANNEL_BINDING_OPTION` | Another channel-binding option was not accepted. |
+| `URL_CONFIG` | An unexpected failure occurred while obtaining/validating URL configuration. |
+| `DRIVER_CREATE` | Driver import, client construction or initial listener setup failed. |
+| `CONNECT` | Establishing the connection failed; this does not disclose whether DNS, network, TLS or authentication caused it. |
+| `BEGIN_READ_ONLY` | Starting the read-only transaction failed. |
+| `SESSION_STATEMENT_TIMEOUT` / `SESSION_LOCK_TIMEOUT` / `SESSION_IDLE_TIMEOUT` | Setting that transaction-local timeout failed. |
+
+Configuration codes are attached only to internally created failures in a private
+WeakMap. External error messages, codes, causes and stacks are never read or
+logged, including hostile properties. Other existing check IDs are unchanged.
+Configuration rejection is not proof of missing schema; do not remove URL
+requirements, relax TLS/PG policy or inspect secrets to force PASS.
+
+Focused verification: 19 helper tests plus 8 build-contract tests PASS (27 total),
+all offline. Added negative fixtures assert exact fixed codes and malicious-error
+suppression; existing connection, SQL capture, default-OFF and cleanup tests remain.
+No database, build, application, browser or remote operation was run for this
+refinement. Independent review and a separate exact-SHA GO remain required before
+any subsequent production-target check.
+
 Status: helper source accepted; actual Production compatibility remains unproven.
 The current narrow wiring correction invokes the unchanged default-OFF helper
 from tracked vercel.json before guarded Next, chained with `&&`. A normal build

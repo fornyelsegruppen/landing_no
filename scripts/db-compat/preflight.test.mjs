@@ -61,7 +61,7 @@ test('requires exact opt-in, Production target, and DATABASE_URL only', async ()
     const f = fixture();
     assert.equal(await runPreflight({ ...f.options, environment: env }), 1);
     assert.deepEqual(f.calls, []);
-    assert.match(f.logs[0], /^DB_COMPAT_FAIL_(OPT_IN|CONNECTION)$/);
+    assert.match(f.logs[0], /^DB_COMPAT_FAIL_(OPT_IN|URL_MISSING)$/);
   }
 });
 
@@ -88,8 +88,66 @@ test('inherited PG settings fail before driver creation and cannot select pgpass
     const f = fixture();
     assert.equal(await runPreflight({ ...f.options, environment: { ...environment, [key]: 'never-log-this' } }), 1);
     assert.deepEqual(f.calls, []);
-    assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_CONNECTION']);
+    assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_ENV_OVERRIDE']);
   }
+});
+
+test('configuration failures have fixed distinct codes and never construct a driver', async () => {
+  for (const [raw, code] of [
+    [undefined, 'URL_MISSING'], ['', 'URL_MISSING'], ['not a URL PRIVATE', 'URL_PARSE'],
+    ['https://synthetic:private@example.invalid/db', 'URL_SCHEME'],
+    ['postgresql://synthetic@example.invalid/db', 'URL_REQUIRED_FIELDS'],
+    ['postgresql://synthetic:private@example.invalid/', 'URL_REQUIRED_FIELDS'],
+    ['postgresql://synthetic:private@example.invalid/db?host=PRIVATE', 'URL_OPTIONS'],
+    ['postgresql://synthetic:private@example.invalid/db?sslrootcert=PRIVATE', 'URL_OPTIONS'],
+    ['postgresql://synthetic:private@example.invalid/db?sslmode=no-verify', 'TLS_MODE'],
+    ['postgresql://synthetic:private@example.invalid/db?channel_binding=require', 'CHANNEL_BINDING_REQUIRED_UNSUPPORTED'],
+    ['postgresql://synthetic:private@example.invalid/db?channel_binding=PRIVATE', 'CHANNEL_BINDING_OPTION'],
+  ]) {
+    const f = fixture();
+    let created = false;
+    assert.equal(await runPreflight({ ...f.options,
+      environment: { ...environment, DATABASE_URL: raw },
+      createClient: async () => { created = true; throw secretError(); },
+    }), 1);
+    assert.equal(created, false);
+    assert.deepEqual(f.calls, []);
+    assert.deepEqual(f.logs, [`DB_COMPAT_FAIL_${code}`]);
+  }
+});
+
+test('driver, connect, readonly BEGIN and each session timeout have distinct safe phases', async () => {
+  for (const [at, code] of [
+    ['connect', 'CONNECT'], ['BEGIN', 'BEGIN_READ_ONLY'],
+    ['SET LOCAL statement_timeout', 'SESSION_STATEMENT_TIMEOUT'],
+    ['SET LOCAL lock_timeout', 'SESSION_LOCK_TIMEOUT'],
+    ['SET LOCAL idle_in_transaction_session_timeout', 'SESSION_IDLE_TIMEOUT'],
+  ]) {
+    const f = fixture(text => text.includes(at));
+    assert.equal(await runPreflight(f.options), 1);
+    assert.deepEqual(f.logs, [`DB_COMPAT_FAIL_${code}`]);
+    assert.equal(f.calls.at(-1), 'end');
+  }
+  const f = fixture();
+  assert.equal(await runPreflight({ ...f.options, createClient: async () => { throw secretError(); } }), 1);
+  assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_DRIVER_CREATE']);
+});
+
+test('malicious external error properties cannot select or leak diagnostic codes', async () => {
+  for (const error of [Object.assign(secretError(), { code: 'URL_MISSING', safeCode: 'PRIVATE' }),
+    { code: 'PRIVATE', message: 'PRIVATE', stack: 'PRIVATE', cause: 'PRIVATE' }, 'PRIVATE', null]) {
+    const f = fixture();
+    assert.equal(await runPreflight({ ...f.options, createClient: async () => { throw error; } }), 1);
+    assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_DRIVER_CREATE']);
+  }
+  const hostile = new Error();
+  for (const key of ['code', 'safeCode', 'message', 'stack', 'cause']) {
+    Object.defineProperty(hostile, key, { get() { assert.fail('must not inspect untrusted error properties'); } });
+  }
+  const f = fixture();
+  f.client.connect = async () => { throw hostile; };
+  assert.equal(await runPreflight(f.options), 1);
+  assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_CONNECT']);
 });
 
 test('common PG credential aliases are ignored by actual pg in an offline child process', async () => {

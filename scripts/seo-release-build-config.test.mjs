@@ -95,18 +95,16 @@ test("normal build preflight is disabled without credential/file/driver IO", asy
   }
 });
 
-test("build wiring preserves the accepted helper and sealed manifest verbatim", () => {
+test("diagnostics preserve accepted SQL capture, sealed manifest and local harness verbatim", () => {
   for (const name of [
     "capture.mjs",
     "manifest.json",
-    "preflight.mjs",
-    "preflight.test.mjs",
     "local-check.mjs",
   ]) {
     const file = `scripts/db-compat/${name}`;
     assert.equal(
       read(file),
-      at("91dd5be6edbb6c9878483ca42c9fbd55e6ac6671", file),
+      at("523fe868200ad37039fc37241def2831f3ceec23", file),
     );
   }
 });

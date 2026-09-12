@@ -7,6 +7,14 @@ const root = new URL('../../', import.meta.url);
 export const MANIFEST_SHA256 = 'b5a12d160007afb102d19e9c90315c8fc5fc4c7483610a00a1fe315d7bc73de2';
 const hash = text => createHash('sha256').update(text).digest('hex');
 const normalize = text => text.replace(/\r\n/g, '\n');
+// Only internally created configuration failures can select a diagnostic code.
+// Driver/parser error properties, messages and causes are never inspected/logged.
+const configurationFailures = new WeakMap();
+const configurationFailure = code => {
+  const error = new Error('CONFIGURATION');
+  configurationFailures.set(error, code);
+  return error;
+};
 const columnsSql = `SELECT c.relname AS table_name, a.attname AS column_name,
   t.typname AS type_name, tn.nspname AS type_schema
 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
@@ -50,21 +58,27 @@ export async function loadArtifact(read = file => readFile(new URL(file, root), 
 }
 
 export function connectionOptions(raw) {
-  if (!raw) throw new Error('DATABASE_CONFIG');
-  const url = new URL(raw);
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname ||
-    !url.username || !url.password || url.pathname.length < 2) throw new Error('DATABASE_CONFIG');
+  if (!raw) throw configurationFailure('URL_MISSING');
+  let url;
+  try { url = new URL(raw); }
+  catch { throw configurationFailure('URL_PARSE'); }
+  if (!['postgres:', 'postgresql:'].includes(url.protocol)) throw configurationFailure('URL_SCHEME');
+  if (!url.hostname || !url.username || !url.password || url.pathname.length < 2) {
+    throw configurationFailure('URL_REQUIRED_FIELDS');
+  }
   const sslmode = url.searchParams.get('sslmode');
-  if (sslmode && !['require', 'verify-ca', 'verify-full'].includes(sslmode)) throw new Error('DATABASE_TLS');
+  if (sslmode && !['require', 'verify-ca', 'verify-full'].includes(sslmode)) throw configurationFailure('TLS_MODE');
   for (const key of url.searchParams.keys()) {
     // pg lets URL query options override explicit client options. Do not allow
     // alternate hosts, SSL files, timeouts, session options or credential sources.
-    if (!['sslmode', 'channel_binding'].includes(key)) throw new Error('DATABASE_CONFIG');
+    if (!['sslmode', 'channel_binding'].includes(key)) throw configurationFailure('URL_OPTIONS');
   }
   // Pinned pg supports opportunistic channel binding, not libpq's "require".
   // Never silently weaken a URL that explicitly requires it.
   const binding = url.searchParams.get('channel_binding');
-  if (binding && !['prefer', 'disable'].includes(binding)) throw new Error('DATABASE_CONFIG');
+  if (binding && !['prefer', 'disable'].includes(binding)) {
+    throw configurationFailure(binding === 'require' ? 'CHANNEL_BINDING_REQUIRED_UNSUPPORTED' : 'CHANNEL_BINDING_OPTION');
+  }
   // Translate supported transport options explicitly; URL parser options must
   // not override certificate/hostname verification or fixed timeouts.
   url.searchParams.delete('sslmode');
@@ -112,7 +126,7 @@ export async function runPreflight({
     check = 'SOURCE';
     const manifest = await load();
     if (cancelled) throw new Error('DEADLINE');
-    check = 'CONNECTION';
+    check = 'ENV_OVERRIDE';
     // These common integration aliases cannot override the complete URL and
     // explicit client options. Other PG* settings can change session semantics.
     // Never read or mutate their values; the URL password prevents pgpass lookup.
@@ -120,19 +134,26 @@ export async function runPreflight({
       'PGSSLMODE', 'PGAPPNAME', 'PGCONNECT_TIMEOUT'];
     if (Object.keys(environment).some(key => /^PG/i.test(key) &&
       !ignoredAliases.includes(key.toUpperCase()))) throw new Error('DATABASE_CONFIG');
+    check = 'URL_CONFIG';
     const options = connectionOptions(environment.DATABASE_URL);
+    check = 'DRIVER_CREATE';
     client = await createClient(options);
     if (cancelled) { await close(); throw new Error('DEADLINE'); }
     // Suppress EventEmitter's raw idle-connection error output; query/cleanup
     // failures still fail the gate. Any async connection error poisons success.
     let connectionError = false;
     client.on('error', () => { connectionError = true; });
+    check = 'CONNECT';
     await client.connect();
     if (cancelled) throw new Error('DEADLINE');
+    check = 'BEGIN_READ_ONLY';
     await query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
     began = true;
+    check = 'SESSION_STATEMENT_TIMEOUT';
     await query("SET LOCAL statement_timeout = '5s'");
+    check = 'SESSION_LOCK_TIMEOUT';
     await query("SET LOCAL lock_timeout = '1s'");
+    check = 'SESSION_IDLE_TIMEOUT';
     await query("SET LOCAL idle_in_transaction_session_timeout = '10s'");
     check = 'SEARCH_PATH';
     // Raw ONE UI queries are unqualified: validate their actual resolution,
@@ -189,7 +210,8 @@ export async function runPreflight({
     })]);
     log('DB_COMPAT_PASS');
     return 0;
-  } catch {
+  } catch (error) {
+    check = configurationFailures.get(error) || check;
     log(`DB_COMPAT_FAIL_${check}`);
     return 1;
   } finally {
