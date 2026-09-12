@@ -103,7 +103,7 @@ Impregnering som redusere fuktopptak krever kontroll. Be om postnummer, valgfri 
 
     expect(result.quality.passed).toBe(true);
     expect(result.article.content).toContain(
-      "Standard fra 138 kr/m² + mva: alt i Basic",
+      "Standard fra 172,50 kr/m² inkl. mva (138 kr/m² ekskl. mva): alt i Basic",
     );
     expect(result.article.content).toContain("som reduserer fuktopptak");
     expect(result.article.content).not.toContain("uten å love");
