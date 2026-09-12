@@ -327,3 +327,11 @@ const copies = {
 export function getAdminV2Copy(locale: PanelLocale) {
   return copies[locale];
 }
+
+export function blogPublishedArticleLabel(locale: PanelLocale) {
+  return locale === "lt"
+    ? "Atidaryti publikuotą straipsnį"
+    : locale === "nb"
+      ? "Åpne publisert artikkel"
+      : "Open published article";
+}

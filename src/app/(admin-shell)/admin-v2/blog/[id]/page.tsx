@@ -2,9 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { BlogArticleViewLink } from "@/components/admin-v2/blog-article-view-link";
 import { BlogEditor } from "@/components/admin-v2/blog-editor";
 import { BlogReviewPanel } from "@/components/admin-v2/blog-review-panel";
-import { getAdminV2Copy } from "@/lib/admin-v2/i18n";
+import { blogPublishedArticleLabel, getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { blogPublishEligibility } from "@/lib/admin-v2/blog-review";
 import { statusLabel } from "@/lib/admin-v2/labels";
 import { requireAdminUser } from "@/lib/auth/internal-session";
@@ -71,10 +72,6 @@ export default async function BlogArticleAdminPage({
         ? post.stockImage
         : null,
   };
-  const preview = `/api/preview?locale=no&path=${encodeURIComponent(`/no/blogg/${post.slug}`)}`;
-  const articleHref = post._status === "draft" ? preview : `/no/blogg/${post.slug}`;
-  const articleLabel = post._status === "draft" ? copy.blogAdmin.preview : copy.blogAdmin.open;
-
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <Link
@@ -95,14 +92,12 @@ export default async function BlogArticleAdminPage({
             </h1>
             <p className="text-muted-foreground mt-2">/{post.slug}</p>
           </div>
-          <a
-            className="hover:border-accent/50 inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 px-4 font-bold"
-            href={articleHref}
-            target="_blank"
-          >
-            {articleLabel}
-            <ExternalLink className="size-4" />
-          </a>
+          <BlogArticleViewLink
+            isDraft={post._status === "draft"}
+            previewLabel={copy.blogAdmin.preview}
+            publishedLabel={blogPublishedArticleLabel(user.interfaceLanguage)}
+            slug={post.slug}
+          />
         </div>
         {imageUrl ? (
           <Image

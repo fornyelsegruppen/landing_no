@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 export function DraftPreviewBanner({ locale }: { locale: "no" | "en" }) {
   const english = locale === "en";
   return (
@@ -7,9 +5,22 @@ export function DraftPreviewBanner({ locale }: { locale: "no" | "en" }) {
       {english
         ? "This is a private draft preview."
         : "Dette er en privat forhåndsvisning av utkast."}{" "}
-      <Link className="underline underline-offset-2" href={`/api/exit-preview?locale=${locale}`}>
+      <a
+        className="underline underline-offset-2"
+        href={`/api/exit-preview?locale=${locale}`}
+      >
         {english ? "Exit preview" : "Avslutt forhåndsvisning"}
-      </Link>
+      </a>
     </aside>
   );
+}
+
+export function DraftPreviewBoundary({
+  enabled,
+  locale,
+}: {
+  enabled: boolean;
+  locale: "no" | "en";
+}) {
+  return enabled ? <DraftPreviewBanner locale={locale} /> : null;
 }
