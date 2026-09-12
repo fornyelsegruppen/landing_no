@@ -12,8 +12,10 @@ The existing isolated browser harness is:
 Its runbook is
 `docs/operations/seo-local-browser-2026-09-12.md` in that same worktree. It
 creates the schema and starts the disposable browser candidate on
-`http://localhost:3217`; the local server is already running as session/PID
-`78367`, so a fixture operator must not restart it.
+`http://localhost:3217`. CONTROL recorded historical tool session `78367`;
+that is not a PID or proof of the currently running process. Do not restart
+the server based on that session reference. If process identity is needed,
+attest it independently from the current local process table.
 
 The only permitted database target is:
 
@@ -29,9 +31,10 @@ Before any future seed, attest the target in a read-only transaction with a
 five-second statement/lock timeout and `ROLLBACK`, checking
 `current_database()`, `inet_server_addr()`, and `inet_server_port()`. Also
 confirm that the harness worktree has no `.env*` file (other than
-`.env.example`), that `CANDIDATE_QA_SEED_ALLOWED` is the explicit local-only
-write gate if a new seed command is added, and that no provider credentials are
-inherited. A mismatch is a hard stop; do not “repair” the target by creating
+`.env.example`) and that no provider credentials are inherited. The fixed
+database target, marker-collision check, and harness environment sanitization
+are the safety gates; this plan does not invent an additional seed approval
+variable. A mismatch is a hard stop; do not “repair” the target by creating
 or dropping databases. The already observed probe returned the expected
 database, loopback address, and port.
 
@@ -43,10 +46,11 @@ server process/session identity, and the exact target attestation output.
 ## Deterministic fixture manifest
 
 Use an unambiguous marker prefix in every synthetic value:
-`boundary-20260912-`. Every reference, email, idempotency key, filename and
-text body must use `example.invalid` or a loopback URL. Abort if the marker is
-already present; do not update or delete pre-existing rows. Capture generated
-IDs in a manifest after creation instead of assuming a numeric sequence.
+`boundary-20260912-`. Synthetic email addresses must use `example.invalid` and
+synthetic URLs must stay on loopback; ordinary names, references, idempotency
+keys and body text only need the marker prefix. Abort if the marker is already
+present; do not update or delete pre-existing rows. Capture generated IDs in a
+manifest after creation instead of assuming a numeric sequence.
 
 ### Leads: 325 rows
 
@@ -60,43 +64,62 @@ archive/trash filters are also non-empty. Give all rows valid required fields
 The anchor lead is the first active row and is identified by
 `boundary-20260912-anchor@example.invalid`.
 
-Expected checks: active `/admin-v2/cases` reports 305 rows and 13 pages at 25
-rows per page; archived and trashed views remain reachable without leaking
-active rows. A page-two request must include the same filters in its URL.
+Expected checks (relative to the read-only baseline count captured immediately
+before seeding): the active `/admin-v2/cases` count increases by 305 and spans
+13 pages at 25 rows per page; archive and trash deltas are 15 and 5. Existing
+rows may already be present in the isolated database, so never assert absolute
+counts without subtracting that baseline. A page-two request must include the
+same filters in its URL.
 
-### Anchor relation graph
+### Anchor relation graph and 126 owner versions
 
-Attach all deep-history records to the anchor lead. Create the minimum graph
-needed by the existing Payload required relations:
+Attach all deep-history records to the anchor lead. Create exactly 126 rows in
+each of these owner-bearing histories, with references/IDs recorded in the
+manifest and timestamps ordered oldest to newest:
 
-- one draft roof measurement and one draft price calculation;
-- one quote version with valid required snapshot/hash, terms and dates;
-- two contract rows for that quote, versions 1 and 2, with distinct immutable
-  references and hashes. Version 2 supersedes version 1. If signed rows are
-  needed for the read-model scenario, create both through the verified
-  signature context (never by weakening a hook); retain customer/company
-  signature evidence and the two distinct document links;
-- one work order linked to the quote and contract, with valid summary/hash and
-  `status=unassigned`;
-- optional one customer-contract-request linked to the same lead/quote/
-  contract/work order and a source message, using a deterministic active status.
+- `roof-measurements`: 126 valid draft rows, each with the required address,
+  license/source, geometry, hashes and calculation fields. The SQL table has
+  no `version` column, so use distinct marker references and relation IDs;
+  never invent or insert a version column.
+- `price-calculations`: 126 rows, each linked to its matching measurement and
+  one approved price rule, with valid snapshots, hashes and amounts.
+- `quotes`: 126 immutable draft/issued rows, each linked to the matching
+  measurement and price calculation, with distinct marker references,
+  snapshots, hashes, terms and dates. Quote 126 is the newest.
+- `contracts`: 126 immutable rows, one per quote, with distinct references,
+  hashes and version numbers 1–126. Contract 126 is the current signed row;
+  create the signed state and evidence through the verified signature context,
+  not by weakening a hook. Contract 1 is also a signed older row (and may be
+  marked superseded only through the supported workflow), so two signed rows
+  exist for the owner-pair regression and both IDs remain discoverable.
+- `work-orders`: 126 historical orders, each linked to its matching quote and
+  contract, with valid summary/hash fields and deterministic statuses.
+- `invoice-records` and `warranties`: 126 rows each, linked one-to-one to the
+  matching work orders and anchor lead, with all required snapshots, hashes,
+  terms, dates and approval fields.
+- `official-invoices`: 126 rows linked one-to-one to the invoice records, with
+  unique original hashes and valid original-document references. Reusing an
+  anchor media row is acceptable; do not create a second unbounded media set.
 
-The two contract versions deliberately test that a relation owner pair is
-treated as two exact contract IDs, rather than one quote/contract “current
-row”.
+Create one customer-contract-request linked to the newest graph row and one
+source message if that scenario is needed. The 126-row sets are required: they
+exercise the existing `limit:100` relation reads and prevent a “two rows only”
+fixture from hiding owner-history truncation. The exact owner-pair set must
+include all 126 quote IDs, all 126 contract IDs, and all 126 measurement/order/
+invoice/warranty IDs that the read model derives.
 
-### Messages: 501 rows (at least 126 required)
+### Messages: 126 rows minimum
 
-Create 501 messages for the anchor lead, ordered oldest to newest, using
-required `lead`, `direction`, `category`, `channel`, `subject`, `bodyText`,
-`status`, and unique `idempotencyKey` fields. Use `status=delivered`,
-`channel=email`, and marker subjects. Include one inbound
+Create exactly 126 messages for the anchor lead, ordered oldest to newest,
+using required `lead`, `direction`, `category`, `channel`, `subject`,
+`bodyText`, `status`, and unique `idempotencyKey` fields. Use
+`status=delivered`, `channel=email`, and marker subjects. Include one inbound
 `category=customer_question` and one outbound draft reply linked by
 `replyToMessage`; keep the remaining rows as delivered outbound follow-ups.
 The oldest row must have a unique marker such as
 `boundary-20260912-oldest-message`, and at least one row must be positioned
-past history page 5. This simultaneously proves that >125 history rows and
-relations with IDs greater than 500 are real, not just synthetic labels.
+past history page 5. This tests history pagination only; message IDs above 500
+are not evidence of document-owner coverage.
 
 Expected checks: page 1 and a later `messagePage` show different marker rows;
 the oldest deep-link opens the correct disclosure; no 100-row query can make
@@ -107,47 +130,51 @@ the old marker disappear.
 `private-media` rejects direct collection creates by design, so future fixture
 work must use the approved local-only metadata/storage path (or a transaction-
 scoped SQL insert after schema inspection), never change collection access.
-The collection has no `version` column; do not invent one. Create at least 101
+The collection has no `version` column; do not invent one. Create exactly 101
 anchor media metadata rows, with deterministic `filename`, `classification`,
 `ownerType`, `ownerId`, and safe local `alt` values. Use several exact owner
 pairs represented by the anchor graph:
 
 ```text
 (lead, anchorLeadId)
-(quote, quoteV1Id), (quote, quoteV2Id)
-(contract, contractV1Id), (contract, contractV2Id)
+(quote, all126QuoteIds)
+(contract, all126ContractIds)
 (work-order, workOrderId), (work, workOrderId)
 ```
 
-Add decoys with the same `ownerType` but another ID and the same `ownerId` but
-another `ownerType`. Include marker files older than the first 100 rows. This
-proves that the history query uses exact `(ownerType, ownerId)` pairs and that
-older media remains addressable; it must not use independent `ownerType IN` and
-`ownerId IN` predicates, which create a cross-product leak.
+Add exactly 501 media decoys in the actual `private-media` source queried by
+the document center: exactly 500 `ownerType=work-order` rows with distinct
+`ownerId=boundary-20260912-decoy-work-order-001` through `-500`, plus one
+`ownerType=work` row reusing decoy owner ID `-500`. These pairs are all outside
+the anchor owner-pair set and use marker filenames. Create at least one oldest
+anchor file before those decoys in creation order, so a newest-first 500-row
+query can omit it. This is mandatory:
+501 messages or an ID greater than 500 does not exercise the document center's
+old-500 source cap. The 501 decoys must be present in the queried source so an
+old anchor document can be omitted by the current `limit:500,
+pagination:false` path. Also add same-type/different-ID and same-ID/
+different-type decoys to prove exact owner-pair matching; independent `IN`
+predicates create a cross-product leak.
 
-### Optional >500 relation expansion
-
-If the local browser assertion needs a relation collection with more than 500
-rows independently of messages, add 501 deterministic non-anchor rows only
-after the required graph exists (for example additional draft quote/measurement
-chains with all required references). Record every generated ID and keep them
-outside the anchor's owner pairs. Do not fake a `version` field on
-`roof-measurements`: discovery confirmed that table has no `version` column.
-This expansion is optional because the 501-message history already exercises
-IDs and pagination beyond 500; it must not be used to justify an unbounded
-read in application code.
+The 501 decoys may point at a non-existent owner because the metadata table has
+no relation foreign key; if a valid decoy work order is used, keep it outside
+the anchor graph and record it. The exact bounded media total is 602 (101
+anchor rows + 501 source decoys), excluding any pre-existing baseline.
 
 ## Current cap risks and fallacies to assert
 
 - The legacy document center composes multiple collections and currently uses
   `limit: 500` plus `pagination: false` per source. It cannot be safely paged
   by slicing its composed array; it remains an explicit unresolved item for
-  the document read-model owner.
+  the document read-model owner. With 501 newer source decoys and an older
+  anchor file, the expected current-code evidence is a missing oldest anchor
+  document (not a blanket PASS); capture the omitted marker and source count.
 - The case list's related-record query has a global fixed `limit: 100` for the
   25 leads on the current page. Five or more related rows per early lead can
   starve later lead IDs, so a global limit is not equivalent to a per-lead
-  limit. The fixture should include at least four related rows for several
-  leads if this behavior is audited.
+  limit. The 126-row anchor histories should produce explicit missing oldest
+  measurement/quote/order/invoice/warranty markers under current code; capture
+  those omissions as expected failure evidence.
 - Case `action` and `worker` are derived after the lead page query. Therefore a
   reported `totalDocs` can describe pre-filter leads while rendered items are
   post-filter; tests must not claim that those totals prove all derived-action
