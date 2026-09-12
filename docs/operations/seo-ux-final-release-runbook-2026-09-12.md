@@ -1,10 +1,11 @@
 # SEO / Admin V2 UX final release — CONTROL review
 
-Status: **PLAN READY FOR REVIEW; EXECUTION BLOCKED by the preconditions below.**
+Status: **CONTROL EXECUTION GATE APPROVED; staged release in progress.**
 The owner has authorized the final-release workflow. This document does not
 request another routine owner GO. CONTROL reviews the concrete plan before
-execution. No deployment, runtime/config change, DB initialization, migration,
-canary, or alias mutation was performed while preparing this document.
+execution. The owner separately approved temporarily pausing all three project
+cron jobs. CONTROL accepted pause containment in place of unavailable exact
+scheduler-definition restoration. Execution evidence is recorded below.
 
 Scope: existing SEO fixes and Admin V2 history UX, plus reviewed minimal
 release-safety hardening. Not a new One UI/RF release or a schema rollout.
@@ -79,6 +80,15 @@ The script also exits zero for non-Postgres/missing migrations: inspect its
 actual comparison, not just exit status. Missing schema is a stop, not consent
 to migrate. Credentials must remain in their approved secret channel.
 
+CONTROL execution clarification: direct migration-ledger access is unavailable
+and remains **UNKNOWN**, not a required export. CLI `env run` explicitly excludes
+18 protected production secrets; do not bypass that protection. Source comparison
+against verified live rollback `412a6e9` found no changes in runtime Payload config,
+migrations, migration script, or sitemap before the narrow safety correction.
+The live native Payload/Admin V2 works. Thus source compatibility plus committed
+startup guard `67763ec5d319671fb4b6274c732620eb35dfd6ff` permits safe staging.
+Actual candidate CMS/admin compatibility is mandatory before canaries/promotion.
+
 Capture effective, nonsecret current reminder/routing flags, operating mode,
 and emergency-pause state. CONTROL observed the current authenticated LT
 Admin V2 dashboard: controlled pilot `PROD-8.2`, automatic sends paused.
@@ -92,17 +102,17 @@ not app authentication. Existing live-domain cookies are not a candidate
 session. Do not extract credentials/cookies or bypass Turnstile. Identify the
 approved inbox/provider-event access needed to prove all three deliveries.
 
-Scheduler recovery is an **unresolved predeployment gate**: verify an exact
-supported way to restore the snapshot above if staging changes it. The public
-OpenAPI inspected exposes no documented cron-definition restoration PATCH;
-do not invent one. Normal path leaves the existing scheduler untouched. In an
-incident, project Settings → Cron Jobs → Disable Cron Jobs is documented, but
-restoring aliases or an Instant Rollback alone does not restore cron jobs,
-and disabling does not cancel an already-running invocation. CONTROL must
-accept the recovery procedure and any interruption before staging. Never
-probe `/api/cron/purge-leads` with a real secret. A candidate-only purge-disable
-guard is a possible separately reviewed containment measure, not implemented
-or presumed approved here. [Vercel cron management](https://vercel.com/docs/cron-jobs/manage-cron-jobs)
+Scheduler containment is now approved: snapshot, then
+`PATCH /v1/projects/prj_MWKBmg22GIxgiGmTtbT9Om3469aI/crons` with JSON
+`{"enabled":false}` in the verified team scope; require `disabledAt` on a fresh
+project GET. This supported toggle is evidenced by the
+[official Vercel Terraform client](https://raw.githubusercontent.com/vercel/terraform-provider-vercel/main/client/project_crons.go).
+It does not restore definitions. Keep all three jobs paused throughout staging,
+alias release, and any rollback; do not re-enable until a separate verified
+target plan is ready. Report paused, not fully restored. Alias/Instant Rollback
+does not restore cron jobs; pausing does not cancel already-running invocations.
+Never probe `/api/cron/purge-leads` with a real secret.
+[Vercel cron management](https://vercel.com/docs/cron-jobs/manage-cron-jobs)
 
 ### 3. Create one fresh functional staged deployment
 
@@ -167,17 +177,18 @@ records, and, with AI enabled, a lead-response AI draft; this is not only one
 external AI request. No automatic quote/contract send or publication is part
 of the canary. Retain clearly marked QA records; no cleanup is authorized.
 
-### 6. Generate one Oslo article, keep it unpublished
+### 6. Generate one relevant service-area article, keep it unpublished
 
 Before the single admin action, inspect eligible topics and account for
 `ensureManualBlogTopics` adding missing seeds. Current
 `POST /api/admin/blog/generate` has no topic parameter and selects the top
-eligible score across the Oslo region or locationless topics. If exact Oslo
-cannot be guaranteed, stop this canary for a narrowly reviewed topic-selection
-solution; do not repeatedly generate until an Oslo result appears.
+eligible score across the Oslo region or locationless topics. CONTROL clarified
+that Oslo, reasonable nearby service towns, or a relevant non-geographic roof
+topic is accepted. Read eligible topics before the single generation; do not add
+a city picker or alter existing unpublished posts merely for QA.
 
 Invoke once through the authenticated UI. Record run/post IDs and provider
-result. Require Oslo relevance, acceptable QA, `_status=draft`,
+result. Require approved service-area/topic relevance, acceptable QA, `_status=draft`,
 `editorialStatus=ai_qa`, no publication, and no sitemap entry. Inspect actual
 stock-image attribution/alt and unapproved review state; no automatic image
 approval. Topic seeding/status, run, and media changes are expected side
@@ -211,9 +222,9 @@ npx.cmd --yes vercel@59.16.0 alias set landing-lizkuhfql-darbasnorvegija4-8212s-
 ```
 
 Verify both mappings and the unchanged `.as` mappings. Compare the scheduler
-snapshot independently: if unchanged, leave it alone; if changed, use only the
-step-2 verified containment/restoration procedure. Report recovery incomplete
-until enabled state and exact host/path/schedule targets are restored. Domain
+snapshot independently, retaining the approved disabled state. Do not re-enable
+as part of alias rollback. Report scheduler paused pending its separate verified
+target plan, never label containment as full scheduler restoration. Domain
 rollback does not undo QA records or already-sent mail; retain their audit trail.
 No automatic deployment retry, schema down-migration, or canary cleanup.
 
@@ -226,9 +237,18 @@ included Vercel SSO HTML: the historical 200 claims are not CMS/admin proof.
 A cron Unauthorized response proves authorization rejection, not independently
 that the configured secret was empty. No live purge probe is needed again.
 
-Still unresolved: reviewed runtime hardening and exact final SHA; direct schema
-compatibility evidence; exact scheduler recovery mechanism; complete effective
-operating-flag baseline; candidate app/Turnstile and inbox access; exact-Oslo
-selection. CONTROL's existing-domain browser/public checks are baseline evidence,
-not candidate checks. Report these gates without re-requesting the owner's
-already-issued general release authorization.
+## Execution evidence
+
+- Safety correction source: `67763ec5d319671fb4b6274c732620eb35dfd6ff`;
+  two actual Vitest files / seven tests PASS using the known x64 runtime.
+  CONTROL also received full typecheck, targeted lint, and diff-check PASS.
+- Current project production flags verified through in-memory CLI env run:
+  AI=true, automatedReminders=false, communicationRoutingV2=true,
+  seoScheduler=false, seoAutoPublish=false, emergencyPause=true,
+  operatingMode=controlled_pilot. Runtime build-without-DB and drop flags absent.
+  These are current project config, not a complete historical runtime export.
+- No local DB connection was injected because protected secrets are excluded;
+  no direct pg connection/query took place. The migration ledger remains UNKNOWN.
+- Candidate app/Turnstile, functional provider results, actual CMS/admin reads,
+  and inbox delivery evidence are post-staging checks. No candidate exists yet
+  at this entry; do not request candidate login before creating it.
