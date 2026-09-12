@@ -14,6 +14,11 @@ describe("blog review helpers", () => {
 
   it("allows direct publish only for approved or scheduled status", () => {
     const approved = {
+      qualityScore: 90,
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       status: "approved",
       reviewerName: "Kari",
       reviewedAt: "2026-09-03T01:00:00.000Z",

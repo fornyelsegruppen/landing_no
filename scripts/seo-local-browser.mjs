@@ -28,6 +28,7 @@ if (
     "seed",
     "repair-fixtures",
     "add-unique-fixture",
+    "api-e2e",
     "build",
     "dev",
     "start",
@@ -82,6 +83,22 @@ Object.assign(environment, {
 });
 process.env = environment;
 process.chdir(root);
+
+if (mode === "api-e2e") {
+  const require = createRequire(import.meta.url);
+  const jiti = require("jiti")(import.meta.url, {
+    alias: { "@": path.join(root, "src") },
+  });
+  const { validGeneratedArticle } = await jiti.import(
+    path.join(root, "src/lib/blog/test-fixtures.ts"),
+  );
+  const { runLocalBlogApiE2E } = await import("./seo-local-api-e2e.mjs");
+  await runLocalBlogApiE2E({
+    account: fixtureAccount,
+    article: validGeneratedArticle(),
+  });
+  process.exit(process.exitCode || 0);
+}
 
 if (!["seed", "repair-fixtures", "add-unique-fixture"].includes(mode)) {
   if (reviewCanary)
@@ -345,12 +362,35 @@ if (!["seed", "repair-fixtures", "add-unique-fixture"].includes(mode)) {
             primaryKeyword: article.primaryKeyword,
             sources: article.sources,
             authorName: "Synthetic local fixture",
+            ...fixtureMetadataPatch(
+              { slug, authorName: "Synthetic local fixture" },
+              article,
+            ),
             aiAssisted: false,
             editorialStatus: "human_review",
             _status: "draft",
           },
         });
         if (state === "published-with-draft") {
+          const { evaluateEditedBlogDraft } = await jiti.import(
+            path.join(root, "src/lib/blog/edited-draft-quality.ts"),
+          );
+          const quality = evaluateEditedBlogDraft({
+            post: created,
+            edits: created,
+          });
+          if (!quality.passed)
+            throw new Error(
+              "Synthetic published fixture must pass current quality rules before setup publication",
+            );
+          await payload.update({
+            collection: "posts",
+            id: created.id,
+            draft: true,
+            overrideAccess: true,
+            context: { trustedBlogQualityRevalidation: true },
+            data: { qualityChecks: quality, qualityScore: quality.score },
+          });
           await payload.update({
             collection: "posts",
             id: created.id,

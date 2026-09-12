@@ -26,7 +26,10 @@ import {
   osloScheduleIso,
 } from "@/lib/admin-v2/blog-schedule-time";
 import type { PanelLocale } from "@/lib/panel-i18n";
-import { blogQualityIssueMessage } from "@/lib/admin-v2/blog-quality-copy";
+import {
+  blogQualityIssueMessage,
+  blogQualityRecheckMessage,
+} from "@/lib/admin-v2/blog-quality-copy";
 import {
   blogDraftFieldIssues,
   blogFieldIssueMessage,
@@ -68,6 +71,7 @@ type Props = {
   publishEligible?: boolean;
   hasPublicVersion?: boolean;
   qualityPassed?: boolean;
+  qualityStale?: boolean;
   qualityScore?: number | null;
   reviewerName: string;
   scheduledAt?: string | null;
@@ -212,7 +216,9 @@ export function BlogEditor(props: Props) {
   });
   const busy = busyAction !== null || refreshState.freezeEditor;
   const needsQualityRecheck =
-    props.qualityPassed !== true || typeof props.qualityScore !== "number";
+    props.qualityStale === true ||
+    props.qualityPassed !== true ||
+    typeof props.qualityScore !== "number";
   const scheduleConversion = osloScheduleIso(form.scheduledAt);
   const scheduleDateIsFuture =
     scheduleConversion.ok &&
@@ -321,6 +327,8 @@ export function BlogEditor(props: Props) {
   }
 
   function actionError(result: BlogActionResponse) {
+    if (result.code === "QUALITY_RECHECK_REQUIRED")
+      return blogQualityRecheckMessage(props.locale);
     if (result.code === "VALIDATION_ERROR")
       return blogValidationSummary(props.locale);
     const gateMessage = blogGateErrorMessage(result.code, props.locale);
@@ -427,6 +435,11 @@ export function BlogEditor(props: Props) {
       data-blog-editor-dirty={dirty ? "true" : "false"}
     >
       <section className="bg-background-elevated/75 rounded-3xl border border-white/10 p-5 sm:p-6">
+        {props.qualityStale ? (
+          <p role="status" className="mb-4 text-sm text-amber-200">
+            {blogQualityRecheckMessage(props.locale)}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2 className="text-xl font-bold">{core.edit}</h2>
           {dirty ? (

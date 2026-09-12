@@ -34,7 +34,7 @@ const original = {
   ],
   aiAssisted: true,
   qualityScore: 94,
-  qualityChecks: { passed: true },
+  qualityChecks: { policyVersion: "2026-09-12-repetition-v1", passed: true },
   reviewerName: "Tidligere kontrollør",
   reviewedAt: "2026-08-29T10:00:00.000Z",
   scheduledAt: "2026-09-01T08:00:00.000Z",
@@ -64,14 +64,26 @@ describe("Posts technical editor quality policy", () => {
       originalDoc: {},
       req: { user: null },
       data: {
-        _status: "draft", editorialStatus: "ai_qa", aiAssisted: true,
-        titleNo: "Kontrollert tittel", contentNo: "Kontrollert innhold",
-        qualityScore: 93, qualityChecks: { passed: true },
+        _status: "draft",
+        editorialStatus: "ai_qa",
+        aiAssisted: true,
+        titleNo: "Kontrollert tittel",
+        contentNo: "Kontrollert innhold",
+        qualityScore: 93,
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+        },
       },
     } as never);
     expect(result).toMatchObject({
-      _status: "draft", editorialStatus: "ai_qa",
-      qualityScore: 93, qualityChecks: { passed: true },
+      _status: "draft",
+      editorialStatus: "ai_qa",
+      qualityScore: 93,
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
     });
   });
 
@@ -158,7 +170,10 @@ describe("Posts technical editor quality policy", () => {
         contentNo: "Nytt kontrollert innhold",
         editorialStatus: "human_review",
         qualityScore: 91,
-        qualityChecks: { passed: true },
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+        },
         reviewerName: null,
         reviewedAt: null,
         scheduledAt: null,
@@ -178,7 +193,10 @@ describe("Posts technical editor quality policy", () => {
       _status: "draft",
       editorialStatus: "human_review",
       qualityScore: 91,
-      qualityChecks: { passed: true },
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
     });
   });
 
@@ -381,9 +399,7 @@ describe("Posts technical editor quality policy", () => {
         "imageBrief",
       ]),
     );
-    expect(
-      publicPostContentFingerprint(original),
-    ).not.toBe(
+    expect(publicPostContentFingerprint(original)).not.toBe(
       publicPostContentFingerprint({
         ...original,
         contentEn: "Changed public English content",

@@ -14,6 +14,7 @@ import type { PanelLocale } from "@/lib/panel-i18n";
 import {
   blogQualityGateLabel,
   blogQualityIssueMessage,
+  blogQualityRecheckMessage,
 } from "@/lib/admin-v2/blog-quality-copy";
 
 type Props = BlogReviewInput & {
@@ -52,6 +53,11 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
 
   return (
     <section className="bg-background-elevated/75 rounded-3xl border border-white/10 p-5 sm:p-7">
+      {review.qualityStale ? (
+        <p className="mb-4 text-sm text-amber-200">
+          {blogQualityRecheckMessage(locale)}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-accent text-xs font-bold tracking-[0.2em] uppercase">

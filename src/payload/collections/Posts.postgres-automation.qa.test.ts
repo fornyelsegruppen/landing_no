@@ -228,7 +228,10 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
         contentNo: body,
         editorialStatus: "human_review",
         qualityScore: 92,
-        qualityChecks: { passed: true },
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+        },
         sources: [
           { label: "Synthetic source", url: "https://example.invalid/source" },
         ],
@@ -270,7 +273,10 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
         contentNo: body,
         editorialStatus: "human_review",
         qualityScore: 93,
-        qualityChecks: { passed: true },
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+        },
       },
     });
     await payload.update({
@@ -691,6 +697,61 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
     }
     throw new Error("No independently blocked PostgreSQL writer observed");
   }
+
+  it("legacy QA100 blocks native approval and publication and sends scheduler to review without unpublishing", async () => {
+    await scheduledPost();
+    // Simulate an already stored result from a prior release, only in this
+    // isolated test document. No policy version is fabricated onto old evidence.
+    const isolatedDb = payload.db as unknown as {
+      drizzle: { execute(q: ReturnType<typeof sql>): Promise<unknown> };
+    };
+    await isolatedDb.drizzle.execute(
+      sql`update _posts_v set version_quality_checks = '{"passed":true}'::jsonb, version_quality_score = 100 where parent_id = ${postID} and latest = true`,
+    );
+    await expect(
+      payload.update({
+        collection: "posts",
+        id: postID,
+        draft: true,
+        overrideAccess: true,
+        data: { editorialStatus: "approved" },
+      }),
+    ).rejects.toThrow(/Current deterministic/);
+    const publish = await handleEndpoints({
+      config: payload.config,
+      payloadInstanceCacheKey: cacheKey,
+      request: new Request(`https://example.invalid/api/posts/${postID}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `JWT ${adminToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ _status: "published" }),
+      }),
+    });
+    expect(publish.status).toBeGreaterThanOrEqual(400);
+    const result = await publishDueBlogPosts(
+      payload,
+      new Date("2026-09-12T10:00:00.000Z"),
+    );
+    expect(result.published).not.toContain(postID);
+    expect(result.attention).toContain(postID);
+    await expect(publicPost(postID)).resolves.toMatchObject({
+      _status: "published",
+      contentNo: initialBody,
+    });
+    const latest = await payload.findByID({
+      collection: "posts",
+      id: postID,
+      draft: true,
+      overrideAccess: true,
+    });
+    expect(latest).toMatchObject({
+      editorialStatus: "human_review",
+      reviewerName: null,
+      scheduledAt: null,
+    });
+  });
 
   it("native edit waits for publish commit and preserves the committed public revision", async () => {
     await scheduledPost();

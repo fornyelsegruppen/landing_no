@@ -36,9 +36,13 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
   let postID: string | number;
 
   beforeAll(async () => {
-    tempRoot = await mkdtemp(path.join(tmpdir(), "payload-post-restore-endpoint-"));
+    tempRoot = await mkdtemp(
+      path.join(tmpdir(), "payload-post-restore-endpoint-"),
+    );
     if (!Media.upload || typeof Media.upload !== "object") {
-      throw new TypeError("The real Media collection must expose upload config");
+      throw new TypeError(
+        "The real Media collection must expose upload config",
+      );
     }
     const config = await buildConfig({
       secret: "phase2d-native-restore-only-not-a-production-secret",
@@ -122,11 +126,20 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
       !tempRoot ||
       resolvedTempRoot === path.parse(resolvedTempRoot).root ||
       path.dirname(resolvedTempRoot) !== resolvedTmpDirectory ||
-      !path.basename(resolvedTempRoot).startsWith("payload-post-restore-endpoint-")
+      !path
+        .basename(resolvedTempRoot)
+        .startsWith("payload-post-restore-endpoint-")
     ) {
-      throw new TypeError("Refusing to remove an unexpected native-restore test path");
+      throw new TypeError(
+        "Refusing to remove an unexpected native-restore test path",
+      );
     }
-    await rm(tempRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    await rm(tempRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 250,
+    });
   });
 
   async function createApprovedPublishedPost(body = initialBody) {
@@ -155,8 +168,13 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
         contentNo: body,
         editorialStatus: "human_review",
         qualityScore: 92,
-        qualityChecks: { passed: true },
-        sources: [{ label: "Synthetic source", url: "https://example.invalid/source" }],
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+        },
+        sources: [
+          { label: "Synthetic source", url: "https://example.invalid/source" },
+        ],
       },
     });
     await payload.update({
@@ -195,7 +213,10 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
         contentNo: body,
         editorialStatus: "human_review",
         qualityScore: 93,
-        qualityChecks: { passed: true },
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+        },
       },
     });
     await payload.update({
@@ -219,15 +240,20 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
   }
 
   async function versionsFor(id: string | number) {
-    return (await payload.findVersions({
-      collection: "posts",
-      overrideAccess: true,
-      where: { parent: { equals: id } },
-      limit: 50,
-    })).docs as StoredVersion[];
+    return (
+      await payload.findVersions({
+        collection: "posts",
+        overrideAccess: true,
+        where: { parent: { equals: id } },
+        limit: 50,
+      })
+    ).docs as StoredVersion[];
   }
 
-  async function restoreThroughNativeEndpoint(versionID: string, token?: string) {
+  async function restoreThroughNativeEndpoint(
+    versionID: string,
+    token?: string,
+  ) {
     return handleEndpoints({
       config: payload.config,
       payloadInstanceCacheKey: cacheKey,
@@ -266,11 +292,16 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
       data: { contentNo: editedBody },
     });
     const selected = (await versionsFor(postID)).find(
-      (version) => version.version._status === "draft" && version.version.contentNo === editedBody,
+      (version) =>
+        version.version._status === "draft" &&
+        version.version.contentNo === editedBody,
     );
     expect(selected).toBeDefined();
 
-    const response = await restoreThroughNativeEndpoint(selected!.id, adminToken);
+    const response = await restoreThroughNativeEndpoint(
+      selected!.id,
+      adminToken,
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       _status: "draft",
@@ -289,11 +320,16 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
     const newerBody = "Syntetisk nyere kontrollert offentlig artikkel.";
     await publishReviewedBody(postID, newerBody);
     const selected = (await versionsFor(postID)).find(
-      (version) => version.version._status === "published" && version.version.contentNo === initialBody,
+      (version) =>
+        version.version._status === "published" &&
+        version.version.contentNo === initialBody,
     );
     expect(selected).toBeDefined();
 
-    const response = await restoreThroughNativeEndpoint(selected!.id, adminToken);
+    const response = await restoreThroughNativeEndpoint(
+      selected!.id,
+      adminToken,
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       _status: "draft",
@@ -318,7 +354,9 @@ describe("Posts native version restore endpoint (isolated PostgreSQL)", () => {
     expect(selected).toBeDefined();
 
     expect((await restoreThroughNativeEndpoint(selected!.id)).status).toBe(401);
-    expect((await restoreThroughNativeEndpoint(selected!.id, workerToken)).status).toBe(403);
+    expect(
+      (await restoreThroughNativeEndpoint(selected!.id, workerToken)).status,
+    ).toBe(403);
     await expect(publicPost(postID)).resolves.toMatchObject({
       _status: "published",
       editorialStatus: "published",

@@ -1,4 +1,8 @@
 import { postRevision } from "@/lib/blog/post-revision";
+import {
+  currentBlogQualityPassed,
+  hasCurrentBlogQuality,
+} from "@/lib/blog/quality-policy";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -326,10 +330,22 @@ export async function POST(
         outcome: "saved",
       });
     }
-    const quality =
-      post.qualityChecks && typeof post.qualityChecks === "object"
-        ? (post.qualityChecks as { passed?: boolean })
-        : {};
+    if (
+      ["approve", "schedule", "publish"].includes(parsed.data.action) &&
+      !hasCurrentBlogQuality(post.qualityChecks)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "QUALITY_RECHECK_REQUIRED",
+          action,
+          error:
+            "Quality rules have changed. Recheck the saved content before approval or publication.",
+          correlationId,
+        },
+        { status: 409 },
+      );
+    }
     const reviewerName =
       parsed.data.action === "approve"
         ? parsed.data.reviewerName ||
@@ -340,7 +356,7 @@ export async function POST(
       {
         status: post.editorialStatus as BlogEditorialStatus,
         qualityScore: post.qualityScore,
-        qualityPassed: quality.passed === true,
+        qualityPassed: currentBlogQualityPassed(post.qualityChecks),
         reviewerName,
         reviewedAt: post.reviewedAt,
       },

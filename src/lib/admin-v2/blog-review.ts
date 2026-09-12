@@ -3,6 +3,10 @@ import {
   publicationReadinessErrors,
   type EditorialPost,
 } from "@/lib/blog/editorial-policy";
+import {
+  currentBlogQualityPassed,
+  hasCurrentBlogQuality,
+} from "@/lib/blog/quality-policy";
 
 export type ReviewIssueSeverity = "warning" | "blocker";
 
@@ -35,6 +39,7 @@ export type StockImageReview = {
 export type BlogReviewInput = {
   aiAssisted?: boolean | null;
   qualityChecks?: {
+    policyVersion?: string;
     issues?: ReviewIssue[] | null;
     passed?: boolean | null;
   } | null;
@@ -49,10 +54,7 @@ export type BlogReviewInput = {
 };
 
 export type PublicationBlocker =
-  | "approval"
-  | "review_record"
-  | "quality"
-  | "precise_source";
+  "approval" | "review_record" | "quality" | "precise_source";
 
 function normalizedUrl(raw: string) {
   try {
@@ -92,7 +94,10 @@ export function blogPublishEligibility(input: BlogReviewInput) {
       aiAssisted: input.aiAssisted,
       editorialStatus: editorialStatus(input.status),
       qualityChecks: input.qualityChecks
-        ? { passed: input.qualityChecks.passed === true }
+        ? {
+            passed: input.qualityChecks.passed === true,
+            policyVersion: input.qualityChecks.policyVersion,
+          }
         : null,
       qualityScore: input.qualityScore,
       reviewedAt: input.reviewedAt,
@@ -128,8 +133,8 @@ export function summarizeBlogReview(input: BlogReviewInput) {
     publicationBlockers.push("review_record");
   }
   if (
-    input.aiAssisted === true &&
-    (input.qualityChecks?.passed !== true || (input.qualityScore || 0) < 75)
+    !currentBlogQualityPassed(input.qualityChecks) ||
+    (input.qualityScore || 0) < 75
   ) {
     publicationBlockers.push("quality");
   }
@@ -145,7 +150,8 @@ export function summarizeBlogReview(input: BlogReviewInput) {
     homepageOnlySources,
     publicationBlockers,
     publishReady,
-    qualityPassed: input.qualityChecks?.passed === true,
+    qualityPassed: currentBlogQualityPassed(input.qualityChecks),
+    qualityStale: !hasCurrentBlogQuality(input.qualityChecks),
     qualityScore:
       typeof input.qualityScore === "number" ? input.qualityScore : null,
     scheduledAt: input.scheduledAt || null,

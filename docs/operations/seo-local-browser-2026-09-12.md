@@ -63,6 +63,27 @@ it until a different future time is selected with no unsaved content edits.
 Final combined pre-build checks after these changes: 49 files / 317 Vitest tests,
 3 local fixture helper tests, full TypeScript, touched ESLint and diff-check PASS.
 
+## Current-quality policy and bounded API acceptance follow-up
+
+Current deterministic results carry `qualityChecks.policyVersion` in the existing
+JSON field. Missing/old/unknown versions require an explicit unchanged-content
+Recheck, which saves current QA and invalidates approval without auto-approving.
+The shared predicate covers API approval/schedule/publish, native approval/publish,
+and the due publisher. `aiAssisted:false` cannot bypass current quality for a new
+publication. Already public content is not automatically withdrawn: visibility
+does not depend on a newly installed quality policy. Never manually stamp a new
+version on historical QA100 or bulk-migrate old evidence to manufacture freshness.
+
+`node scripts/seo-local-browser.mjs api-e2e` uses only fixed localhost3217 and the
+existing synthetic login, not browser cookies. It creates its own new random-slug
+fixture; it never touches fixture3 (whose browser confirmation was uncertain) or
+fixture4. It performs real current SaveQA/approval/reschedule/manual publication,
+warms public article/list/sitemap, explicitly unpublishes and checks immediate
+removal, then restores native history as an unpublished/review-required draft.
+Cleanup verifies only its own fixture identity and withdraws it without deleting
+versions. No provider calls, cron trigger, browser bypass, or production mutation.
+Its result is API acceptance only; it cannot confer browser acceptance.
+
 Fixtures:
 
 - `/no/blogg/seo-local-draft`: draft only; normal public request should not show

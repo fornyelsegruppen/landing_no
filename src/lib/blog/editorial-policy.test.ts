@@ -50,6 +50,11 @@ describe("blog editorial policy", () => {
           titleNo: "Norsk",
           contentNo: "Innhold",
           authorName: "Fagperson",
+          qualityScore: 90,
+          qualityChecks: {
+            policyVersion: "2026-09-12-repetition-v1",
+            passed: true,
+          },
           reviewerName: "Kontrollør",
           reviewedAt: "2026-08-23T10:00:00.000Z",
           sources: [
@@ -77,7 +82,10 @@ describe("blog editorial policy", () => {
           authorName: "Takfornyelse",
           aiAssisted: true,
           qualityScore: 92,
-          qualityChecks: { passed: true },
+          qualityChecks: {
+            policyVersion: "2026-09-12-repetition-v1",
+            passed: true,
+          },
           sources: [
             {
               url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
@@ -127,7 +135,10 @@ describe("blog editorial policy", () => {
           authorName: "Takfornyelse",
           aiAssisted: true,
           qualityScore: 94,
-          qualityChecks: { passed: true },
+          qualityChecks: {
+            policyVersion: "2026-09-12-repetition-v1",
+            passed: true,
+          },
           reviewerName: "Tidligere kontrollør",
           reviewedAt: "2026-08-29T10:00:00.000Z",
           scheduledAt: "2026-09-01T08:00:00.000Z",

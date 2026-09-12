@@ -2,6 +2,7 @@ import {
   generatedArticleSchema,
   type GeneratedArticle,
 } from "./article-schema";
+import { BLOG_QUALITY_POLICY_VERSION } from "./quality-policy";
 import {
   approvedBlogKnowledge,
   approvedPackageConsumerPricePhrases,
@@ -24,6 +25,7 @@ export type QualityIssue = {
 };
 
 export type ArticleQualityResult = {
+  policyVersion?: string;
   passed: boolean;
   score: number;
   issues: QualityIssue[];
@@ -109,7 +111,13 @@ export function evaluateArticleQuality(
         `${error.path.join(".")}: ${error.message}`,
       );
     }
-    return { passed: false, score: 0, issues, checkedAt: now.toISOString() };
+    return {
+      policyVersion: BLOG_QUALITY_POLICY_VERSION,
+      passed: false,
+      score: 0,
+      issues,
+      checkedAt: now.toISOString(),
+    };
   }
 
   const article: GeneratedArticle = parsed.data;
@@ -527,6 +535,7 @@ export function evaluateArticleQuality(
   ).length;
   const score = Math.max(0, 100 - blockers * 30 - warnings * 7);
   return {
+    policyVersion: BLOG_QUALITY_POLICY_VERSION,
     passed: blockers === 0 && score >= 75,
     score,
     issues,

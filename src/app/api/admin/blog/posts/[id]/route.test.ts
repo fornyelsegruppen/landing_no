@@ -66,6 +66,26 @@ function request(body: Record<string, unknown>) {
 const context = { params: Promise.resolve({ id: "9" }) };
 
 describe("admin blog post actions", () => {
+  it.each(["approve", "schedule", "publish"])(
+    "requires recheck of legacy QA100 before %s",
+    async (action) => {
+      mocks.findByID.mockResolvedValue({
+        ...(await mocks.findByID()),
+        qualityScore: 100,
+        qualityChecks: { passed: true },
+        editorialStatus: action === "approve" ? "human_review" : "approved",
+      });
+      const response = await POST(
+        request({ action, scheduledAt: "2099-09-14T07:00:00.000Z" }),
+        context,
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        code: "QUALITY_RECHECK_REQUIRED",
+      });
+      expect(mocks.update).not.toHaveBeenCalled();
+    },
+  );
   it("reschedules unchanged reviewed content with revision guards and no new approval", async () => {
     const post = {
       ...(await mocks.findByID()),
@@ -310,6 +330,7 @@ describe("admin blog post actions", () => {
       .mockResolvedValue({ user: { id: 4, role: "admin", name: "Kari" } });
     mocks.captureException.mockReset();
     mocks.evaluateEdited.mockReset().mockReturnValue({
+      policyVersion: "2026-09-12-repetition-v1",
       passed: false,
       score: 40,
       issues: [{ code: "unsafe_roof_advice", severity: "blocker" }],
@@ -331,7 +352,10 @@ describe("admin blog post actions", () => {
         },
       ],
       qualityScore: 92,
-      qualityChecks: { passed: true },
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       reviewerName: "Tidligere kontrollør",
       reviewedAt: "2026-08-29T10:00:00.000Z",
       scheduledAt: "2026-09-01T08:00:00.000Z",
@@ -498,7 +522,10 @@ describe("admin blog post actions", () => {
       id: 9,
       editorialStatus: "approved",
       qualityScore: 92,
-      qualityChecks: { passed: true },
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       authorName: "Takfornyelse",
       sources: [
         {
@@ -533,7 +560,10 @@ describe("admin blog post actions", () => {
       id: 9,
       editorialStatus: "human_review",
       qualityScore: 92,
-      qualityChecks: { passed: true },
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       authorName: "Takfornyelse",
       sources: [
         {
@@ -561,7 +591,10 @@ describe("admin blog post actions", () => {
       id: 9,
       editorialStatus: "approved",
       qualityScore: 92,
-      qualityChecks: { passed: true },
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       authorName: "Takfornyelse",
       sources: [
         {
@@ -589,7 +622,10 @@ describe("admin blog post actions", () => {
       id: 9,
       editorialStatus: "approved",
       qualityScore: 92,
-      qualityChecks: { passed: true },
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       authorName: "Takfornyelse",
       sources: [
         {

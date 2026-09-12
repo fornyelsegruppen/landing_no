@@ -5,6 +5,10 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { BlogArticleViewLink } from "@/components/admin-v2/blog-article-view-link";
 import { BlogEditor } from "@/components/admin-v2/blog-editor";
 import { blogHistoryCopy } from "@/lib/admin-v2/blog-history-copy";
+import {
+  currentBlogQualityPassed,
+  hasCurrentBlogQuality,
+} from "@/lib/blog/quality-policy";
 import { BlogReviewPanel } from "@/components/admin-v2/blog-review-panel";
 import { blogPublishedArticleLabel, getAdminV2Copy } from "@/lib/admin-v2/i18n";
 import { blogPublishEligibility } from "@/lib/admin-v2/blog-review";
@@ -62,6 +66,10 @@ export default async function BlogArticleAdminPage({
     aiAssisted: post.aiAssisted === true,
     qualityChecks: qualityChecks
       ? {
+          policyVersion:
+            typeof qualityChecks.policyVersion === "string"
+              ? qualityChecks.policyVersion
+              : undefined,
           passed:
             "passed" in qualityChecks ? qualityChecks.passed === true : null,
           issues:
@@ -129,7 +137,8 @@ export default async function BlogArticleAdminPage({
         locale={user.interfaceLanguage}
         primaryKeyword={post.primaryKeyword || undefined}
         publishEligible={blogPublishEligibility(reviewInput)}
-        qualityPassed={qualityChecks?.passed === true}
+        qualityPassed={currentBlogQualityPassed(qualityChecks)}
+        qualityStale={!hasCurrentBlogQuality(qualityChecks)}
         qualityScore={
           typeof post.qualityScore === "number" ? post.qualityScore : null
         }

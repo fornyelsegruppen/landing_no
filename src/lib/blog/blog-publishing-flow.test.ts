@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { prepareEditorialPost, validateEditorialPost } from "./editorial-policy";
+import {
+  prepareEditorialPost,
+  validateEditorialPost,
+} from "./editorial-policy";
 import { blogPostLanguageUrls } from "./routing";
 import { publicSeoOrigin } from "./canonical";
 import { safePreviewPath } from "@/lib/preview-path";
@@ -33,6 +36,12 @@ describe("manual article publishing and measured lead flow", () => {
         ...draft,
         _status: "published",
         editorialStatus: "approved",
+        // Synthetic boundary evidence; article quality itself is tested separately.
+        qualityScore: 90,
+        qualityChecks: {
+          passed: true,
+          policyVersion: "2026-09-12-repetition-v1",
+        },
         authorName: "Takfornyelse",
         reviewerName: "Faglig ansvarlig",
         reviewedAt: "2026-08-23T10:00:00.000Z",

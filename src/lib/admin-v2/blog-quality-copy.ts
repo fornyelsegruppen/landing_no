@@ -81,6 +81,14 @@ const copy = {
   },
 };
 
+export function blogQualityRecheckMessage(locale: PanelLocale) {
+  return {
+    lt: "Kokybės taisyklės atnaujintos arba galiojanti patikra neatlikta. Paleiskite kokybės patikrą iš naujo net nekeisdami teksto. Ankstesnis balas nesuteikia naujo patvirtinimo.",
+    nb: "Kvalitetsreglene er oppdatert, eller gjeldende kontroll mangler. Kjør kvalitetskontrollen på nytt, også uten tekstendringer. En tidligere poengsum gir ikke ny godkjenning.",
+    en: "Quality rules have changed or a current check is missing. Run the quality check again, even without text changes. An old score does not grant new approval.",
+  }[locale];
+}
+
 /** Presentation only: preserve stored QA codes, scores and thresholds. */
 export function blogQualityIssueMessage(issue: Issue, locale: PanelLocale) {
   if (issue.code === "repeated_meaningful_paragraph")

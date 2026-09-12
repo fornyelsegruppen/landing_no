@@ -1,3 +1,5 @@
+import { currentBlogQualityPassed } from "./quality-policy";
+
 export type EditorialPost = {
   _status?: "draft" | "published" | null;
   aiAssisted?: boolean | null;
@@ -125,17 +127,9 @@ function publicContentChanged(
         }
       : original;
   return (
-    publicPostContentFingerprint(originalForComparison as Record<string, unknown>) !==
-    publicPostContentFingerprint(merged as Record<string, unknown>)
-  );
-}
-
-function qualityChecksPassed(value: EditorialPost["qualityChecks"]): boolean {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    value.passed === true,
+    publicPostContentFingerprint(
+      originalForComparison as Record<string, unknown>,
+    ) !== publicPostContentFingerprint(merged as Record<string, unknown>)
   );
 }
 
@@ -223,10 +217,12 @@ export function publicationReadinessErrors(post: EditorialPost): string[] {
   }
 
   if (
-    post.aiAssisted === true &&
-    (!qualityChecksPassed(post.qualityChecks) || (post.qualityScore || 0) < 75)
+    !currentBlogQualityPassed(post.qualityChecks) ||
+    (post.qualityScore || 0) < 75
   ) {
-    errors.push("AI-utkastet må bestå kvalitetskontrollen før publisering");
+    errors.push(
+      "Artikkelen må bestå kvalitetskontrollen etter gjeldende regler. Kjør kontrollen på nytt i Admin V2 før publisering.",
+    );
   }
 
   const preciseSourceCount = (post.sources || []).filter((source) =>
@@ -284,7 +280,15 @@ export function prepareEditorialPost(
   const merged = { ...(original ?? {}), ...prepared };
   const errors = validateEditorialPost(merged);
   if (errors.length) throw new TypeError(errors.join("; "));
-
+  if (
+    ["approved", "scheduled"].includes(prepared.editorialStatus || "") &&
+    (!currentBlogQualityPassed(merged.qualityChecks) ||
+      (merged.qualityScore || 0) < 75)
+  ) {
+    throw new TypeError(
+      "Current deterministic quality review is required before approval or scheduling. Run the quality check again in Admin V2.",
+    );
+  }
   if (merged._status !== "published") return prepared;
   return {
     ...prepared,
@@ -310,12 +314,11 @@ export function prepareAdminPublication(
   }
 
   if (
-    merged.aiAssisted === true &&
-    (!qualityChecksPassed(merged.qualityChecks) ||
-      (merged.qualityScore || 0) < 75)
+    !currentBlogQualityPassed(merged.qualityChecks) ||
+    (merged.qualityScore || 0) < 75
   ) {
     throw new TypeError(
-      "AI-utkastet må bestå kvalitetskontrollen før publisering",
+      "Artikkelen må bestå kvalitetskontrollen etter gjeldende regler. Kjør kontrollen på nytt i Admin V2 før publisering.",
     );
   }
 

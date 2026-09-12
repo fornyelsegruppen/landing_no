@@ -99,7 +99,11 @@ describe("BlogReviewPanel", () => {
     const html = renderToStaticMarkup(
       createElement(BlogReviewPanel, {
         locale: "en",
-        qualityChecks: { passed: true, issues: [] },
+        qualityChecks: {
+          policyVersion: "2026-09-12-repetition-v1",
+          passed: true,
+          issues: [],
+        },
         qualityScore: 90,
         aiAssisted: true,
         reviewedAt: "2026-09-03T01:00:00.000Z",

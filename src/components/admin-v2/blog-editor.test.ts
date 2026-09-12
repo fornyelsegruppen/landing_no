@@ -31,6 +31,35 @@ const props = {
 };
 
 describe("blog editor", () => {
+  it("allows unchanged legacy QA100 to be explicitly rechecked without approval", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ ok: true, action: "save", qualityPassed: false }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    await renderedEditor(
+      async (container) => {
+        expect(container.textContent).toContain(
+          "Kokybės taisyklės atnaujintos",
+        );
+        const button = Array.from(container.querySelectorAll("button")).find(
+          (item) => item.textContent?.includes("Pakartoti kokybės"),
+        );
+        const save =
+          button ||
+          container.querySelector<HTMLButtonElement>("section button")!;
+        expect(save.disabled).toBe(false);
+        await act(async () => save.click());
+        expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+          action: "save",
+          contentNo: props.contentNo,
+        });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+      },
+      { qualityPassed: false, qualityScore: 100, qualityStale: true },
+    );
+  });
   it("offers rescheduling only after the saved future time changes", async () => {
     const fetcher = vi
       .fn()
