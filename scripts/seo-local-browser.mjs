@@ -1,7 +1,7 @@
 // Isolated local-only browser fixture. Never use this script for deployment.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readdirSync } from "node:fs";
+import { cpSync, existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 
@@ -70,6 +70,24 @@ process.env = environment;
 process.chdir(root);
 
 if (mode !== "seed") {
+  const standalone = path.join(root, ".next", "standalone");
+  if (mode === "start") {
+    if (!existsSync(path.join(standalone, "server.js"))) {
+      throw new Error(
+        "Run the isolated local build before starting its standalone server.",
+      );
+    }
+    // Only generated build output is populated. No source or shared data is
+    // moved/deleted. Next's standalone server needs its own static/public files.
+    for (const relative of ["public", ".next/static"]) {
+      const destination = path.resolve(standalone, relative);
+      if (!destination.startsWith(`${standalone}${path.sep}`))
+        throw new Error("Unexpected standalone asset destination");
+      cpSync(path.join(root, relative), destination, { recursive: true });
+    }
+    environment.HOSTNAME = "127.0.0.1";
+    environment.PORT = port;
+  }
   const args =
     mode === "build"
       ? ["build", "--webpack"]
@@ -83,7 +101,9 @@ if (mode !== "seed") {
         ];
   const child = spawn(
     process.execPath,
-    [path.join(root, "node_modules/next/dist/bin/next"), ...args],
+    mode === "start"
+      ? [path.join(standalone, "server.js")]
+      : [path.join(root, "node_modules/next/dist/bin/next"), ...args],
     { cwd: root, env: environment, stdio: "inherit", windowsHide: true },
   );
   child.on("error", () => {

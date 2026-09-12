@@ -25,6 +25,9 @@ environment values, fixes the database target to
 flags. Build invokes Next directly, not the deployment migration script. Schema
 push is limited to the dedicated local database. Seed is repeatable and does not
 overwrite existing fixture articles or delete database content.
+`start` uses the generated `.next/standalone/server.js`, copies static/public
+assets only into that generated output, and explicitly binds it to loopback.
+It does not use the incompatible `next start` command for a standalone build.
 
 Fixtures:
 
