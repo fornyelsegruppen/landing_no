@@ -25,6 +25,8 @@ import { CaseMessageHistory } from "@/components/admin-v2/case-message-history";
 import { CaseMessageFailureNotice } from "@/components/admin-v2/case-message-failure-notice";
 import { CaseHistoryPagination } from "@/components/admin-v2/case-history-pagination";
 import { loadCaseDocumentHistory } from "@/lib/admin-v2/case-document-history";
+import { loadCaseCurrentSelection } from "@/lib/admin-v2/case-current-selection";
+import { loadCaseQuestionContext } from "@/lib/admin-v2/case-question-context";
 import { CustomerQuestionWorkbench } from "@/components/admin-v2/customer-question-workbench";
 import { ManualContactRecoveryPanel } from "@/components/admin-v2/manual-contact-recovery-panel";
 import { CancellationReviewPanel } from "@/components/admin-v2/cancellation-review-panel";
@@ -752,6 +754,9 @@ export default async function AdminCasePage({
       Number(id),
       { documentPage, messagePage },
       (leadId, page) => loadCaseDocumentHistory(payload, user, leadId, page),
+      (leadId) => loadCaseCurrentSelection(payload, user, leadId),
+      (leadId, questionIds) =>
+        loadCaseQuestionContext(payload, user, leadId, questionIds),
     ),
     payload.find({
       collection: "users",

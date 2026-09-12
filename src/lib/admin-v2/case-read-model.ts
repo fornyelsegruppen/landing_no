@@ -1,13 +1,11 @@
-import type { Payload, Where } from "payload";
+import type { CollectionSlug, Payload, Where } from "payload";
 import { parseLeadPhotoUrls } from "@/lib/lead-photo-token";
-import {
-  loadCustomerQuestionContext,
-  type CustomerQuestionContext,
-} from "@/lib/messages/customer-question-state";
+import { type CustomerQuestionContext } from "@/lib/messages/customer-question-state";
 import {
   deriveCaseCommercialContext,
   type CaseCommercialContext,
 } from "./case-commercial-context";
+import type { CaseCurrentSelection } from "./case-current-selection";
 
 export type CaseNextActionKind =
   | "approve_measurement"
@@ -849,6 +847,7 @@ function currentMessage(messages: Array<Record<string, unknown>>) {
 export async function loadAdminCase(
   payload: Payload,
   leadId: number,
+  selection?: CaseCurrentSelection,
 ): Promise<AdminCase | null> {
   const loadedAt = Date.now();
   let leadRaw: unknown;
@@ -910,11 +909,47 @@ export async function loadAdminCase(
     }),
   ]);
 
-  const measurements = measurementsResult.docs.map(asRecord);
-  const prices = pricesResult.docs.map(asRecord);
-  const quotes = quotesResult.docs.map(asRecord);
-  const messages = messagesResult.docs.map(asRecord);
-  const workOrders = workOrdersResult.docs.map(asRecord);
+  const includeSelected = async (
+    collection: CollectionSlug,
+    docs: unknown[],
+    ids: Array<number | null | undefined>,
+  ) => {
+    const records = docs.map(asRecord);
+    const missing = [
+      ...new Set(
+        ids.filter(
+          (id): id is number =>
+            typeof id === "number" &&
+            !records.some((item) => numericId(item.id) === id),
+        ),
+      ),
+    ];
+    const selected = await Promise.all(
+      missing.map((id) =>
+        payload.findByID({ collection, id, depth: 1, overrideAccess: true }),
+      ),
+    );
+    return [...records, ...selected.map(asRecord)];
+  };
+  // Presentation slices never decide current state: exact IDs are selected
+  // over the full case graph, then at most nine missing records are hydrated.
+  const [measurements, prices, quotes, messages, workOrders] =
+    await Promise.all([
+      includeSelected("roof-measurements", measurementsResult.docs, [
+        selection?.measurementId,
+      ]),
+      includeSelected("price-calculations", pricesResult.docs, [
+        selection?.priceId,
+      ]),
+      includeSelected("quotes", quotesResult.docs, [
+        selection?.workingQuoteId,
+        selection?.effectiveQuoteId,
+      ]),
+      includeSelected("messages", messagesResult.docs, [selection?.messageId]),
+      includeSelected("work-orders", workOrdersResult.docs, [
+        selection?.workOrderId,
+      ]),
+    ]);
   const contractRequests = contractRequestsResult.docs.map(asRecord);
   const quoteIds = quotes
     .map((quote) => numericId(quote.id))
@@ -964,7 +999,11 @@ export async function loadAdminCase(
       where: { lead: { equals: leadId } },
     }),
   ]);
-  const contracts = contractsResult.docs.map(asRecord);
+  const contracts = await includeSelected("contracts", contractsResult.docs, [
+    selection?.workingContractId,
+    selection?.effectiveContractId,
+    selection?.actionContractId,
+  ]);
   const changes = changesResult.docs.map(asRecord);
   const invoices = invoicesResult.docs.map(asRecord);
   const warranties = warrantiesResult.docs.map(asRecord);
@@ -1050,25 +1089,33 @@ export async function loadAdminCase(
       })
     : { docs: [] };
 
-  const latestMeasurementRaw =
-    latest(measurements.filter((item) => item.status !== "superseded")) ||
-    latest(measurements);
-  const latestPriceRaw =
-    latest(prices.filter((item) => item.status !== "superseded")) ||
-    latest(prices);
+  const latestMeasurementRaw = selection
+    ? measurements.find(
+        (item) => numericId(item.id) === selection.measurementId,
+      )
+    : latest(measurements.filter((item) => item.status !== "superseded")) ||
+      latest(measurements);
+  const latestPriceRaw = selection
+    ? prices.find((item) => numericId(item.id) === selection.priceId)
+    : latest(prices.filter((item) => item.status !== "superseded")) ||
+      latest(prices);
   const latestQuoteRaw =
     quotes.find((item) => numericId(item.id) === commercial.workingQuote?.id) ||
     latest(quotes.filter((item) => item.status !== "superseded")) ||
     latest(quotes);
-  const latestContractRaw =
-    contracts.find(
-      (item) => numericId(item.id) === commercial.workingContract?.id,
-    ) ||
-    latest(contracts.filter((item) => item.status !== "superseded")) ||
-    latest(contracts);
-  const latestWorkRaw =
-    latest(workOrders.filter((item) => item.status !== "cancelled")) ||
-    latest(workOrders);
+  const latestContractRaw = selection
+    ? contracts.find(
+        (item) => numericId(item.id) === selection.actionContractId,
+      )
+    : contracts.find(
+        (item) => numericId(item.id) === commercial.workingContract?.id,
+      ) ||
+      latest(contracts.filter((item) => item.status !== "superseded")) ||
+      latest(contracts);
+  const latestWorkRaw = selection
+    ? workOrders.find((item) => numericId(item.id) === selection.workOrderId)
+    : latest(workOrders.filter((item) => item.status !== "cancelled")) ||
+      latest(workOrders);
   const latestInvoiceRaw = latest(invoices);
   const latestWarrantyRaw = latest(warranties);
   const commercialStageStarted = Boolean(
@@ -1085,7 +1132,9 @@ export async function loadAdminCase(
       commercialStageStarted;
     return !isObsoleteIntakeDraft;
   });
-  const currentMessageRaw = currentMessage(visibleMessages);
+  const currentMessageRaw = selection
+    ? visibleMessages.find((item) => numericId(item.id) === selection.messageId)
+    : currentMessage(visibleMessages);
 
   const latestManualOverride = latestMeasurementRaw
     ? manualOverride(latestMeasurementRaw.calculationSnapshot)
@@ -1752,25 +1801,39 @@ export type AdminCaseWorkspace = AdminCase & {
 };
 
 /**
- * Workspace integration loader. Customer questions intentionally come from
- * their exact, uncapped query instead of the case history's presentation cap.
+ * Workspace integration loader. Current IDs and question summaries are exact
+ * bounded reads independent of presentation/history slices.
  */
 export async function loadAdminCaseWorkspace(
   payload: Payload,
   leadId: number,
   pages: { documentPage?: unknown; messagePage?: unknown },
   loadDocuments: CaseDocumentHistoryLoader,
+  loadCurrent: (leadId: number) => Promise<CaseCurrentSelection>,
+  loadQuestions: (
+    leadId: number,
+    targetQuestionIds: number[],
+  ) => Promise<CustomerQuestionContext>,
 ): Promise<AdminCaseWorkspace | null> {
-  const [caseData, customerQuestionContext] = await Promise.all([
-    loadAdminCase(payload, leadId),
-    loadCustomerQuestionContext(payload, leadId),
-  ]);
+  const selection = await loadCurrent(leadId);
+  const caseData = await loadAdminCase(payload, leadId, selection);
   if (!caseData) return null;
   const history = await loadCaseWorkspaceHistory(
     payload,
     caseData,
     pages,
     loadDocuments,
+  );
+  const targetQuestionIds = [
+    ...new Set(
+      history.messages.items
+        .map((message) => message.replyToMessageId)
+        .filter((id): id is number => typeof id === "number"),
+    ),
+  ];
+  const customerQuestionContext = await loadQuestions(
+    leadId,
+    targetQuestionIds,
   );
   return { ...caseData, customerQuestionContext, history };
 }

@@ -16,6 +16,7 @@ const requiredFixtureVariables = [
   "E2E_ADMIN_CASE_DOCUMENT_HREF",
   "E2E_ADMIN_CASE_DOCUMENT_NAME",
   "E2E_ADMIN_CASE_OLDER_MESSAGE_ID",
+  "E2E_ADMIN_CASE_OLDER_MESSAGE_PAGE",
 ] as const;
 
 function baseURLHost() {
@@ -234,8 +235,15 @@ test.describe("Admin Case Workspace V3 browser acceptance", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await signInAndOpenCase(page);
 
-    if (!olderMessageId) {
-      throw new Error("Older message fixture variable is required");
+    if (
+      !olderMessageId ||
+      !olderMessagePage ||
+      !Number.isSafeInteger(Number(olderMessagePage)) ||
+      Number(olderMessagePage) <= 1
+    ) {
+      throw new Error(
+        "Older message fixture must identify a message on a later page (page > 1)",
+      );
     }
 
     const escapedOlderMessageId = olderMessageId
@@ -244,13 +252,12 @@ test.describe("Admin Case Workspace V3 browser acceptance", () => {
     const olderMessage = page.locator(
       `[id="message-${escapedOlderMessageId}"]`,
     );
-    await expect(olderMessage).toBeAttached();
+    // This must exercise server pagination, not an already-loaded hidden row.
+    await expect(olderMessage).toHaveCount(0);
     const disclosure = olderMessage.locator("xpath=ancestor::details[1]");
-    await expect(disclosure).toBeAttached();
-    await expect(disclosure).not.toHaveAttribute("open", "");
 
     await page.goto(
-      `/admin-v2/cases/${encodeURIComponent(caseId!)}${olderMessagePage ? `?messagePage=${encodeURIComponent(olderMessagePage)}` : ""}#message-${encodeURIComponent(olderMessageId)}`,
+      `/admin-v2/cases/${encodeURIComponent(caseId!)}?messagePage=${encodeURIComponent(olderMessagePage)}#message-${encodeURIComponent(olderMessageId)}`,
     );
     await expect(disclosure).toHaveAttribute("open", "");
     await expect(olderMessage).toBeVisible();
