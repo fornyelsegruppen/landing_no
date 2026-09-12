@@ -46,17 +46,21 @@ describe("SEO draft cron", () => {
     mocks.refresh
       .mockReset()
       .mockResolvedValue({ created: 0, updated: 0, skipped: 0, received: 0 });
-    mocks.listSignals
-      .mockReset()
-      .mockResolvedValue({
-        current: {
-          signals: [],
-          status: "no-data",
-          periodStart: "2026-08-13",
-          periodEnd: "2026-09-09",
-        },
-        geography: "unknown",
-      });
+    mocks.listSignals.mockReset().mockResolvedValue({
+      current: {
+        signals: [],
+        status: "no-data",
+        periodStart: "2026-08-13",
+        periodEnd: "2026-09-09",
+      },
+      baseline: {
+        signals: [],
+        status: "no-data",
+        periodStart: "2026-07-16",
+        periodEnd: "2026-08-12",
+      },
+      geography: "unknown",
+    });
     mocks.generate
       .mockReset()
       .mockResolvedValue({ duplicate: false, run: { id: 5 }, post: { id: 7 } });
@@ -87,8 +91,22 @@ describe("SEO draft cron", () => {
             property,
             access: "verified",
             observationStatus: "no-data",
+            baselineObservationStatus: "no-data",
+            baselinePeriodStart: "2026-07-16",
+            baselinePeriodEnd: "2026-08-12",
           }),
         }),
+      }),
+    );
+    expect(mocks.refresh).toHaveBeenCalledWith(
+      expect.anything(),
+      [],
+      expect.any(Date),
+      expect.any(Number),
+      expect.objectContaining({
+        status: "no-data",
+        periodStart: "2026-07-16",
+        periodEnd: "2026-08-12",
       }),
     );
     mocks.listSignals.mockRejectedValueOnce(new Error("synthetic denied"));

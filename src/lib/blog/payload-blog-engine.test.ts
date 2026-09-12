@@ -38,6 +38,7 @@ import {
   ensureManualBlogTopics,
   generateNextPayloadBlogDraft,
   importSearchSignals,
+  refreshPayloadSearchSignals,
 } from "./payload-blog-engine";
 
 describe("payload blog draft generation", () => {
@@ -249,6 +250,96 @@ describe("payload blog draft generation", () => {
     expect(
       manualCreates.every(([input]) => input.data.sourceMetrics === undefined),
     ).toBe(true);
+  });
+
+  it("persists matched baseline provenance for both created and refreshed topics", async () => {
+    const payload = {
+      find: mocks.find,
+      create: mocks.create,
+      update: mocks.update,
+      logger: { warn: mocks.warn },
+    } as never;
+    const signal = {
+      source: "search-console" as const,
+      origin: "api" as const,
+      query: "takvask pris oslo",
+      impressions: 7,
+      clicks: 0,
+      periodStart: "2026-08-13",
+      periodEnd: "2026-09-09",
+    };
+    const baseline = {
+      status: "available" as const,
+      periodStart: "2026-07-16",
+      periodEnd: "2026-08-12",
+      signals: [
+        {
+          ...signal,
+          impressions: 0,
+          periodStart: "2026-07-16",
+          periodEnd: "2026-08-12",
+        },
+      ],
+    };
+    await refreshPayloadSearchSignals(
+      payload,
+      [signal],
+      new Date("2026-09-12T12:00:00Z"),
+      undefined,
+      baseline,
+    );
+    const created = mocks.create.mock.calls.find(
+      ([call]) => call.collection === "seo-topics",
+    )?.[0];
+    expect(created?.data.sourceMetrics).toMatchObject({
+      metrics: { impressions: 7, clicks: 0 },
+      baselineObservation: {
+        status: "available",
+        match: "matched",
+        observationPeriod: { start: "2026-07-16", end: "2026-08-12" },
+        metrics: { impressions: 0, clicks: 0 },
+      },
+    });
+
+    mocks.create.mockClear();
+    mocks.update.mockClear();
+    mocks.find.mockImplementation(async (call) => {
+      if (call.collection === "posts") return { docs: [] };
+      if (call.collection === "seo-runs") return { docs: [] };
+      if (call.collection === "services") return { docs: [{ id: 3 }] };
+      if (call.collection === "seo-topics") {
+        if (call.where?.selectedTopics) return { docs: [] };
+        return {
+          docs: [
+            {
+              id: 72,
+              primaryKeyword: "takvask pris oslo",
+              searchIntent: "commercial",
+              status: "candidate",
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected collection ${call.collection}`);
+    });
+    await refreshPayloadSearchSignals(
+      payload,
+      [signal],
+      new Date("2026-09-12T12:00:00Z"),
+      undefined,
+      baseline,
+    );
+    const updated = mocks.update.mock.calls.find(
+      ([call]) => call.collection === "seo-topics",
+    )?.[0];
+    expect(updated?.data.sourceMetrics).toMatchObject({
+      metrics: { impressions: 7, clicks: 0 },
+      baselineObservation: {
+        status: "available",
+        match: "matched",
+        metrics: { impressions: 0, clicks: 0 },
+      },
+    });
   });
 
   it("retains the already-created initial draft when configured Pexels returns no image", async () => {

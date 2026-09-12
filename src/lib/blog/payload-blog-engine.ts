@@ -1,7 +1,11 @@
 import { postRevision } from "./post-revision";
 import { createHash } from "node:crypto";
 import type { Payload } from "payload";
-import type { AiProvider, SearchSignal } from "@/lib/providers/contracts";
+import type {
+  AiProvider,
+  SearchSignal,
+  SearchSignalObservationWindow,
+} from "@/lib/providers/contracts";
 import { sanitizeJobError } from "@/lib/jobs/job-policy";
 import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
 import { ArticleQualityBlockedError, generateBlogDraft } from "./draft-engine";
@@ -109,6 +113,7 @@ async function createTopicCandidate(
   payload: Payload,
   candidate: TopicCandidate,
   existing: ExistingTopic[],
+  sourceMetrics?: Record<string, unknown>,
 ) {
   const key = fingerprint(candidate);
   const found = await payload.find({
@@ -136,14 +141,16 @@ async function createTopicCandidate(
       ...(candidate.location ? { location: candidate.location } : {}),
       ...(candidate.season ? { season: candidate.season } : {}),
       source: candidate.source,
-      ...(candidate.sourceSignal
-        ? {
-            sourceMetrics: sourceMetricsFromSignal(
-              candidate.sourceSignal,
-              new Date().toISOString(),
-            ),
-          }
-        : {}),
+      ...(sourceMetrics
+        ? { sourceMetrics }
+        : candidate.sourceSignal
+          ? {
+              sourceMetrics: sourceMetricsFromSignal(
+                candidate.sourceSignal,
+                new Date().toISOString(),
+              ),
+            }
+          : {}),
       proposedBrief: suggestedBrief(candidate),
       topicScore: topicScore(candidate.factors),
       overlapScore: overlap,
@@ -210,6 +217,7 @@ export async function refreshPayloadSearchSignals(
   signals: SearchSignal[],
   now = new Date(),
   deadline = Date.now() + 10_000,
+  baseline?: SearchSignalObservationWindow,
 ) {
   return withSeoPayloadTransaction(payload, async (scoped) => {
     const topics = await scoped.find({
@@ -234,9 +242,17 @@ export async function refreshPayloadSearchSignals(
         existingTopics: topics.docs,
         importedAt: now.toISOString(),
         now,
+        baseline,
       });
       if (plan.action === "create") {
-        if (await createTopicCandidate(scoped, plan.candidate, existing))
+        if (
+          await createTopicCandidate(
+            scoped,
+            plan.candidate,
+            existing,
+            plan.sourceMetrics,
+          )
+        )
           created++;
       } else if (plan.action === "update") {
         const reserved = await scoped.find({

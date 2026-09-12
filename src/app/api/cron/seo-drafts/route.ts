@@ -92,6 +92,7 @@ export async function GET(request: Request) {
             observation.current.signals,
             now,
             Math.min(deadline - 15_000, Date.now() + 8_000),
+            observation.baseline,
           );
           await payload.update({
             collection: "seo-runs",
@@ -106,6 +107,9 @@ export async function GET(request: Request) {
                 observationStatus: observation.current.status,
                 periodStart: observation.current.periodStart,
                 periodEnd: observation.current.periodEnd,
+                baselineObservationStatus: observation.baseline.status,
+                baselinePeriodStart: observation.baseline.periodStart,
+                baselinePeriodEnd: observation.baseline.periodEnd,
                 geography: observation.geography,
                 ...imported,
               },
