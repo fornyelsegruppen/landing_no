@@ -104,9 +104,13 @@ DATABASE_URL, and do not treat historical build env as fresh runtime evidence.
    for a reviewed read-only query; it initializes migration-mode Payload.
 4. Verify effective target env without displaying credentials: production DB
    identity/real secret available; build-only guard not persisted at runtime;
-   intended public/canonical origin and protection policy; FEATURE_AI_DRAFTS,
-   FEATURE_SEO_SCHEDULER, FEATURE_SEO_AUTO_PUBLISH all false. Existing providers
-   are not exercised or rotated. Executor remains paused/unverified.
+   intended public/canonical origin and protection policy. Preserve CONTROL's
+   verified existing9EA release flags: FEATURE_AI_DRAFTS=true (already-released
+   manual generation), FEATURE_SEO_SCHEDULER=false, FEATURE_SEO_AUTO_PUBLISH=false.
+   Local all-OFF isolation is NOT the release configuration. Preferred protected
+   staging preserves manual AI=true with zero provider clicks; any explicitly
+   authorized staging-only AI=false requires separate final-config evidence.
+   Providers are not exercised or rotated. Executor remains paused/unverified.
 5. Read back project Cron Jobs DISABLED before and after any deployment or
    rollback. Unchanged source cron definitions are NOT a disabled-state proof;
    the existing list includes purge-leads. Never enable all project crons or
@@ -119,7 +123,8 @@ DATABASE_URL, and do not treat historical build env as fresh runtime evidence.
    Inspect build logs for the exact guarded direct Next command and no migration
    invocation. Record actual output/source/env; abort on a mismatch.
 7. Separately authorized read-only staged runtime checks: normal admin login,
-   automation status OFF, public CMS content (not just200), representative
+   automation status showing scheduler/publisher OFF and preserved manual-AI
+   configuration, public CMS content (not just200), representative
    existing published NO/EN article, draft exclusion, full sitemap and canonical
    origin, current history navigation, no unexpected schema/adapter errors.
    Do not publish a real article or POST a customer form. Build fallback content
@@ -127,7 +132,8 @@ DATABASE_URL, and do not treat historical build env as fresh runtime evidence.
 8. Only after these gates and explicit traffic-switch GO, move exactly the
    approved aliases. Leave old-domain/BRIDGE mappings untouched unless explicitly
    included in that operation. Record before/after mapping and repeat public,
-   admin, OFF/executor and cron-state readback. This is not SEO automation GO.
+   admin, scheduler/publisher OFF, preserved manual-AI/executor and cron-state
+   readback. This is not scheduled SEO automation GO.
 
 ## Exact rollback checklist (prepared, not executed)
 
@@ -144,7 +150,8 @@ DATABASE_URL, and do not treat historical build env as fresh runtime evidence.
    list against the approved mapping; custom aliases and the distinct default
    Production state make a generic project rollback unsafe to assume.
 4. Recheck each alias and both relevant domains, normal admin/public reads,
-   canonical/sitemap, effective OFF flags and disabled cron state. Vercel notes
+   canonical/sitemap, preserved manual-AI=true with scheduler/publisher OFF and
+   disabled cron state (or the separately captured prior flags). Vercel notes
    rollback restores an existing build's environment/config and cron state;
    it does not undo database or CMS changes. No down migrations, DB restores,
    history deletion, blanket cron enable, or old-source rebuild is authorized.
