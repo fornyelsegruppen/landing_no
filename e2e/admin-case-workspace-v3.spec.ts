@@ -182,6 +182,10 @@ test.describe("Admin Case Workspace V3 browser acceptance", () => {
         await expect(page.locator("#next-action-title")).toHaveCount(1);
         await openPrimaryAction(page);
         await assertWorkspaceGeometry(page);
+        await page.screenshot({
+          path: test.info().outputPath(`case-workspace-${viewport.width}.png`),
+          fullPage: false,
+        });
       });
     }
   });
