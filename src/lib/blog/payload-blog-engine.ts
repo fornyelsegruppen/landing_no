@@ -372,7 +372,13 @@ export async function generateNextPayloadBlogDraft(input: {
           provider: stockProvider,
           preserveInitialQuality: true,
         });
-        post = stockResult.post;
+        if (stockResult.outcome === "replaced") {
+          post = stockResult.post;
+        } else {
+          input.payload.logger.warn(
+            `Pexels enrichment found no alternative for draft ${post.id}; retaining the valid draft without changing its image.`,
+          );
+        }
       } catch {
         // Image enrichment must never discard an otherwise valid article draft.
         input.payload.logger.warn(
