@@ -1,9 +1,23 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BlogReviewPanel } from "./blog-review-panel";
+import { BlogReviewPanel, blogReviewListKey } from "./blog-review-panel";
 
 describe("BlogReviewPanel", () => {
+  it("uses distinct list keys when QA returns repeated issue, flag, or source values", () => {
+    const keys = [
+      blogReviewListKey("blocker", "invalid_output", 0),
+      blogReviewListKey("blocker", "invalid_output", 1),
+      blogReviewListKey("warning", "invalid_output", 0),
+      blogReviewListKey("flag", "manual review", 0),
+      blogReviewListKey("flag", "manual review", 1),
+      blogReviewListKey("source", "https://example.invalid/source", 0),
+      blogReviewListKey("source", "https://example.invalid/source", 1),
+    ];
+
+    expect(new Set(keys)).toHaveLength(keys.length);
+  });
+
   it("shows the blocked publish gate, homepage-only risk and stock provenance", () => {
     const html = renderToStaticMarkup(
       createElement(BlogReviewPanel, {

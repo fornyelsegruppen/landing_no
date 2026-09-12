@@ -26,6 +26,14 @@ function severityClasses(kind: "pass" | "warning" | "blocker") {
   return "border-rose-500/30 bg-rose-500/10 text-rose-100";
 }
 
+export function blogReviewListKey(
+  prefix: string,
+  value: string | null | undefined,
+  index: number,
+) {
+  return `${prefix}-${value || "item"}-${index}`;
+}
+
 export function BlogReviewPanel({ locale, ...input }: Props) {
   const copy = getAdminV2Copy(locale).blogAdmin;
   const review = summarizeBlogReview(input);
@@ -112,7 +120,7 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
               {review.blockers.map((issue, index) => (
                 <article
                   className={`rounded-2xl border p-4 ${severityClasses("blocker")}`}
-                  key={`blocker-${issue.code || index}`}
+                  key={blogReviewListKey("blocker", issue.code, index)}
                 >
                   <div className="flex items-start gap-3">
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" />
@@ -132,7 +140,7 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
               {review.warnings.map((issue, index) => (
                 <article
                   className={`rounded-2xl border p-4 ${severityClasses("warning")}`}
-                  key={`warning-${issue.code || index}`}
+                  key={blogReviewListKey("warning", issue.code, index)}
                 >
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" />
@@ -165,8 +173,8 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
             <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
               <h3 className="font-bold">{copy.reviewFlags}</h3>
               <ul className="text-muted-foreground mt-3 grid gap-2 text-sm">
-                {review.reviewFlags.map((flag) => (
-                  <li key={flag}>{flag}</li>
+                {review.reviewFlags.map((flag, index) => (
+                  <li key={blogReviewListKey("flag", flag, index)}>{flag}</li>
                 ))}
               </ul>
             </div>
@@ -181,7 +189,11 @@ export function BlogReviewPanel({ locale, ...input }: Props) {
                 review.sources.map((source, index) => (
                   <div
                     className="rounded-xl border border-white/10 p-3"
-                    key={`${source.url || source.label || index}`}
+                    key={blogReviewListKey(
+                      "source",
+                      source.url || source.label,
+                      index,
+                    )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
