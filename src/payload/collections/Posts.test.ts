@@ -324,6 +324,26 @@ describe("Posts technical editor quality policy", () => {
     });
   });
 
+  it("does not let a first-publication author replacement reuse approval", () => {
+    const result = beforeChangeHook()({
+      context: {},
+      data: {
+        _status: "published",
+        authorName: "Different public author",
+      },
+      operation: "update",
+      originalDoc: { ...original, _status: "draft", publishedAt: null },
+      req: { user: null },
+    } as never);
+
+    expect(result).toMatchObject({
+      _status: "draft",
+      editorialStatus: "human_review",
+      qualityScore: null,
+      qualityChecks: null,
+    });
+  });
+
   it("invalidates author and date changes for a previously published revision", () => {
     const result = beforeChangeHook()({
       context: {},

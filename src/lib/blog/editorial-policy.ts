@@ -116,6 +116,7 @@ function publicContentChanged(
   const originalForComparison =
     original._status !== "published" &&
     !original.publishedAt &&
+    !original.authorName?.trim() &&
     merged._status === "published"
       ? {
           ...original,
