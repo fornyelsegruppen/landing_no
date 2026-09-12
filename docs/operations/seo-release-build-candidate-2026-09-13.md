@@ -1,5 +1,68 @@
 # SEO: no-migration remote build candidate
 
+## Current default-OFF build-wiring correction
+
+Owner: SEO. Based on clean91dd5be6edbb6c9878483ca42c9fbd55e6ac6671
+with accepted application b02955a. The tracked command is now:
+
+```sh
+node scripts/db-compat/preflight.mjs && PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack
+```
+
+The unchanged helper defaults OFF, returning DB_COMPAT_DISABLED before
+credential, manifest/source-file, driver or connection IO. A separately approved
+one-shot Production-target build supplies --build-env SEO_DB_COMPAT_PREFLIGHT=1,
+never --env or a permanent inline1. Require actual DB_COMPAT_PASS before Next;
+DISABLED is not compatibility evidence. The && stops Next after failure.
+Unsupported TLS/channel-binding/configuration remains fail-closed; no weakening.
+No application, helper implementation, sealed manifest, package, runtime env,
+function, cron or region changes. Existing accepted local3218 stays unchanged.
+This narrow change requires independent source review and separate new-SHA
+remote-build GO, not another application build or repeated GUI acceptance.
+
+### Actual uploaded configuration versus metadata
+
+The single approved91dd5be staged attempt became READY as
+dpl_hfmC8dtQaUVdTrta5cVvsx2uUdWp, but is BUILD-only, NOT DB compatibility PASS.
+The complete alternate --local-config JSON differed only in buildCommand, and
+deployment API projectSettings.buildCommand contained preflight plus Next.
+Nevertheless actual remote logs ran only the original tracked
+PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack, without any helper invocation.
+Thus metadata did not establish effective command execution, consistent with
+uploaded source vercel.json taking precedence later in the build.
+
+The correction places the default-OFF gate in uploaded tracked configuration.
+A future approved command must use the clean reviewed new SHA without the
+obsolete alternate config and with the one-shot build-env opt-in. Actual logs,
+not metadata alone, must establish the command and DB_COMPAT_PASS. No new remote
+attempt is authorized here.
+
+Five public aliases/defaultProduction13g/disabled crons/protection remained
+unchanged after the first build. The CLI automatically assigned the generated
+project alias separately; do not claim zero alias changes of every kind.
+ROOT's staged browser sitemap attempt returned ERR_BLOCKED_BY_CLIENT even after
+one normal reload: no XML or first runtime response was established. This is
+access-blocked evidence, not a sitemap defect or permission to bypass protection.
+
+### Focused verification and gates
+
+Run scripts/seo-release-build-config.test.mjs plus the unchanged helper's
+16 offline tests. Added contract checks reject a skipped gate, permanent inline1,
+semicolon/OR failure bypass and runtime opt-in; they assert default-OFF zero IO
+and unchanged helper/manifest bytes against91dd5be. No full build/tsc is needed
+for this wiring-only delta. Independent review belongs to CONTROL.
+
+Current focused result: 8 build-contract tests plus 16 unchanged helper tests
+PASS (24 total), Node24.21.0; touched test formatting and git diff whitespace
+checks PASS. No full app build, tsc, Production DB check or remote repeat ran.
+
+Migration-ledger parity is NOT a gate; accepted structural/permission checks
+plus separate staged runtime/auth/content evidence are. No migration/status
+wrapper, secret export, provider call, form POST, cron call or traffic move.
+The earlier checklist below is historical context, not fresh execution authority.
+
+## Historical initial guarded-build proposal (superseded where noted)
+
 Owner: SEO. Candidate only, based on clean application
 `051260e536dfe06b2d757eb9f764dba5367b7d6d`. Do not integrate, build, push,
 deploy, change project settings, or reassign domains before CONTROL review.
@@ -53,7 +116,7 @@ and still unsafe to invoke in this no-migration workflow.
   don't print the complete environment. Do not copy synthetic local secrets.
 - Source comparison with historical live source414f65f shows unchanged migration
   files, config, generated Payload types and collection fields. Posts changes
-  are hooks/endpoint behavior. Actual deployed DB schema/ledger compatibility
+  are hooks/endpoint behavior. Actual deployed DB structural/permission compatibility
   still needs independent read-only evidence; a source diff is not a DB audit.
 
 ## Evidence and limits
@@ -98,7 +161,7 @@ DATABASE_URL, and do not treat historical build env as fresh runtime evidence.
    still identifies DCH as default Production. These are distinct states.
    Reconfirm full DCH ID; do not infer that default Production is the rollback
    target for the new-domain aliases.
-3. Obtain actual read-only Production DB schema/migration-ledger compatibility
+3. Obtain actual read-only Production DB structural/permission compatibility
    and exact pre-release rollback target for EACH touched alias. Stop if access
    or evidence is unavailable. Do not execute run-migrate-status as a substitute
    for a reviewed read-only query; it initializes migration-mode Payload.

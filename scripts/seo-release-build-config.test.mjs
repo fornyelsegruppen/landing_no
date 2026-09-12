@@ -1,14 +1,16 @@
-// Read-only source-contract checks. Never executes a build, CLI, or DB call.
+// Source-contract and disabled-helper checks. No build, remote CLI, or DB call.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { runPreflight } from "./db-compat/preflight.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const base = "051260e536dfe06b2d757eb9f764dba5367b7d6d";
 const liveSource = "414f65f555895552c5905553330b0d2b1dc72828";
-const command = "PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack";
+const command =
+  "node scripts/db-compat/preflight.mjs && PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack";
 const read = (name) =>
   readFileSync(new URL(`../${name}`, import.meta.url), "utf8").replace(
     /\r\n/g,
@@ -26,7 +28,7 @@ function assertReleaseConfig(candidate) {
   assert.deepEqual(rest, originalConfig);
 }
 
-test("only a deployment-scoped direct Next build override is added", () => {
+test("tracked build runs default-OFF preflight before guarded direct Next", () => {
   assertReleaseConfig(config);
 });
 
@@ -36,6 +38,10 @@ test("unsafe or unguarded build substitutions fail the contract", () => {
     "npm run build:migrate && next build",
     "next build --webpack",
     "PAYLOAD_BUILD_WITHOUT_DB=1 npm run build",
+    "PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack",
+    "SEO_DB_COMPAT_PREFLIGHT=1 " + command,
+    command.replace(" && ", " ; "),
+    command.replace(" && ", " || "),
   ]) {
     assert.throws(() => assertReleaseConfig({ ...config, buildCommand }));
   }
@@ -48,11 +54,61 @@ test("cron definitions and runtime env overrides cannot be changed silently", ()
     assertReleaseConfig({ ...config, env: { PAYLOAD_BUILD_WITHOUT_DB: "1" } }),
   );
   assert.throws(() =>
+    assertReleaseConfig({ ...config, env: { SEO_DB_COMPAT_PREFLIGHT: "1" } }),
+  );
+  assert.throws(() =>
     assertReleaseConfig({
       ...config,
       build: { env: { FEATURE_AI_DRAFTS: "true" } },
     }),
   );
+});
+
+test("normal build preflight is disabled without credential/file/driver IO", async () => {
+  assert.equal(
+    config.buildCommand.split(" && ")[0],
+    "node scripts/db-compat/preflight.mjs",
+  );
+  assert.doesNotMatch(config.buildCommand, /SEO_DB_COMPAT_PREFLIGHT=/);
+  for (const flag of [undefined, "0", "false"]) {
+    const environment = new Proxy(
+      {},
+      {
+        get: (_target, key) => {
+          assert.equal(key, "SEO_DB_COMPAT_PREFLIGHT");
+          return flag;
+        },
+      },
+    );
+    const noIO = async () => assert.fail("disabled helper must not perform IO");
+    const logs = [];
+    assert.equal(
+      await runPreflight({
+        environment,
+        load: noIO,
+        createClient: noIO,
+        log: (message) => logs.push(message),
+      }),
+      0,
+    );
+    assert.deepEqual(logs, ["DB_COMPAT_DISABLED"]);
+  }
+});
+
+test("build wiring preserves the accepted helper and sealed manifest verbatim", () => {
+  for (const name of [
+    "capture.mjs",
+    "manifest.json",
+    "preflight.mjs",
+    "preflight.test.mjs",
+    "local-check.mjs",
+  ]) {
+    const file = `scripts/db-compat/${name}`;
+    assert.equal(
+      read(file),
+      at("91dd5be6edbb6c9878483ca42c9fbd55e6ac6671", file),
+    );
+  }
 });
 
 test("package lifecycle and explicit migration policy remain untouched", () => {

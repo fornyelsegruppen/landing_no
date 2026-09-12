@@ -1,10 +1,16 @@
 # Optional production database compatibility preflight
 
-Status: source candidate only. No production database access, deployment, environment change,
-migration, or build-command integration was performed to create this package.
-This is a structure/permissions gate, not a production readiness certificate.
-The existing Vercel build command is unchanged. A normal build does not require
-this preflight or a database connection.
+Status: helper source accepted; actual Production compatibility remains unproven.
+The current narrow wiring correction invokes the unchanged default-OFF helper
+from tracked vercel.json before guarded Next, chained with `&&`. A normal build
+only reports DB_COMPAT_DISABLED and does not load credentials, manifest/source,
+driver or connect to a database. This is a structure/permissions gate, not a
+production readiness certificate. No migration or runtime guard is introduced.
+
+The earlier91dd5be staged attempt is BUILD-only: deployment metadata reflected
+the alternate preflight command, but actual logs executed the original uploaded
+tracked command without preflight. The tracked-wiring correction needs independent
+review and a separate new-SHA remote GO. No Production helper PASS is claimed.
 
 ## Invocation and release boundary
 
@@ -23,12 +29,15 @@ arguments, files, command output, or documentation. Never run it through
 
 After independent source acceptance, the owner may explicitly opt it in for one
 protected Production-target build without assigning the public domain, and use
-this command ordering (not configured by this patch):
+this command ordering now present in the tracked build configuration:
 
 ```sh
 node scripts/db-compat/preflight.mjs && PAYLOAD_BUILD_WITHOUT_DB=1 next build --webpack
 ```
 
+Supply the opt-in only through `--build-env SEO_DB_COMPAT_PREFLIGHT=1` for the
+separately authorized one-shot build, never runtime `--env` or permanent inline1.
+Do not use the obsolete alternate config from the first failed-gate attempt.
 The opt-in flag must be provided deliberately for that check. If absent, the
 first command is only a no-op: `DB_COMPAT_DISABLED` is not database evidence.
 Require `DB_COMPAT_PASS` from the exact candidate build before treating this gate
