@@ -56,6 +56,7 @@ describe("bounded case question context", () => {
         (206, 8, 'inbound', 'customer_question', 'email', 'Other lead', 'Other', 'delivered', 'question-other', NULL, '2026-03-01T00:00:00Z', '2026-03-01T00:00:00Z');
       INSERT INTO messages (id, lead_id, direction, category, channel, subject, body_text, status, idempotency_key, reply_to_message_id, created_at, updated_at)
       VALUES
+        (211, 7, 'outbound', 'ai_reply', 'email', 'Older delivered reply', 'Delivered first', 'delivered', 'reply-202-old', 202, '2026-02-02T00:00:30Z', '2026-02-02T00:00:30Z'),
         (207, 7, 'outbound', 'ai_reply', 'email', 'Retry then delivered', 'Old attempt', 'failed', 'reply-208-old', 208, '2026-04-01T00:00:00Z', '2026-04-01T00:00:00Z'),
         (209, 7, 'outbound', 'ai_reply', 'email', 'Retry then delivered', 'New attempt', 'delivered', 'reply-208-new', 208, '2026-04-01T00:01:00Z', '2026-04-01T00:01:00Z'),
         (208, 7, 'inbound', 'customer_question', 'email', 'Delivered latest reply', 'Question with delivery', 'delivered', 'question-208', NULL, '2026-04-01T00:00:00Z', '2026-04-01T00:00:00Z');
