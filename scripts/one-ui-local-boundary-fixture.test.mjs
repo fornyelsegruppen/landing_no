@@ -29,6 +29,20 @@ describe("one-ui local boundary fixture guard", () => {
       contractRequests: 126,
       privateMediaDecoys: 501,
     });
+    expect(value.ownerTypes).toEqual([
+      "roof-measurement",
+      "quote",
+      "contract",
+      "work-order",
+      "invoice-record",
+      "warranty",
+    ]);
+    expect(value.boundaryAssertions).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("actual private_media source rows"),
+        expect.stringContaining("local3217 has no roof_measurements.version"),
+      ]),
+    );
     expect(output).not.toMatch(/@(?!(example\.invalid))/i);
   });
 

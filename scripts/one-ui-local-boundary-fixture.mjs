@@ -82,7 +82,7 @@ function manifest() {
       privateMediaDecoys: MEDIA_DECOY_COUNT,
     },
     invoiceOwnerLeadOrdinals: INVOICE_OWNER_ORDINALS,
-    ownerTypes: ["measurement", "quote", "contract", "work-order", "invoice", "warranty"],
+    ownerTypes: ["roof-measurement", "quote", "contract", "work-order", "invoice-record", "warranty"],
     boundaryAssertions: [
       "All 325 lead rows are marker-scoped; no baseline row count is assumed.",
       "The first anchor media row is older than all 501 decoys in private_media.",
@@ -249,12 +249,12 @@ async function insertFixture(client, actorId) {
 
   const media = [];
   for (let index = 1; index <= MEDIA_ANCHOR_COUNT; index += 1) {
-    const ownerType = ["measurement", "quote", "contract", "work-order", "invoice", "warranty"][(index - 1) % 6];
-    const owners = { measurement: measurements, quote: quotes, contract: contracts, "work-order": workOrders, invoice: invoices, warranty: warranties };
+    const ownerType = ["roof-measurement", "quote", "contract", "work-order", "invoice-record", "warranty"][(index - 1) % 6];
+    const owners = { "roof-measurement": measurements, quote: quotes, contract: contracts, "work-order": workOrders, "invoice-record": invoices, warranty: warranties };
     const ownerId = owners[ownerType][(index - 1) % OWNER_VERSION_COUNT];
     const result = await client.query(
       `INSERT INTO private_media (classification,owner_type,owner_id,alt,filename,mime_type,filesize,url,created_at,updated_at)
-       VALUES ('${ownerType === "measurement" ? "measurement" : ownerType === "invoice" ? "invoice" : ownerType === "warranty" ? "warranty" : ownerType === "work-order" ? "work" : "contract"}',$1,$2,$3,$4,'application/pdf',1,$5,$6,$6) RETURNING id`,
+       VALUES ('${ownerType === "roof-measurement" ? "measurement" : ownerType === "invoice-record" ? "invoice" : ownerType === "warranty" ? "warranty" : ownerType === "work-order" ? "work" : "contract"}',$1,$2,$3,$4,'application/pdf',1,$5,$6,$6) RETURNING id`,
       [ownerType, String(ownerId), `${MARKER} anchor media ${index}`, `${MARKER}-anchor-${String(index).padStart(3, "0")}.pdf`, `${TARGET.browserBaseUrl}/fixtures/${MARKER}/anchor-${index}.pdf`, iso(1000 + index)],
     );
     media.push(result.rows[0].id);
