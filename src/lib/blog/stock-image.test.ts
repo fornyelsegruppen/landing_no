@@ -8,6 +8,7 @@ import {
   type StockImageReplacementResult,
 } from "./stock-image";
 import type { PexelsStockImageProvider } from "@/lib/providers/pexels-stock-image-provider";
+import { blogServiceAreas } from "./knowledge-base";
 
 describe("blog stock images", () => {
   function expectReplacement(result: StockImageReplacementResult) {
@@ -348,6 +349,81 @@ describe("blog stock images", () => {
     expect(result).toEqual({
       outcome: "no_alternative",
       query: "Norwegian house roof tiles exterior",
+      existingAssetId: "29114658",
+    });
+  });
+
+  it.each(blogServiceAreas)(
+    "rejects the exact Bergen landmark fixture for the %s Oslo service area",
+    async (location) => {
+      const update = vi.fn();
+      const result = await attachPexelsStockImageToPost({
+        payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+        post: {
+          id: 11,
+          titleNo: `Takfornying i ${location}`,
+          primaryKeyword: `takfornying ${location}`,
+          stockImage: { provider: "pexels", assetId: "29114658" },
+        },
+        provider: {
+          search: vi.fn(async () => [
+            {
+              id: 29525395,
+              width: 2400,
+              height: 1350,
+              pageUrl:
+                "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
+              photographer: "Fixture Photographer",
+              photographerUrl: "https://www.pexels.com/@fixture/",
+              alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
+              imageUrl:
+                "https://images.pexels.com/photos/29525395/bryggen.jpeg",
+            },
+          ]),
+        } as unknown as PexelsStockImageProvider,
+        persistToMedia: false,
+      });
+
+      expect(update).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        outcome: "no_alternative",
+        existingAssetId: "29114658",
+      });
+    },
+  );
+
+  it("rejects mixed Oslo and Bergen metadata instead of accepting one matching location", async () => {
+    const update = vi.fn();
+    const result = await attachPexelsStockImageToPost({
+      payload: { update, logger: { warn: vi.fn() } } as unknown as Payload,
+      post: {
+        id: 11,
+        titleNo: "Takfornying i Oslo",
+        primaryKeyword: "takfornying Oslo",
+        stockImage: { provider: "pexels", assetId: "29114658" },
+      },
+      provider: {
+        search: vi.fn(async () => [
+          {
+            id: 29525397,
+            width: 2400,
+            height: 1350,
+            pageUrl:
+              "https://www.pexels.com/photo/oslo-and-bergen-roof-view-29525397/",
+            photographer: "Mixed Metadata Photographer",
+            photographerUrl: "https://www.pexels.com/@mixed/",
+            alt: "Oslo roof view with Bergen Bryggen buildings",
+            imageUrl:
+              "https://images.pexels.com/photos/29525397/mixed-metadata.jpeg",
+          },
+        ]),
+      } as unknown as PexelsStockImageProvider,
+      persistToMedia: false,
+    });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      outcome: "no_alternative",
       existingAssetId: "29114658",
     });
   });

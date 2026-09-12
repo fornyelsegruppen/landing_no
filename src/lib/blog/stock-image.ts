@@ -4,6 +4,7 @@ import {
   PexelsStockImageProvider,
   pexelsLicenseUrl,
 } from "@/lib/providers/pexels-stock-image-provider";
+import { blogServiceAreas } from "./knowledge-base";
 
 type StockPost = {
   id: number;
@@ -28,9 +29,14 @@ const queryByVariant: Record<NonNullable<StockPost["ctaVariant"]>, string> = {
 
 // This is deliberately metadata-only. We do not infer a photo's location;
 // we reject only an explicit conflict between the article's stated location
-// and Pexels' supplied alt text or source-page slug.
+// and Pexels' supplied alt text or source-page slug. Coverage is limited to
+// our Oslo service region versus explicit Bergen metadata; other geographies
+// remain eligible unless a future reviewed rule adds them.
 const norwegianLocationMetadata = [
-  { key: "oslo", terms: ["oslo", "akershus", "holmenkollen", "vigeland"] },
+  {
+    key: "oslo-service-region",
+    terms: [...blogServiceAreas, "akershus", "holmenkollen", "vigeland"],
+  },
   { key: "bergen", terms: ["bergen", "bryggen", "fløyen", "fløybanen"] },
 ] as const;
 
@@ -59,7 +65,7 @@ function isGeographicallyCompatiblePexelsCandidate(
   );
   return (
     candidateLocations.size === 0 ||
-    [...candidateLocations].some((location) => articleLocations.has(location))
+    [...candidateLocations].every((location) => articleLocations.has(location))
   );
 }
 
