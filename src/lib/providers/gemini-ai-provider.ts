@@ -22,6 +22,7 @@ export class GeminiAiProvider implements AiProvider {
   constructor(
     environment: Readonly<Record<string, string | undefined>> = process.env,
     private readonly request: typeof fetch = fetch,
+    private readonly timeoutMs = 45_000,
   ) {
     this.apiKey = environment.GEMINI_API_KEY?.trim() || "";
     this.model = environment.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
@@ -42,10 +43,13 @@ export class GeminiAiProvider implements AiProvider {
       throw new ProviderUnavailableError("gemini", "configuration_required");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45_000);
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const attachments = input.attachments ?? [];
-      if (attachments.length > 3 || attachments.some((item) => item.dataBase64.length > 14_000_000)) {
+      if (
+        attachments.length > 3 ||
+        attachments.some((item) => item.dataBase64.length > 14_000_000)
+      ) {
         throw new TypeError("AI image attachment limit exceeded");
       }
       const response = await this.request(
@@ -60,10 +64,20 @@ export class GeminiAiProvider implements AiProvider {
           signal: controller.signal,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: input.system }] },
-            contents: [{ role: "user", parts: [
-              { text: input.prompt },
-              ...attachments.map((attachment) => ({ inlineData: { mimeType: attachment.mimeType, data: attachment.dataBase64 } })),
-            ] }],
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: input.prompt },
+                  ...attachments.map((attachment) => ({
+                    inlineData: {
+                      mimeType: attachment.mimeType,
+                      data: attachment.dataBase64,
+                    },
+                  })),
+                ],
+              },
+            ],
             generationConfig: {
               temperature: 0.25,
               responseMimeType: "application/json",
@@ -79,7 +93,9 @@ export class GeminiAiProvider implements AiProvider {
           providerStatus: result.error?.status || "unknown",
           providerMessage: (result.error?.message || "unknown").slice(0, 500),
         });
-        throw new Error(`Gemini request failed (${response.status}): ${result.error?.status || "unknown"}`);
+        throw new Error(
+          `Gemini request failed (${response.status}): ${result.error?.status || "unknown"}`,
+        );
       }
       const text = result.candidates?.[0]?.content?.parts
         ?.map((part) => part.text || "")

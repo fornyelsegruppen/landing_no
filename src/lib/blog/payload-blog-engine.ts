@@ -1,3 +1,4 @@
+import { postRevision } from "./post-revision";
 import { createHash } from "node:crypto";
 import type { Payload } from "payload";
 import type { AiProvider, SearchSignal } from "@/lib/providers/contracts";
@@ -6,7 +7,8 @@ import { assertPayloadAiUsageAvailable } from "@/lib/ai/payload-usage-limit";
 import { ArticleQualityBlockedError, generateBlogDraft } from "./draft-engine";
 import {
   highestTopicOverlap,
-  manualTopicSeeds,
+  getManualTopicSeeds,
+  seasonalRelevanceForTopic,
   topicScore,
   candidateFromSignal,
   sourceMetricsFromSignal,
@@ -16,6 +18,10 @@ import {
 import { attachPexelsStockImageToPost } from "./stock-image";
 import { PexelsStockImageProvider } from "@/lib/providers/pexels-stock-image-provider";
 import { blogServiceAreas } from "./knowledge-base";
+import { claimSeoRun, markSeoRunFailure, type RunPhase } from "./seo-run-state";
+import { withSeoPayloadTransaction } from "./post-write-transaction";
+import { planSearchSignalRefresh } from "./search-signal-refresh";
+import { runAttempt } from "./seo-run-state";
 
 type TriggerSource = "manual" | "cron" | "regenerate";
 
@@ -30,9 +36,14 @@ function priorQualityIssues(value: unknown) {
   return issues.flatMap((issue) => {
     if (!issue || typeof issue !== "object") return [];
     const item = issue as Record<string, unknown>;
-    const code = typeof item.code === "string" ? item.code.slice(0, 120) : "quality_issue";
-    const severity = typeof item.severity === "string" ? item.severity.slice(0, 40) : "warning";
-    const message = typeof item.message === "string" ? item.message.slice(0, 500) : "";
+    const code =
+      typeof item.code === "string" ? item.code.slice(0, 120) : "quality_issue";
+    const severity =
+      typeof item.severity === "string"
+        ? item.severity.slice(0, 40)
+        : "warning";
+    const message =
+      typeof item.message === "string" ? item.message.slice(0, 500) : "";
     return message ? [{ code, severity, message }] : [];
   });
 }
@@ -126,7 +137,12 @@ async function createTopicCandidate(
       ...(candidate.season ? { season: candidate.season } : {}),
       source: candidate.source,
       ...(candidate.sourceSignal
-        ? { sourceMetrics: sourceMetricsFromSignal(candidate.sourceSignal, new Date().toISOString()) }
+        ? {
+            sourceMetrics: sourceMetricsFromSignal(
+              candidate.sourceSignal,
+              new Date().toISOString(),
+            ),
+          }
         : {}),
       proposedBrief: suggestedBrief(candidate),
       topicScore: topicScore(candidate.factors),
@@ -147,10 +163,13 @@ async function createTopicCandidate(
   return true;
 }
 
-export async function ensureManualBlogTopics(payload: Payload) {
+export async function ensureManualBlogTopics(
+  payload: Payload,
+  now = new Date(),
+) {
   const existing = await existingTopics(payload);
   let created = 0;
-  for (const candidate of manualTopicSeeds) {
+  for (const candidate of getManualTopicSeeds(now)) {
     if (await createTopicCandidate(payload, candidate, existing)) {
       created += 1;
       existing.push({
@@ -186,6 +205,69 @@ export async function importSearchSignals(
   return { accepted, filtered, received: signals.length };
 }
 
+export async function refreshPayloadSearchSignals(
+  payload: Payload,
+  signals: SearchSignal[],
+  now = new Date(),
+  deadline = Date.now() + 10_000,
+) {
+  return withSeoPayloadTransaction(payload, async (scoped) => {
+    const topics = await scoped.find({
+      collection: "seo-topics",
+      overrideAccess: true,
+      depth: 0,
+      limit: 500,
+      pagination: false,
+    });
+    const existing = await existingTopics(scoped);
+    let created = 0,
+      updated = 0,
+      skipped = 0;
+    // Bound the per-run DB work; refresh snapshots, never sum repeated imports.
+    for (const signal of [...signals]
+      .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+      .slice(0, 50)) {
+      if (Date.now() >= deadline)
+        throw new TypeError("Signal persistence deadline reached");
+      const plan = planSearchSignalRefresh({
+        signal,
+        existingTopics: topics.docs,
+        importedAt: now.toISOString(),
+        now,
+      });
+      if (plan.action === "create") {
+        if (await createTopicCandidate(scoped, plan.candidate, existing))
+          created++;
+      } else if (plan.action === "update") {
+        const reserved = await scoped.find({
+          collection: "seo-runs",
+          depth: 0,
+          limit: 1,
+          overrideAccess: true,
+          where: { selectedTopics: { equals: plan.topicId } },
+        });
+        if (reserved.docs.length) {
+          skipped++;
+          continue;
+        }
+        await scoped.update({
+          collection: "seo-topics",
+          id: plan.topicId,
+          overrideAccess: true,
+          data: {
+            sourceMetrics: plan.sourceMetrics,
+            topicScore: plan.topicScore,
+            scoreBreakdown: plan.candidate.factors,
+            checkedAt: now.toISOString(),
+          },
+        });
+        updated++;
+      } else skipped++;
+    }
+    return { created, updated, skipped, received: signals.length };
+  });
+}
+
 function relationId(value: unknown): number | undefined {
   if (typeof value === "number") return value;
   if (value && typeof value === "object" && "id" in value) {
@@ -195,7 +277,10 @@ function relationId(value: unknown): number | undefined {
   return undefined;
 }
 
-function topicFromDocument(document: Record<string, unknown>): TopicCandidate {
+function topicFromDocument(
+  document: Record<string, unknown>,
+  now = new Date(),
+): TopicCandidate {
   const service = document.service;
   const serviceKey =
     service && typeof service === "object" && "key" in service
@@ -213,7 +298,7 @@ function topicFromDocument(document: Record<string, unknown>): TopicCandidate {
   const factors =
     document.scoreBreakdown && typeof document.scoreBreakdown === "object"
       ? (document.scoreBreakdown as TopicCandidate["factors"])
-      : manualTopicSeeds[0]!.factors;
+      : getManualTopicSeeds(now)[0]!.factors;
   return {
     topic: String(document.topic),
     primaryKeyword: String(document.primaryKeyword),
@@ -223,31 +308,61 @@ function topicFromDocument(document: Record<string, unknown>): TopicCandidate {
     serviceKey,
     ...(document.location ? { location: String(document.location) } : {}),
     ...(document.season ? { season: String(document.season) } : {}),
-    factors,
+    factors: {
+      ...factors,
+      // Persisted snapshots may come from a different season. Re-rank in memory;
+      // never rewrite an already reserved, drafted, or otherwise protected topic.
+      seasonalRelevance: seasonalRelevanceForTopic(
+        `${document.topic} ${document.primaryKeyword} ${document.season || ""}`,
+        now,
+      ),
+    },
     reason: String(document.reasonForSelection || "Godkjent temakandidat"),
   };
 }
 
 async function nextTopic(payload: Payload) {
+  const now = new Date();
   const result = await payload.find({
     collection: "seo-topics",
     depth: 1,
-    limit: 20,
+    limit: 100,
     sort: "-topicScore",
     overrideAccess: true,
     where: {
       and: [
         { status: { in: ["candidate", "queued"] } },
         { overlapScore: { less_than: 70 } },
-        { or: [
-          { location: { exists: false } },
-          { location: { equals: "" } },
-          { location: { in: blogServiceAreas } },
-        ] },
+        {
+          or: [
+            { location: { exists: false } },
+            { location: { equals: "" } },
+            { location: { in: blogServiceAreas } },
+          ],
+        },
       ],
     },
   });
-  return result.docs[0] || null;
+  const ranked = result.docs
+    .map((document) => ({
+      document,
+      score: topicScore(
+        topicFromDocument(document as unknown as Record<string, unknown>, now)
+          .factors,
+      ),
+    }))
+    .sort((a, b) => b.score - a.score || a.document.id - b.document.id);
+  for (const { document: candidate } of ranked) {
+    const reserved = await payload.find({
+      collection: "seo-runs",
+      depth: 0,
+      limit: 1,
+      overrideAccess: true,
+      where: { selectedTopics: { equals: candidate.id } },
+    });
+    if (!reserved.docs.length) return candidate;
+  }
+  return null;
 }
 
 async function availableSlug(payload: Payload, requested: string) {
@@ -276,38 +391,42 @@ export async function generateNextPayloadBlogDraft(input: {
   triggerSource: TriggerSource;
   weekKey?: string;
   slot?: string;
+  refreshSignals?: () => Promise<unknown>;
+  deadline?: number;
 }) {
-  const duplicate = await input.payload.find({
-    collection: "seo-runs",
-    depth: 1,
-    limit: 1,
-    overrideAccess: true,
-    where: { idempotencyKey: { equals: input.idempotencyKey } },
-  });
-  if (duplicate.docs[0]) {
-    return { duplicate: true as const, run: duplicate.docs[0] };
-  }
-
-  await ensureManualBlogTopics(input.payload);
-  await assertPayloadAiUsageAvailable(input.payload, { reserve: 1 });
-  const topicDocument = await nextTopic(input.payload);
-  if (!topicDocument) throw new Error("No eligible SEO topic is available");
-  const run = await input.payload.create({
-    collection: "seo-runs",
-    overrideAccess: true,
-    data: {
-      idempotencyKey: input.idempotencyKey,
-      jobType: "blog.article.draft",
-      triggerSource: input.triggerSource,
-      ...(input.weekKey ? { weekKey: input.weekKey } : {}),
-      ...(input.slot ? { slot: input.slot } : {}),
-      status: "running",
-      startedAt: new Date().toISOString(),
-      selectedTopics: [topicDocument.id],
-    },
-  });
-
+  const claim = await claimSeoRun(input.payload, input);
+  if (!claim.claimed)
+    return { duplicate: true as const, run: claim.run, outcome: claim.outcome };
+  const run = claim.run;
+  let phase: RunPhase = "claimed";
   try {
+    // The source adapter runs only after the slot is durably claimed.
+    phase = "signals";
+    await input.refreshSignals?.();
+    const topicDocument = await withSeoPayloadTransaction(
+      input.payload,
+      async (scoped) => {
+        await ensureManualBlogTopics(scoped);
+        await assertPayloadAiUsageAvailable(scoped);
+        const topic = await nextTopic(scoped);
+        if (!topic) throw new TypeError("No eligible SEO topic is available");
+        await scoped.update({
+          collection: "seo-runs",
+          id: run.id,
+          overrideAccess: true,
+          data: {
+            selectedTopics: [topic.id],
+            qualityResult: {
+              kind: "seo-orchestration-v1",
+              phase: "provider",
+              attempt: runAttempt(run),
+            },
+          },
+        });
+        return topic;
+      },
+    );
+    phase = "provider";
     const existing = await existingTopics(input.payload);
     const generated = await generateBlogDraft({
       provider: input.provider,
@@ -319,56 +438,90 @@ export async function generateNextPayloadBlogDraft(input: {
     });
     const primaryService = relationId(topicDocument.service);
     const slug = await availableSlug(input.payload, generated.article.slug);
-    let post = await input.payload.create({
-      collection: "posts",
-      draft: true,
-      overrideAccess: true,
-      context: { trustedBlogQualityRevalidation: true },
-      data: {
-        slug,
-        titleNo: generated.article.title,
-        excerptNo: generated.article.excerpt,
-        contentNo: generated.article.content,
-        seoTitleNo: generated.article.seoTitle,
-        seoDescriptionNo: generated.article.seoDescription,
-        editorialStatus: "ai_qa",
-        searchIntent: topicDocument.searchIntent,
-        primaryKeyword: generated.article.primaryKeyword,
-        secondaryKeywords: generated.article.secondaryKeywords.map(
-          (keyword) => ({ keyword }),
-        ),
-        ...(primaryService ? { primaryService } : {}),
-        ...(topicDocument.location
-          ? { locationText: topicDocument.location }
-          : {}),
-        sources: generated.article.sources,
-        authorName: "Takfornyelse",
-        aiAssisted: true,
-        aiGenerationRun: run.id,
-        qualityScore: generated.quality.score,
-        qualityChecks: generated.quality,
-        reviewFlags: generated.article.claimsForReview.map((flag) => ({
-          flag,
-        })),
-        proposedInternalLinks: generated.article.internalLinks,
-        ctaVariant: generated.article.ctaVariant,
-        faqItems: generated.article.faq.map((item) => ({
-          questionNo: item.question,
-          answerNo: item.answer,
-        })),
-        imageBrief: generated.article.imageBrief,
-        imageAlt: generated.article.imageAlt,
-        _status: "draft",
+    let post = await withSeoPayloadTransaction(
+      input.payload,
+      async (scoped) => {
+        const created = await scoped.create({
+          collection: "posts",
+          draft: true,
+          overrideAccess: true,
+          context: { trustedBlogQualityRevalidation: true },
+          data: {
+            slug,
+            titleNo: generated.article.title,
+            excerptNo: generated.article.excerpt,
+            contentNo: generated.article.content,
+            seoTitleNo: generated.article.seoTitle,
+            seoDescriptionNo: generated.article.seoDescription,
+            editorialStatus: "ai_qa",
+            searchIntent: topicDocument.searchIntent,
+            primaryKeyword: generated.article.primaryKeyword,
+            secondaryKeywords: generated.article.secondaryKeywords.map(
+              (keyword) => ({ keyword }),
+            ),
+            ...(primaryService ? { primaryService } : {}),
+            ...(topicDocument.location
+              ? { locationText: topicDocument.location }
+              : {}),
+            sources: generated.article.sources,
+            authorName: "Takfornyelse",
+            aiAssisted: true,
+            aiGenerationRun: run.id,
+            qualityScore: generated.quality.score,
+            qualityChecks: generated.quality,
+            reviewFlags: generated.article.claimsForReview.map((flag) => ({
+              flag,
+            })),
+            proposedInternalLinks: generated.article.internalLinks,
+            ctaVariant: generated.article.ctaVariant,
+            faqItems: generated.article.faq.map((item) => ({
+              questionNo: item.question,
+              answerNo: item.answer,
+            })),
+            imageBrief: generated.article.imageBrief,
+            imageAlt: generated.article.imageAlt,
+            _status: "draft",
+          },
+        });
+        await scoped.update({
+          collection: "seo-topics",
+          id: topicDocument.id,
+          overrideAccess: true,
+          data: { status: "drafted", relatedPost: created.id },
+        });
+        await scoped.update({
+          collection: "seo-runs",
+          id: run.id,
+          overrideAccess: true,
+          data: {
+            status: "completed",
+            finishedAt: new Date().toISOString(),
+            modelVersion: generated.model,
+            promptVersion: generated.promptVersion,
+            knowledgeVersion: generated.knowledgeVersion,
+            qualityResult: generated.quality,
+            createdPost: created.id,
+          },
+        });
+        return created;
       },
-    });
-    const stockProvider = new PexelsStockImageProvider();
-    if (stockProvider.isConfigured()) {
+    );
+    const stockBudget = input.deadline
+      ? input.deadline - Date.now() - 5_000
+      : 45_000;
+    const stockProvider = new PexelsStockImageProvider(
+      process.env,
+      fetch,
+      AbortSignal.timeout(Math.max(1, stockBudget)),
+    );
+    if (stockBudget >= 3_000 && stockProvider.isConfigured()) {
       try {
         const stockResult = await attachPexelsStockImageToPost({
           payload: input.payload,
           post,
           provider: stockProvider,
           preserveInitialQuality: true,
+          ...(input.triggerSource === "cron" ? { persistToMedia: false } : {}),
         });
         if (stockResult.outcome === "replaced") {
           post = stockResult.post;
@@ -384,46 +537,14 @@ export async function generateNextPayloadBlogDraft(input: {
         );
       }
     }
-    await Promise.all([
-      input.payload.update({
-        collection: "seo-runs",
-        id: run.id,
-        overrideAccess: true,
-        data: {
-          status: "completed",
-          finishedAt: new Date().toISOString(),
-          modelVersion: generated.model,
-          promptVersion: generated.promptVersion,
-          knowledgeVersion: generated.knowledgeVersion,
-          qualityResult: generated.quality,
-          createdPost: post.id,
-        },
-      }),
-      input.payload.update({
-        collection: "seo-topics",
-        id: topicDocument.id,
-        overrideAccess: true,
-        data: { status: "drafted", relatedPost: post.id },
-      }),
-    ]);
     return { duplicate: false as const, run, post, generated };
   } catch (error) {
-    const sanitized = sanitizeJobError(error);
-    await input.payload.update({
-      collection: "seo-runs",
-      id: run.id,
-      overrideAccess: true,
-      data: {
-        status:
-          error instanceof ArticleQualityBlockedError ? "attention" : "failed",
-        finishedAt: new Date().toISOString(),
-        errorCode: sanitized.code,
-        errorMessage: sanitized.message,
-        ...(error instanceof ArticleQualityBlockedError
-          ? { qualityResult: error.quality }
-          : {}),
-      },
-    });
+    await markSeoRunFailure(
+      input.payload,
+      run,
+      phase,
+      error instanceof ArticleQualityBlockedError ? error.quality : undefined,
+    );
     throw error;
   }
 }
@@ -448,7 +569,9 @@ export async function regeneratePayloadBlogPost(input: {
     throw new TypeError("Published articles cannot be regenerated in place");
   }
   if (post.locationText && !blogServiceAreas.includes(post.locationText)) {
-    throw new TypeError("Straipsnio vietovė nepatenka į aptarnaujamą Oslo regioną. Sukurkite naują tinkamos vietovės juodraštį.");
+    throw new TypeError(
+      "Straipsnio vietovė nepatenka į aptarnaujamą Oslo regioną. Sukurkite naują tinkamos vietovės juodraštį.",
+    );
   }
   const run = await input.payload.create({
     collection: "seo-runs",
@@ -475,7 +598,7 @@ export async function regeneratePayloadBlogPost(input: {
       source: "manual",
       serviceKey,
       ...(post.locationText ? { location: post.locationText } : {}),
-      factors: manualTopicSeeds[0]!.factors,
+      factors: getManualTopicSeeds()[0]!.factors,
       reason:
         "Regenerering av eksisterende AI-utkast etter administratorhandling.",
     };
@@ -501,7 +624,11 @@ export async function regeneratePayloadBlogPost(input: {
       id: post.id,
       draft: true,
       overrideAccess: true,
-      context: { trustedBlogQualityRevalidation: true },
+      context: {
+        trustedBlogQualityRevalidation: true,
+        expectedBlogUpdatedAt: post.updatedAt,
+        expectedBlogRevision: postRevision(post),
+      },
       data: {
         titleNo: generated.article.title,
         excerptNo: generated.article.excerpt,

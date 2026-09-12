@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { validGeneratedArticle } from "./test-fixtures";
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +12,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/ai/payload-usage-limit", () => ({
   assertPayloadAiUsageAvailable: vi.fn(),
+}));
+vi.mock("./post-write-transaction", () => ({
+  withSeoPayloadTransaction: (
+    _payload: unknown,
+    work: (payload: unknown) => unknown,
+  ) => work(_payload),
 }));
 vi.mock("./draft-engine", () => ({
   ArticleQualityBlockedError: class ArticleQualityBlockedError extends Error {},
@@ -35,6 +41,113 @@ import {
 } from "./payload-blog-engine";
 
 describe("payload blog draft generation", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("re-ranks persisted topics for the current season without rewriting their snapshots", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const previousFind = mocks.find.getMockImplementation()!;
+    const factors = {
+      serviceRelevance: 1,
+      demand: 0.6,
+      commercialValue: 0.6,
+      contentGap: 0.8,
+      seasonalRelevance: 1,
+      originalEvidence: 0.5,
+      localRelevance: 0,
+    };
+    const documents = [
+      {
+        id: 101,
+        topic: "Takvask før vinteren",
+        primaryKeyword: "takvask vinter",
+        topicScore: 99,
+      },
+      {
+        id: 102,
+        topic: "Takvask før høstregn",
+        primaryKeyword: "takvask høst",
+        topicScore: 10,
+      },
+    ].map((doc) => ({
+      ...doc,
+      scoreBreakdown: factors,
+      searchIntent: "informational",
+      source: "manual",
+      service: { key: "takvask" },
+    }));
+    mocks.find.mockImplementation(async (input) => {
+      if (input.collection === "seo-topics" && input.where?.and) {
+        expect(input.limit).toBe(100);
+        return { docs: documents };
+      }
+      return previousFind(input);
+    });
+    const payload = {
+      find: mocks.find,
+      create: mocks.create,
+      update: mocks.update,
+      logger: { warn: mocks.warn },
+    } as never;
+    for (const [date, expected] of [
+      ["2026-09-12T09:00:00Z", "takvask høst"],
+      ["2026-12-12T09:00:00Z", "takvask vinter"],
+    ]) {
+      vi.setSystemTime(new Date(date));
+      await generateNextPayloadBlogDraft({
+        payload,
+        provider: {} as never,
+        idempotencyKey: date,
+        correlationId: "season-clock",
+        triggerSource: "cron",
+      });
+      expect(mocks.generate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          topic: expect.objectContaining({
+            primaryKeyword: expected,
+            factors: expect.objectContaining({ seasonalRelevance: 1 }),
+          }),
+        }),
+      );
+    }
+    expect(documents[0].topicScore).toBe(99);
+    expect(documents[1].topicScore).toBe(10);
+    expect(
+      mocks.update.mock.calls
+        .filter(([input]) => input.collection === "seo-topics")
+        .every(
+          ([input]) =>
+            input.data.topicScore === undefined &&
+            input.data.scoreBreakdown === undefined,
+        ),
+    ).toBe(true);
+  });
+
+  it("claims before refreshing signals and refreshes before selection/generation", async () => {
+    const refresh = vi.fn(async () => {
+      expect(
+        mocks.create.mock.calls.some(
+          ([input]) => input.collection === "seo-runs",
+        ),
+      ).toBe(true);
+      expect(mocks.generate).not.toHaveBeenCalled();
+    });
+    await generateNextPayloadBlogDraft({
+      payload: {
+        find: mocks.find,
+        create: mocks.create,
+        update: mocks.update,
+        logger: { warn: mocks.warn },
+      } as never,
+      provider: {} as never,
+      idempotencyKey: "refresh-order",
+      correlationId: "test",
+      triggerSource: "cron",
+      refreshSignals: refresh,
+    });
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(mocks.generate).toHaveBeenCalledOnce();
+  });
+
   beforeEach(() => {
     let topicFingerprintChecks = 0;
     mocks.find.mockReset().mockImplementation(async (input) => {
@@ -66,7 +179,8 @@ describe("payload blog draft generation", () => {
     mocks.create.mockReset().mockImplementation(async (input) => {
       if (input.collection === "seo-runs") return { id: 7, ...input.data };
       if (input.collection === "posts") return { id: 55, ...input.data };
-      if (input.collection === "seo-topics") return { id: topicFingerprintChecks, ...input.data };
+      if (input.collection === "seo-topics")
+        return { id: topicFingerprintChecks, ...input.data };
       throw new Error(`Unexpected create ${input.collection}`);
     });
     mocks.update.mockReset().mockImplementation(async (input) => ({
@@ -76,7 +190,12 @@ describe("payload blog draft generation", () => {
     mocks.warn.mockReset();
     mocks.generate.mockReset().mockResolvedValue({
       article: validGeneratedArticle(),
-      quality: { passed: true, score: 91, issues: [], checkedAt: "2026-09-12T00:00:00.000Z" },
+      quality: {
+        passed: true,
+        score: 91,
+        issues: [],
+        checkedAt: "2026-09-12T00:00:00.000Z",
+      },
       provider: "test",
       model: "test-model",
       promptVersion: "test-prompt",
@@ -96,17 +215,21 @@ describe("payload blog draft generation", () => {
       update: mocks.update,
       logger: { warn: mocks.warn },
     } as never;
-    await importSearchSignals(payload, [{
-      source: "search-console",
-      origin: "api",
-      query: "takvask pris",
-      impressions: 0,
-      clicks: 0,
-      periodStart: "2026-06-01",
-      periodEnd: "2026-08-31",
-    }]);
+    await importSearchSignals(payload, [
+      {
+        source: "search-console",
+        origin: "api",
+        query: "takvask pris",
+        impressions: 0,
+        clicks: 0,
+        periodStart: "2026-06-01",
+        periodEnd: "2026-08-31",
+      },
+    ]);
 
-    const imported = mocks.create.mock.calls.find(([input]) => input.collection === "seo-topics")?.[0];
+    const imported = mocks.create.mock.calls.find(
+      ([input]) => input.collection === "seo-topics",
+    )?.[0];
     expect(imported?.data.sourceMetrics).toMatchObject({
       kind: "aggregated-search-signal",
       source: "search-console",
@@ -119,9 +242,13 @@ describe("payload blog draft generation", () => {
 
     mocks.create.mockClear();
     await ensureManualBlogTopics(payload);
-    const manualCreates = mocks.create.mock.calls.filter(([input]) => input.collection === "seo-topics");
+    const manualCreates = mocks.create.mock.calls.filter(
+      ([input]) => input.collection === "seo-topics",
+    );
     expect(manualCreates).toHaveLength(10);
-    expect(manualCreates.every(([input]) => input.data.sourceMetrics === undefined)).toBe(true);
+    expect(
+      manualCreates.every(([input]) => input.data.sourceMetrics === undefined),
+    ).toBe(true);
   });
 
   it("retains the already-created initial draft when configured Pexels returns no image", async () => {

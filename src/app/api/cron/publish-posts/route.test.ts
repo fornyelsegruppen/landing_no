@@ -1,141 +1,77 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 const mocks = vi.hoisted(() => ({
   authorized: vi.fn(),
-  assertReady: vi.fn(),
-  find: vi.fn(),
+  publish: vi.fn(),
+  create: vi.fn(),
   update: vi.fn(),
 }));
-
 vi.mock("@/lib/security/cron-auth", () => ({
   cronRequestAuthorized: mocks.authorized,
 }));
-vi.mock("@/lib/platform/features", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/platform/features")>();
-  return { ...actual, assertFeatureReady: mocks.assertReady };
-});
 vi.mock("@/lib/payload", () => ({
-  getPayload: vi.fn(async () => ({ find: mocks.find, update: mocks.update })),
+  getPayload: async () => ({ create: mocks.create, update: mocks.update }),
 }));
-
+vi.mock("@/lib/blog/scheduled-publisher", () => ({
+  publishDueBlogPosts: mocks.publish,
+}));
 import { GET } from "./route";
-
-describe("scheduled post publishing cron", () => {
+describe("approved scheduled publisher route", () => {
   beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://takfornyelsenorge.no");
     vi.stubEnv("FEATURE_SEO_AUTO_PUBLISH", "true");
+    vi.stubEnv("FEATURE_SEO_SCHEDULER", "true");
     mocks.authorized.mockReset().mockReturnValue(true);
-    mocks.assertReady.mockReset();
-    mocks.find.mockReset().mockResolvedValue({
-      docs: [
-        {
-          id: 8,
-          editorialStatus: "scheduled",
-          sources: [
-            {
-              label: "Arbeidstilsynet",
-              url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",
-              publisher: "Arbeidstilsynet",
-            },
-          ],
-          reviewerName: "Kari",
-          reviewedAt: "2026-08-27T08:00:00.000Z",
-        },
-      ],
-    });
-    mocks.update.mockReset().mockResolvedValue({ id: 8, _status: "published" });
+    mocks.publish
+      .mockReset()
+      .mockResolvedValue({ published: [8], attention: [], skipped: [] });
+    mocks.create.mockReset().mockResolvedValue({ id: 1 });
+    mocks.update.mockReset().mockResolvedValue({ id: 1 });
   });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("rejects requests without cron authorization", async () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const request = () =>
+    new Request("https://takfornyelsenorge.no/api/cron/publish-posts");
+  it("rejects unauthorized before DB access", async () => {
     mocks.authorized.mockReturnValue(false);
-
-    const response = await GET(
-      new Request("https://www.takfornyelse.as/api/cron/publish-posts"),
-    );
-
-    expect(response.status).toBe(401);
-    expect(mocks.find).not.toHaveBeenCalled();
+    expect((await GET(request())).status).toBe(401);
+    expect(mocks.create).not.toHaveBeenCalled();
   });
-
-  it("fails closed while automatic SEO publication is not explicitly enabled", async () => {
-    delete process.env.FEATURE_SEO_AUTO_PUBLISH;
-
-    const response = await GET(
-      new Request("https://www.takfornyelse.as/api/cron/publish-posts"),
-    );
-
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({
-      error: "disabled",
-      feature: "seoAutoPublish",
-    });
-    expect(mocks.assertReady).not.toHaveBeenCalled();
-    expect(mocks.find).not.toHaveBeenCalled();
-    expect(mocks.update).not.toHaveBeenCalled();
+  it("fails closed on kill switch", async () => {
+    vi.stubEnv("FEATURE_SEO_AUTO_PUBLISH", "false");
+    expect((await GET(request())).status).toBe(503);
+    expect(mocks.publish).not.toHaveBeenCalled();
   });
-
-  it("selects only administrator-reviewed scheduled drafts", async () => {
-    const response = await GET(
-      new Request("https://www.takfornyelse.as/api/cron/publish-posts"),
-    );
-
-    expect(response.status).toBe(200);
-    expect(mocks.assertReady).toHaveBeenCalledWith("seoScheduler");
-    expect(mocks.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        collection: "posts",
-        draft: true,
-        where: {
-          and: expect.arrayContaining([
-            { _status: { equals: "draft" } },
-            { editorialStatus: { equals: "scheduled" } },
-          ]),
-        },
-      }),
-    );
+  it("rejects frozen/old deployment target", async () => {
+    expect(
+      (await GET(new Request("https://old.vercel.app/api/cron/publish-posts")))
+        .status,
+    ).toBe(503);
+    expect(mocks.publish).not.toHaveBeenCalled();
+  });
+  it("publishes reviewed due work without requiring an AI provider", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+    expect((await GET(request())).status).toBe(200);
+    expect(mocks.publish).toHaveBeenCalledOnce();
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        collection: "posts",
-        id: 8,
-        draft: false,
-        data: { _status: "published" },
+        data: expect.objectContaining({ status: "completed" }),
       }),
     );
   });
-
-  it("keeps scheduled posts in attention when publishability checks fail", async () => {
-    mocks.find.mockResolvedValue({
-      docs: [
-        {
-          id: 8,
-          editorialStatus: "scheduled",
-          sources: [
-            {
-              label: "SINTEF",
-              url: "https://www.sintef.no/",
-              publisher: "SINTEF",
-            },
-          ],
-          reviewerName: "Kari",
-          reviewedAt: "2026-08-27T08:00:00.000Z",
-        },
-      ],
-    });
-
-    const response = await GET(
-      new Request("https://www.takfornyelse.as/api/cron/publish-posts"),
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      ok: true,
+  it("persists attention outcomes", async () => {
+    mocks.publish.mockResolvedValue({
       published: [],
       attention: [8],
+      skipped: [],
     });
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect((await GET(request())).status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "attention",
+          errorCode: "POST_RECHECK_REQUIRED",
+        }),
+      }),
+    );
   });
 });

@@ -148,7 +148,9 @@ describe("blog stock images", () => {
         collection: "posts",
         id: 9,
         draft: true,
-        context: { trustedBlogQualityRevalidation: true },
+        context: expect.objectContaining({
+          trustedBlogQualityRevalidation: true,
+        }),
         data: expect.objectContaining({
           heroImage: 41,
           imageAlt: "Tiled roof",
@@ -179,7 +181,10 @@ describe("blog stock images", () => {
     for (const editorialStatus of ["ai_qa", "approved"]) {
       const update = vi.fn(async (input) => ({ id: 22, ...input.data }));
       const result = await attachPexelsStockImageToPost({
-        payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+        payload: payloadWithEmptyVersionHistory({
+          update,
+          logger: { warn: vi.fn() },
+        }),
         post: {
           id: 22,
           titleNo: "Takfornying",
@@ -190,7 +195,9 @@ describe("blog stock images", () => {
         provider: providerWithPage(async () => [selected]),
         persistToMedia: false,
       });
-      expect(update.mock.calls[0]?.[0]).not.toHaveProperty("context");
+      expect(
+        update.mock.calls[0]?.[0].context.trustedBlogQualityRevalidation,
+      ).toBe(false);
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -213,7 +220,10 @@ describe("blog stock images", () => {
   it("returns an honest no-alternative outcome without updating when Pexels returns only the current asset", async () => {
     const update = vi.fn(async (input) => ({ id: 23, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+      payload: payloadWithEmptyVersionHistory({
+        update,
+        logger: { warn: vi.fn() },
+      }),
       post: {
         id: 23,
         titleNo: "Takfornying",
@@ -222,17 +232,17 @@ describe("blog stock images", () => {
         stockImage: { provider: "pexels", assetId: "654" },
       },
       provider: providerWithPage(async () => [
-          {
-            id: 654,
-            width: 2400,
-            height: 1350,
-            pageUrl: "https://www.pexels.com/photo/roof-654/",
-            photographer: "Same Asset",
-            photographerUrl: "https://www.pexels.com/@same/",
-            alt: "Red tiled roof",
-            imageUrl: "https://images.pexels.com/photos/654/roof.jpeg",
-          },
-        ]),
+        {
+          id: 654,
+          width: 2400,
+          height: 1350,
+          pageUrl: "https://www.pexels.com/photo/roof-654/",
+          photographer: "Same Asset",
+          photographerUrl: "https://www.pexels.com/@same/",
+          alt: "Red tiled roof",
+          imageUrl: "https://images.pexels.com/photos/654/roof.jpeg",
+        },
+      ]),
       persistToMedia: false,
     });
 
@@ -248,7 +258,10 @@ describe("blog stock images", () => {
   it("excludes the current Pexels asset and selects a genuine alternative", async () => {
     const update = vi.fn(async (input) => ({ id: 23, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+      payload: payloadWithEmptyVersionHistory({
+        update,
+        logger: { warn: vi.fn() },
+      }),
       post: {
         id: 23,
         titleNo: "Takfornying",
@@ -256,27 +269,27 @@ describe("blog stock images", () => {
         stockImage: { provider: "pexels", assetId: "654" },
       },
       provider: providerWithPage(async () => [
-          {
-            id: 654,
-            width: 2400,
-            height: 1350,
-            pageUrl: "https://www.pexels.com/photo/roof-654/",
-            photographer: "Current Asset",
-            photographerUrl: "https://www.pexels.com/@current/",
-            alt: "Current roof",
-            imageUrl: "https://images.pexels.com/photos/654/roof.jpeg",
-          },
-          {
-            id: 655,
-            width: 2400,
-            height: 1350,
-            pageUrl: "https://www.pexels.com/photo/roof-655/",
-            photographer: "Alternative Asset",
-            photographerUrl: "https://www.pexels.com/@alternative/",
-            alt: "Alternative roof",
-            imageUrl: "https://images.pexels.com/photos/655/roof.jpeg",
-          },
-        ]),
+        {
+          id: 654,
+          width: 2400,
+          height: 1350,
+          pageUrl: "https://www.pexels.com/photo/roof-654/",
+          photographer: "Current Asset",
+          photographerUrl: "https://www.pexels.com/@current/",
+          alt: "Current roof",
+          imageUrl: "https://images.pexels.com/photos/654/roof.jpeg",
+        },
+        {
+          id: 655,
+          width: 2400,
+          height: 1350,
+          pageUrl: "https://www.pexels.com/photo/roof-655/",
+          photographer: "Alternative Asset",
+          photographerUrl: "https://www.pexels.com/@alternative/",
+          alt: "Alternative roof",
+          imageUrl: "https://images.pexels.com/photos/655/roof.jpeg",
+        },
+      ]),
       persistToMedia: false,
     });
 
@@ -297,7 +310,10 @@ describe("blog stock images", () => {
   it("skips explicit Bergen landmark metadata for an Oslo article but keeps a neutral roof alternative", async () => {
     const update = vi.fn(async (input) => ({ id: 11, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+      payload: payloadWithEmptyVersionHistory({
+        update,
+        logger: { warn: vi.fn() },
+      }),
       post: {
         id: 11,
         titleNo: "Takfornying i Oslo",
@@ -305,30 +321,30 @@ describe("blog stock images", () => {
         stockImage: { provider: "pexels", assetId: "29114658" },
       },
       provider: providerWithPage(async () => [
-          {
-            id: 29525395,
-            width: 2400,
-            height: 1350,
-            pageUrl:
-              "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
-            photographer: "Fixture Photographer",
-            photographerUrl: "https://www.pexels.com/@fixture/",
-            alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
-            imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
-          },
-          {
-            id: 29525396,
-            width: 2400,
-            height: 1350,
-            pageUrl:
-              "https://www.pexels.com/photo/red-tiled-house-roof-29525396/",
-            photographer: "Roof Photographer",
-            photographerUrl: "https://www.pexels.com/@roof/",
-            alt: "Red tiled house roof under a clear sky",
-            imageUrl:
-              "https://images.pexels.com/photos/29525396/red-tiled-roof.jpeg",
-          },
-        ]),
+        {
+          id: 29525395,
+          width: 2400,
+          height: 1350,
+          pageUrl:
+            "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
+          photographer: "Fixture Photographer",
+          photographerUrl: "https://www.pexels.com/@fixture/",
+          alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
+          imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
+        },
+        {
+          id: 29525396,
+          width: 2400,
+          height: 1350,
+          pageUrl:
+            "https://www.pexels.com/photo/red-tiled-house-roof-29525396/",
+          photographer: "Roof Photographer",
+          photographerUrl: "https://www.pexels.com/@roof/",
+          alt: "Red tiled house roof under a clear sky",
+          imageUrl:
+            "https://images.pexels.com/photos/29525396/red-tiled-roof.jpeg",
+        },
+      ]),
       persistToMedia: false,
     });
 
@@ -348,7 +364,10 @@ describe("blog stock images", () => {
   it("keeps NO_ALTERNATIVE when the only distinct candidate is an explicit wrong-city landmark", async () => {
     const update = vi.fn();
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+      payload: payloadWithEmptyVersionHistory({
+        update,
+        logger: { warn: vi.fn() },
+      }),
       post: {
         id: 11,
         titleNo: "Takfornying i Oslo",
@@ -356,18 +375,18 @@ describe("blog stock images", () => {
         stockImage: { provider: "pexels", assetId: "29114658" },
       },
       provider: providerWithPage(async () => [
-          {
-            id: 29525395,
-            width: 2400,
-            height: 1350,
-            pageUrl:
-              "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
-            photographer: "Fixture Photographer",
-            photographerUrl: "https://www.pexels.com/@fixture/",
-            alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
-            imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
-          },
-        ]),
+        {
+          id: 29525395,
+          width: 2400,
+          height: 1350,
+          pageUrl:
+            "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
+          photographer: "Fixture Photographer",
+          photographerUrl: "https://www.pexels.com/@fixture/",
+          alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
+          imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
+        },
+      ]),
       persistToMedia: false,
     });
 
@@ -401,7 +420,11 @@ describe("blog stock images", () => {
 
     for (const expectedId of [101, 102, 103, 104]) {
       const result = await attachPexelsStockImageToPost({
-        payload: { findVersions, update, logger: { warn: vi.fn() } } as unknown as Payload,
+        payload: {
+          findVersions,
+          update,
+          logger: { warn: vi.fn() },
+        } as unknown as Payload,
         post,
         provider: { searchPage } as unknown as PexelsStockImageProvider,
         persistToMedia: false,
@@ -413,7 +436,9 @@ describe("blog stock images", () => {
         nextStockImage?.provider !== "pexels" ||
         typeof nextStockImage.assetId !== "string"
       ) {
-        throw new Error("Expected the replacement post to retain a Pexels asset ID");
+        throw new Error(
+          "Expected the replacement post to retain a Pexels asset ID",
+        );
       }
       post = {
         ...post,
@@ -473,7 +498,9 @@ describe("blog stock images", () => {
 
     expect(expectReplacement(result).selected.id).toBe(103);
     expect(searchPage).toHaveBeenCalledTimes(1);
-    expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([1]);
+    expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([
+      1,
+    ]);
   });
 
   it("advances through page two and page three before selecting an unused candidate", async () => {
@@ -490,7 +517,11 @@ describe("blog stock images", () => {
     }));
 
     const result = await attachPexelsStockImageToPost({
-      payload: { findVersions, update, logger: { warn: vi.fn() } } as unknown as Payload,
+      payload: {
+        findVersions,
+        update,
+        logger: { warn: vi.fn() },
+      } as unknown as Payload,
       post: {
         id: 16,
         titleNo: "Takfornying i Oslo",
@@ -550,7 +581,9 @@ describe("blog stock images", () => {
       existingAssetId: "102",
     });
     expect(update).not.toHaveBeenCalled();
-    expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([1, 2, 3]);
+    expect(searchPage.mock.calls.map(([, options]) => options.page)).toEqual([
+      1, 2, 3,
+    ]);
   });
 
   it("keeps the post unchanged when all bounded-page candidates are exhausted", async () => {
@@ -579,7 +612,10 @@ describe("blog stock images", () => {
       persistToMedia: false,
     });
 
-    expect(result).toMatchObject({ outcome: "no_alternative", existingAssetId: "101" });
+    expect(result).toMatchObject({
+      outcome: "no_alternative",
+      existingAssetId: "101",
+    });
     expect(update).not.toHaveBeenCalled();
     expect(searchPage).toHaveBeenCalledTimes(2);
   });
@@ -610,7 +646,10 @@ describe("blog stock images", () => {
     async (location) => {
       const update = vi.fn();
       const result = await attachPexelsStockImageToPost({
-        payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+        payload: payloadWithEmptyVersionHistory({
+          update,
+          logger: { warn: vi.fn() },
+        }),
         post: {
           id: 11,
           titleNo: `Takfornying i ${location}`,
@@ -618,19 +657,18 @@ describe("blog stock images", () => {
           stockImage: { provider: "pexels", assetId: "29114658" },
         },
         provider: providerWithPage(async () => [
-            {
-              id: 29525395,
-              width: 2400,
-              height: 1350,
-              pageUrl:
-                "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
-              photographer: "Fixture Photographer",
-              photographerUrl: "https://www.pexels.com/@fixture/",
-              alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
-              imageUrl:
-                "https://images.pexels.com/photos/29525395/bryggen.jpeg",
-            },
-          ]),
+          {
+            id: 29525395,
+            width: 2400,
+            height: 1350,
+            pageUrl:
+              "https://www.pexels.com/photo/colorful-bryggen-buildings-in-bergen-norway-29525395/",
+            photographer: "Fixture Photographer",
+            photographerUrl: "https://www.pexels.com/@fixture/",
+            alt: "Colorful historic buildings in Bryggen, Bergen under a bright blue sky.",
+            imageUrl: "https://images.pexels.com/photos/29525395/bryggen.jpeg",
+          },
+        ]),
         persistToMedia: false,
       });
 
@@ -645,7 +683,10 @@ describe("blog stock images", () => {
   it("rejects mixed Oslo and Bergen metadata instead of accepting one matching location", async () => {
     const update = vi.fn();
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+      payload: payloadWithEmptyVersionHistory({
+        update,
+        logger: { warn: vi.fn() },
+      }),
       post: {
         id: 11,
         titleNo: "Takfornying i Oslo",
@@ -653,19 +694,19 @@ describe("blog stock images", () => {
         stockImage: { provider: "pexels", assetId: "29114658" },
       },
       provider: providerWithPage(async () => [
-          {
-            id: 29525397,
-            width: 2400,
-            height: 1350,
-            pageUrl:
-              "https://www.pexels.com/photo/oslo-and-bergen-roof-view-29525397/",
-            photographer: "Mixed Metadata Photographer",
-            photographerUrl: "https://www.pexels.com/@mixed/",
-            alt: "Oslo roof view with Bergen Bryggen buildings",
-            imageUrl:
-              "https://images.pexels.com/photos/29525397/mixed-metadata.jpeg",
-          },
-        ]),
+        {
+          id: 29525397,
+          width: 2400,
+          height: 1350,
+          pageUrl:
+            "https://www.pexels.com/photo/oslo-and-bergen-roof-view-29525397/",
+          photographer: "Mixed Metadata Photographer",
+          photographerUrl: "https://www.pexels.com/@mixed/",
+          alt: "Oslo roof view with Bergen Bryggen buildings",
+          imageUrl:
+            "https://images.pexels.com/photos/29525397/mixed-metadata.jpeg",
+        },
+      ]),
       persistToMedia: false,
     });
 
@@ -679,7 +720,10 @@ describe("blog stock images", () => {
   it("invalidates scheduled review evidence when an uploaded hero overrides matching stock metadata", async () => {
     const update = vi.fn(async (input) => ({ id: 24, ...input.data }));
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ update, logger: { warn: vi.fn() } }),
+      payload: payloadWithEmptyVersionHistory({
+        update,
+        logger: { warn: vi.fn() },
+      }),
       post: {
         id: 24,
         titleNo: "Takfornying",
@@ -689,17 +733,17 @@ describe("blog stock images", () => {
         stockImage: { provider: "pexels", assetId: "222" },
       },
       provider: providerWithPage(async () => [
-          {
-            id: 223,
-            width: 2400,
-            height: 1350,
-            pageUrl: "https://www.pexels.com/photo/roof-223/",
-            photographer: "Matching Metadata",
-            photographerUrl: "https://www.pexels.com/@matching/",
-            alt: "",
-            imageUrl: "https://images.pexels.com/photos/223/roof.jpeg",
-          },
-        ]),
+        {
+          id: 223,
+          width: 2400,
+          height: 1350,
+          pageUrl: "https://www.pexels.com/photo/roof-223/",
+          photographer: "Matching Metadata",
+          photographerUrl: "https://www.pexels.com/@matching/",
+          alt: "",
+          imageUrl: "https://images.pexels.com/photos/223/roof.jpeg",
+        },
+      ]),
       persistToMedia: false,
     });
 
@@ -745,7 +789,11 @@ describe("blog stock images", () => {
     const warn = vi.fn();
 
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ create, update, logger: { warn } }),
+      payload: payloadWithEmptyVersionHistory({
+        create,
+        update,
+        logger: { warn },
+      }),
       post: {
         id: 12,
         titleNo: "Sjekk taket etter vinteren",
@@ -795,9 +843,13 @@ describe("blog stock images", () => {
     }));
 
     const result = await attachPexelsStockImageToPost({
-      payload: payloadWithEmptyVersionHistory({ create, update, logger: { warn } }),
+      payload: payloadWithEmptyVersionHistory({
+        create,
+        update,
+        logger: { warn },
+      }),
       post: { id: 13, titleNo: "Takmaling", ctaVariant: "assessment" },
-        provider: providerWithPage(async () => [selected], download),
+      provider: providerWithPage(async () => [selected], download),
       persistToMedia: false,
     });
 

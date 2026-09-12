@@ -50,6 +50,7 @@ vi.mock("@/lib/blog/payload-blog-engine", () => ({
 
 import { POST } from "./route";
 import { ArticleQualityBlockedError } from "@/lib/blog/draft-engine";
+import { assertExpectedPostRevision } from "@/lib/blog/post-write-transaction";
 
 function request(body: Record<string, unknown>) {
   return new Request("https://www.takfornyelse.as/api/admin/blog/posts/9", {
@@ -62,6 +63,33 @@ function request(body: Record<string, unknown>) {
 const context = { params: Promise.resolve({ id: "9" }) };
 
 describe("admin blog post actions", () => {
+  it.each(["approve", "reject", "schedule", "publish"])(
+    "%s rejects a different revision even with the same timestamp",
+    async (action) => {
+      const base = await mocks.findByID();
+      const captured = {
+        ...base,
+        editorialStatus: action === "approve" ? "human_review" : "approved",
+        updatedAt: "2026-09-12T00:00:00.000Z",
+      };
+      mocks.findByID.mockResolvedValue(captured);
+      mocks.update.mockImplementation(async ({ context: writeContext }) => {
+        assertExpectedPostRevision(writeContext, {
+          ...captured,
+          contentNo: "Concurrent native change",
+          reviewerName: null,
+        });
+        throw new Error("Snapshot guard must reject first");
+      });
+      const response = await POST(
+        request({ action, scheduledAt: "2099-09-14T07:00:00.000Z" }),
+        context,
+      );
+      expect(response.status).toBe(409);
+      expect(mocks.update).toHaveBeenCalledOnce();
+      expect(mocks.recordAudit).not.toHaveBeenCalled();
+    },
+  );
   beforeEach(() => {
     mocks.captureException.mockReset();
     mocks.evaluateEdited.mockReset().mockReturnValue({
@@ -128,7 +156,9 @@ describe("admin blog post actions", () => {
     );
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: { trustedBlogQualityRevalidation: true },
+        context: expect.objectContaining({
+          trustedBlogQualityRevalidation: true,
+        }),
         draft: true,
         data: expect.objectContaining({
           qualityScore: 40,

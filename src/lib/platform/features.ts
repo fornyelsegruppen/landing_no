@@ -266,7 +266,7 @@ const featureDependencies: Record<FeatureFlagName, IntegrationName[]> = {
   contractSigning: ["signature", "email", "legal"],
   workerPortal: [],
   automatedReminders: ["email", "jobs"],
-  seoScheduler: ["ai", "jobs", "stockImages"],
+  seoScheduler: ["ai", "jobs"],
   caseStateEngineV2: [],
   measurementEvidenceV2: ["maps", "buildingFootprints", "privateStorage"],
   adminExceptionFlowsV2: [],

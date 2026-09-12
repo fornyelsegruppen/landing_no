@@ -1,3 +1,4 @@
+import { postRevision } from "./post-revision";
 import type { Payload } from "payload";
 import type { Media, Post } from "@/payload/payload-types";
 import {
@@ -12,6 +13,7 @@ const STOCK_ROTATION_PAGE_SIZE = 30;
 
 type StockPost = {
   id: number;
+  updatedAt?: string;
   titleNo: string;
   primaryKeyword?: string | null;
   ctaVariant?: "assessment" | "wash" | "renewal" | "new_roof" | null;
@@ -256,9 +258,11 @@ export async function attachPexelsStockImageToPost(input: {
     overrideAccess: true,
     // A later human-triggered stock replacement invalidates prior QA/review
     // evidence whenever its Pexels asset or factual alt text changes.
-    ...(input.preserveInitialQuality === true
-      ? { context: { trustedBlogQualityRevalidation: true } }
-      : {}),
+    context: {
+      expectedBlogUpdatedAt: input.post.updatedAt,
+      expectedBlogRevision: postRevision(input.post),
+      trustedBlogQualityRevalidation: input.preserveInitialQuality === true,
+    },
     data: {
       ...(media ? { heroImage: media.id } : { heroImage: null }),
       imageAlt,

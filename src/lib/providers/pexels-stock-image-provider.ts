@@ -75,6 +75,7 @@ export class PexelsStockImageProvider {
   constructor(
     env: Record<string, string | undefined> = process.env,
     private readonly request: typeof fetch = fetch,
+    private readonly signal?: AbortSignal,
   ) {
     this.apiKey = env.PEXELS_API_KEY?.trim() || "";
   }
@@ -102,7 +103,11 @@ export class PexelsStockImageProvider {
     if (!Number.isInteger(page) || page < 1) {
       throw new TypeError("Pexels-siden er ugyldig");
     }
-    if (!Number.isInteger(perPage) || perPage < 1 || perPage > MAX_SEARCH_PER_PAGE) {
+    if (
+      !Number.isInteger(perPage) ||
+      perPage < 1 ||
+      perPage > MAX_SEARCH_PER_PAGE
+    ) {
       throw new TypeError("Pexels sideantall er ugyldig");
     }
 
@@ -114,7 +119,9 @@ export class PexelsStockImageProvider {
 
     const response = await this.request(url, {
       headers: { Authorization: this.apiKey },
-      signal: AbortSignal.timeout(12_000),
+      signal: this.signal
+        ? AbortSignal.any([this.signal, AbortSignal.timeout(12_000)])
+        : AbortSignal.timeout(12_000),
     });
     if (!response.ok) {
       throw new Error(`Pexels search failed with HTTP ${response.status}`);
@@ -152,7 +159,9 @@ export class PexelsStockImageProvider {
     const url = assertPexelsImageUrl(photo.imageUrl);
     const response = await this.request(url, {
       redirect: "error",
-      signal: AbortSignal.timeout(20_000),
+      signal: this.signal
+        ? AbortSignal.any([this.signal, AbortSignal.timeout(20_000)])
+        : AbortSignal.timeout(20_000),
     });
     if (!response.ok) {
       throw new Error(

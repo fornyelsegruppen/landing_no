@@ -1,3 +1,4 @@
+import { postRevision } from "@/lib/blog/post-revision";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -47,7 +48,9 @@ const actionSchema = z.object({
 
 class BlogActionConflictError extends TypeError {
   constructor() {
-    super("Artikkelen er endret av en annen økt. Last siden på nytt før du fortsetter.");
+    super(
+      "Artikkelen er endret av en annen økt. Last siden på nytt før du fortsetter.",
+    );
     this.name = "BlogActionConflictError";
   }
 }
@@ -186,7 +189,11 @@ export async function POST(
         id: post.id,
         draft: true,
         overrideAccess: true,
-        context: { trustedBlogQualityRevalidation: true },
+        context: {
+          trustedBlogQualityRevalidation: true,
+          expectedBlogUpdatedAt: post.updatedAt,
+          expectedBlogRevision: postRevision(post),
+        },
         data,
       });
       await recordAuditEvent(createPayloadAuditWriter(payload), {
@@ -308,6 +315,10 @@ export async function POST(
       id: post.id,
       draft: parsed.data.action !== "publish",
       overrideAccess: true,
+      context: {
+        expectedBlogUpdatedAt: post.updatedAt,
+        expectedBlogRevision: postRevision(post),
+      },
       data,
     });
     await recordAuditEvent(createPayloadAuditWriter(payload), {

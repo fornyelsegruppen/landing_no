@@ -7,6 +7,11 @@ import {
 import { restorePostVersionAsDraft } from "../../lib/blog/restore-post-version";
 import { reviewerNameForUser } from "../../lib/blog/reviewer";
 import {
+  beginPostWrite,
+  finishPostWrite,
+  assertExpectedPostRevision,
+} from "../../lib/blog/post-write-transaction";
+import {
   adminOnly,
   adminsAndEditors,
   authenticatedOrPublishedPost,
@@ -71,7 +76,10 @@ export const Posts: CollectionConfig = {
 
         const versionID = req.routeParams?.id;
         if (typeof versionID !== "string" || versionID.length === 0) {
-          return Response.json({ message: "A version ID is required" }, { status: 400 });
+          return Response.json(
+            { message: "A version ID is required" },
+            { status: 400 },
+          );
         }
 
         const result = await restorePostVersionAsDraft({
@@ -98,27 +106,33 @@ export const Posts: CollectionConfig = {
         }
         return args;
       },
+      beginPostWrite,
     ],
     beforeChange: [
-      ({ context, data, originalDoc, req }) =>
-        (data._status === "published" && userIsAdmin(req.user)
-          ? prepareAdminPublication(
-              originalDoc,
-              data,
-              reviewerNameForUser(req.user),
-              undefined,
-              {
+      ({ context, data, originalDoc, req }) => {
+        assertExpectedPostRevision(context, originalDoc);
+        return (
+          data._status === "published" && userIsAdmin(req.user)
+            ? prepareAdminPublication(
+                originalDoc,
+                data,
+                reviewerNameForUser(req.user),
+                undefined,
+                {
+                  qualityRevalidated:
+                    context?.trustedBlogQualityRevalidation === true,
+                  forceReviewReset: context?.isRestoringVersion === true,
+                },
+              )
+            : prepareEditorialPost(originalDoc, data, undefined, {
                 qualityRevalidated:
                   context?.trustedBlogQualityRevalidation === true,
                 forceReviewReset: context?.isRestoringVersion === true,
-              },
-            )
-          : prepareEditorialPost(originalDoc, data, undefined, {
-              qualityRevalidated:
-                context?.trustedBlogQualityRevalidation === true,
-              forceReviewReset: context?.isRestoringVersion === true,
-            })) as typeof data,
+              })
+        ) as typeof data;
+      },
     ],
+    afterOperation: [finishPostWrite],
   },
   fields: [
     {
