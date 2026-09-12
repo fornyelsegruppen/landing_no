@@ -1,0 +1,1672 @@
+{
+  "version": 1,
+  "sourceCommit": "b02955a03461878ed95f927db45f388079e0827f",
+  "sourceHashes": {
+    "src/lib/admin-v2/case-list.ts": "d7fa2f635b40f107052d166735052696a9f981c0fe53f516a8546b35b16c1d28",
+    "src/lib/admin-v2/case-current-selection.ts": "c1ba6e60f9f701fd1a9554f61cd30bf2528e045e719bca86fe3349adceb9b012",
+    "src/lib/admin-v2/case-document-history.ts": "d77372225299e3a54e25e65f75de3695782825a7bade990150f4ab1f5089d81d",
+    "src/lib/admin-v2/document-register-query.ts": "41c2daebd650dfe6651863f02bdfb784059469df4700d87c58570b2b84d54114",
+    "src/lib/admin-v2/case-selected-records.ts": "779c8ae30d01bdf3930bdcb61f54f16cace1ae4613dd7e8e90a597f74b8a2250",
+    "src/lib/admin-v2/case-history-navigation.ts": "407cdd04d4948982ea7bf93fe8f8c63d3145e3ffc55f0195d64ed27c06b7f2b3",
+    "src/lib/admin-v2/pagination.ts": "38167913fcc6619bda101e64a006b2b2b41b680e86478db8fd275dacd78ee316",
+    "src/lib/admin-v2/admin-read-db.ts": "3964ca07b9911d55e9114cfef20966e694977fd97cdc852ffbcefcc7db47187d",
+    "src/lib/admin-v2/case-read-model.ts": "2fad05b3d5b5d98b24cf83a8a86eec90018b4de9162c8dd6f57635ca101d0ca6",
+    "src/lib/blog/scheduled-publisher.ts": "dc0ff47088c714a530a46b160d03343ca5e781fe95c8fb7c11919df2345864aa",
+    "src/lib/blog/seo-run-state.ts": "884e6cb9bfe04dc678100dfb5f6bf848226d3b5c701eb562b6e5a4944d6efeca",
+    "src/lib/blog/payload-blog-engine.ts": "b2d7871c2637d48ff13392cd6b9747b0ad510bb0b7dae67948bdf2cf4f3f3afe",
+    "src/lib/blog/post-write-transaction.ts": "b922398b88faeb28d6de66c788f87272a2c62fe67d48e9226d86558908a04970",
+    "src/payload.config.ts": "78d50fe8b9efeeca0ac4f54051aed47426852f00ac8e10c745ea5fc1a538ae00",
+    "src/payload/collections/Posts.ts": "2252ee20ded8801cf67097cc877494aa1737cbd46eb18b089ea7a021508871c6",
+    "src/payload/collections/SeoRuns.ts": "abe2fc21b1b90596a9b293a97ed26af8e63315d17041742ca2074429273c64ed",
+    "src/payload/collections/SeoTopics.ts": "120dbdf2760c4ed81a32a4e86e533e097df7d7d54264687740df4e4170680788",
+    "src/payload/payload-types.ts": "1a421a1c2fdb2ace07b7c7146b2c29b9271e053a86205f0bf73c272330674238",
+    "src/payload/migrations/20260824_094425_phase11_stock_image_fallback.json": "9b3c4a47e61627b34f48e124cb5c55b778ad99d4f1be96c0646f44d9bfc7b874"
+  },
+  "columns": [
+    {
+      "table": "posts_secondary_keywords",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "posts_secondary_keywords",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_secondary_keywords",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_secondary_keywords",
+      "column": "keyword",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_sources",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "posts_sources",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_sources",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_sources",
+      "column": "label",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_sources",
+      "column": "url",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_sources",
+      "column": "publisher",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_sources",
+      "column": "accessed_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts_review_flags",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "posts_review_flags",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_review_flags",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_review_flags",
+      "column": "flag",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_proposed_internal_links",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "posts_proposed_internal_links",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_proposed_internal_links",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_proposed_internal_links",
+      "column": "href",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_proposed_internal_links",
+      "column": "anchor",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_proposed_internal_links",
+      "column": "reason",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "question_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "answer_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "question_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_faq_items",
+      "column": "answer_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "posts",
+      "column": "slug",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "title_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "title_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "excerpt_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "excerpt_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "content_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "content_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "hero_image_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts",
+      "column": "seo_title_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "seo_title_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "seo_description_no",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "seo_description_en",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "published_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "editorial_status",
+      "type": "enum_posts_editorial_status"
+    },
+    {
+      "table": "posts",
+      "column": "scheduled_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "search_intent",
+      "type": "enum_posts_search_intent"
+    },
+    {
+      "table": "posts",
+      "column": "primary_keyword",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "primary_service_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts",
+      "column": "location_text",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "category",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "author_name",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "reviewer_name",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "reviewed_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "ai_assisted",
+      "type": "bool"
+    },
+    {
+      "table": "posts",
+      "column": "ai_generation_run_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts",
+      "column": "quality_score",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "quality_checks",
+      "type": "jsonb"
+    },
+    {
+      "table": "posts",
+      "column": "image_brief",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "image_alt",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_provider",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_asset_id",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_image_url",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_source_url",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_photographer",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_photographer_url",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_license_url",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_query",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "stock_image_selected_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "cta_variant",
+      "type": "enum_posts_cta_variant"
+    },
+    {
+      "table": "posts",
+      "column": "last_content_audit_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "lead_performance_leads",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "lead_performance_converted_leads",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "lead_performance_updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_impressions",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_clicks",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_ctr",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_average_position",
+      "type": "numeric"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_index_verdict",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_coverage_state",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "search_performance_last_crawl_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "performance_notes",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "content_audit_recommendation",
+      "type": "enum_posts_content_audit_recommendation"
+    },
+    {
+      "table": "posts",
+      "column": "content_audit_reason",
+      "type": "varchar"
+    },
+    {
+      "table": "posts",
+      "column": "content_audit_generated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "content_audit_target_post_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts",
+      "column": "content_audit_reviewed_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "created_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "posts",
+      "column": "_status",
+      "type": "enum_posts_status"
+    },
+    {
+      "table": "posts_rels",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_rels",
+      "column": "order",
+      "type": "int4"
+    },
+    {
+      "table": "posts_rels",
+      "column": "parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_rels",
+      "column": "path",
+      "type": "varchar"
+    },
+    {
+      "table": "posts_rels",
+      "column": "posts_id",
+      "type": "int4"
+    },
+    {
+      "table": "posts_rels",
+      "column": "services_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_secondary_keywords",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_secondary_keywords",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_secondary_keywords",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_secondary_keywords",
+      "column": "keyword",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_secondary_keywords",
+      "column": "_uuid",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "label",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "url",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "publisher",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "accessed_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v_version_sources",
+      "column": "_uuid",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_review_flags",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_review_flags",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_review_flags",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_review_flags",
+      "column": "flag",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_review_flags",
+      "column": "_uuid",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "href",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "anchor",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "reason",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_proposed_internal_links",
+      "column": "_uuid",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "question_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "answer_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "question_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "answer_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_version_faq_items",
+      "column": "_uuid",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v",
+      "column": "parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_slug",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_title_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_title_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_excerpt_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_excerpt_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_hero_image_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_seo_title_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_seo_title_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_seo_description_no",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_seo_description_en",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_published_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_editorial_status",
+      "type": "enum__posts_v_version_editorial_status"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_scheduled_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_intent",
+      "type": "enum__posts_v_version_search_intent"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_primary_keyword",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_primary_service_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_location_text",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_category",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_author_name",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_reviewer_name",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_reviewed_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_ai_assisted",
+      "type": "bool"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_ai_generation_run_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_quality_score",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_quality_checks",
+      "type": "jsonb"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_image_brief",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_image_alt",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_provider",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_asset_id",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_image_url",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_source_url",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_photographer",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_photographer_url",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_license_url",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_query",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_stock_image_selected_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_cta_variant",
+      "type": "enum__posts_v_version_cta_variant"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_last_content_audit_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_lead_performance_leads",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_lead_performance_converted_leads",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_lead_performance_updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_impressions",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_clicks",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_ctr",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_average_position",
+      "type": "numeric"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_index_verdict",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_coverage_state",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_search_performance_last_crawl_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_performance_notes",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_audit_recommendation",
+      "type": "enum__posts_v_version_content_audit_recommendation"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_audit_reason",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_audit_generated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_audit_target_post_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_content_audit_reviewed_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version_created_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "version__status",
+      "type": "enum__posts_v_version_status"
+    },
+    {
+      "table": "_posts_v",
+      "column": "created_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "_posts_v",
+      "column": "latest",
+      "type": "bool"
+    },
+    {
+      "table": "_posts_v",
+      "column": "autosave",
+      "type": "bool"
+    },
+    {
+      "table": "_posts_v_rels",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_rels",
+      "column": "order",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_rels",
+      "column": "parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_rels",
+      "column": "path",
+      "type": "varchar"
+    },
+    {
+      "table": "_posts_v_rels",
+      "column": "posts_id",
+      "type": "int4"
+    },
+    {
+      "table": "_posts_v_rels",
+      "column": "services_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics_secondary_keywords",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics_secondary_keywords",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics_secondary_keywords",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics_secondary_keywords",
+      "column": "keyword",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics_rejection_reasons",
+      "column": "_order",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics_rejection_reasons",
+      "column": "_parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics_rejection_reasons",
+      "column": "id",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics_rejection_reasons",
+      "column": "reason",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics",
+      "column": "fingerprint",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "topic",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "primary_keyword",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "search_intent",
+      "type": "enum_seo_topics_search_intent"
+    },
+    {
+      "table": "seo_topics",
+      "column": "service_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics",
+      "column": "location",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "season",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "source",
+      "type": "enum_seo_topics_source"
+    },
+    {
+      "table": "seo_topics",
+      "column": "source_metrics",
+      "type": "jsonb"
+    },
+    {
+      "table": "seo_topics",
+      "column": "proposed_brief",
+      "type": "jsonb"
+    },
+    {
+      "table": "seo_topics",
+      "column": "topic_score",
+      "type": "numeric"
+    },
+    {
+      "table": "seo_topics",
+      "column": "overlap_score",
+      "type": "numeric"
+    },
+    {
+      "table": "seo_topics",
+      "column": "score_breakdown",
+      "type": "jsonb"
+    },
+    {
+      "table": "seo_topics",
+      "column": "reason_for_selection",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_topics",
+      "column": "status",
+      "type": "enum_seo_topics_status"
+    },
+    {
+      "table": "seo_topics",
+      "column": "checked_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_topics",
+      "column": "related_post_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_topics",
+      "column": "updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_topics",
+      "column": "created_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_runs",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_runs",
+      "column": "idempotency_key",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "job_type",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "trigger_source",
+      "type": "enum_seo_runs_trigger_source"
+    },
+    {
+      "table": "seo_runs",
+      "column": "week_key",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "slot",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "status",
+      "type": "enum_seo_runs_status"
+    },
+    {
+      "table": "seo_runs",
+      "column": "started_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_runs",
+      "column": "finished_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_runs",
+      "column": "model_version",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "prompt_version",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "knowledge_version",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "quality_result",
+      "type": "jsonb"
+    },
+    {
+      "table": "seo_runs",
+      "column": "error_code",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "error_message",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs",
+      "column": "created_post_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_runs",
+      "column": "updated_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_runs",
+      "column": "created_at",
+      "type": "timestamptz"
+    },
+    {
+      "table": "seo_runs_rels",
+      "column": "id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_runs_rels",
+      "column": "order",
+      "type": "int4"
+    },
+    {
+      "table": "seo_runs_rels",
+      "column": "parent_id",
+      "type": "int4"
+    },
+    {
+      "table": "seo_runs_rels",
+      "column": "path",
+      "type": "varchar"
+    },
+    {
+      "table": "seo_runs_rels",
+      "column": "seo_topics_id",
+      "type": "int4"
+    }
+  ],
+  "queries": [
+    {
+      "id": "CASE_DEFAULT_1",
+      "text": "SELECT id, display_name, email FROM \"users\"\n       WHERE role = 'worker' AND active = TRUE\n       ORDER BY display_name ASC NULLS LAST, id ASC\n       LIMIT 50",
+      "values": []
+    },
+    {
+      "id": "CASE_DEFAULT_2",
+      "text": "WITH state AS (\n  SELECT\n    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,\n    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,\n    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,\n    l.assigned_to_id,\n    measurement.id AS measurement_id, measurement.status AS measurement_status,\n    price.id AS price_id, price.status AS price_status,\n    quote.id AS quote_id, quote.status AS quote_status,\n    contract.id AS contract_id, contract.status AS contract_status,\n    contract.company_signed_at,\n    message.id AS message_id, message.status AS message_status,\n    message.category AS message_category, message.direction AS message_direction,\n    message.subject AS message_subject,\n    message.reply_to_message_id,\n    message.ai_analysis AS message_ai_analysis,\n    work_order.id AS work_order_id, work_order.status AS work_status,\n    work_order.assigned_worker_id AS work_assigned_worker_id,\n    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,\n    work_order.documentation_submitted_at\n  FROM \"leads\" l\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"roof_measurements\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) measurement ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"price_calculations\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) price ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, version FROM \"quotes\"\n    WHERE lead_id = l.id\n    ORDER BY\n      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,\n      COALESCE(version, 0) DESC,\n      CASE status\n        WHEN 'accepted' THEN 80\n        WHEN 'viewed' THEN 70\n        WHEN 'sent' THEN 60\n        WHEN 'approved' THEN 50\n        WHEN 'draft' THEN 40\n        WHEN 'declined' THEN 30\n        ELSE 0\n      END DESC,\n      id DESC\n    LIMIT 1\n  ) quote ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, company_signed_at FROM \"contracts\"\n    WHERE quote_id = quote.id\n       OR quote_id IN (\n         SELECT related_quote.id FROM \"quotes\" related_quote\n         WHERE related_quote.lead_id = l.id\n       )\n    ORDER BY\n      CASE\n        WHEN quote_id = quote.id\n          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0\n        WHEN status IS DISTINCT FROM 'superseded' THEN 1\n        ELSE 2\n      END,\n      COALESCE(version, 0) DESC, id DESC\n    LIMIT 1\n  ) contract ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at\n    FROM \"messages\"\n    WHERE lead_id = l.id\n      AND NOT (\n        COALESCE(category::text, '') = 'ai_reply'\n        AND status IS NOT DISTINCT FROM 'cancelled'\n      )\n      AND NOT (\n        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'\n        AND COALESCE(category::text, '') = 'ai_reply'\n        AND COALESCE(status::text, '') = 'draft'\n        AND reply_to_message_id IS NULL\n      )\n    ORDER BY\n      CASE WHEN status IN ('failed', 'attention', 'draft')\n        AND NOT EXISTS (\n          SELECT 1 FROM \"messages\" newer\n          WHERE newer.lead_id = \"messages\".lead_id\n            AND newer.subject IS NOT DISTINCT FROM \"messages\".subject\n            AND newer.category IS NOT DISTINCT FROM \"messages\".category\n            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')\n            AND newer.created_at > \"messages\".created_at\n        ) THEN 0 ELSE 1 END,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) message ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, assigned_worker_id, documentation_submitted_at\n    FROM \"work_orders\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) work_order ON TRUE\n  LEFT JOIN \"users\" work_worker ON work_worker.id = work_order.assigned_worker_id\n  LEFT JOIN \"users\" assigned_worker ON assigned_worker.id = l.assigned_to_id\n  WHERE l.record_state::text = $1::text\n), derived AS (\n  SELECT state.*,\n    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,\n    CASE\n      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'\n      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'\n      WHEN message_status = 'draft'\n        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'\n        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')\n        THEN 'send_closure_confirmation'\n      WHEN message_status = 'draft' AND NOT (\n        COALESCE(message_category::text, '') = 'ai_reply'\n        AND NULLIF(address, '') IS NOT NULL\n        AND address !~* '^ikke oppgitt$'\n        AND inquiry_type IS DISTINCT FROM 'usikker'\n      ) THEN 'approve_message'\n      WHEN status = 'closed' THEN 'none'\n      WHEN quote_status = 'declined' THEN 'follow_up_decline'\n      WHEN work_status = 'unassigned' THEN 'assign_worker'\n      WHEN work_status = 'assigned' THEN 'schedule_work'\n      WHEN work_status = 'blocked' THEN 'resolve_work_block'\n      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'\n      WHEN work_status = 'completed' THEN 'wait_worker_documentation'\n      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'\n      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'\n      WHEN work_status = 'in_progress' THEN 'wait_work_completion'\n      WHEN work_status IN ('documented', 'cancelled') THEN 'none'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'\n      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'\n      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'\n      WHEN measurement_id IS NULL THEN 'prepare_package'\n      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'\n      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'\n      WHEN measurement_status = 'blocked' THEN 'measurement_required'\n      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'\n      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'\n      WHEN quote_status = 'draft' THEN 'approve_quote'\n      WHEN quote_status = 'approved' THEN 'issue_quote'\n      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'\n      ELSE 'none'\n    END AS next_action\n  FROM state\n), filtered AS (\n  SELECT * FROM derived\n  \n) SELECT count(*) AS total_docs FROM filtered",
+      "values": [
+        "active"
+      ]
+    },
+    {
+      "id": "CASE_DEFAULT_3",
+      "text": "WITH state AS (\n  SELECT\n    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,\n    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,\n    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,\n    l.assigned_to_id,\n    measurement.id AS measurement_id, measurement.status AS measurement_status,\n    price.id AS price_id, price.status AS price_status,\n    quote.id AS quote_id, quote.status AS quote_status,\n    contract.id AS contract_id, contract.status AS contract_status,\n    contract.company_signed_at,\n    message.id AS message_id, message.status AS message_status,\n    message.category AS message_category, message.direction AS message_direction,\n    message.subject AS message_subject,\n    message.reply_to_message_id,\n    message.ai_analysis AS message_ai_analysis,\n    work_order.id AS work_order_id, work_order.status AS work_status,\n    work_order.assigned_worker_id AS work_assigned_worker_id,\n    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,\n    work_order.documentation_submitted_at\n  FROM \"leads\" l\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"roof_measurements\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) measurement ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"price_calculations\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) price ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, version FROM \"quotes\"\n    WHERE lead_id = l.id\n    ORDER BY\n      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,\n      COALESCE(version, 0) DESC,\n      CASE status\n        WHEN 'accepted' THEN 80\n        WHEN 'viewed' THEN 70\n        WHEN 'sent' THEN 60\n        WHEN 'approved' THEN 50\n        WHEN 'draft' THEN 40\n        WHEN 'declined' THEN 30\n        ELSE 0\n      END DESC,\n      id DESC\n    LIMIT 1\n  ) quote ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, company_signed_at FROM \"contracts\"\n    WHERE quote_id = quote.id\n       OR quote_id IN (\n         SELECT related_quote.id FROM \"quotes\" related_quote\n         WHERE related_quote.lead_id = l.id\n       )\n    ORDER BY\n      CASE\n        WHEN quote_id = quote.id\n          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0\n        WHEN status IS DISTINCT FROM 'superseded' THEN 1\n        ELSE 2\n      END,\n      COALESCE(version, 0) DESC, id DESC\n    LIMIT 1\n  ) contract ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at\n    FROM \"messages\"\n    WHERE lead_id = l.id\n      AND NOT (\n        COALESCE(category::text, '') = 'ai_reply'\n        AND status IS NOT DISTINCT FROM 'cancelled'\n      )\n      AND NOT (\n        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'\n        AND COALESCE(category::text, '') = 'ai_reply'\n        AND COALESCE(status::text, '') = 'draft'\n        AND reply_to_message_id IS NULL\n      )\n    ORDER BY\n      CASE WHEN status IN ('failed', 'attention', 'draft')\n        AND NOT EXISTS (\n          SELECT 1 FROM \"messages\" newer\n          WHERE newer.lead_id = \"messages\".lead_id\n            AND newer.subject IS NOT DISTINCT FROM \"messages\".subject\n            AND newer.category IS NOT DISTINCT FROM \"messages\".category\n            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')\n            AND newer.created_at > \"messages\".created_at\n        ) THEN 0 ELSE 1 END,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) message ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, assigned_worker_id, documentation_submitted_at\n    FROM \"work_orders\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) work_order ON TRUE\n  LEFT JOIN \"users\" work_worker ON work_worker.id = work_order.assigned_worker_id\n  LEFT JOIN \"users\" assigned_worker ON assigned_worker.id = l.assigned_to_id\n  WHERE l.record_state::text = $1::text\n), derived AS (\n  SELECT state.*,\n    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,\n    CASE\n      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'\n      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'\n      WHEN message_status = 'draft'\n        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'\n        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')\n        THEN 'send_closure_confirmation'\n      WHEN message_status = 'draft' AND NOT (\n        COALESCE(message_category::text, '') = 'ai_reply'\n        AND NULLIF(address, '') IS NOT NULL\n        AND address !~* '^ikke oppgitt$'\n        AND inquiry_type IS DISTINCT FROM 'usikker'\n      ) THEN 'approve_message'\n      WHEN status = 'closed' THEN 'none'\n      WHEN quote_status = 'declined' THEN 'follow_up_decline'\n      WHEN work_status = 'unassigned' THEN 'assign_worker'\n      WHEN work_status = 'assigned' THEN 'schedule_work'\n      WHEN work_status = 'blocked' THEN 'resolve_work_block'\n      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'\n      WHEN work_status = 'completed' THEN 'wait_worker_documentation'\n      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'\n      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'\n      WHEN work_status = 'in_progress' THEN 'wait_work_completion'\n      WHEN work_status IN ('documented', 'cancelled') THEN 'none'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'\n      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'\n      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'\n      WHEN measurement_id IS NULL THEN 'prepare_package'\n      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'\n      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'\n      WHEN measurement_status = 'blocked' THEN 'measurement_required'\n      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'\n      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'\n      WHEN quote_status = 'draft' THEN 'approve_quote'\n      WHEN quote_status = 'approved' THEN 'issue_quote'\n      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'\n      ELSE 'none'\n    END AS next_action\n  FROM state\n), filtered AS (\n  SELECT * FROM derived\n  \n)\nSELECT id, name, email, phone, address, house_number, postal, city,\n  inquiry_type, status, record_state, archive_classification, created_at,\n  next_action_at, purge_after, assigned_worker_name, work_status, next_action\nFROM filtered\nORDER BY created_at DESC NULLS LAST, id DESC\nLIMIT $2::integer OFFSET $3::integer",
+      "values": [
+        "active",
+        25,
+        0
+      ]
+    },
+    {
+      "id": "CASE_FILTERED_1",
+      "text": "SELECT id, display_name, email FROM \"users\"\n       WHERE role = 'worker' AND active = TRUE\n       ORDER BY display_name ASC NULLS LAST, id ASC\n       LIMIT 50",
+      "values": []
+    },
+    {
+      "id": "CASE_FILTERED_2",
+      "text": "WITH state AS (\n  SELECT\n    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,\n    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,\n    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,\n    l.assigned_to_id,\n    measurement.id AS measurement_id, measurement.status AS measurement_status,\n    price.id AS price_id, price.status AS price_status,\n    quote.id AS quote_id, quote.status AS quote_status,\n    contract.id AS contract_id, contract.status AS contract_status,\n    contract.company_signed_at,\n    message.id AS message_id, message.status AS message_status,\n    message.category AS message_category, message.direction AS message_direction,\n    message.subject AS message_subject,\n    message.reply_to_message_id,\n    message.ai_analysis AS message_ai_analysis,\n    work_order.id AS work_order_id, work_order.status AS work_status,\n    work_order.assigned_worker_id AS work_assigned_worker_id,\n    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,\n    work_order.documentation_submitted_at\n  FROM \"leads\" l\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"roof_measurements\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) measurement ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"price_calculations\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) price ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, version FROM \"quotes\"\n    WHERE lead_id = l.id\n    ORDER BY\n      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,\n      COALESCE(version, 0) DESC,\n      CASE status\n        WHEN 'accepted' THEN 80\n        WHEN 'viewed' THEN 70\n        WHEN 'sent' THEN 60\n        WHEN 'approved' THEN 50\n        WHEN 'draft' THEN 40\n        WHEN 'declined' THEN 30\n        ELSE 0\n      END DESC,\n      id DESC\n    LIMIT 1\n  ) quote ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, company_signed_at FROM \"contracts\"\n    WHERE quote_id = quote.id\n       OR quote_id IN (\n         SELECT related_quote.id FROM \"quotes\" related_quote\n         WHERE related_quote.lead_id = l.id\n       )\n    ORDER BY\n      CASE\n        WHEN quote_id = quote.id\n          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0\n        WHEN status IS DISTINCT FROM 'superseded' THEN 1\n        ELSE 2\n      END,\n      COALESCE(version, 0) DESC, id DESC\n    LIMIT 1\n  ) contract ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at\n    FROM \"messages\"\n    WHERE lead_id = l.id\n      AND NOT (\n        COALESCE(category::text, '') = 'ai_reply'\n        AND status IS NOT DISTINCT FROM 'cancelled'\n      )\n      AND NOT (\n        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'\n        AND COALESCE(category::text, '') = 'ai_reply'\n        AND COALESCE(status::text, '') = 'draft'\n        AND reply_to_message_id IS NULL\n      )\n    ORDER BY\n      CASE WHEN status IN ('failed', 'attention', 'draft')\n        AND NOT EXISTS (\n          SELECT 1 FROM \"messages\" newer\n          WHERE newer.lead_id = \"messages\".lead_id\n            AND newer.subject IS NOT DISTINCT FROM \"messages\".subject\n            AND newer.category IS NOT DISTINCT FROM \"messages\".category\n            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')\n            AND newer.created_at > \"messages\".created_at\n        ) THEN 0 ELSE 1 END,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) message ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, assigned_worker_id, documentation_submitted_at\n    FROM \"work_orders\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) work_order ON TRUE\n  LEFT JOIN \"users\" work_worker ON work_worker.id = work_order.assigned_worker_id\n  LEFT JOIN \"users\" assigned_worker ON assigned_worker.id = l.assigned_to_id\n  WHERE l.record_state::text = $1::text AND l.status::text <> 'closed' AND l.created_at >= $2::timestamptz AND l.created_at <= $3::timestamptz AND (l.name ILIKE $4::text OR l.email ILIKE $4::text OR l.phone ILIKE $4::text OR l.address ILIKE $4::text OR l.house_number ILIKE $4::text OR l.postal ILIKE $4::text OR l.city ILIKE $4::text OR EXISTS (SELECT 1 FROM \"quotes\" reference_quote WHERE reference_quote.lead_id = l.id AND reference_quote.reference ILIKE $4::text) OR EXISTS (SELECT 1 FROM \"contracts\" reference_contract JOIN \"quotes\" contract_quote ON contract_quote.id = reference_contract.quote_id WHERE contract_quote.lead_id = l.id AND reference_contract.reference ILIKE $4::text) OR EXISTS (SELECT 1 FROM \"work_orders\" reference_work WHERE reference_work.lead_id = l.id AND reference_work.reference ILIKE $4::text) OR l.id = $5::integer)\n), derived AS (\n  SELECT state.*,\n    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,\n    CASE\n      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'\n      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'\n      WHEN message_status = 'draft'\n        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'\n        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')\n        THEN 'send_closure_confirmation'\n      WHEN message_status = 'draft' AND NOT (\n        COALESCE(message_category::text, '') = 'ai_reply'\n        AND NULLIF(address, '') IS NOT NULL\n        AND address !~* '^ikke oppgitt$'\n        AND inquiry_type IS DISTINCT FROM 'usikker'\n      ) THEN 'approve_message'\n      WHEN status = 'closed' THEN 'none'\n      WHEN quote_status = 'declined' THEN 'follow_up_decline'\n      WHEN work_status = 'unassigned' THEN 'assign_worker'\n      WHEN work_status = 'assigned' THEN 'schedule_work'\n      WHEN work_status = 'blocked' THEN 'resolve_work_block'\n      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'\n      WHEN work_status = 'completed' THEN 'wait_worker_documentation'\n      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'\n      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'\n      WHEN work_status = 'in_progress' THEN 'wait_work_completion'\n      WHEN work_status IN ('documented', 'cancelled') THEN 'none'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'\n      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'\n      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'\n      WHEN measurement_id IS NULL THEN 'prepare_package'\n      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'\n      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'\n      WHEN measurement_status = 'blocked' THEN 'measurement_required'\n      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'\n      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'\n      WHEN quote_status = 'draft' THEN 'approve_quote'\n      WHEN quote_status = 'approved' THEN 'issue_quote'\n      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'\n      ELSE 'none'\n    END AS next_action\n  FROM state\n), filtered AS (\n  SELECT * FROM derived\n  WHERE derived.next_action = $6::text AND derived.assigned_worker_id = $7::integer\n) SELECT count(*) AS total_docs FROM filtered",
+      "values": [
+        "archived",
+        "2026-01-01T00:00:00.000Z",
+        "2026-01-02T23:59:59.999Z",
+        "%1%",
+        1,
+        "approve_message",
+        1
+      ]
+    },
+    {
+      "id": "CASE_FILTERED_3",
+      "text": "WITH state AS (\n  SELECT\n    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,\n    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,\n    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,\n    l.assigned_to_id,\n    measurement.id AS measurement_id, measurement.status AS measurement_status,\n    price.id AS price_id, price.status AS price_status,\n    quote.id AS quote_id, quote.status AS quote_status,\n    contract.id AS contract_id, contract.status AS contract_status,\n    contract.company_signed_at,\n    message.id AS message_id, message.status AS message_status,\n    message.category AS message_category, message.direction AS message_direction,\n    message.subject AS message_subject,\n    message.reply_to_message_id,\n    message.ai_analysis AS message_ai_analysis,\n    work_order.id AS work_order_id, work_order.status AS work_status,\n    work_order.assigned_worker_id AS work_assigned_worker_id,\n    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,\n    work_order.documentation_submitted_at\n  FROM \"leads\" l\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"roof_measurements\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) measurement ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"price_calculations\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) price ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, version FROM \"quotes\"\n    WHERE lead_id = l.id\n    ORDER BY\n      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,\n      COALESCE(version, 0) DESC,\n      CASE status\n        WHEN 'accepted' THEN 80\n        WHEN 'viewed' THEN 70\n        WHEN 'sent' THEN 60\n        WHEN 'approved' THEN 50\n        WHEN 'draft' THEN 40\n        WHEN 'declined' THEN 30\n        ELSE 0\n      END DESC,\n      id DESC\n    LIMIT 1\n  ) quote ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, company_signed_at FROM \"contracts\"\n    WHERE quote_id = quote.id\n       OR quote_id IN (\n         SELECT related_quote.id FROM \"quotes\" related_quote\n         WHERE related_quote.lead_id = l.id\n       )\n    ORDER BY\n      CASE\n        WHEN quote_id = quote.id\n          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0\n        WHEN status IS DISTINCT FROM 'superseded' THEN 1\n        ELSE 2\n      END,\n      COALESCE(version, 0) DESC, id DESC\n    LIMIT 1\n  ) contract ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at\n    FROM \"messages\"\n    WHERE lead_id = l.id\n      AND NOT (\n        COALESCE(category::text, '') = 'ai_reply'\n        AND status IS NOT DISTINCT FROM 'cancelled'\n      )\n      AND NOT (\n        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'\n        AND COALESCE(category::text, '') = 'ai_reply'\n        AND COALESCE(status::text, '') = 'draft'\n        AND reply_to_message_id IS NULL\n      )\n    ORDER BY\n      CASE WHEN status IN ('failed', 'attention', 'draft')\n        AND NOT EXISTS (\n          SELECT 1 FROM \"messages\" newer\n          WHERE newer.lead_id = \"messages\".lead_id\n            AND newer.subject IS NOT DISTINCT FROM \"messages\".subject\n            AND newer.category IS NOT DISTINCT FROM \"messages\".category\n            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')\n            AND newer.created_at > \"messages\".created_at\n        ) THEN 0 ELSE 1 END,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) message ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, assigned_worker_id, documentation_submitted_at\n    FROM \"work_orders\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) work_order ON TRUE\n  LEFT JOIN \"users\" work_worker ON work_worker.id = work_order.assigned_worker_id\n  LEFT JOIN \"users\" assigned_worker ON assigned_worker.id = l.assigned_to_id\n  WHERE l.record_state::text = $1::text AND l.status::text <> 'closed' AND l.created_at >= $2::timestamptz AND l.created_at <= $3::timestamptz AND (l.name ILIKE $4::text OR l.email ILIKE $4::text OR l.phone ILIKE $4::text OR l.address ILIKE $4::text OR l.house_number ILIKE $4::text OR l.postal ILIKE $4::text OR l.city ILIKE $4::text OR EXISTS (SELECT 1 FROM \"quotes\" reference_quote WHERE reference_quote.lead_id = l.id AND reference_quote.reference ILIKE $4::text) OR EXISTS (SELECT 1 FROM \"contracts\" reference_contract JOIN \"quotes\" contract_quote ON contract_quote.id = reference_contract.quote_id WHERE contract_quote.lead_id = l.id AND reference_contract.reference ILIKE $4::text) OR EXISTS (SELECT 1 FROM \"work_orders\" reference_work WHERE reference_work.lead_id = l.id AND reference_work.reference ILIKE $4::text) OR l.id = $5::integer)\n), derived AS (\n  SELECT state.*,\n    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,\n    CASE\n      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'\n      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'\n      WHEN message_status = 'draft'\n        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'\n        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')\n        THEN 'send_closure_confirmation'\n      WHEN message_status = 'draft' AND NOT (\n        COALESCE(message_category::text, '') = 'ai_reply'\n        AND NULLIF(address, '') IS NOT NULL\n        AND address !~* '^ikke oppgitt$'\n        AND inquiry_type IS DISTINCT FROM 'usikker'\n      ) THEN 'approve_message'\n      WHEN status = 'closed' THEN 'none'\n      WHEN quote_status = 'declined' THEN 'follow_up_decline'\n      WHEN work_status = 'unassigned' THEN 'assign_worker'\n      WHEN work_status = 'assigned' THEN 'schedule_work'\n      WHEN work_status = 'blocked' THEN 'resolve_work_block'\n      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'\n      WHEN work_status = 'completed' THEN 'wait_worker_documentation'\n      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'\n      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'\n      WHEN work_status = 'in_progress' THEN 'wait_work_completion'\n      WHEN work_status IN ('documented', 'cancelled') THEN 'none'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'\n      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'\n      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'\n      WHEN measurement_id IS NULL THEN 'prepare_package'\n      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'\n      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'\n      WHEN measurement_status = 'blocked' THEN 'measurement_required'\n      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'\n      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'\n      WHEN quote_status = 'draft' THEN 'approve_quote'\n      WHEN quote_status = 'approved' THEN 'issue_quote'\n      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'\n      ELSE 'none'\n    END AS next_action\n  FROM state\n), filtered AS (\n  SELECT * FROM derived\n  WHERE derived.next_action = $6::text AND derived.assigned_worker_id = $7::integer\n)\nSELECT id, name, email, phone, address, house_number, postal, city,\n  inquiry_type, status, record_state, archive_classification, created_at,\n  next_action_at, purge_after, assigned_worker_name, work_status, next_action\nFROM filtered\nORDER BY created_at DESC NULLS LAST, id DESC\nLIMIT $8::integer OFFSET $9::integer",
+      "values": [
+        "archived",
+        "2026-01-01T00:00:00.000Z",
+        "2026-01-02T23:59:59.999Z",
+        "%1%",
+        1,
+        "approve_message",
+        1,
+        25,
+        25
+      ]
+    },
+    {
+      "id": "CASE_STATUS_1",
+      "text": "SELECT id, display_name, email FROM \"users\"\n       WHERE role = 'worker' AND active = TRUE\n       ORDER BY display_name ASC NULLS LAST, id ASC\n       LIMIT 50",
+      "values": []
+    },
+    {
+      "id": "CASE_STATUS_2",
+      "text": "WITH state AS (\n  SELECT\n    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,\n    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,\n    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,\n    l.assigned_to_id,\n    measurement.id AS measurement_id, measurement.status AS measurement_status,\n    price.id AS price_id, price.status AS price_status,\n    quote.id AS quote_id, quote.status AS quote_status,\n    contract.id AS contract_id, contract.status AS contract_status,\n    contract.company_signed_at,\n    message.id AS message_id, message.status AS message_status,\n    message.category AS message_category, message.direction AS message_direction,\n    message.subject AS message_subject,\n    message.reply_to_message_id,\n    message.ai_analysis AS message_ai_analysis,\n    work_order.id AS work_order_id, work_order.status AS work_status,\n    work_order.assigned_worker_id AS work_assigned_worker_id,\n    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,\n    work_order.documentation_submitted_at\n  FROM \"leads\" l\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"roof_measurements\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) measurement ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"price_calculations\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) price ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, version FROM \"quotes\"\n    WHERE lead_id = l.id\n    ORDER BY\n      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,\n      COALESCE(version, 0) DESC,\n      CASE status\n        WHEN 'accepted' THEN 80\n        WHEN 'viewed' THEN 70\n        WHEN 'sent' THEN 60\n        WHEN 'approved' THEN 50\n        WHEN 'draft' THEN 40\n        WHEN 'declined' THEN 30\n        ELSE 0\n      END DESC,\n      id DESC\n    LIMIT 1\n  ) quote ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, company_signed_at FROM \"contracts\"\n    WHERE quote_id = quote.id\n       OR quote_id IN (\n         SELECT related_quote.id FROM \"quotes\" related_quote\n         WHERE related_quote.lead_id = l.id\n       )\n    ORDER BY\n      CASE\n        WHEN quote_id = quote.id\n          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0\n        WHEN status IS DISTINCT FROM 'superseded' THEN 1\n        ELSE 2\n      END,\n      COALESCE(version, 0) DESC, id DESC\n    LIMIT 1\n  ) contract ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at\n    FROM \"messages\"\n    WHERE lead_id = l.id\n      AND NOT (\n        COALESCE(category::text, '') = 'ai_reply'\n        AND status IS NOT DISTINCT FROM 'cancelled'\n      )\n      AND NOT (\n        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'\n        AND COALESCE(category::text, '') = 'ai_reply'\n        AND COALESCE(status::text, '') = 'draft'\n        AND reply_to_message_id IS NULL\n      )\n    ORDER BY\n      CASE WHEN status IN ('failed', 'attention', 'draft')\n        AND NOT EXISTS (\n          SELECT 1 FROM \"messages\" newer\n          WHERE newer.lead_id = \"messages\".lead_id\n            AND newer.subject IS NOT DISTINCT FROM \"messages\".subject\n            AND newer.category IS NOT DISTINCT FROM \"messages\".category\n            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')\n            AND newer.created_at > \"messages\".created_at\n        ) THEN 0 ELSE 1 END,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) message ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, assigned_worker_id, documentation_submitted_at\n    FROM \"work_orders\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) work_order ON TRUE\n  LEFT JOIN \"users\" work_worker ON work_worker.id = work_order.assigned_worker_id\n  LEFT JOIN \"users\" assigned_worker ON assigned_worker.id = l.assigned_to_id\n  WHERE l.status::text = $1::text\n), derived AS (\n  SELECT state.*,\n    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,\n    CASE\n      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'\n      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'\n      WHEN message_status = 'draft'\n        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'\n        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')\n        THEN 'send_closure_confirmation'\n      WHEN message_status = 'draft' AND NOT (\n        COALESCE(message_category::text, '') = 'ai_reply'\n        AND NULLIF(address, '') IS NOT NULL\n        AND address !~* '^ikke oppgitt$'\n        AND inquiry_type IS DISTINCT FROM 'usikker'\n      ) THEN 'approve_message'\n      WHEN status = 'closed' THEN 'none'\n      WHEN quote_status = 'declined' THEN 'follow_up_decline'\n      WHEN work_status = 'unassigned' THEN 'assign_worker'\n      WHEN work_status = 'assigned' THEN 'schedule_work'\n      WHEN work_status = 'blocked' THEN 'resolve_work_block'\n      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'\n      WHEN work_status = 'completed' THEN 'wait_worker_documentation'\n      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'\n      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'\n      WHEN work_status = 'in_progress' THEN 'wait_work_completion'\n      WHEN work_status IN ('documented', 'cancelled') THEN 'none'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'\n      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'\n      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'\n      WHEN measurement_id IS NULL THEN 'prepare_package'\n      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'\n      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'\n      WHEN measurement_status = 'blocked' THEN 'measurement_required'\n      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'\n      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'\n      WHEN quote_status = 'draft' THEN 'approve_quote'\n      WHEN quote_status = 'approved' THEN 'issue_quote'\n      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'\n      ELSE 'none'\n    END AS next_action\n  FROM state\n), filtered AS (\n  SELECT * FROM derived\n  \n) SELECT count(*) AS total_docs FROM filtered",
+      "values": [
+        "closed"
+      ]
+    },
+    {
+      "id": "CASE_STATUS_3",
+      "text": "WITH state AS (\n  SELECT\n    l.id, l.name, l.email, l.phone, l.address, l.house_number, l.postal,\n    l.city, l.inquiry_type, l.status, l.record_state, l.archive_classification,\n    l.created_at, l.next_action_at, l.purge_after, l.next_action_blocker,\n    l.assigned_to_id,\n    measurement.id AS measurement_id, measurement.status AS measurement_status,\n    price.id AS price_id, price.status AS price_status,\n    quote.id AS quote_id, quote.status AS quote_status,\n    contract.id AS contract_id, contract.status AS contract_status,\n    contract.company_signed_at,\n    message.id AS message_id, message.status AS message_status,\n    message.category AS message_category, message.direction AS message_direction,\n    message.subject AS message_subject,\n    message.reply_to_message_id,\n    message.ai_analysis AS message_ai_analysis,\n    work_order.id AS work_order_id, work_order.status AS work_status,\n    work_order.assigned_worker_id AS work_assigned_worker_id,\n    COALESCE(work_worker.display_name, assigned_worker.display_name) AS assigned_worker_name,\n    work_order.documentation_submitted_at\n  FROM \"leads\" l\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"roof_measurements\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) measurement ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status FROM \"price_calculations\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'superseded') ASC, created_at DESC, id DESC\n    LIMIT 1\n  ) price ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, version FROM \"quotes\"\n    WHERE lead_id = l.id\n    ORDER BY\n      COALESCE(status IN ('expired', 'revoked', 'superseded'), FALSE) ASC,\n      COALESCE(version, 0) DESC,\n      CASE status\n        WHEN 'accepted' THEN 80\n        WHEN 'viewed' THEN 70\n        WHEN 'sent' THEN 60\n        WHEN 'approved' THEN 50\n        WHEN 'draft' THEN 40\n        WHEN 'declined' THEN 30\n        ELSE 0\n      END DESC,\n      id DESC\n    LIMIT 1\n  ) quote ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, company_signed_at FROM \"contracts\"\n    WHERE quote_id = quote.id\n       OR quote_id IN (\n         SELECT related_quote.id FROM \"quotes\" related_quote\n         WHERE related_quote.lead_id = l.id\n       )\n    ORDER BY\n      CASE\n        WHEN quote_id = quote.id\n          AND (status IS NULL OR status NOT IN ('revoked', 'superseded')) THEN 0\n        WHEN status IS DISTINCT FROM 'superseded' THEN 1\n        ELSE 2\n      END,\n      COALESCE(version, 0) DESC, id DESC\n    LIMIT 1\n  ) contract ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, category, direction, subject, reply_to_message_id, ai_analysis, created_at\n    FROM \"messages\"\n    WHERE lead_id = l.id\n      AND NOT (\n        COALESCE(category::text, '') = 'ai_reply'\n        AND status IS NOT DISTINCT FROM 'cancelled'\n      )\n      AND NOT (\n        quote.id IS NOT NULL AND quote.status::text IS DISTINCT FROM 'draft'\n        AND COALESCE(category::text, '') = 'ai_reply'\n        AND COALESCE(status::text, '') = 'draft'\n        AND reply_to_message_id IS NULL\n      )\n    ORDER BY\n      CASE WHEN status IN ('failed', 'attention', 'draft')\n        AND NOT EXISTS (\n          SELECT 1 FROM \"messages\" newer\n          WHERE newer.lead_id = \"messages\".lead_id\n            AND newer.subject IS NOT DISTINCT FROM \"messages\".subject\n            AND newer.category IS NOT DISTINCT FROM \"messages\".category\n            AND newer.status IN ('approved', 'queued', 'sent', 'delivered')\n            AND newer.created_at > \"messages\".created_at\n        ) THEN 0 ELSE 1 END,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) message ON TRUE\n  LEFT JOIN LATERAL (\n    SELECT id, status, assigned_worker_id, documentation_submitted_at\n    FROM \"work_orders\"\n    WHERE lead_id = l.id\n    ORDER BY (status IS NOT DISTINCT FROM 'cancelled') ASC,\n      created_at DESC, id DESC\n    LIMIT 1\n  ) work_order ON TRUE\n  LEFT JOIN \"users\" work_worker ON work_worker.id = work_order.assigned_worker_id\n  LEFT JOIN \"users\" assigned_worker ON assigned_worker.id = l.assigned_to_id\n  WHERE l.status::text = $1::text\n), derived AS (\n  SELECT state.*,\n    COALESCE(work_assigned_worker_id, assigned_to_id) AS assigned_worker_id,\n    CASE\n      WHEN next_action_blocker = 'CUSTOMER_CANCELLATION_REQUEST' THEN 'review_cancellation'\n      WHEN message_status IN ('failed', 'attention') THEN 'retry_message'\n      WHEN message_status = 'draft'\n        AND (message_ai_analysis ->> 'customerContractRequestId') ~ '^[1-9][0-9]*$'\n        AND message_ai_analysis ->> 'decision' IN ('close', 'do_not_contact')\n        THEN 'send_closure_confirmation'\n      WHEN message_status = 'draft' AND NOT (\n        COALESCE(message_category::text, '') = 'ai_reply'\n        AND NULLIF(address, '') IS NOT NULL\n        AND address !~* '^ikke oppgitt$'\n        AND inquiry_type IS DISTINCT FROM 'usikker'\n      ) THEN 'approve_message'\n      WHEN status = 'closed' THEN 'none'\n      WHEN quote_status = 'declined' THEN 'follow_up_decline'\n      WHEN work_status = 'unassigned' THEN 'assign_worker'\n      WHEN work_status = 'assigned' THEN 'schedule_work'\n      WHEN work_status = 'blocked' THEN 'resolve_work_block'\n      WHEN work_status = 'completed' AND documentation_submitted_at IS NOT NULL THEN 'review_completion'\n      WHEN work_status = 'completed' THEN 'wait_worker_documentation'\n      WHEN work_status = 'scheduled' THEN 'wait_scheduled_start'\n      WHEN work_status IN ('on_way', 'arrived', 'precheck', 'ready') THEN 'wait_worker_precheck'\n      WHEN work_status = 'in_progress' THEN 'wait_work_completion'\n      WHEN work_status IN ('documented', 'cancelled') THEN 'none'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NULL THEN 'company_sign_contract'\n      WHEN quote_status = 'accepted' AND contract_status = 'signed' AND company_signed_at IS NOT NULL AND work_order_id IS NULL THEN 'create_work_order'\n      WHEN message_direction = 'inbound' AND message_category::text = 'customer_question' THEN 'prepare_question_reply'\n      WHEN message_id IS NULL OR message_direction = 'inbound' THEN 'generate_reply'\n      WHEN measurement_id IS NULL THEN 'prepare_package'\n      WHEN measurement_status IN ('draft', 'review_required') AND price_id IS NOT NULL AND quote_status = 'draft' AND contract_status = 'draft' THEN 'approve_package'\n      WHEN measurement_status IN ('draft', 'review_required') THEN 'approve_measurement'\n      WHEN measurement_status = 'blocked' THEN 'measurement_required'\n      WHEN measurement_status = 'approved' AND price_id IS NULL THEN 'calculate_price'\n      WHEN price_status = 'ready' AND quote_id IS NULL THEN 'create_quote'\n      WHEN quote_status = 'draft' THEN 'approve_quote'\n      WHEN quote_status = 'approved' THEN 'issue_quote'\n      WHEN quote_status IN ('sent', 'viewed') THEN 'wait_customer'\n      ELSE 'none'\n    END AS next_action\n  FROM state\n), filtered AS (\n  SELECT * FROM derived\n  \n)\nSELECT id, name, email, phone, address, house_number, postal, city,\n  inquiry_type, status, record_state, archive_classification, created_at,\n  next_action_at, purge_after, assigned_worker_name, work_status, next_action\nFROM filtered\nORDER BY created_at DESC NULLS LAST, id DESC\nLIMIT $2::integer OFFSET $3::integer",
+      "values": [
+        "closed",
+        25,
+        0
+      ]
+    },
+    {
+      "id": "CURRENT_SELECTION_1",
+      "text": "WITH quote_ranked AS (\n  SELECT\n    q.id,\n    q.status::text AS status,\n    COALESCE(q.version::numeric, 0) AS version,\n    CASE q.status::text\n      WHEN 'accepted' THEN 80\n      WHEN 'viewed' THEN 70\n      WHEN 'sent' THEN 60\n      WHEN 'approved' THEN 50\n      WHEN 'draft' THEN 40\n      WHEN 'declined' THEN 30\n      ELSE 0\n    END AS status_priority\n  FROM quotes q\n  WHERE q.lead_id = $1::integer\n),\nworking_quote AS (\n  SELECT id, status\n  FROM quote_ranked\n  ORDER BY\n    CASE\n      WHEN status IS NULL OR status NOT IN ('superseded', 'revoked', 'expired')\n        THEN 0\n      ELSE 1\n    END,\n    version DESC,\n    status_priority DESC,\n    id DESC\n  LIMIT 1\n),\nworking_contract AS (\n  SELECT c.id\n  FROM contracts c\n  JOIN quotes owner_quote\n    ON owner_quote.id = c.quote_id\n   AND owner_quote.lead_id = $1::integer\n  WHERE (\n    (\n      EXISTS (SELECT 1 FROM working_quote)\n      AND c.quote_id = (SELECT id FROM working_quote)\n      AND (\n        c.status::text IS NULL\n        OR c.status::text NOT IN ('superseded', 'revoked')\n      )\n    )\n    OR NOT EXISTS (SELECT 1 FROM working_quote)\n  )\n  ORDER BY\n    CASE\n      WHEN NOT EXISTS (SELECT 1 FROM working_quote)\n       AND (c.status::text IS NULL OR c.status::text NOT IN ('superseded', 'revoked'))\n        THEN 0\n      WHEN NOT EXISTS (SELECT 1 FROM working_quote) THEN 1\n      ELSE 0\n    END,\n    COALESCE(c.version::numeric, 0) DESC,\n    c.id DESC\n  LIMIT 1\n),\neffective_contract AS (\n  SELECT c.id, c.quote_id\n  FROM contracts c\n  JOIN quotes q ON q.id = c.quote_id AND q.lead_id = $1::integer\n  WHERE c.status::text = 'signed' AND c.company_signed_at IS NOT NULL\n  ORDER BY COALESCE(c.version::numeric, 0) DESC, c.id DESC\n  LIMIT 1\n),\nvisible_messages AS (\n  SELECT m.id, m.status, m.category, m.subject, m.created_at\n  FROM messages m\n  WHERE m.lead_id = $1::integer\n    AND NOT COALESCE(m.category::text = 'ai_reply' AND m.status::text = 'cancelled', false)\n    AND NOT COALESCE(\n      m.category::text = 'ai_reply'\n      AND m.status::text = 'draft'\n      AND m.reply_to_message_id IS NULL\n      AND EXISTS (SELECT 1 FROM working_quote)\n      AND (SELECT status FROM working_quote) IS DISTINCT FROM 'draft'\n    , false)\n),\npriority_message AS (\n  SELECT m.id\n  FROM visible_messages m\n  WHERE m.status::text IN ('failed', 'attention', 'draft')\n    AND NOT EXISTS (\n      SELECT 1\n      FROM visible_messages newer\n      WHERE newer.status::text IN ('approved', 'queued', 'sent', 'delivered')\n        AND newer.subject IS NOT DISTINCT FROM m.subject\n        AND newer.category IS NOT DISTINCT FROM m.category\n        AND newer.created_at > m.created_at\n    )\n  ORDER BY m.created_at DESC, m.id DESC\n  LIMIT 1\n),\nlatest_message AS (\n  SELECT id\n  FROM visible_messages\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n),\nlatest_action_contract AS (\n  SELECT c.id\n  FROM contracts c\n  JOIN quotes owner_quote\n    ON owner_quote.id = c.quote_id\n   AND owner_quote.lead_id = $1::integer\n  WHERE c.status::text IS DISTINCT FROM 'superseded'\n  ORDER BY COALESCE(c.version::numeric, 0) DESC, c.id DESC\n  LIMIT 1\n),\nfallback_action_contract AS (\n  SELECT c.id\n  FROM contracts c\n  JOIN quotes owner_quote\n    ON owner_quote.id = c.quote_id\n   AND owner_quote.lead_id = $1::integer\n  ORDER BY COALESCE(c.version::numeric, 0) DESC, c.id DESC\n  LIMIT 1\n),\nlatest_measurement AS (\n  SELECT id\n  FROM roof_measurements\n  WHERE lead_id = $1::integer AND status::text IS DISTINCT FROM 'superseded'\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n),\nfallback_measurement AS (\n  SELECT id\n  FROM roof_measurements\n  WHERE lead_id = $1::integer\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n),\nlatest_price AS (\n  SELECT id\n  FROM price_calculations\n  WHERE lead_id = $1::integer AND status::text IS DISTINCT FROM 'superseded'\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n),\nfallback_price AS (\n  SELECT id\n  FROM price_calculations\n  WHERE lead_id = $1::integer\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n),\nlatest_work_order AS (\n  SELECT id\n  FROM work_orders\n  WHERE lead_id = $1::integer AND status::text IS DISTINCT FROM 'cancelled'\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n),\nfallback_work_order AS (\n  SELECT id\n  FROM work_orders\n  WHERE lead_id = $1::integer\n  ORDER BY created_at DESC, id DESC\n  LIMIT 1\n)\nSELECT\n  COALESCE((SELECT id FROM latest_measurement), (SELECT id FROM fallback_measurement))::integer AS measurement_id,\n  COALESCE((SELECT id FROM latest_price), (SELECT id FROM fallback_price))::integer AS price_id,\n  (SELECT id FROM working_quote)::integer AS working_quote_id,\n  (SELECT id FROM working_contract)::integer AS working_contract_id,\n  COALESCE(\n    (SELECT id FROM working_contract),\n    (SELECT id FROM latest_action_contract),\n    (SELECT id FROM fallback_action_contract)\n  )::integer AS action_contract_id,\n  (SELECT id FROM effective_contract)::integer AS effective_contract_id,\n  (SELECT quote_id FROM effective_contract)::integer AS effective_quote_id,\n  COALESCE((SELECT id FROM latest_work_order), (SELECT id FROM fallback_work_order))::integer AS work_order_id,\n  COALESCE((SELECT id FROM priority_message), (SELECT id FROM latest_message))::integer AS message_id",
+      "values": [
+        1
+      ]
+    },
+    {
+      "id": "DOCUMENT_HISTORY_1",
+      "text": "SELECT count(*)::text AS total FROM private_media m WHERE (\n  (m.owner_type = 'lead' AND m.owner_id = $1::integer::text)\n  OR (m.owner_type = 'roof-measurement' AND EXISTS (\n    SELECT 1 FROM roof_measurements e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'quote' AND EXISTS (\n    SELECT 1 FROM quotes e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'contract' AND EXISTS (\n    SELECT 1 FROM contracts e JOIN quotes q ON q.id = e.quote_id\n    WHERE q.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type IN ('work-order', 'work', 'completion-certificate') AND EXISTS (\n    SELECT 1 FROM work_orders e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'change-agreement' AND EXISTS (\n    SELECT 1 FROM change_agreements e JOIN work_orders w ON w.id = e.work_order_id\n    WHERE w.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'invoice-record' AND EXISTS (\n    SELECT 1 FROM invoice_records e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'warranty' AND EXISTS (\n    SELECT 1 FROM warranties e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n)",
+      "values": [
+        1
+      ]
+    },
+    {
+      "id": "DOCUMENT_HISTORY_2",
+      "text": "SELECT m.id, m.filename, m.classification::text AS classification,\n        to_char(m.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS \"createdAt\",\n        m.mime_type AS \"mimeType\", m.owner_id AS \"ownerId\", m.owner_type AS \"ownerType\"\n       FROM private_media m WHERE (\n  (m.owner_type = 'lead' AND m.owner_id = $1::integer::text)\n  OR (m.owner_type = 'roof-measurement' AND EXISTS (\n    SELECT 1 FROM roof_measurements e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'quote' AND EXISTS (\n    SELECT 1 FROM quotes e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'contract' AND EXISTS (\n    SELECT 1 FROM contracts e JOIN quotes q ON q.id = e.quote_id\n    WHERE q.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type IN ('work-order', 'work', 'completion-certificate') AND EXISTS (\n    SELECT 1 FROM work_orders e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'change-agreement' AND EXISTS (\n    SELECT 1 FROM change_agreements e JOIN work_orders w ON w.id = e.work_order_id\n    WHERE w.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'invoice-record' AND EXISTS (\n    SELECT 1 FROM invoice_records e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n  OR (m.owner_type = 'warranty' AND EXISTS (\n    SELECT 1 FROM warranties e WHERE e.lead_id = $1 AND e.id::text = m.owner_id\n  ))\n)\n       ORDER BY m.created_at DESC, m.id DESC LIMIT $2 OFFSET $3",
+      "values": [
+        1,
+        25,
+        0
+      ]
+    },
+    {
+      "id": "SELECTED_RECORDS_1",
+      "text": "SELECT r.id, r.reference, r.status::text, r.created_at,\n          m.id AS document_id, w.reference AS work_reference, r.subtotal_ex_vat_ore, r.vat_ore, r.total_inc_vat_ore, r.issued_at, r.due_at, r.external_reference, r.admin_note\n        FROM invoice_records r\n        LEFT JOIN private_media m ON m.id = r.document_id\n        LEFT JOIN work_orders w ON w.id = r.work_order_id AND w.lead_id = $1::integer\n        WHERE r.lead_id = $1::integer AND r.id = $2::integer LIMIT 1",
+      "values": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "SELECTED_RECORDS_2",
+      "text": "SELECT r.id, r.reference, r.status::text, r.created_at,\n          m.id AS document_id, w.reference AS work_reference, r.scope, r.starts_at, r.ends_at, r.terms_version\n        FROM warranties r\n        LEFT JOIN private_media m ON m.id = r.document_id\n        LEFT JOIN work_orders w ON w.id = r.work_order_id AND w.lead_id = $1::integer\n        WHERE r.lead_id = $1::integer AND r.id = $2::integer LIMIT 1",
+      "values": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "DOCUMENT_FORWARD",
+      "text": "SELECT id, lead_id, customer, reference, filename, href, case_href, type, status, version, created_at, hash, source_id, type_rank FROM ((SELECT 'quote' || '-' || q.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(q.reference, ''), '#' || q.id::text)::text AS reference, COALESCE(NULLIF(q.reference, ''), q.id::text) || '.pdf'::text AS filename, '/api/admin/quotes/' || q.id::text || '/pdf'::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'quote'::text AS type, q.status::text::text AS status, q.version::numeric AS version, q.created_at::timestamptz::timestamptz AS created_at, q.snapshot_hash::text::text AS hash, q.id::bigint AS source_id, 1::integer AS type_rank FROM \"quotes\" q JOIN \"leads\" l ON l.id = q.lead_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(q.reference, ''), '#' || q.id::text)::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(q.reference, ''), q.id::text) || '.pdf'::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92)) AND q.status::text = $2 AND (q.created_at::timestamptz < $3::timestamptz OR (q.created_at::timestamptz = $3::timestamptz AND (1 > $4 OR (1 = $4 AND q.id < $5)))) ORDER BY q.created_at::timestamptz DESC, q.id DESC LIMIT 26) UNION ALL (SELECT 'contract_draft' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf'::text AS filename, '/api/admin/quotes/' || q.id::text || '/pdf'::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'contract_draft'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 2::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id LEFT JOIN \"private_media\" sm ON sm.id = c.signed_document_id LEFT JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE sm.id IS NULL AND fm.id IS NULL AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf'::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92)) AND c.status::text = $7 AND (c.created_at::timestamptz < $8::timestamptz OR (c.created_at::timestamptz = $8::timestamptz AND (2 > $9 OR (2 = $9 AND c.id < $10)))) ORDER BY c.created_at::timestamptz DESC, c.id DESC LIMIT 26) UNION ALL (SELECT 'customer_signed' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(sm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || sm.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'customer_signed'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 3::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" sm ON sm.id = c.signed_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(sm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92)) AND c.status::text = $12 AND (c.created_at::timestamptz < $13::timestamptz OR (c.created_at::timestamptz = $13::timestamptz AND (3 > $14 OR (3 = $14 AND c.id < $15)))) ORDER BY c.created_at::timestamptz DESC, c.id DESC LIMIT 26) UNION ALL (SELECT 'final_contract' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(fm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || fm.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'final_contract'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 4::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(fm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92)) AND c.status::text = $17 AND (c.created_at::timestamptz < $18::timestamptz OR (c.created_at::timestamptz = $18::timestamptz AND (4 > $19 OR (4 = $19 AND c.id < $20)))) ORDER BY c.created_at::timestamptz DESC, c.id DESC LIMIT 26) UNION ALL (SELECT 'change_agreement' || '-' || a.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(a.reference, ''), '#' || a.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(a.reference, ''), a.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'change_agreement'::text AS type, a.status::text::text AS status, a.version::numeric AS version, a.created_at::timestamptz::timestamptz AS created_at, a.document_hash::text::text AS hash, a.id::bigint AS source_id, 5::integer AS type_rank FROM \"change_agreements\" a JOIN \"work_orders\" w ON w.id = a.work_order_id JOIN \"leads\" l ON l.id = w.lead_id JOIN \"private_media\" m ON m.id = a.accepted_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(a.reference, ''), '#' || a.id::text)::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(a.reference, ''), a.id::text) || '.pdf')::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92)) AND a.status::text = $22 AND (a.created_at::timestamptz < $23::timestamptz OR (a.created_at::timestamptz = $23::timestamptz AND (5 > $24 OR (5 = $24 AND a.id < $25)))) ORDER BY a.created_at::timestamptz DESC, a.id DESC LIMIT 26) UNION ALL (SELECT 'work_documentation' || '-' || m.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(w.reference, ''), '#' || m.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), '#' || m.id::text)::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'work_documentation'::text AS type, w.status::text::text AS status, NULL::numeric AS version, m.created_at::timestamptz::timestamptz AS created_at, NULL::text::text AS hash, m.id::bigint AS source_id, 6::integer AS type_rank FROM \"private_media\" m JOIN \"work_orders\" w ON m.owner_type IN ('work-order', 'work') AND m.owner_id = w.id::text JOIN \"leads\" l ON l.id = w.lead_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(w.reference, ''), '#' || m.id::text)::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), '#' || m.id::text)::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92)) AND w.status::text = $27 AND (m.created_at::timestamptz < $28::timestamptz OR (m.created_at::timestamptz = $28::timestamptz AND (6 > $29 OR (6 = $29 AND m.id < $30)))) ORDER BY m.created_at::timestamptz DESC, m.id DESC LIMIT 26) UNION ALL (SELECT 'measurement' || '-' || r.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(r.reference, ''), '#' || r.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), 'measurement-' || r.id::text)::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'measurement'::text AS type, r.status::text::text AS status, NULL::numeric AS version, r.created_at::timestamptz::timestamptz AS created_at, r.input_hash::text::text AS hash, r.id::bigint AS source_id, 7::integer AS type_rank FROM \"roof_measurements\" r JOIN \"leads\" l ON l.id = r.lead_id JOIN \"private_media\" m ON m.id = r.map_image_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(r.reference, ''), '#' || r.id::text)::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), 'measurement-' || r.id::text)::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92)) AND r.status::text = $32 AND (r.created_at::timestamptz < $33::timestamptz OR (r.created_at::timestamptz = $33::timestamptz AND (7 > $34 OR (7 = $34 AND r.id < $35)))) ORDER BY r.created_at::timestamptz DESC, r.id DESC LIMIT 26) UNION ALL (SELECT 'invoice_draft' || '-' || i.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(i.reference, ''), '#' || i.id::text)::text AS reference, CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.reference, ''), i.id::text) || '.pdf') END::text AS filename, CASE WHEN m.id IS NULL THEN '/admin-v2/cases/' || l.id::text || '?invoiceRecord=' || i.id::text || '#invoice-' || i.id::text ELSE '/api/admin/media/' || m.id::text END::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'invoice_draft'::text AS type, i.status::text::text AS status, NULL::numeric AS version, i.created_at::timestamptz::timestamptz AS created_at, CASE WHEN m.id IS NULL THEN NULL ELSE i.document_hash::text END::text AS hash, i.id::bigint AS source_id, 8::integer AS type_rank FROM \"invoice_records\" i JOIN \"leads\" l ON l.id = i.lead_id LEFT JOIN \"private_media\" m ON m.id = i.document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(i.reference, ''), '#' || i.id::text)::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92) OR COALESCE(CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.reference, ''), i.id::text) || '.pdf') END::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92)) AND i.status::text = $37 AND (i.created_at::timestamptz < $38::timestamptz OR (i.created_at::timestamptz = $38::timestamptz AND (8 > $39 OR (8 = $39 AND i.id < $40)))) ORDER BY i.created_at::timestamptz DESC, i.id DESC LIMIT 26) UNION ALL (SELECT 'official_invoice' || '-' || i.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(i.invoice_number, ''), NULLIF(i.reference, ''), '#' || i.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.invoice_number, ''), i.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'official_invoice'::text AS type, i.status::text::text AS status, NULL::numeric AS version, i.created_at::timestamptz::timestamptz AS created_at, i.original_hash::text::text AS hash, i.id::bigint AS source_id, 9::integer AS type_rank FROM \"official_invoices\" i JOIN \"leads\" l ON l.id = i.lead_id JOIN \"private_media\" m ON m.id = i.original_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(i.invoice_number, ''), NULLIF(i.reference, ''), '#' || i.id::text)::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.invoice_number, ''), i.id::text) || '.pdf')::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92)) AND i.status::text = $42 AND (i.created_at::timestamptz < $43::timestamptz OR (i.created_at::timestamptz = $43::timestamptz AND (9 > $44 OR (9 = $44 AND i.id < $45)))) ORDER BY i.created_at::timestamptz DESC, i.id DESC LIMIT 26) UNION ALL (SELECT 'warranty' || '-' || w.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(w.reference, ''), '#' || w.id::text)::text AS reference, CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(w.reference, ''), w.id::text) || '.pdf') END::text AS filename, CASE WHEN m.id IS NULL THEN '/admin-v2/cases/' || l.id::text || '?warrantyRecord=' || w.id::text || '#warranty-' || w.id::text ELSE '/api/admin/media/' || m.id::text END::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'warranty'::text AS type, w.status::text::text AS status, NULL::numeric AS version, w.created_at::timestamptz::timestamptz AS created_at, CASE WHEN m.id IS NULL THEN NULL ELSE w.document_hash::text END::text AS hash, w.id::bigint AS source_id, 10::integer AS type_rank FROM \"warranties\" w JOIN \"leads\" l ON l.id = w.lead_id LEFT JOIN \"private_media\" m ON m.id = w.document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(w.reference, ''), '#' || w.id::text)::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92) OR COALESCE(CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(w.reference, ''), w.id::text) || '.pdf') END::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92)) AND w.status::text = $47 AND (w.created_at::timestamptz < $48::timestamptz OR (w.created_at::timestamptz = $48::timestamptz AND (10 > $49 OR (10 = $49 AND w.id < $50)))) ORDER BY w.created_at::timestamptz DESC, w.id DESC LIMIT 26)) AS document_candidates ORDER BY created_at DESC, type_rank ASC, source_id DESC LIMIT 26",
+      "values": [
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1
+      ]
+    },
+    {
+      "id": "DOCUMENT_BACKWARD",
+      "text": "SELECT id, lead_id, customer, reference, filename, href, case_href, type, status, version, created_at, hash, source_id, type_rank FROM ((SELECT 'quote' || '-' || q.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(q.reference, ''), '#' || q.id::text)::text AS reference, COALESCE(NULLIF(q.reference, ''), q.id::text) || '.pdf'::text AS filename, '/api/admin/quotes/' || q.id::text || '/pdf'::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'quote'::text AS type, q.status::text::text AS status, q.version::numeric AS version, q.created_at::timestamptz::timestamptz AS created_at, q.snapshot_hash::text::text AS hash, q.id::bigint AS source_id, 1::integer AS type_rank FROM \"quotes\" q JOIN \"leads\" l ON l.id = q.lead_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(q.reference, ''), '#' || q.id::text)::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(q.reference, ''), q.id::text) || '.pdf'::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92)) AND q.status::text = $2 AND (q.created_at::timestamptz > $3::timestamptz OR (q.created_at::timestamptz = $3::timestamptz AND (1 < $4 OR (1 = $4 AND q.id > $5)))) ORDER BY q.created_at::timestamptz ASC, q.id ASC LIMIT 26) UNION ALL (SELECT 'contract_draft' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf'::text AS filename, '/api/admin/quotes/' || q.id::text || '/pdf'::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'contract_draft'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 2::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id LEFT JOIN \"private_media\" sm ON sm.id = c.signed_document_id LEFT JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE sm.id IS NULL AND fm.id IS NULL AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf'::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92)) AND c.status::text = $7 AND (c.created_at::timestamptz > $8::timestamptz OR (c.created_at::timestamptz = $8::timestamptz AND (2 < $9 OR (2 = $9 AND c.id > $10)))) ORDER BY c.created_at::timestamptz ASC, c.id ASC LIMIT 26) UNION ALL (SELECT 'customer_signed' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(sm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || sm.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'customer_signed'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 3::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" sm ON sm.id = c.signed_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(sm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $11 || '%' ESCAPE CHR(92)) AND c.status::text = $12 AND (c.created_at::timestamptz > $13::timestamptz OR (c.created_at::timestamptz = $13::timestamptz AND (3 < $14 OR (3 = $14 AND c.id > $15)))) ORDER BY c.created_at::timestamptz ASC, c.id ASC LIMIT 26) UNION ALL (SELECT 'final_contract' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(fm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || fm.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'final_contract'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 4::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(fm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $16 || '%' ESCAPE CHR(92)) AND c.status::text = $17 AND (c.created_at::timestamptz > $18::timestamptz OR (c.created_at::timestamptz = $18::timestamptz AND (4 < $19 OR (4 = $19 AND c.id > $20)))) ORDER BY c.created_at::timestamptz ASC, c.id ASC LIMIT 26) UNION ALL (SELECT 'change_agreement' || '-' || a.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(a.reference, ''), '#' || a.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(a.reference, ''), a.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'change_agreement'::text AS type, a.status::text::text AS status, a.version::numeric AS version, a.created_at::timestamptz::timestamptz AS created_at, a.document_hash::text::text AS hash, a.id::bigint AS source_id, 5::integer AS type_rank FROM \"change_agreements\" a JOIN \"work_orders\" w ON w.id = a.work_order_id JOIN \"leads\" l ON l.id = w.lead_id JOIN \"private_media\" m ON m.id = a.accepted_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(a.reference, ''), '#' || a.id::text)::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(a.reference, ''), a.id::text) || '.pdf')::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $21 || '%' ESCAPE CHR(92)) AND a.status::text = $22 AND (a.created_at::timestamptz > $23::timestamptz OR (a.created_at::timestamptz = $23::timestamptz AND (5 < $24 OR (5 = $24 AND a.id > $25)))) ORDER BY a.created_at::timestamptz ASC, a.id ASC LIMIT 26) UNION ALL (SELECT 'work_documentation' || '-' || m.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(w.reference, ''), '#' || m.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), '#' || m.id::text)::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'work_documentation'::text AS type, w.status::text::text AS status, NULL::numeric AS version, m.created_at::timestamptz::timestamptz AS created_at, NULL::text::text AS hash, m.id::bigint AS source_id, 6::integer AS type_rank FROM \"private_media\" m JOIN \"work_orders\" w ON m.owner_type IN ('work-order', 'work') AND m.owner_id = w.id::text JOIN \"leads\" l ON l.id = w.lead_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(w.reference, ''), '#' || m.id::text)::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), '#' || m.id::text)::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $26 || '%' ESCAPE CHR(92)) AND w.status::text = $27 AND (m.created_at::timestamptz > $28::timestamptz OR (m.created_at::timestamptz = $28::timestamptz AND (6 < $29 OR (6 = $29 AND m.id > $30)))) ORDER BY m.created_at::timestamptz ASC, m.id ASC LIMIT 26) UNION ALL (SELECT 'measurement' || '-' || r.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(r.reference, ''), '#' || r.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), 'measurement-' || r.id::text)::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'measurement'::text AS type, r.status::text::text AS status, NULL::numeric AS version, r.created_at::timestamptz::timestamptz AS created_at, r.input_hash::text::text AS hash, r.id::bigint AS source_id, 7::integer AS type_rank FROM \"roof_measurements\" r JOIN \"leads\" l ON l.id = r.lead_id JOIN \"private_media\" m ON m.id = r.map_image_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(r.reference, ''), '#' || r.id::text)::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), 'measurement-' || r.id::text)::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $31 || '%' ESCAPE CHR(92)) AND r.status::text = $32 AND (r.created_at::timestamptz > $33::timestamptz OR (r.created_at::timestamptz = $33::timestamptz AND (7 < $34 OR (7 = $34 AND r.id > $35)))) ORDER BY r.created_at::timestamptz ASC, r.id ASC LIMIT 26) UNION ALL (SELECT 'invoice_draft' || '-' || i.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(i.reference, ''), '#' || i.id::text)::text AS reference, CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.reference, ''), i.id::text) || '.pdf') END::text AS filename, CASE WHEN m.id IS NULL THEN '/admin-v2/cases/' || l.id::text || '?invoiceRecord=' || i.id::text || '#invoice-' || i.id::text ELSE '/api/admin/media/' || m.id::text END::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'invoice_draft'::text AS type, i.status::text::text AS status, NULL::numeric AS version, i.created_at::timestamptz::timestamptz AS created_at, CASE WHEN m.id IS NULL THEN NULL ELSE i.document_hash::text END::text AS hash, i.id::bigint AS source_id, 8::integer AS type_rank FROM \"invoice_records\" i JOIN \"leads\" l ON l.id = i.lead_id LEFT JOIN \"private_media\" m ON m.id = i.document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(i.reference, ''), '#' || i.id::text)::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92) OR COALESCE(CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.reference, ''), i.id::text) || '.pdf') END::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $36 || '%' ESCAPE CHR(92)) AND i.status::text = $37 AND (i.created_at::timestamptz > $38::timestamptz OR (i.created_at::timestamptz = $38::timestamptz AND (8 < $39 OR (8 = $39 AND i.id > $40)))) ORDER BY i.created_at::timestamptz ASC, i.id ASC LIMIT 26) UNION ALL (SELECT 'official_invoice' || '-' || i.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(i.invoice_number, ''), NULLIF(i.reference, ''), '#' || i.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.invoice_number, ''), i.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'official_invoice'::text AS type, i.status::text::text AS status, NULL::numeric AS version, i.created_at::timestamptz::timestamptz AS created_at, i.original_hash::text::text AS hash, i.id::bigint AS source_id, 9::integer AS type_rank FROM \"official_invoices\" i JOIN \"leads\" l ON l.id = i.lead_id JOIN \"private_media\" m ON m.id = i.original_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(i.invoice_number, ''), NULLIF(i.reference, ''), '#' || i.id::text)::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.invoice_number, ''), i.id::text) || '.pdf')::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $41 || '%' ESCAPE CHR(92)) AND i.status::text = $42 AND (i.created_at::timestamptz > $43::timestamptz OR (i.created_at::timestamptz = $43::timestamptz AND (9 < $44 OR (9 = $44 AND i.id > $45)))) ORDER BY i.created_at::timestamptz ASC, i.id ASC LIMIT 26) UNION ALL (SELECT 'warranty' || '-' || w.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(w.reference, ''), '#' || w.id::text)::text AS reference, CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(w.reference, ''), w.id::text) || '.pdf') END::text AS filename, CASE WHEN m.id IS NULL THEN '/admin-v2/cases/' || l.id::text || '?warrantyRecord=' || w.id::text || '#warranty-' || w.id::text ELSE '/api/admin/media/' || m.id::text END::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'warranty'::text AS type, w.status::text::text AS status, NULL::numeric AS version, w.created_at::timestamptz::timestamptz AS created_at, CASE WHEN m.id IS NULL THEN NULL ELSE w.document_hash::text END::text AS hash, w.id::bigint AS source_id, 10::integer AS type_rank FROM \"warranties\" w JOIN \"leads\" l ON l.id = w.lead_id LEFT JOIN \"private_media\" m ON m.id = w.document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(w.reference, ''), '#' || w.id::text)::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92) OR COALESCE(CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(w.reference, ''), w.id::text) || '.pdf') END::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $46 || '%' ESCAPE CHR(92)) AND w.status::text = $47 AND (w.created_at::timestamptz > $48::timestamptz OR (w.created_at::timestamptz = $48::timestamptz AND (10 < $49 OR (10 = $49 AND w.id > $50)))) ORDER BY w.created_at::timestamptz ASC, w.id ASC LIMIT 26)) AS document_candidates ORDER BY created_at ASC, type_rank DESC, source_id ASC LIMIT 26",
+      "values": [
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1,
+        "synthetic",
+        "draft",
+        "2026-01-01T00:00:00.000Z",
+        1,
+        1
+      ]
+    },
+    {
+      "id": "DOCUMENT_DEFAULT",
+      "text": "SELECT id, lead_id, customer, reference, filename, href, case_href, type, status, version, created_at, hash, source_id, type_rank FROM ((SELECT 'quote' || '-' || q.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(q.reference, ''), '#' || q.id::text)::text AS reference, COALESCE(NULLIF(q.reference, ''), q.id::text) || '.pdf'::text AS filename, '/api/admin/quotes/' || q.id::text || '/pdf'::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'quote'::text AS type, q.status::text::text AS status, q.version::numeric AS version, q.created_at::timestamptz::timestamptz AS created_at, q.snapshot_hash::text::text AS hash, q.id::bigint AS source_id, 1::integer AS type_rank FROM \"quotes\" q JOIN \"leads\" l ON l.id = q.lead_id WHERE TRUE ORDER BY q.created_at::timestamptz DESC, q.id DESC LIMIT 26) UNION ALL (SELECT 'contract_draft' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf'::text AS filename, '/api/admin/quotes/' || q.id::text || '/pdf'::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'contract_draft'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 2::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id LEFT JOIN \"private_media\" sm ON sm.id = c.signed_document_id LEFT JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE sm.id IS NULL AND fm.id IS NULL ORDER BY c.created_at::timestamptz DESC, c.id DESC LIMIT 26) UNION ALL (SELECT 'customer_signed' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(sm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || sm.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'customer_signed'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 3::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" sm ON sm.id = c.signed_document_id WHERE TRUE ORDER BY c.created_at::timestamptz DESC, c.id DESC LIMIT 26) UNION ALL (SELECT 'final_contract' || '-' || c.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text AS reference, COALESCE(NULLIF(fm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || fm.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'final_contract'::text AS type, c.status::text::text AS status, c.version::numeric AS version, c.created_at::timestamptz::timestamptz AS created_at, c.document_hash::text::text AS hash, c.id::bigint AS source_id, 4::integer AS type_rank FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE TRUE ORDER BY c.created_at::timestamptz DESC, c.id DESC LIMIT 26) UNION ALL (SELECT 'change_agreement' || '-' || a.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(a.reference, ''), '#' || a.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(a.reference, ''), a.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'change_agreement'::text AS type, a.status::text::text AS status, a.version::numeric AS version, a.created_at::timestamptz::timestamptz AS created_at, a.document_hash::text::text AS hash, a.id::bigint AS source_id, 5::integer AS type_rank FROM \"change_agreements\" a JOIN \"work_orders\" w ON w.id = a.work_order_id JOIN \"leads\" l ON l.id = w.lead_id JOIN \"private_media\" m ON m.id = a.accepted_document_id WHERE TRUE ORDER BY a.created_at::timestamptz DESC, a.id DESC LIMIT 26) UNION ALL (SELECT 'work_documentation' || '-' || m.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(w.reference, ''), '#' || m.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), '#' || m.id::text)::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'work_documentation'::text AS type, w.status::text::text AS status, NULL::numeric AS version, m.created_at::timestamptz::timestamptz AS created_at, NULL::text::text AS hash, m.id::bigint AS source_id, 6::integer AS type_rank FROM \"private_media\" m JOIN \"work_orders\" w ON m.owner_type IN ('work-order', 'work') AND m.owner_id = w.id::text JOIN \"leads\" l ON l.id = w.lead_id WHERE TRUE ORDER BY m.created_at::timestamptz DESC, m.id DESC LIMIT 26) UNION ALL (SELECT 'measurement' || '-' || r.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(r.reference, ''), '#' || r.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), 'measurement-' || r.id::text)::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'measurement'::text AS type, r.status::text::text AS status, NULL::numeric AS version, r.created_at::timestamptz::timestamptz AS created_at, r.input_hash::text::text AS hash, r.id::bigint AS source_id, 7::integer AS type_rank FROM \"roof_measurements\" r JOIN \"leads\" l ON l.id = r.lead_id JOIN \"private_media\" m ON m.id = r.map_image_id WHERE TRUE ORDER BY r.created_at::timestamptz DESC, r.id DESC LIMIT 26) UNION ALL (SELECT 'invoice_draft' || '-' || i.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(i.reference, ''), '#' || i.id::text)::text AS reference, CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.reference, ''), i.id::text) || '.pdf') END::text AS filename, CASE WHEN m.id IS NULL THEN '/admin-v2/cases/' || l.id::text || '?invoiceRecord=' || i.id::text || '#invoice-' || i.id::text ELSE '/api/admin/media/' || m.id::text END::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'invoice_draft'::text AS type, i.status::text::text AS status, NULL::numeric AS version, i.created_at::timestamptz::timestamptz AS created_at, CASE WHEN m.id IS NULL THEN NULL ELSE i.document_hash::text END::text AS hash, i.id::bigint AS source_id, 8::integer AS type_rank FROM \"invoice_records\" i JOIN \"leads\" l ON l.id = i.lead_id LEFT JOIN \"private_media\" m ON m.id = i.document_id WHERE TRUE ORDER BY i.created_at::timestamptz DESC, i.id DESC LIMIT 26) UNION ALL (SELECT 'official_invoice' || '-' || i.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(i.invoice_number, ''), NULLIF(i.reference, ''), '#' || i.id::text)::text AS reference, COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.invoice_number, ''), i.id::text) || '.pdf')::text AS filename, '/api/admin/media/' || m.id::text::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'official_invoice'::text AS type, i.status::text::text AS status, NULL::numeric AS version, i.created_at::timestamptz::timestamptz AS created_at, i.original_hash::text::text AS hash, i.id::bigint AS source_id, 9::integer AS type_rank FROM \"official_invoices\" i JOIN \"leads\" l ON l.id = i.lead_id JOIN \"private_media\" m ON m.id = i.original_document_id WHERE TRUE ORDER BY i.created_at::timestamptz DESC, i.id DESC LIMIT 26) UNION ALL (SELECT 'warranty' || '-' || w.id::text AS id, l.id::integer AS lead_id, COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text AS customer, COALESCE(NULLIF(w.reference, ''), '#' || w.id::text)::text AS reference, CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(w.reference, ''), w.id::text) || '.pdf') END::text AS filename, CASE WHEN m.id IS NULL THEN '/admin-v2/cases/' || l.id::text || '?warrantyRecord=' || w.id::text || '#warranty-' || w.id::text ELSE '/api/admin/media/' || m.id::text END::text AS href, '/admin-v2/cases/' || l.id::text AS case_href, 'warranty'::text AS type, w.status::text::text AS status, NULL::numeric AS version, w.created_at::timestamptz::timestamptz AS created_at, CASE WHEN m.id IS NULL THEN NULL ELSE w.document_hash::text END::text AS hash, w.id::bigint AS source_id, 10::integer AS type_rank FROM \"warranties\" w JOIN \"leads\" l ON l.id = w.lead_id LEFT JOIN \"private_media\" m ON m.id = w.document_id WHERE TRUE ORDER BY w.created_at::timestamptz DESC, w.id DESC LIMIT 26)) AS document_candidates ORDER BY created_at DESC, type_rank ASC, source_id DESC LIMIT 26",
+      "values": []
+    },
+    {
+      "id": "DOCUMENT_FACETS",
+      "text": "SELECT DISTINCT status FROM (SELECT q.status::text::text AS status FROM \"quotes\" q JOIN \"leads\" l ON l.id = q.lead_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(q.reference, ''), '#' || q.id::text)::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(q.reference, ''), q.id::text) || '.pdf'::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $1 || '%' ESCAPE CHR(92)) UNION ALL SELECT c.status::text::text AS status FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id LEFT JOIN \"private_media\" sm ON sm.id = c.signed_document_id LEFT JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE sm.id IS NULL AND fm.id IS NULL AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $2 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $2 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf'::text, '') ILIKE '%' || $2 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $2 || '%' ESCAPE CHR(92)) UNION ALL SELECT c.status::text::text AS status FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" sm ON sm.id = c.signed_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $3 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $3 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(sm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text, '') ILIKE '%' || $3 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $3 || '%' ESCAPE CHR(92)) UNION ALL SELECT c.status::text::text AS status FROM \"contracts\" c JOIN \"quotes\" q ON q.id = c.quote_id JOIN \"leads\" l ON l.id = q.lead_id JOIN \"private_media\" fm ON fm.id = c.company_signed_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $4 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(c.reference, ''), '#' || c.id::text)::text, '') ILIKE '%' || $4 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(fm.filename, ''), COALESCE(NULLIF(c.reference, ''), c.id::text) || '.pdf')::text, '') ILIKE '%' || $4 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $4 || '%' ESCAPE CHR(92)) UNION ALL SELECT a.status::text::text AS status FROM \"change_agreements\" a JOIN \"work_orders\" w ON w.id = a.work_order_id JOIN \"leads\" l ON l.id = w.lead_id JOIN \"private_media\" m ON m.id = a.accepted_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $5 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(a.reference, ''), '#' || a.id::text)::text, '') ILIKE '%' || $5 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(a.reference, ''), a.id::text) || '.pdf')::text, '') ILIKE '%' || $5 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $5 || '%' ESCAPE CHR(92)) UNION ALL SELECT w.status::text::text AS status FROM \"private_media\" m JOIN \"work_orders\" w ON m.owner_type IN ('work-order', 'work') AND m.owner_id = w.id::text JOIN \"leads\" l ON l.id = w.lead_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(w.reference, ''), '#' || m.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), '#' || m.id::text)::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $6 || '%' ESCAPE CHR(92)) UNION ALL SELECT r.status::text::text AS status FROM \"roof_measurements\" r JOIN \"leads\" l ON l.id = r.lead_id JOIN \"private_media\" m ON m.id = r.map_image_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $7 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(r.reference, ''), '#' || r.id::text)::text, '') ILIKE '%' || $7 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), 'measurement-' || r.id::text)::text, '') ILIKE '%' || $7 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $7 || '%' ESCAPE CHR(92)) UNION ALL SELECT i.status::text::text AS status FROM \"invoice_records\" i JOIN \"leads\" l ON l.id = i.lead_id LEFT JOIN \"private_media\" m ON m.id = i.document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $8 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(i.reference, ''), '#' || i.id::text)::text, '') ILIKE '%' || $8 || '%' ESCAPE CHR(92) OR COALESCE(CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.reference, ''), i.id::text) || '.pdf') END::text, '') ILIKE '%' || $8 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $8 || '%' ESCAPE CHR(92)) UNION ALL SELECT i.status::text::text AS status FROM \"official_invoices\" i JOIN \"leads\" l ON l.id = i.lead_id JOIN \"private_media\" m ON m.id = i.original_document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $9 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(i.invoice_number, ''), NULLIF(i.reference, ''), '#' || i.id::text)::text, '') ILIKE '%' || $9 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(i.invoice_number, ''), i.id::text) || '.pdf')::text, '') ILIKE '%' || $9 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $9 || '%' ESCAPE CHR(92)) UNION ALL SELECT w.status::text::text AS status FROM \"warranties\" w JOIN \"leads\" l ON l.id = w.lead_id LEFT JOIN \"private_media\" m ON m.id = w.document_id WHERE TRUE AND (COALESCE(COALESCE(NULLIF(l.name, ''), '#' || l.id::text)::text, '') ILIKE '%' || $10 || '%' ESCAPE CHR(92) OR COALESCE(COALESCE(NULLIF(w.reference, ''), '#' || w.id::text)::text, '') ILIKE '%' || $10 || '%' ESCAPE CHR(92) OR COALESCE(CASE WHEN m.id IS NULL THEN '' ELSE COALESCE(NULLIF(m.filename, ''), COALESCE(NULLIF(w.reference, ''), w.id::text) || '.pdf') END::text, '') ILIKE '%' || $10 || '%' ESCAPE CHR(92) OR COALESCE(l.id::text::text, '') ILIKE '%' || $10 || '%' ESCAPE CHR(92))) AS document_statuses WHERE status IS NOT NULL ORDER BY status",
+      "values": [
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic",
+        "synthetic"
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "enum_posts_editorial_status",
+      "values": [
+        "draft",
+        "ai_qa",
+        "human_review",
+        "rejected",
+        "approved",
+        "scheduled",
+        "published"
+      ]
+    },
+    {
+      "name": "enum_posts_search_intent",
+      "values": [
+        "informational",
+        "commercial",
+        "local",
+        "comparison"
+      ]
+    },
+    {
+      "name": "enum_posts_cta_variant",
+      "values": [
+        "assessment",
+        "wash",
+        "renewal",
+        "new_roof"
+      ]
+    },
+    {
+      "name": "enum_posts_content_audit_recommendation",
+      "values": [
+        "keep",
+        "update",
+        "merge",
+        "redirect"
+      ]
+    },
+    {
+      "name": "enum_posts_status",
+      "values": [
+        "draft",
+        "published"
+      ]
+    },
+    {
+      "name": "enum__posts_v_version_editorial_status",
+      "values": [
+        "draft",
+        "ai_qa",
+        "human_review",
+        "rejected",
+        "approved",
+        "scheduled",
+        "published"
+      ]
+    },
+    {
+      "name": "enum__posts_v_version_search_intent",
+      "values": [
+        "informational",
+        "commercial",
+        "local",
+        "comparison"
+      ]
+    },
+    {
+      "name": "enum__posts_v_version_cta_variant",
+      "values": [
+        "assessment",
+        "wash",
+        "renewal",
+        "new_roof"
+      ]
+    },
+    {
+      "name": "enum__posts_v_version_content_audit_recommendation",
+      "values": [
+        "keep",
+        "update",
+        "merge",
+        "redirect"
+      ]
+    },
+    {
+      "name": "enum__posts_v_version_status",
+      "values": [
+        "draft",
+        "published"
+      ]
+    },
+    {
+      "name": "enum_seo_topics_search_intent",
+      "values": [
+        "informational",
+        "commercial",
+        "local",
+        "comparison"
+      ]
+    },
+    {
+      "name": "enum_seo_topics_source",
+      "values": [
+        "search_console",
+        "ads",
+        "trends",
+        "lead",
+        "manual"
+      ]
+    },
+    {
+      "name": "enum_seo_topics_status",
+      "values": [
+        "candidate",
+        "rejected",
+        "queued",
+        "drafted",
+        "approved",
+        "published"
+      ]
+    },
+    {
+      "name": "enum_seo_runs_trigger_source",
+      "values": [
+        "manual",
+        "cron",
+        "regenerate"
+      ]
+    },
+    {
+      "name": "enum_seo_runs_status",
+      "values": [
+        "running",
+        "completed",
+        "failed",
+        "attention"
+      ]
+    }
+  ]
+}
