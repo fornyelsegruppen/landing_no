@@ -198,13 +198,39 @@ export async function runPreflight({
       to_regclass(format('%I',name)) = to_regclass(format('public.%I',name)), false)) AS ok
       FROM unnest($1::text[]) AS name`, [names]);
     if (resolution.rows[0]?.ok !== true) throw new Error('SEARCH_PATH');
-    check = 'SEO_COLUMNS';
+    check = 'SEO_COLUMNS_READ';
     const columns = await query(columnsSql, [tables]);
+    if (cancelled) throw new Error('DEADLINE');
+    check = 'SEO_COLUMNS';
+    const knownTypes = [];
     for (const expected of manifest.columns) {
-      const actual = columns.rows.find(c => c.table_name === expected.table && c.column_name === expected.column);
-      if (!actual || actual.type_name !== expected.type ||
-        actual.type_schema !== (expected.type.startsWith('enum_') ? 'public' : 'pg_catalog')) throw new Error('SEO_COLUMNS');
+      const namespace = expected.type.startsWith('enum_') ? 'public' : 'pg_catalog';
+      if (!knownTypes.some(known => known.type === expected.type && known.namespace === namespace)) {
+        knownTypes.push({ type: expected.type, namespace });
+      }
     }
+    let columnMismatch = false;
+    for (const [index, expected] of manifest.columns.entries()) {
+      const actual = columns.rows.find(c => c.table_name === expected.table && c.column_name === expected.column);
+      const flags = [];
+      if (!actual) flags.push('MISSING');
+      else {
+        if (actual.type_name !== expected.type) flags.push('TYPE');
+        if (actual.type_schema !== (expected.type.startsWith('enum_') ? 'public' : 'pg_catalog')) flags.push('NAMESPACE');
+      }
+      if (flags.length) {
+        columnMismatch = true;
+        // Only sealed ordinals + internal flags/tokens, never actual metadata.
+        let typeToken = '';
+        if (actual) {
+          const knownIndex = knownTypes.findIndex(known =>
+            actual.type_name === known.type && actual.type_schema === known.namespace);
+          typeToken = knownIndex < 0 ? '_OTHER' : `_T${String(knownIndex + 1).padStart(3, '0')}`;
+        }
+        log(`DB_COMPAT_COLUMN_${String(index + 1).padStart(3, '0')}_${flags.join('_')}${typeToken}`);
+      }
+    }
+    if (columnMismatch) throw new Error('SEO_COLUMNS');
     check = 'SEO_ENUMS';
     const enums = await query(`SELECT t.typname AS name, e.enumlabel AS value
       FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace

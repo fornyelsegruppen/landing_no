@@ -1,5 +1,31 @@
 # Optional production database compatibility preflight
 
+## Bounded column mismatch diagnostics
+
+The `5e3e1b5` attempt reached `SEO_COLUMNS`, after native bootstrap/connection,
+read-only BEGIN, timeouts and search-path checks. It did not establish whether
+the catalog query failed or expected columns differed. No migration is implied.
+
+The existing single catalog query is unchanged. Query failure now reports only
+`DB_COMPAT_FAIL_SEO_COLUMNS_READ`. After a successful read, every mismatched
+manifest entry reports `DB_COMPAT_COLUMN_NNN_FLAGS`, where `NNN` is the sealed
+one-based ordinal 001–251 and flags are `MISSING`, `TYPE`, `NAMESPACE`, or
+`TYPE_NAMESPACE`. Missing entries have no type suffix. Other mismatches append
+`_T001`–`_T021` only when the actual type AND namespace exactly equal a known
+expected pair; otherwise the suffix is `_OTHER`. The token list is distinct
+expected pairs in first-occurrence manifest order, using `public` for enum types
+and `pg_catalog` otherwise. Decode identifiers/types offline from the sealed
+manifest; no actual names, types, rows, errors or credentials are printed.
+
+At most 251 mismatch records precede one `DB_COMPAT_FAIL_SEO_COLUMNS`. The gate
+then rolls back/closes without later metadata queries or EXPLAIN. A late response
+after cancellation emits no details. `OTHER` remains unknown, not repair evidence.
+There are no new queries, privileges, migration operations or security changes.
+41 focused Node tests pass, including multiple faults, complete bounded output,
+known/unknown type tokens, malicious-value suppression, read failures, deadlines,
+unchanged query order/manifest and zero-I/O default OFF. No remote retry is
+authorized by this source patch; backup/rollback approval precedes any DB writes.
+
 ## Exact native artifact-version contract correction
 
 The subsequent `8e6a8f7` attempt failed `NATIVE_VERSION`, before the URL was sent.

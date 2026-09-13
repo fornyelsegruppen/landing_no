@@ -312,6 +312,88 @@ test('failures are sanitized and attempt rollback/close; never pass after query 
   }
 });
 
+test('column diagnostics collect all mismatches with only sealed ordinal and fixed flags', async () => {
+  const baseline = fixture();
+  assert.equal(await runPreflight(baseline.options), 0);
+  const f = fixture();
+  const query = f.client.query;
+  f.client.query = async (text, values) => {
+    const result = await query(text, values);
+    if (text.includes('t.typname AS type_name')) {
+      result.rows[1].type_name = 'numeric';
+      result.rows[2].type_schema = 'postgresql://PRIVATE';
+      result.rows[3].type_name = 'PRIVATE';
+      result.rows[3].type_schema = 'PRIVATE';
+      result.rows[4].type_name = 'PRIVATE actual type';
+      result.rows.pop();
+      result.rows.shift();
+    }
+    return result;
+  };
+  assert.equal(await runPreflight(f.options), 1);
+  assert.deepEqual(f.logs, ['DB_COMPAT_COLUMN_001_MISSING', 'DB_COMPAT_COLUMN_002_TYPE_T007',
+    'DB_COMPAT_COLUMN_003_NAMESPACE_OTHER', 'DB_COMPAT_COLUMN_004_TYPE_NAMESPACE_OTHER',
+    'DB_COMPAT_COLUMN_005_TYPE_OTHER',
+    'DB_COMPAT_COLUMN_251_MISSING', 'DB_COMPAT_FAIL_SEO_COLUMNS']);
+  assert.doesNotMatch(JSON.stringify(f.logs), /PRIVATE|postgres|type_name|table_name/);
+  const readIndex = baseline.calls.findIndex(sql => sql.includes('t.typname AS type_name'));
+  assert.deepEqual(f.calls, [...baseline.calls.slice(0, readIndex + 1), 'ROLLBACK', 'end']);
+});
+
+test('type tokens match both sealed type and namespace in deterministic manifest order', async () => {
+  const pairs = [...new Set(manifest.columns.map(c =>
+    `${c.type}:${c.type.startsWith('enum_') ? 'public' : 'pg_catalog'}`))];
+  assert.equal(pairs.length, 21);
+  for (let index = 0; index < pairs.length; index++) {
+    const f = fixture();
+    const query = f.client.query;
+    f.client.query = async (text, values) => {
+      const result = await query(text, values);
+      if (text.includes('t.typname AS type_name')) {
+        [result.rows[index === 0 ? 2 : 0].type_name, result.rows[index === 0 ? 2 : 0].type_schema] = pairs[index].split(':');
+      }
+      return result;
+    };
+    assert.equal(await runPreflight(f.options), 1);
+    assert.deepEqual(f.logs, [`DB_COMPAT_COLUMN_${index === 0 ? '003' : '001'}_TYPE${pairs[index].endsWith(':public') ? '_NAMESPACE' : ''}_T${String(index + 1).padStart(3, '0')}`,
+      'DB_COMPAT_FAIL_SEO_COLUMNS']);
+  }
+});
+
+test('all-column absence is bounded at 251 ordinal records then one failure', async () => {
+  const f = fixture();
+  const query = f.client.query;
+  f.client.query = async (text, values) => {
+    const result = await query(text, values);
+    return text.includes('t.typname AS type_name') ? { rows: [] } : result;
+  };
+  assert.equal(await runPreflight(f.options), 1);
+  assert.equal(manifest.columns.length, 251);
+  assert.deepEqual(f.logs, [...manifest.columns.map((_column, index) =>
+    `DB_COMPAT_COLUMN_${String(index + 1).padStart(3, '0')}_MISSING`), 'DB_COMPAT_FAIL_SEO_COLUMNS']);
+  assert.equal(f.calls.filter(sql => sql.includes('t.typname AS type_name')).length, 1);
+  assert.equal(f.calls.some(sql => sql.includes('e.enumlabel') || sql.startsWith('EXPLAIN')), false);
+});
+
+test('catalog read failure and late response never emit column mismatch details', async () => {
+  const failure = fixture(sql => sql.includes('t.typname AS type_name'));
+  assert.equal(await runPreflight(failure.options), 1);
+  assert.deepEqual(failure.logs, ['DB_COMPAT_FAIL_SEO_COLUMNS_READ']);
+  const late = fixture();
+  const query = late.client.query;
+  late.client.query = async (text, values) => {
+    if (text.includes('t.typname AS type_name')) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+      return { rows: [] };
+    }
+    return query(text, values);
+  };
+  assert.equal(await runPreflight({ ...late.options, deadlineMs: 5 }), 1);
+  await new Promise(resolve => setTimeout(resolve, 40));
+  assert.deepEqual(late.logs, ['DB_COMPAT_FAIL_DEADLINE']);
+  assert.equal(late.calls.some(sql => sql.includes('e.enumlabel') || sql.startsWith('EXPLAIN')), false);
+});
+
 test('missing metadata/permissions/uniqueness fails closed', async () => {
   for (const match of ['bool_and', 'pg_catalog.pg_attribute', 'e.enumlabel', 'AS can_select', 'x.indisunique']) {
     const f = fixture();
