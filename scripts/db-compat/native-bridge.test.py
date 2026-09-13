@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
@@ -178,12 +179,12 @@ class NativeWireTests(unittest.TestCase):
             # child, so this synthetic server thread can always service TLS/auth.
             environment = {key: os.environ[key] for key in ['PATH', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP'] if key in os.environ}
             environment.update(PSYCOPG_IMPL='binary', SSL_CERT_FILE=str(self.cert if trusted else self.other_cert))
-            requests = json.dumps({'id': 1, 'op': 'connect', 'url': url}) + '\n' + json.dumps({'id': 2, 'op': 'close'}) + '\n'
+            requests = json.dumps({'id': 1, 'op': 'initialize'}) + '\n' + json.dumps({'id': 2, 'op': 'connect', 'url': url}) + '\n' + json.dumps({'id': 3, 'op': 'close'}) + '\n'
             child = subprocess.run([sys.executable, '-I', '-S', str(HERE / 'native-bridge.py'),
                 '--dependencies', DEPENDENCIES], input=requests, text=True, capture_output=True,
                 timeout=8, env=environment)
             responses = [json.loads(line) for line in child.stdout.splitlines()]
-            succeeded = child.returncode == 0 and bool(responses) and responses[0].get('ok') is True
+            succeeded = child.returncode == 0 and len(responses) >= 2 and all(response.get('ok') is True for response in responses[:2])
         except BaseException as error:
             peer.failure_type = type(error).__name__
         finally:
@@ -196,7 +197,8 @@ class NativeWireTests(unittest.TestCase):
         succeeded, peer = self.connect("plus")
         self.assertTrue(succeeded, f"synthetic stage: {getattr(peer, 'failure_type', None)}, startup={bool(peer.startup)}, responses={len(peer.password_frames)}")
         self.assertEqual(len(peer.password_frames), 2)
-        self.assertIn(b"default_transaction_read_only=on", peer.startup)
+        self.assertNotIn(b"options\0", peer.startup)
+        self.assertNotIn(b"default_transaction_read_only", peer.startup)
 
     def test_no_downgrade_credential_response_for_cleartext_md5_plain_scram_or_trust(self):
         for mode in ["cleartext", "md5", "plain-scram", "trust"]:
@@ -221,6 +223,45 @@ class NativeWireTests(unittest.TestCase):
 
 
 class ParameterTests(unittest.TestCase):
+    def test_bootstrap_failures_are_internal_codes_without_exception_details(self):
+        directory = str(HERE)
+        for expected in ["NATIVE_IMPORT", "NATIVE_ORIGIN", "NATIVE_VERSION", "NATIVE_CA"]:
+            with self.subTest(expected=expected):
+                file = str(HERE / "synthetic.py")
+                pq = SimpleNamespace(__file__=file, __impl__="binary", version=lambda: 180004)
+                psycopg = SimpleNamespace(__file__=file, __version__="3.3.5", pq=pq)
+                binary = SimpleNamespace(__file__=file)
+                modules = {"psycopg": psycopg, "psycopg_binary": binary,
+                    "psycopg.conninfo": SimpleNamespace(make_conninfo=lambda *a, **k: None)}
+                if expected == "NATIVE_IMPORT":
+                    modules["psycopg"] = None
+                elif expected == "NATIVE_ORIGIN":
+                    binary.__file__ = str(HERE.parent / "outside.py")
+                elif expected == "NATIVE_VERSION":
+                    pq.version = lambda: 1
+                original_path = list(sys.path)
+                try:
+                    with patch.dict(sys.modules, modules), patch.object(bridge, "root_certificate", side_effect=RuntimeError("PRIVATE")):
+                        value, phase = bridge.bootstrap(directory)
+                    self.assertIsNone(value)
+                    self.assertEqual(phase, expected)
+                    self.assertNotIn("PRIVATE", phase)
+                finally:
+                    sys.path[:] = original_path
+
+    def test_connection_configuration_has_no_pooler_incompatible_startup_options(self):
+        captured = {}
+        def conninfo(url, **options):
+            captured.update(options)
+            return "synthetic"
+        conn = SimpleNamespace(status=1, ssl_in_use=True)
+        pq = SimpleNamespace(PGconn=SimpleNamespace(connect=lambda info: conn), ConnStatus=SimpleNamespace(OK=1))
+        self.assertIs(bridge.connect_native("synthetic", pq, conninfo, "/fixed/system/ca"), conn)
+        self.assertNotIn("options", captured)
+        self.assertEqual(captured["channel_binding"], "require")
+        self.assertEqual(captured["sslmode"], "verify-full")
+        self.assertEqual(captured["sslrootcert"], "/fixed/system/ca")
+
     def test_linux_uses_only_existing_documented_system_bundle(self):
         checked = []
         path = bridge.root_certificate("linux", lambda path: checked.append(path) or True)

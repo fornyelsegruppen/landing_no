@@ -1,5 +1,40 @@
 # Optional production database compatibility preflight
 
+## Pooler compatibility and credential-free bootstrap refinement
+
+The actual native candidate reached `DB_COMPAT_FAIL_CONNECT`, after installation
+but before Next. That code does not establish whether import, version, CA or a
+real connection failed, and does not prove the production failure's root cause.
+
+This refinement removes only the newly injected libpq startup `options` string.
+Neon documents rejection of unsupported startup options by its transaction pooler;
+our added timeout settings are not among its documented tracked startup fields.
+This is a documented pooler-compatibility correction, not a proven diagnosis of
+the previous run. The unchanged first SQL remains explicit repeatable-read READ
+ONLY BEGIN, immediately followed by all three SET LOCAL timeouts, before any
+catalog or EXPLAIN query. Binding, certificate/hostname verification, fixed CA,
+URL, PG policy, client/outer deadlines, rollback and sealed SQL remain unchanged.
+No unpooled URL substitution or authentication/transport fallback is introduced.
+
+Node now sends a credential-free `initialize` request and waits for success before
+writing the original URL to the child. Bootstrap reports only internally assigned
+fixed failure codes: `NATIVE_IMPORT`, `NATIVE_ORIGIN`, `NATIVE_VERSION`, `NATIVE_CA`.
+Each is prefixed `DB_COMPAT_FAIL_` in logs. They reveal no numeric versions,
+paths, credentials, native error text/properties or metadata. Unclassified bridge
+startup/protocol/timeout failures are `NATIVE_BOOTSTRAP`; after ready, connection
+failures remain `CONNECT`. Unknown/malformed phase frames cannot alter diagnostics
+or allow connection, and a failed bootstrap receives no URL or SQL.
+
+Focused verification: 37 Node tests and 10 Python tests PASS. Tests cover no URL
+before ready or after bootstrap failure, fixed phase sanitization, no startup
+options, unchanged first-SQL read-only/timeouts sequence, and the synthetic real
+libpq PLUS/downgrade/TLS tests with the new handshake. These are not production or
+Linux runtime proof. No retry is authorized without new exact-SHA source review
+and a separate release-owner decision.
+
+Source: [Neon startup-parameter errors](https://neon.com/docs/connect/connection-errors)
+and [transaction pooling](https://neon.com/docs/connect/connection-pooling).
+
 ## Native mandatory-binding transport candidate
 
 Source-only change from `50005b0`: explicit `channel_binding=require` now selects
@@ -37,8 +72,8 @@ Public `PGconn.connect`/`exec_params` enforce `channel_binding=require`,
 `sslmode=verify-full`, the fixed system trust store below, `require_auth=scram-sha-256`, disabled
 client certificates and disabled GSS transport. This is low-level libpq: no
 implicit psycopg transaction or context-manager COMMIT. The unchanged explicit
-repeatable-read READ ONLY transaction is additionally protected by a startup
-read-only default. Exact SQL and bound `$n` parameters cross bounded private IPC;
+repeatable-read READ ONLY transaction is the first SQL; startup session options
+were removed by the pooler-compatibility refinement above. Exact SQL and bound `$n` parameters cross bounded private IPC;
 EXPLAIN plans never cross back. Connect/query limits remain 5/6 seconds and server
 statement/lock/idle-transaction limits remain 5/1/10 seconds. Errors, EOF, malformed
 or late frames permanently poison success. Cleanup rolls back/finishes or kills

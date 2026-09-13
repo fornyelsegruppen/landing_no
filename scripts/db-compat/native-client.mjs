@@ -11,6 +11,7 @@ const requirements = fileURLToPath(new URL('./native-requirements.txt', import.m
 const bridge = fileURLToPath(new URL('./native-bridge.py', import.meta.url));
 const REQUIREMENTS_HASH = '7bbac86fe74b69ed27a5368209ef9eb4145afec62ddf6c91117a7136d50e0d20';
 const MAX_FRAME = 1024 * 1024;
+const BOOTSTRAP_FAILURES = new Set(['NATIVE_IMPORT', 'NATIVE_ORIGIN', 'NATIVE_VERSION', 'NATIVE_CA']);
 const safeError = () => new Error('NATIVE_TRANSPORT');
 
 export function childEnvironment(environment = process.env) {
@@ -71,6 +72,7 @@ export class NativeClient extends EventEmitter {
 
   async connect() {
     if (this.closed || !this.dependencies) throw safeError();
+    this.emit('preflightPhase', 'NATIVE_BOOTSTRAP');
     const child = this.spawnProcess(this.python, ['-I', '-S', bridge, '--dependencies', this.dependencies],
       { env: this.environment, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
     this.child = child;
@@ -103,6 +105,11 @@ export class NativeClient extends EventEmitter {
         const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
         try {
           const response = JSON.parse(line);
+          if (this.pending?.op === 'initialize' && response.id === this.pending.id &&
+            response.ok === false && BOOTSTRAP_FAILURES.has(response.phase)) {
+            this.emit('preflightPhase', response.phase);
+            return fail();
+          }
           if (!this.pending || response.id !== this.pending.id ||
             response.ok !== true || !Array.isArray(response.rows)) return fail();
           const pending = this.pending; this.pending = null;
@@ -111,6 +118,8 @@ export class NativeClient extends EventEmitter {
         } catch { return fail(); }
       }
     });
+    await this.request({ op: 'initialize' });
+    this.emit('preflightPhase', 'CONNECT');
     await this.request({ op: 'connect', url: this.options.nativeConnectionString });
   }
 
@@ -123,8 +132,8 @@ export class NativeClient extends EventEmitter {
         this.closed = true;
         this.pending?.reject(safeError()); this.pending = null;
         this.child?.kill('SIGKILL');
-      }, message.op === 'connect' ? this.options.connectionTimeoutMillis : this.options.query_timeout);
-      this.pending = { id, accept, reject, timer };
+      }, ['initialize', 'connect'].includes(message.op) ? this.options.connectionTimeoutMillis : this.options.query_timeout);
+      this.pending = { id, op: message.op, accept, reject, timer };
       const frame = JSON.stringify({ ...message, id }) + '\n';
       if (Buffer.byteLength(frame) > MAX_FRAME) { clearTimeout(timer); this.pending = null; reject(safeError()); return; }
       this.child.stdin.write(frame);

@@ -162,6 +162,11 @@ export async function runPreflight({
     let connectionError = false;
     client.on('error', () => { connectionError = true; });
     if (options.nativeConnectionString) {
+      const phases = new Set(['NATIVE_BOOTSTRAP', 'NATIVE_IMPORT', 'NATIVE_ORIGIN',
+        'NATIVE_VERSION', 'NATIVE_CA', 'CONNECT']);
+      client.on('preflightPhase', phase => {
+        if (!cancelled && phases.has(phase)) check = phase;
+      });
       // Provisioning has its own hard budget, outside the 45s database budget.
       check = 'NATIVE_PREPARE';
       startDeadline(provisionDeadlineMs, 'NATIVE_PREPARE_DEADLINE');

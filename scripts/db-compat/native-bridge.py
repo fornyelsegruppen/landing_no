@@ -40,15 +40,14 @@ def root_certificate(platform=sys.platform, is_file=None):
     raise ValueError("PLATFORM")
 
 
-def connect_native(url, pq, make_conninfo):
+def connect_native(url, pq, make_conninfo, certificate):
     # URL identity/password are not rewritten or supplied by another source.
     # Keyword overrides strengthen require/verify-ca to the existing strict TLS
     # policy; mandatory binding is enforced by libpq, never by pg internals.
     info = make_conninfo(url, channel_binding="require", sslmode="verify-full",
-        sslrootcert=root_certificate(), sslcertmode="disable", gssencmode="disable",
+        sslrootcert=certificate, sslcertmode="disable", gssencmode="disable",
         require_auth="scram-sha-256", connect_timeout="5",
-        application_name="seo-one-ui-compat-preflight", client_encoding="UTF8",
-        options="-c default_transaction_read_only=on -c statement_timeout=5000 -c lock_timeout=1000 -c idle_in_transaction_session_timeout=10000")
+        application_name="seo-one-ui-compat-preflight", client_encoding="UTF8")
     conn = pq.PGconn.connect(info.encode("utf8"))
     if conn.status != pq.ConnStatus.OK or not conn.ssl_in_use:
         conn.finish()
@@ -78,36 +77,66 @@ def execute(conn, pq, text, values):
     return rows
 
 
-def serve(dependencies):
+def bootstrap(dependencies):
     # -I -S excludes user/site/PYTHONPATH injection. Only the hash-verified private
     # installation is added; force binary implementation, with no system fallback.
-    sys.path.insert(0, dependencies)
-    import psycopg
-    import psycopg_binary
-    from psycopg import pq
-    from psycopg.conninfo import make_conninfo
-    from pathlib import Path
-    private_root = Path(dependencies).resolve()
-    if any(not Path(module.__file__).resolve().is_relative_to(private_root)
-           for module in (psycopg, psycopg_binary, pq)):
-        raise ValueError("DRIVER")
-    if (sys.implementation.name != "cpython" or sys.version_info[:2] not in ((3, 12), (3, 13), (3, 14))
-            or psycopg.__version__ != "3.3.5" or pq.__impl__ != "binary" or pq.version() != 180004):
-        raise ValueError("DRIVER")
+    phase = "NATIVE_IMPORT"
+    try:
+        sys.path.insert(0, dependencies)
+        import psycopg
+        import psycopg_binary
+        from psycopg import pq
+        from psycopg.conninfo import make_conninfo
+        from pathlib import Path
+        phase = "NATIVE_ORIGIN"
+        private_root = Path(dependencies).resolve()
+        if any(not Path(module.__file__).resolve().is_relative_to(private_root)
+               for module in (psycopg, psycopg_binary, pq)):
+            raise ValueError("DRIVER")
+        phase = "NATIVE_VERSION"
+        if (sys.implementation.name != "cpython" or sys.version_info[:2] not in ((3, 12), (3, 13), (3, 14))
+                or psycopg.__version__ != "3.3.5" or pq.__impl__ != "binary" or pq.version() != 180004):
+            raise ValueError("DRIVER")
+        phase = "NATIVE_CA"
+        certificate = root_certificate()
+        return (pq, make_conninfo, certificate), None
+    except BaseException:
+        return None, phase  # Only internal literals; never inspect exception data.
+
+
+def read_request():
+    frame = sys.stdin.buffer.readline(MAX_FRAME + 1)
+    if not frame:
+        return None
+    if len(frame) > MAX_FRAME or not frame.endswith(b"\n"):
+        raise ValueError("FRAME")
+    return json.loads(frame)
+
+
+def serve(dependencies):
+    request = read_request()
+    if request is None or request.get("op") != "initialize":
+        raise ValueError("REQUEST")
+    # No URL/password is accepted until this credential-free bootstrap succeeds.
+    initialized, phase = bootstrap(dependencies)
+    response = {"id": request["id"], "ok": initialized is not None, "rows": []}
+    if phase is not None:
+        response["phase"] = phase
+    print(json.dumps(response, separators=(",", ":")), flush=True)
+    if initialized is None:
+        return
+    pq, make_conninfo, certificate = initialized
     conn = None
     try:
         for _ in range(64):
-            frame = sys.stdin.buffer.readline(MAX_FRAME + 1)
-            if not frame:
+            request = read_request()
+            if request is None:
                 break
-            if len(frame) > MAX_FRAME or not frame.endswith(b"\n"):
-                raise ValueError("FRAME")
-            request = json.loads(frame)
             response = {"id": request["id"], "ok": False}
             closing = request.get("op") == "close"
             try:
                 if request.get("op") == "connect" and conn is None:
-                    conn = connect_native(request["url"], pq, make_conninfo)
+                    conn = connect_native(request["url"], pq, make_conninfo, certificate)
                     rows = []
                 elif request.get("op") == "query" and conn is not None:
                     rows = execute(conn, pq, request["text"], request["values"])

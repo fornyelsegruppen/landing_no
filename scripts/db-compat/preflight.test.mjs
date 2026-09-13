@@ -130,11 +130,31 @@ test('native provisioning has a separate bounded budget and never consumes the D
   const f = fixture();
   f.client.prepare = async () => { await new Promise(resolve => setTimeout(resolve, 25)); };
   assert.equal(await runPreflight({ ...f.options, environment: nativeEnv, deadlineMs: 15, provisionDeadlineMs: 100 }), 0);
+  assert.deepEqual(f.calls.slice(0, 5), ['connect',
+    'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+    "SET LOCAL statement_timeout = '5s'", "SET LOCAL lock_timeout = '1s'",
+    "SET LOCAL idle_in_transaction_session_timeout = '10s'"]);
   const blocked = fixture();
   blocked.client.prepare = async () => new Promise(() => {});
   assert.equal(await runPreflight({ ...blocked.options, environment: nativeEnv, deadlineMs: 100, provisionDeadlineMs: 5 }), 1);
   assert.deepEqual(blocked.logs, ['DB_COMPAT_FAIL_NATIVE_PREPARE_DEADLINE']);
   assert.deepEqual(blocked.calls, ['end']);
+});
+
+test('native bootstrap diagnostics use fixed phases without logging external errors', async () => {
+  const nativeEnv = { ...environment, DATABASE_URL: environment.DATABASE_URL.replace('binding=prefer', 'binding=require') };
+  for (const phase of ['NATIVE_IMPORT', 'NATIVE_ORIGIN', 'NATIVE_VERSION', 'NATIVE_CA', 'PRIVATE']) {
+    const f = fixture();
+    f.client.prepare = async () => {};
+    f.client.connect = async () => {
+      f.client.emit('preflightPhase', 'NATIVE_BOOTSTRAP');
+      f.client.emit('preflightPhase', phase);
+      throw secretError();
+    };
+    assert.equal(await runPreflight({ ...f.options, environment: nativeEnv }), 1);
+    assert.deepEqual(f.logs, ['DB_COMPAT_FAIL_' + (phase === 'PRIVATE' ? 'NATIVE_BOOTSTRAP' : phase)]);
+    assert.deepEqual(f.calls, ['end']);
+  }
 });
 
 test('driver, connect, readonly BEGIN and each session timeout have distinct safe phases', async () => {

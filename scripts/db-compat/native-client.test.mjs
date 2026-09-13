@@ -43,11 +43,25 @@ test('credentials are stdin-only; exact SQL and repeated/out-of-order parameters
   const text = "EXPLAIN (FORMAT JSON) SELECT $2, $1, $2, '50%'::text";
   const values = [['quoted"', 'back\\slash', null], 'synthetic'];
   await f.client.query(text, values); await f.client.end();
-  assert.equal(f.requests[0].url, options.nativeConnectionString);
-  assert.deepEqual(f.requests[1], { op: 'query', text, values, id: 2 });
+  assert.deepEqual(f.requests[0], { op: 'initialize', id: 1 });
+  assert.equal(f.requests[1].url, options.nativeConnectionString);
+  assert.deepEqual(f.requests[2], { op: 'query', text, values, id: 3 });
   assert.doesNotMatch(JSON.stringify(f.calls.map(c => [c.command, c.args, c.config])), /PRIVATE/);
   assert.deepEqual(f.calls[0].config.stdio, ['pipe', 'pipe', 'ignore']);
   assert.ok(f.calls[0].args.includes('-S'));
+});
+
+test('bootstrap failures send no URL and accept only fixed internal phase codes', async () => {
+  for (const phase of ['NATIVE_IMPORT', 'NATIVE_ORIGIN', 'NATIVE_VERSION', 'NATIVE_CA', 'PRIVATE']) {
+    const f = fixture(request => ({ id: request.id, ok: false, phase, message: 'PRIVATE' }));
+    const phases = [];
+    f.client.on('preflightPhase', phase => phases.push(phase));
+    await f.client.prepare();
+    await assert.rejects(f.client.connect());
+    assert.deepEqual(f.requests, [{ id: 1, op: 'initialize' }]);
+    assert.deepEqual(phases, phase === 'PRIVATE' ? ['NATIVE_BOOTSTRAP'] : ['NATIVE_BOOTSTRAP', phase]);
+    await f.client.end().catch(() => {});
+  }
 });
 
 test('native error payload, malformed output and EOF fail without exposing content', async () => {
@@ -67,14 +81,14 @@ test('native error payload, malformed output and EOF fail without exposing conte
 });
 
 test('connect/query deadline kills child and late responses cannot permit another query', async () => {
-  for (const at of ['connect', 'query']) {
+  for (const at of ['initialize', 'connect', 'query']) {
     const f = fixture(request => request.op === at ? undefined : { id: request.id, ok: true, rows: [] });
     f.client.options = { ...options, connectionTimeoutMillis: 5, query_timeout: 5 };
     await f.client.prepare();
     if (at === 'query') await f.client.connect();
-    await assert.rejects(at === 'connect' ? f.client.connect() : f.client.query('SELECT $1', ['synthetic']));
+    await assert.rejects(at !== 'query' ? f.client.connect() : f.client.query('SELECT $1', ['synthetic']));
     assert.equal(f.calls[0].child.killed, true);
-    f.calls[0].child.stdout.write(JSON.stringify({ id: at === 'connect' ? 1 : 2, ok: true, rows: [] }) + '\n');
+    f.calls[0].child.stdout.write(JSON.stringify({ id: at === 'initialize' ? 1 : at === 'connect' ? 2 : 3, ok: true, rows: [] }) + '\n');
     await assert.rejects(f.client.query('SELECT 1'));
     await assert.rejects(f.client.end());
   }
