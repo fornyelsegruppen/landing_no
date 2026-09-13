@@ -94,14 +94,27 @@ def bootstrap(dependencies):
                for module in (psycopg, psycopg_binary, pq)):
             raise ValueError("DRIVER")
         phase = "NATIVE_VERSION"
-        if (sys.implementation.name != "cpython" or sys.version_info[:2] not in ((3, 12), (3, 13), (3, 14))
-                or psycopg.__version__ != "3.3.5" or pq.__impl__ != "binary" or pq.version() != 180004):
+        from sysconfig import get_platform
+        if (psycopg.__version__ != "3.3.5" or pq.__impl__ != "binary"
+                or not supported_native_version(sys.platform, get_platform(),
+                    sys.implementation.name, sys.version_info[:2], pq.version())):
             raise ValueError("DRIVER")
         phase = "NATIVE_CA"
         certificate = root_certificate()
         return (pq, make_conninfo, certificate), None
     except BaseException:
         return None, phase  # Only internal literals; never inspect exception data.
+
+
+def supported_native_version(platform_name, interpreter_abi, implementation, python_version, libpq_version):
+    # Exact observed hash-pinned wheel contracts, not host CPU architecture:
+    # x64 Python under ARM64 Windows still has the win-amd64 interpreter ABI.
+    versions = {
+        ("linux", "linux-x86_64", "cpython", (3, 12)): 180006,
+        ("win32", "win-amd64", "cpython", (3, 12)): 180004,
+    }
+    expected = versions.get((platform_name, interpreter_abi, implementation, python_version))
+    return expected is not None and libpq_version == expected
 
 
 def read_request():

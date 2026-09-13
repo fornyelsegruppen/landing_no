@@ -1,5 +1,48 @@
 # Optional production database compatibility preflight
 
+## Exact native artifact-version contract correction
+
+The subsequent `8e6a8f7` attempt failed `NATIVE_VERSION`, before the URL was sent.
+Public artifact inspection identified a deterministic source-contract error:
+the Linux wheel already pinned by the requirements bundles libpq **18.6**
+(`180006`), while the original check required Windows-observed **18.4** (`180004`)
+on every platform. Thus that exact Linux artifact necessarily failed the check.
+This does not establish any database connection, schema or TLS result.
+
+Artifact: `psycopg_binary-3.3.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl`,
+SHA-256 `682a17a57415c3ca1731eec018ed031f012ffcb81ba74806eb219cb396065672`,
+verified against [official PyPI release metadata](https://pypi.org/pypi/psycopg-binary/3.3.5/json).
+Static ZIP/ELF inspection, without executing the wheel, found:
+
+- WHEEL tags identify CPython 3.12 / Linux x86_64; METADATA version is 3.3.5.
+- `psycopg_binary.libs/libpq-e9b5c9ac.so.5.18` exports `PQlibVersion` at file
+  offset 120800, six bytes `B8 26 BF 02 00 C3`: `mov eax,180006; ret`.
+- The Python extension's `DT_NEEDED` names that exact bundled libpq; its
+  `DT_RPATH` is `$ORIGIN/../psycopg_binary.libs`.
+
+Only two observed interpreter-ABI tuples now pass; every other tuple or version
+fails with the same fixed `NATIVE_VERSION`, without printing runtime details:
+
+| Python platform / `sysconfig.get_platform()` | Implementation / Python | Exact libpq |
+| --- | --- | --- |
+| `linux` / `linux-x86_64` | CPython 3.12 | `180006` |
+| `win32` / `win-amd64` | CPython 3.12 | `180004` |
+
+Interpreter ABI is intentional: x64 CPython under ARM64 Windows reports
+`win-amd64` even when `platform.machine()` describes ARM64 host hardware.
+Inherited `_PYTHON_HOST_PLATFORM` is not forwarded to the child. No broad minimum
+version, architecture guess, other Python version or unverified tuple is accepted.
+Package, implementation and private-origin checks remain in place.
+
+Requirements/hashes, SQL/manifest, original URL, strict TLS, mandatory binding,
+fixed CA and all deadlines are unchanged. Focused checks: 37 Node tests and 8
+offline Python contract tests PASS, covering both exact tuples, wrong versions,
+unknown tuples and Windows emulation. The four synthetic authentication/TLS tests
+passed in the preceding transport revision and were not rerun for this pure
+version-contract correction. The artifact proof was independently reproduced;
+no native Linux code, production DB, deployment or remote API was invoked by this
+audit. Actual Linux bootstrap/connection success remains a separate release gate.
+
 ## Pooler compatibility and credential-free bootstrap refinement
 
 The actual native candidate reached `DB_COMPAT_FAIL_CONNECT`, after installation
@@ -52,12 +95,13 @@ directory: psycopg/psycopg-binary 3.3.5, typing-extensions 4.16.0, tzdata 2026.4
 No app package or global Python installation changes. There is no source-build,
 system-driver or weaker-authentication fallback. The requirements file itself is
 hash sealed; imported modules must resolve inside that private installation and
-report CPython 3.12–3.14, binary implementation and libpq 18.4.
+match the two exact interpreter/libpq tuples above and the binary implementation.
 
 Provisioning requires an existing `python3.12` with pip and public PyPI access;
 it has a separate 120-second hard deadline, outside the subsequent 45-second DB
-budget. Binary hashes cover Linux x64/arm64 CPython 3.12–3.14 and Windows x64
-CPython 3.12. Python/pip availability and matching wheels on the actual builder
+budget. Retained binary hashes cover Linux x64/arm64 CPython 3.12–3.14 and Windows
+x64 CPython 3.12, but the runtime accepts only the two verified tuples above.
+Python/pip availability and matching wheels on the actual builder
 are still release-platform gates, not assumptions proved by these local tests.
 `NATIVE_PREPARE` and `NATIVE_PREPARE_DEADLINE` are fixed sanitized failure suffixes;
 connection/authentication/trust failures remain `CONNECT` with no native details.

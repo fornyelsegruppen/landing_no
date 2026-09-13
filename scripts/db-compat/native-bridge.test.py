@@ -223,6 +223,24 @@ class NativeWireTests(unittest.TestCase):
 
 
 class ParameterTests(unittest.TestCase):
+    def test_only_exact_verified_interpreter_abi_and_libpq_pairs_are_supported(self):
+        self.assertTrue(bridge.supported_native_version("linux", "linux-x86_64", "cpython", (3, 12), 180006))
+        self.assertTrue(bridge.supported_native_version("win32", "win-amd64", "cpython", (3, 12), 180004))
+        for platform_name, abi, implementation, python_version, libpq_version in [
+                ("linux", "linux-x86_64", "cpython", (3, 12), 180004),
+                ("linux", "linux-x86_64", "cpython", (3, 12), 180007),
+                ("win32", "win-amd64", "cpython", (3, 12), 180006),
+                ("linux", "linux-aarch64", "cpython", (3, 12), 180006),
+                ("linux", "linux-x86_64", "cpython", (3, 13), 180006),
+                ("linux", "linux-x86_64", "pypy", (3, 12), 180006),
+                ("win32", "win-arm64", "cpython", (3, 12), 180004),
+                ("darwin", "macosx-x86_64", "cpython", (3, 12), 180004)]:
+            self.assertFalse(bridge.supported_native_version(platform_name, abi, implementation, python_version, libpq_version))
+
+    def test_emulated_windows_x64_uses_interpreter_abi_not_arm64_host_hardware(self):
+        with patch("platform.machine", return_value="ARM64"):
+            self.assertTrue(bridge.supported_native_version("win32", "win-amd64", "cpython", (3, 12), 180004))
+
     def test_bootstrap_failures_are_internal_codes_without_exception_details(self):
         directory = str(HERE)
         for expected in ["NATIVE_IMPORT", "NATIVE_ORIGIN", "NATIVE_VERSION", "NATIVE_CA"]:
@@ -241,7 +259,11 @@ class ParameterTests(unittest.TestCase):
                     pq.version = lambda: 1
                 original_path = list(sys.path)
                 try:
-                    with patch.dict(sys.modules, modules), patch.object(bridge, "root_certificate", side_effect=RuntimeError("PRIVATE")):
+                    # Isolate phase routing with the Windows-observed fake value;
+                    # the real platform/version contract is tested separately.
+                    with patch.dict(sys.modules, modules), \
+                            patch.object(bridge, "supported_native_version", side_effect=lambda _p, _a, _i, _v, libpq: libpq == 180004), \
+                            patch.object(bridge, "root_certificate", side_effect=RuntimeError("PRIVATE")):
                         value, phase = bridge.bootstrap(directory)
                     self.assertIsNone(value)
                     self.assertEqual(phase, expected)

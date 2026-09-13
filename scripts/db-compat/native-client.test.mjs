@@ -31,7 +31,7 @@ test('child allowlist drops all credential, PG, PIP, SSL, OpenSSL and Python ove
   const clean = childEnvironment({ PATH: 'system-path', DATABASE_URL: 'PRIVATE', PGPASSWORD: 'PRIVATE',
     PGOPTIONS: 'PRIVATE', PIP_INDEX_URL: 'PRIVATE', PIP_CONFIG_FILE: 'PRIVATE', NETRC: 'PRIVATE',
     SSL_CERT_FILE: 'PRIVATE', SSL_CERT_DIR: 'PRIVATE', OPENSSL_CONF: 'PRIVATE',
-    PYTHONPATH: 'PRIVATE', PYTHONHOME: 'PRIVATE', PSYCOPG_IMPL: 'python' });
+    PYTHONPATH: 'PRIVATE', PYTHONHOME: 'PRIVATE', _PYTHON_HOST_PLATFORM: 'PRIVATE', PSYCOPG_IMPL: 'python' });
   assert.equal(clean.PATH, 'system-path');
   assert.equal(clean.PSYCOPG_IMPL, 'binary');
   assert.equal(clean.PIP_CONFIG_FILE, process.platform === 'win32' ? 'NUL' : '/dev/null');
