@@ -210,12 +210,19 @@ export async function runPreflight({
       }
     }
     let columnMismatch = false;
+    let legacyVersionStatus = false;
     for (const [index, expected] of manifest.columns.entries()) {
       const actual = columns.rows.find(c => c.table_name === expected.table && c.column_name === expected.column);
+      // The original Posts migration used the base status enum; the subsequent
+      // version-table rename preserved it. This is one exact legacy column only.
+      const legacyStatus = expected.table === '_posts_v' && expected.column === 'version__status' &&
+        expected.type === 'enum__posts_v_version_status' && actual?.type_name === 'enum_posts_status' &&
+        actual.type_schema === 'public';
+      if (legacyStatus) legacyVersionStatus = true;
       const flags = [];
       if (!actual) flags.push('MISSING');
       else {
-        if (actual.type_name !== expected.type) flags.push('TYPE');
+        if (actual.type_name !== expected.type && !legacyStatus) flags.push('TYPE');
         if (actual.type_schema !== (expected.type.startsWith('enum_') ? 'public' : 'pg_catalog')) flags.push('NAMESPACE');
       }
       if (flags.length) {
@@ -237,7 +244,14 @@ export async function runPreflight({
       JOIN pg_catalog.pg_enum e ON e.enumtypid=t.oid
       WHERE n.nspname='public' AND t.typname=ANY($1::text[])`, [manifest.enums.map(e => e.name)]);
     for (const expected of manifest.enums) {
-      if (expected.values.some(value => !enums.rows.some(e => e.name === expected.name && e.value === value))) throw new Error('SEO_ENUMS');
+      // The snapshot-only enum has no other manifest consumer. Require labels on
+      // the observed legacy type, not existence of an unused shadow enum.
+      const name = legacyVersionStatus && expected.name === 'enum__posts_v_version_status'
+        ? 'enum_posts_status' : expected.name;
+      const values = enums.rows.filter(e => e.name === name).map(e => e.value);
+      if (expected.values.some(value => !values.includes(value))) throw new Error('SEO_ENUMS');
+      if (legacyVersionStatus && name === 'enum_posts_status' &&
+        (values.length !== 2 || !values.includes('draft') || !values.includes('published'))) throw new Error('SEO_ENUMS');
     }
     check = 'SEO_PERMISSIONS';
     const permissions = await query(permissionsSql, [tables]);

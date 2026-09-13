@@ -396,3 +396,41 @@ acceptance remain necessary for their respective claims. Public CMS success by
 itself does not exercise the ONE UI joins or SEO scheduling permissions. Conversely,
 optional performance-index names and migration-ledger parity must not be turned
 into blanket release blockers when these fixed structural checks pass.
+
+## Exact historical Posts version-status exception
+
+The 2026-09-13 protected check reported only column ordinal 190 TYPE T011:
+`_posts_v.version__status` uses `public.enum_posts_status`, while the generated
+snapshot declares `public.enum__posts_v_version_status`. This is supported by
+executable migration history: `20260727_150000_pages_posts_redirects.ts` creates
+the version column with `enum_posts_status`; `20260823_150443_phase3_blog_foundation.ts`
+renames the table without changing that type. No executable migration introduces
+the snapshot-only version-status type.
+
+The gate therefore accepts only that exact column/expected-type/actual-public-type
+combination. Only after observing it, the otherwise unused shadow enum's label
+check resolves to the actual shared enum and requires exactly `draft,published`.
+The canonical shape still requires its canonical enum. No other column, namespace,
+enum alias, label-set equivalence or text coercion is accepted. SQL, sealed source
+manifest, transport, permissions and transaction behavior are unchanged. This
+exception does not require a production schema mutation.
+
+Focused offline tests cover wrong namespace/name/column, missing column/shadow,
+and missing/extra/changed labels. The explicitly opted-in
+`Posts.legacy-status.postgres.qa.test.ts` additionally passed both canonical and
+legacy/no-shadow shapes on a fresh schema-only clone of the fixed synthetic
+loopback fixture. It verified actual Payload draft create/update/read,
+status-filtered version reads, explicit draft restore, draft-input normalization,
+and PostgreSQL invalid-label rejection. Each shape passed all 18 sealed EXPLAINs;
+adding an invalid enum label failed before EXPLAIN. The generated clone and its
+temporary schema file were removed. The shared fixture was read-only.
+
+Local command (existing matching ARM64 Node/Vitest, clean environment containing
+only OS path/temp variables plus `NODE_ENV=test` and `SEO_LEGACY_STATUS_LOCAL=1`):
+`node ../../node_modules/vitest/vitest.mjs run src/payload/collections/Posts.legacy-status.postgres.qa.test.ts`
+from the isolated worktree (its existing dependency tree is two directories up).
+Result: 2 tests PASS; focused Node contracts: 42 PASS; TypeScript noEmit and touched
+test ESLint PASS. This local proof injects a loopback client, so it is not evidence
+of production TLS, production enum labels, other stored data or remote runtime
+behavior. The 18 sealed plans do not themselves exercise Payload version writes;
+the separate actual Payload assertions supply that bounded local evidence.

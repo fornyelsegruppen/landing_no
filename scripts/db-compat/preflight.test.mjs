@@ -375,6 +375,44 @@ test('all-column absence is bounded at 251 ordinal records then one failure', as
   assert.equal(f.calls.some(sql => sql.includes('e.enumlabel') || sql.startsWith('EXPLAIN')), false);
 });
 
+test('only the historical version-status column accepts the exact public legacy enum with complete labels', async () => {
+  const canonicalName = 'enum__posts_v_version_status';
+  assert.deepEqual(manifest.columns.filter(c => c.type === canonicalName),
+    [{ table: '_posts_v', column: 'version__status', type: canonicalName }]);
+  for (const scenario of ['legacy', 'wrong_namespace', 'wrong_name', 'other_column', 'missing_column',
+    'missing_label', 'extra_label', 'changed_label', 'canonical_missing_enum']) {
+    const f = fixture();
+    const query = f.client.query;
+    f.client.query = async (text, parameters) => {
+      const result = await query(text, parameters);
+      if (text.includes('t.typname AS type_name')) {
+        const column = result.rows.find(c => c.table_name === '_posts_v' && c.column_name === 'version__status');
+        if (scenario !== 'canonical_missing_enum') column.type_name = 'enum_posts_status';
+        if (scenario === 'wrong_namespace') column.type_schema = 'PRIVATE';
+        if (scenario === 'wrong_name') column.type_name = 'enum_seo_topics_status';
+        if (scenario === 'other_column') result.rows.find(c => c.table_name === '_posts_v' &&
+          c.column_name === 'version_editorial_status').type_name = 'enum_posts_status';
+        if (scenario === 'missing_column') result.rows = result.rows.filter(c => c !== column);
+      }
+      if (text.includes('e.enumlabel')) {
+        result.rows = result.rows.filter(e => e.name !== canonicalName);
+        if (scenario === 'missing_label' || scenario === 'changed_label') result.rows = result.rows.filter(e =>
+          !(e.name === 'enum_posts_status' && e.value === 'published'));
+        if (scenario === 'extra_label' || scenario === 'changed_label') result.rows.push({ name: 'enum_posts_status', value: 'PRIVATE' });
+      }
+      return result;
+    };
+    assert.equal(await runPreflight(f.options), scenario === 'legacy' ? 0 : 1, scenario);
+    if (scenario === 'legacy') {
+      assert.deepEqual(f.logs, ['DB_COMPAT_PASS']);
+      assert.equal(f.calls.filter(sql => sql.startsWith('EXPLAIN')).length, 18);
+    } else {
+      assert.equal(f.calls.some(sql => sql.startsWith('EXPLAIN')), false);
+      assert.doesNotMatch(JSON.stringify(f.logs), /PRIVATE|enum_posts/);
+    }
+  }
+});
+
 test('catalog read failure and late response never emit column mismatch details', async () => {
   const failure = fixture(sql => sql.includes('t.typname AS type_name'));
   assert.equal(await runPreflight(failure.options), 1);
