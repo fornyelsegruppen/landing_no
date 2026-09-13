@@ -1,6 +1,79 @@
 # Optional production database compatibility preflight
 
-## Diagnostic-only refinement after the tracked-gate attempt
+## Native mandatory-binding transport candidate
+
+Source-only change from `50005b0`: explicit `channel_binding=require` now selects
+the supported libpq transport below, instead of rejecting that requirement.
+The original URL is passed privately on stdin; it is not rewritten, exported,
+printed, stored, or put in process arguments. Duplicate allowed URL parameters
+fail with `URL_OPTIONS`. Other URL/PG policies, app driver/dependencies, tracked
+build command, sealed manifest and its 18 EXPLAIN statements remain unchanged.
+No remote build, production DB check or traffic change is authorized by this patch.
+
+Default OFF still returns before any credential, manifest, native-module,
+Python, installation or connection I/O. Explicit opt-in plus mandatory binding
+provisions hash-pinned official PyPI binary wheels into a fresh private temporary
+directory: psycopg/psycopg-binary 3.3.5, typing-extensions 4.16.0, tzdata 2026.4.
+No app package or global Python installation changes. There is no source-build,
+system-driver or weaker-authentication fallback. The requirements file itself is
+hash sealed; imported modules must resolve inside that private installation and
+report CPython 3.12–3.14, binary implementation and libpq 18.4.
+
+Provisioning requires an existing `python3.12` with pip and public PyPI access;
+it has a separate 120-second hard deadline, outside the subsequent 45-second DB
+budget. Binary hashes cover Linux x64/arm64 CPython 3.12–3.14 and Windows x64
+CPython 3.12. Python/pip availability and matching wheels on the actual builder
+are still release-platform gates, not assumptions proved by these local tests.
+`NATIVE_PREPARE` and `NATIVE_PREPARE_DEADLINE` are fixed sanitized failure suffixes;
+connection/authentication/trust failures remain `CONNECT` with no native details.
+
+The child receives only OS executable/temp-location keys, fixed binary selection,
+and null pip/netrc configuration. It does not inherit PG, PIP, Python, TLS trust,
+OpenSSL or credential settings. pip is isolated, hash/binary-only, fixed to PyPI,
+with all configuration files disabled and keyring disabled. Runtime Python uses
+`-I -S`; raw installer/native stderr is discarded. No secrets reach pip.
+
+Public `PGconn.connect`/`exec_params` enforce `channel_binding=require`,
+`sslmode=verify-full`, the fixed system trust store below, `require_auth=scram-sha-256`, disabled
+client certificates and disabled GSS transport. This is low-level libpq: no
+implicit psycopg transaction or context-manager COMMIT. The unchanged explicit
+repeatable-read READ ONLY transaction is additionally protected by a startup
+read-only default. Exact SQL and bound `$n` parameters cross bounded private IPC;
+EXPLAIN plans never cross back. Connect/query limits remain 5/6 seconds and server
+statement/lock/idle-transaction limits remain 5/1/10 seconds. Errors, EOF, malformed
+or late frames permanently poison success. Cleanup rolls back/finishes or kills
+and reaps the child; only its owned temporary dependency directory is removed.
+
+Linux uses only AWS's documented AL2023 system bundle
+`/etc/pki/tls/certs/ca-bundle.crt`, requiring an existing regular file and passing
+that exact path to libpq. No CA contents are copied, exported or discovered, and
+inherited trust overrides are not forwarded. This avoids bundled OpenSSL's
+potentially different compiled default path. Windows synthetic tests alone use
+`sslrootcert=system`. Vercel documents AL2023 and Python versions, but actual
+builder interpreter/pip availability and CA-file presence remain unproven.
+Missing trust fails closed; never copy/export credentials, scrape a host CA store, remove
+binding, substitute an unverified CA or disable verification to force PASS.
+
+Local evidence: 35 focused Node tests (21 preflight, 6 native IPC, 8 build contracts)
+and 8 Python tests pass. The latter use an ephemeral synthetic TLS PostgreSQL wire
+peer, not an existing DB: real pinned libpq completes SCRAM-SHA-256-PLUS and proves
+certificate binding; cleartext/MD5/plain-SCRAM/trust challenges are reached and
+rejected without password frames; bad server proof fails after two SASL frames;
+wrong hostname and untrusted certificate fail before credentials. A synthetic
+test-only CA is passed only to the wire-test child; production drops that override.
+Linux path selection/missing-file rejection are unit tested, not a Linux deployment
+PASS. All 18 parameterized SQL texts are checked without execution. These tests do not
+prove production schema, Linux trust portability, actual application behavior or
+real-server execution through the new native bridge. Independent source review
+and a separate exact-SHA one-shot build approval remain required.
+
+References: [Psycopg binary installation](https://www.psycopg.org/psycopg3/docs/basic/install.html),
+[public libpq wrapper](https://www.psycopg.org/psycopg3/docs/api/pq.html),
+[libpq connection policy](https://www.postgresql.org/docs/current/libpq-connect.html),
+[AWS AL2023 system trust store](https://aws.amazon.com/blogs/security/how-to-configure-and-verify-acm-certificates-with-trust-stores/),
+[Vercel build image](https://vercel.com/docs/builds/build-image).
+
+## Historical diagnostic-only refinement after the tracked-gate attempt
 
 The actual 523fe868 build invoked the gate but reported only
 `DB_COMPAT_FAIL_CONNECTION`; that earlier code does not identify its cause.
@@ -19,7 +92,7 @@ New failure suffixes (each is prefixed `DB_COMPAT_FAIL_`):
 | `URL_REQUIRED_FIELDS` | A required URL component was absent. |
 | `URL_OPTIONS` | A URL option was not allowlisted. |
 | `TLS_MODE` | The explicit URL TLS mode was not accepted. |
-| `CHANNEL_BINDING_REQUIRED_UNSUPPORTED` | Explicit mandatory channel binding remains unsupported. |
+| `CHANNEL_BINDING_REQUIRED_UNSUPPORTED` | Historical pre-native rejection; superseded by the native candidate above. |
 | `CHANNEL_BINDING_OPTION` | Another channel-binding option was not accepted. |
 | `URL_CONFIG` | An unexpected failure occurred while obtaining/validating URL configuration. |
 | `DRIVER_CREATE` | Driver import, client construction or initial listener setup failed. |
@@ -143,12 +216,11 @@ TLS always verifies certificates and hostname. Only URL query parameters
 `sslmode` and `channel_binding` are accepted; `sslmode` must be absent or
 `require`/`verify-ca`/`verify-full`, and is removed before passing the URL to `pg`
 so it cannot override strict TLS. `channel_binding` may be absent, `prefer`, or
-`disable`; supported values map explicitly to the pinned driver's
-`enableChannelBinding` option. `channel_binding=require` is unsupported because
-this driver offers opportunistic binding, not libpq's mandatory-binding contract.
-This is an inconclusive transport/configuration failure, not missing DB schema.
-Do not remove or rewrite that requirement from the original production URL to
-force PASS. It needs a separately reviewed transport solution if present.
+`disable`; those values map explicitly to the pinned pg driver's
+`enableChannelBinding` option. `channel_binding=require` selects only the native
+mandatory-binding transport described above. No fallback to pg occurs if it fails.
+Transport failure is inconclusive, not missing DB schema; do not remove or rewrite
+the requirement from the original production URL to force PASS.
 All other URL options fail closed, including
 alternate-host, SSL-file and timeout overrides. A private-CA deployment may need
 a separately approved CA strategy; do not add `rejectUnauthorized: false`.

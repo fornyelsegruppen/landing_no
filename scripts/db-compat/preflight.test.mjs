@@ -77,8 +77,7 @@ test('strict TLS cannot be overridden by URL ssl parameters or inherited PG defa
   for (const raw of ['', 'file:./fallback.db', 'postgresql://x@host/db',
     'postgresql://x:y@host/db?sslmode=disable', 'postgresql://x:y@host/db?ssl=false',
     'postgresql://x:y@host/db?sslrootcert=/secret', 'postgresql://x:y@host/db?query_timeout=0',
-    'postgresql://x:y@host/db?host=elsewhere', 'postgresql://x:y@host/db?options=-c%20statement_timeout%3D0',
-    'postgresql://x:y@host/db?channel_binding=require']) {
+    'postgresql://x:y@host/db?host=elsewhere', 'postgresql://x:y@host/db?options=-c%20statement_timeout%3D0']) {
     assert.throws(() => connectionOptions(raw));
   }
 });
@@ -100,8 +99,10 @@ test('configuration failures have fixed distinct codes and never construct a dri
     ['postgresql://synthetic:private@example.invalid/', 'URL_REQUIRED_FIELDS'],
     ['postgresql://synthetic:private@example.invalid/db?host=PRIVATE', 'URL_OPTIONS'],
     ['postgresql://synthetic:private@example.invalid/db?sslrootcert=PRIVATE', 'URL_OPTIONS'],
+    ['postgresql://synthetic:private@example.invalid/db?channel_binding=prefer&channel_binding=require', 'URL_OPTIONS'],
+    ['postgresql://synthetic:private@example.invalid/db?channel_binding=require&channel_binding=prefer', 'URL_OPTIONS'],
+    ['postgresql://synthetic:private@example.invalid/db?sslmode=require&sslmode=verify-full', 'URL_OPTIONS'],
     ['postgresql://synthetic:private@example.invalid/db?sslmode=no-verify', 'TLS_MODE'],
-    ['postgresql://synthetic:private@example.invalid/db?channel_binding=require', 'CHANNEL_BINDING_REQUIRED_UNSUPPORTED'],
     ['postgresql://synthetic:private@example.invalid/db?channel_binding=PRIVATE', 'CHANNEL_BINDING_OPTION'],
   ]) {
     const f = fixture();
@@ -114,6 +115,26 @@ test('configuration failures have fixed distinct codes and never construct a dri
     assert.deepEqual(f.calls, []);
     assert.deepEqual(f.logs, [`DB_COMPAT_FAIL_${code}`]);
   }
+});
+
+test('mandatory binding preserves original URL for native-only enforcement', () => {
+  const raw = environment.DATABASE_URL.replace('channel_binding=prefer', 'channel_binding=require');
+  const options = connectionOptions(raw);
+  assert.equal(options.nativeConnectionString, raw);
+  assert.deepEqual(options.ssl, { rejectUnauthorized: true });
+  assert.equal(connectionOptions(environment.DATABASE_URL).nativeConnectionString, undefined);
+});
+
+test('native provisioning has a separate bounded budget and never consumes the DB budget', async () => {
+  const nativeEnv = { ...environment, DATABASE_URL: environment.DATABASE_URL.replace('binding=prefer', 'binding=require') };
+  const f = fixture();
+  f.client.prepare = async () => { await new Promise(resolve => setTimeout(resolve, 25)); };
+  assert.equal(await runPreflight({ ...f.options, environment: nativeEnv, deadlineMs: 15, provisionDeadlineMs: 100 }), 0);
+  const blocked = fixture();
+  blocked.client.prepare = async () => new Promise(() => {});
+  assert.equal(await runPreflight({ ...blocked.options, environment: nativeEnv, deadlineMs: 100, provisionDeadlineMs: 5 }), 1);
+  assert.deepEqual(blocked.logs, ['DB_COMPAT_FAIL_NATIVE_PREPARE_DEADLINE']);
+  assert.deepEqual(blocked.calls, ['end']);
 });
 
 test('driver, connect, readonly BEGIN and each session timeout have distinct safe phases', async () => {

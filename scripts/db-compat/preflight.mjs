@@ -66,6 +66,9 @@ export function connectionOptions(raw) {
   if (!url.hostname || !url.username || !url.password || url.pathname.length < 2) {
     throw configurationFailure('URL_REQUIRED_FIELDS');
   }
+  for (const key of ['sslmode', 'channel_binding']) {
+    if (url.searchParams.getAll(key).length > 1) throw configurationFailure('URL_OPTIONS');
+  }
   const sslmode = url.searchParams.get('sslmode');
   if (sslmode && !['require', 'verify-ca', 'verify-full'].includes(sslmode)) throw configurationFailure('TLS_MODE');
   for (const key of url.searchParams.keys()) {
@@ -73,11 +76,11 @@ export function connectionOptions(raw) {
     // alternate hosts, SSL files, timeouts, session options or credential sources.
     if (!['sslmode', 'channel_binding'].includes(key)) throw configurationFailure('URL_OPTIONS');
   }
-  // Pinned pg supports opportunistic channel binding, not libpq's "require".
-  // Never silently weaken a URL that explicitly requires it.
+  // Mandatory binding is handled only by the supported native libpq transport.
+  // pg remains unchanged for URLs that do not require channel binding.
   const binding = url.searchParams.get('channel_binding');
-  if (binding && !['prefer', 'disable'].includes(binding)) {
-    throw configurationFailure(binding === 'require' ? 'CHANNEL_BINDING_REQUIRED_UNSUPPORTED' : 'CHANNEL_BINDING_OPTION');
+  if (binding && !['prefer', 'disable', 'require'].includes(binding)) {
+    throw configurationFailure('CHANNEL_BINDING_OPTION');
   }
   // Translate supported transport options explicitly; URL parser options must
   // not override certificate/hostname verification or fixed timeouts.
@@ -85,6 +88,7 @@ export function connectionOptions(raw) {
   url.searchParams.delete('channel_binding');
   if (!url.port) url.port = '5432';
   return { connectionString: url.toString(), ssl: { rejectUnauthorized: true },
+    ...(binding === 'require' ? { nativeConnectionString: raw } : {}),
     connectionTimeoutMillis: 5000, query_timeout: 6000,
     enableChannelBinding: binding === 'prefer',
     application_name: 'seo-one-ui-compat-preflight' };
@@ -94,8 +98,15 @@ export async function runPreflight({
   environment = process.env,
   log = line => console.log(line),
   load = loadArtifact,
-  createClient = async options => { const { default: pg } = await import('pg'); return new pg.Client(options); },
+  createClient = async options => {
+    if (options.nativeConnectionString) {
+      const { NativeClient } = await import('./native-client.mjs');
+      return new NativeClient(options);
+    }
+    const { default: pg } = await import('pg'); return new pg.Client(options);
+  },
   deadlineMs = 45000,
+  provisionDeadlineMs = 120000,
   cleanupTimeoutMs = 2000,
 } = {}) {
   // No file/credential/driver/database access on the normal build path.
@@ -103,10 +114,17 @@ export async function runPreflight({
     log('DB_COMPAT_DISABLED');
     return 0;
   }
-  let check = 'OPT_IN', client, timer, began = false, ending, cancelled = false;
+  let check = 'OPT_IN', client, timer, rejectDeadline, began = false, ending, cancelled = false;
   const close = () => {
     if (client && !ending) ending = Promise.resolve().then(() => client.end());
     return ending || Promise.resolve();
+  };
+  const startDeadline = (duration, phase = 'DEADLINE') => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      cancelled = true; check = phase;
+      void close().catch(() => {}); rejectDeadline(new Error('DEADLINE'));
+    }, duration);
   };
   const query = (...args) => {
     if (cancelled) throw new Error('DEADLINE');
@@ -143,6 +161,14 @@ export async function runPreflight({
     // failures still fail the gate. Any async connection error poisons success.
     let connectionError = false;
     client.on('error', () => { connectionError = true; });
+    if (options.nativeConnectionString) {
+      // Provisioning has its own hard budget, outside the 45s database budget.
+      check = 'NATIVE_PREPARE';
+      startDeadline(provisionDeadlineMs, 'NATIVE_PREPARE_DEADLINE');
+      await client.prepare();
+      if (cancelled) throw new Error('DEADLINE');
+      startDeadline(deadlineMs);
+    }
     check = 'CONNECT';
     await client.connect();
     if (cancelled) throw new Error('DEADLINE');
@@ -205,9 +231,9 @@ export async function runPreflight({
     if (connectionError) throw new Error('CONNECTION');
   };
   try {
-    await Promise.race([work(), new Promise((_, reject) => {
-      timer = setTimeout(() => { cancelled = true; check = 'DEADLINE'; void close().catch(() => {}); reject(new Error('DEADLINE')); }, deadlineMs);
-    })]);
+    const deadline = new Promise((_, reject) => { rejectDeadline = reject; });
+    startDeadline(deadlineMs);
+    await Promise.race([work(), deadline]);
     log('DB_COMPAT_PASS');
     return 0;
   } catch (error) {
