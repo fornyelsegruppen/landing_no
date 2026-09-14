@@ -13,10 +13,10 @@ const PENDING_LEAD_STORAGE_KEY = "takfornyelse_pending_lead_conversion";
 // can override them, while the fallbacks prevent a missing Vercel variable from
 // silently disabling paid-ad conversion measurement in production.
 const googleAdsId =
-  process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "AW-18395015353";
+  process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "AW-18213788044";
 const googleAdsLeadLabel =
   process.env.NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL?.trim() ||
-  "MEIiCKPAk-UcELnRtsNE";
+  "oHJeCIutstUcEIyzge1D";
 const googleAnalyticsId =
   process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID?.trim() || "G-ENMB8696J8";
 const metaPixelId =
@@ -112,8 +112,8 @@ function sendLeadConversion(
   };
 
   sendGoogleEvent("generate_lead", eventParams);
-  // This exact GA4 event is the primary website conversion already imported
-  // in Google Ads account 493-800-5876.
+  // Keep the GA4 event alongside the account-specific Google Ads event so the
+  // same successful enquiry can be verified across both measurement surfaces.
   sendGoogleEvent("manual_event_SUBMIT_LEAD_FORM", eventParams);
   if (googleAdsId && googleAdsLeadLabel) {
     sendGoogleEvent("conversion", {
