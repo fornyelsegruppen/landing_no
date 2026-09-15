@@ -19,7 +19,7 @@ export class ResendEmailProvider implements EmailProvider {
     if (!this.apiKey) throw new ProviderUnavailableError("resend", "configuration_required");
     const response = await new Resend(this.apiKey).emails.send(
       {
-        from: this.environment.LEAD_FROM_EMAIL || "Takfornyelse <post@takfornyelse.as>",
+        from: this.environment.LEAD_FROM_EMAIL || "Takfornyelse <post@takfornyelsenorge.no>",
         to: message.to,
         subject: message.subject,
         text: message.text,

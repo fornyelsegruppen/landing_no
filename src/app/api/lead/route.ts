@@ -391,7 +391,7 @@ export async function POST(request: Request) {
         });
         await resend.emails.send(
           {
-            from: process.env.LEAD_FROM_EMAIL || "leads@takfornyelse.as",
+            from: process.env.LEAD_FROM_EMAIL || "post@takfornyelsenorge.no",
             to: adminRecipients,
             ...(email ? { replyTo: email } : {}),
             subject: buildLeadEmailSubject(emailPayload),
