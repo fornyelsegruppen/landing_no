@@ -101,6 +101,27 @@ describe("public lead durability", () => {
     );
   });
 
+  it.each(["website", "company_url_hp"])(
+    "keeps %s honeypot rejection silently successful without a persisted lead ID",
+    async (field) => {
+      const original = request();
+      const body = await original.json();
+      const response = await POST(
+        new Request(original.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, [field]: "spam" }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+      expect(mocks.create).not.toHaveBeenCalled();
+      expect(mocks.receipt).not.toHaveBeenCalled();
+      expect(mocks.resendSend).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps the saved lead when AI job enqueueing fails", async () => {
     process.env.FEATURE_AI_DRAFTS = "true";
     mocks.enqueueAi.mockRejectedValueOnce(new Error("AI queue unavailable"));
