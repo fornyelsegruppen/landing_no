@@ -29,4 +29,8 @@ describe("legacy redirects", () => {
       "https://fornyelsegruppen.no/tjenester/fjerning-av-taksno",
     );
   });
+
+  it("preserves the projects sitelink intent at the existing reference section", () => {
+    expect(destinationFor("/no/prosjekter")).toBe("/no#referanser");
+  });
 });

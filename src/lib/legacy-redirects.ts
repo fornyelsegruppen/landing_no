@@ -126,6 +126,7 @@ const legacySectionRedirects: LegacyRedirect[] = [
   redirect("/omrader", "/no#tjenester"),
   redirect("/tilbud", "/no#kontakt"),
   redirect("/kontakt", "/no#kontakt"),
+  redirect("/no/prosjekter", "/no#referanser"),
   redirect("/om-oss", "/no#om-oss"),
   redirect("/pakker", "/no#pakker"),
   redirect("/kalkulator", "/no#kalkulator"),
