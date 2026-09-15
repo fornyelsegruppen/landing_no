@@ -45,7 +45,7 @@ type MetaPixelFunction = ((...args: unknown[]) => void) & {
 
 declare global {
   interface Window {
-    dataLayer?: unknown[][];
+    dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
     fbq?: MetaPixelFunction;
     _fbq?: MetaPixelFunction;
@@ -207,8 +207,10 @@ function ensureGoogleTag() {
   if (!loaderId) return;
 
   window.dataLayer ||= [];
-  window.gtag ||= (...args: unknown[]) => {
-    window.dataLayer?.push(args);
+  window.gtag ||= function () {
+    // gtag.js dispatches Arguments objects; plain arrays are data-model calls.
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer?.push(arguments);
   };
   window.gtag("consent", "default", {
     ad_storage: "denied",

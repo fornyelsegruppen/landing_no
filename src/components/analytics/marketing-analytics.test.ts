@@ -145,6 +145,7 @@ describe("advertising consent", () => {
     consentStorage.setItem(CONSENT_KEY, "granted");
     renderAnalytics("granted");
 
+    expect(window.gtag).toBe(google);
     expect(appendScript.mock.calls.map(([script]) => script.src)).toEqual([
       "https://www.googletagmanager.com/gtag/js?id=G-ENMB8696J8",
       "https://connect.facebook.net/en_US/fbevents.js",
@@ -163,6 +164,53 @@ describe("advertising consent", () => {
     expect(googleEvents("page_view")[0][2]).toMatchObject({
       page_location: "https://takfornyelsenorge.no/no",
     });
+  });
+
+  it("queues first-load commands in the format consumed by the Google tag", () => {
+    consentStorage.setItem(CONSENT_KEY, "granted");
+    delete window.gtag;
+    renderAnalytics("granted");
+
+    // gtag.js treats plain arrays as data-model method calls; only Arguments
+    // objects enter its consent/config/event command dispatcher.
+    const acceptedCommands = (window.dataLayer || [])
+      .filter(
+        (message): message is IArguments =>
+          Object.prototype.toString.call(message) === "[object Arguments]",
+      )
+      .map((message) => Array.from(message));
+
+    expect(acceptedCommands).toEqual([
+      [
+        "consent",
+        "default",
+        expect.objectContaining({ analytics_storage: "denied" }),
+      ],
+      ["js", expect.any(Date)],
+      [
+        "consent",
+        "update",
+        expect.objectContaining({ analytics_storage: "granted" }),
+      ],
+      [
+        "config",
+        "G-ENMB8696J8",
+        expect.objectContaining({ send_page_view: false }),
+      ],
+      [
+        "config",
+        "AW-18213788044",
+        expect.objectContaining({ send_page_view: false }),
+      ],
+      [
+        "event",
+        "page_view",
+        {
+          page_location: "https://takfornyelsenorge.no/no",
+          page_path: "/no",
+        },
+      ],
+    ]);
   });
 
   it("revokes initialized tags, discards pending conversion, and blocks later explicit events", () => {
