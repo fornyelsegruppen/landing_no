@@ -28,6 +28,7 @@ import {
 import { CertificationBadges } from "@/components/trust/certification-badges";
 import {
   captureLeadAttribution,
+  resolveLeadAcquisition,
   readContentSource,
   type LeadAttribution,
 } from "@/lib/lead-attribution";
@@ -576,6 +577,15 @@ export function ContactSection() {
         return;
       }
 
+      const marketingConsent = getMarketingConsentChoice();
+      let attribution = attributionRef.current;
+      try {
+        attribution = resolveLeadAcquisition(
+          window.sessionStorage,
+          attribution,
+          marketingConsent,
+        );
+      } catch {}
       const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -593,8 +603,8 @@ export function ContactSection() {
           turnstileToken: submissionTurnstileToken || undefined,
           consent: true as const,
           consentText,
-          ...attributionRef.current,
-          marketingConsent: getMarketingConsentChoice(),
+          ...attribution,
+          marketingConsent,
           website: honeypot.website,
           company_url_hp: honeypot.company_url_hp,
         }),
@@ -602,6 +612,7 @@ export function ContactSection() {
 
       const data = (await res.json().catch(() => null)) as {
         ok?: boolean;
+        id?: number | string;
         error?: string;
       } | null;
 
@@ -614,7 +625,7 @@ export function ContactSection() {
         throw new Error(data?.error || "Failed");
       }
 
-      trackLeadConversion({ inquiryType: step1.data.type });
+      trackLeadConversion({ inquiryType: step1.data.type, persistedLeadId: data.id });
       toast.success(copy.contact.form.success);
       if (failed > 0 && photoUrls.length) {
         toast.message(copy.contact.form.partialUpload);

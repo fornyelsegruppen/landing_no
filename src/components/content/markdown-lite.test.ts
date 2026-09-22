@@ -26,6 +26,9 @@ describe("safe Markdown links", () => {
         "en",
       ),
     ).toBe("/en/takvask?source=blog#tilbud");
+    expect(
+      safeContentHref("https://www.takfornyelse.as/no/takmaling", "no"),
+    ).toBe("/no/takmaling");
   });
 
   it("allows web links and rejects executable schemes", () => {

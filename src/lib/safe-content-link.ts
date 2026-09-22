@@ -1,6 +1,12 @@
 import { siteConfig } from "@/lib/site";
 
 const localePath = /^\/(?:no|en)(?=\/|[?#]|$)/;
+const PUBLIC_SITE_HOSTS = new Set([
+  "takfornyelsenorge.no",
+  "www.takfornyelsenorge.no",
+  "takfornyelse.as",
+  "www.takfornyelse.as",
+]);
 
 function localizeInternalPath(href: string, locale: "no" | "en") {
   if (
@@ -31,7 +37,7 @@ export function safeContentHref(
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
 
     const siteOrigin = new URL(siteConfig.url).origin;
-    if (url.origin === siteOrigin) {
+    if (url.origin === siteOrigin || PUBLIC_SITE_HOSTS.has(url.hostname)) {
       return localizeInternalPath(
         `${url.pathname}${url.search}${url.hash}`,
         locale,

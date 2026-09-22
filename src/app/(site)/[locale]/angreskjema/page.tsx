@@ -22,7 +22,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: `${siteConfig.url}/${loc}/angreskjema`,
       languages: Object.fromEntries(
-        routing.locales.map((language) => [language, `${siteConfig.url}/${language}/angreskjema`]),
+        [
+          ...routing.locales.map((language) => [
+            language,
+            `${siteConfig.url}/${language}/angreskjema`,
+          ]),
+          ["x-default", `${siteConfig.url}/no/angreskjema`],
+        ],
       ),
     },
     robots: { index: true, follow: true },

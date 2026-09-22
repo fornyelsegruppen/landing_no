@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/routing";
+import {
+  ACQUISITION_TTL_MS,
+  captureLeadAttribution,
+  clearLeadAcquisition,
+  hasCampaignAttribution,
+  rememberLeadAcquisition,
+  type LeadAttribution,
+} from "@/lib/lead-attribution";
 
 const CONSENT_STORAGE_KEY = "takfornyelse_marketing_consent";
 const OPEN_CONSENT_EVENT = "takfornyelse:open-marketing-consent";
 const PENDING_LEAD_STORAGE_KEY = "takfornyelse_pending_lead_conversion";
+const SENT_GA4_LEAD_STORAGE_PREFIX = "takfornyelse_sent_ga4_lead:";
+const sentGa4LeadIds = new Set<string>();
 
-// These public measurement IDs belong to takfornyelse.as. Environment values
+// Preserve the existing measurement history for takfornyelsenorge.no. Environment values
 // can override them, while the fallbacks prevent a missing Vercel variable from
 // silently disabling paid-ad conversion measurement in production.
 const googleAdsId =
@@ -35,7 +45,7 @@ type MetaPixelFunction = ((...args: unknown[]) => void) & {
 
 declare global {
   interface Window {
-    dataLayer?: unknown[][];
+    dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
     fbq?: MetaPixelFunction;
     _fbq?: MetaPixelFunction;
@@ -43,18 +53,22 @@ declare global {
 }
 
 function sendGoogleEvent(name: string, params?: Record<string, unknown>) {
+  if (getMarketingConsentChoice() !== "granted") return;
   window.gtag?.("event", name, params || {});
 }
 
 function sendMetaEvent(name: string, params?: Record<string, unknown>) {
+  if (getMarketingConsentChoice() !== "granted") return;
   window.fbq?.("track", name, params || {});
 }
 
 function sendMetaLeadEvent(params: Record<string, unknown>, eventId: string) {
+  if (getMarketingConsentChoice() !== "granted") return;
   window.fbq?.("track", "Lead", params, { eventID: eventId });
 }
 
 function sendMetaCustomEvent(name: string, params?: Record<string, unknown>) {
+  if (getMarketingConsentChoice() !== "granted") return;
   window.fbq?.("trackCustom", name, params || {});
 }
 
@@ -66,8 +80,32 @@ export function trackArticleCtaClick(slug: string) {
 
 export function getMarketingConsentChoice(): ConsentChoice | "unknown" {
   if (typeof window === "undefined") return "unknown";
-  const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
-  return stored === "granted" || stored === "denied" ? stored : "unknown";
+  try {
+    const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+    return stored === "granted" || stored === "denied" ? stored : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function claimGa4LeadEvent(eventId: string) {
+  if (!window.gtag || sentGa4LeadIds.has(eventId)) return false;
+
+  try {
+    if (
+      window.sessionStorage.getItem(`${SENT_GA4_LEAD_STORAGE_PREFIX}${eventId}`)
+    ) {
+      return false;
+    }
+    window.sessionStorage.setItem(
+      `${SENT_GA4_LEAD_STORAGE_PREFIX}${eventId}`,
+      "sent",
+    );
+  } catch {
+    // The in-memory marker also protects same-page recovery when storage is blocked.
+  }
+  sentGa4LeadIds.add(eventId);
+  return true;
 }
 
 type LeadFormEvent =
@@ -104,6 +142,8 @@ function sendLeadConversion(
   eventId: string,
   params?: { inquiryType?: string },
 ) {
+  if (getMarketingConsentChoice() !== "granted") return;
+
   const eventParams = {
     value: 1,
     currency: "NOK",
@@ -111,10 +151,12 @@ function sendLeadConversion(
     ...(params?.inquiryType ? { inquiry_type: params.inquiryType } : {}),
   };
 
-  sendGoogleEvent("generate_lead", eventParams);
-  // Keep the GA4 event alongside the account-specific Google Ads event so the
-  // same successful enquiry can be verified across both measurement surfaces.
-  sendGoogleEvent("manual_event_SUBMIT_LEAD_FORM", eventParams);
+  // GA4 does not deduplicate these lead events using the custom lead_event_id.
+  // Claim once per successful enquiry before a confirmation-page recovery can run.
+  if (claimGa4LeadEvent(eventId)) {
+    sendGoogleEvent("generate_lead", eventParams);
+    sendGoogleEvent("manual_event_SUBMIT_LEAD_FORM", eventParams);
+  }
   if (googleAdsId && googleAdsLeadLabel) {
     sendGoogleEvent("conversion", {
       send_to: `${googleAdsId}/${googleAdsLeadLabel}`,
@@ -126,7 +168,24 @@ function sendLeadConversion(
   sendMetaLeadEvent(eventParams, eventId);
 }
 
-export function trackLeadConversion(params?: { inquiryType?: string }) {
+export function trackLeadConversion(params?: {
+  inquiryType?: string;
+  persistedLeadId?: number | string;
+}) {
+  const leadId = params?.persistedLeadId;
+  const persisted =
+    (typeof leadId === "number" && Number.isFinite(leadId) && leadId > 0) ||
+    (typeof leadId === "string" && leadId.trim().length > 0);
+  // Honeypot rejection intentionally looks successful but never has a saved lead ID.
+  if (!persisted) return;
+
+  if (getMarketingConsentChoice() === "denied") {
+    try {
+      window.sessionStorage.removeItem(PENDING_LEAD_STORAGE_KEY);
+    } catch {}
+    return;
+  }
+
   const eventId = crypto.randomUUID();
 
   try {
@@ -148,8 +207,10 @@ function ensureGoogleTag() {
   if (!loaderId) return;
 
   window.dataLayer ||= [];
-  window.gtag ||= (...args: unknown[]) => {
-    window.dataLayer?.push(args);
+  window.gtag ||= function () {
+    // gtag.js dispatches Arguments objects; plain arrays are data-model calls.
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer?.push(arguments);
   };
   window.gtag("consent", "default", {
     ad_storage: "denied",
@@ -214,6 +275,10 @@ function initializeMetaPixel() {
 }
 
 function revokeTrackingConsent() {
+  try {
+    clearLeadAcquisition(window.sessionStorage);
+    window.sessionStorage.removeItem(PENDING_LEAD_STORAGE_KEY);
+  } catch {}
   window.gtag?.("consent", "update", {
     ad_storage: "denied",
     ad_user_data: "denied",
@@ -228,20 +293,53 @@ export function MarketingAnalytics() {
   const pathname = usePathname();
   const [choice, setChoice] = useState<ConsentChoice | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const acquisitionRef = useRef<{ at: number; value: LeadAttribution } | null>(
+    null,
+  );
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+    const stored = getMarketingConsentChoice();
     const timer = window.setTimeout(() => {
       if (stored === "granted" || stored === "denied") setChoice(stored);
     }, 0);
     const openSettings = () => setSettingsOpen(true);
     window.addEventListener(OPEN_CONSENT_EVENT, openSettings);
-    return () => { window.clearTimeout(timer); window.removeEventListener(OPEN_CONSENT_EVENT, openSettings); };
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(OPEN_CONSENT_EVENT, openSettings);
+    };
   }, []);
 
   useEffect(() => {
-    ensureGoogleTag();
-  }, []);
+    const consent = getMarketingConsentChoice();
+    if (consent === "denied") {
+      acquisitionRef.current = null;
+      try {
+        clearLeadAcquisition(window.sessionStorage);
+      } catch {}
+      return;
+    }
+    const now = Date.now();
+    const current = captureLeadAttribution(
+      window.location.href,
+      document.referrer,
+    );
+    if (
+      !acquisitionRef.current ||
+      now - acquisitionRef.current.at >= ACQUISITION_TTL_MS ||
+      hasCampaignAttribution(current)
+    ) {
+      acquisitionRef.current = { at: now, value: current };
+    }
+    try {
+      rememberLeadAcquisition(
+        window.sessionStorage,
+        acquisitionRef.current.value,
+        consent,
+        now,
+      );
+    } catch {}
+  }, [choice, pathname]);
 
   useEffect(() => {
     if (choice !== "granted") return;

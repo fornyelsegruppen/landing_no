@@ -1,12 +1,13 @@
-# Takfornyelse.as – Google launch checklist
+# Takfornyelsenorge.no – Google migration and launch checklist
 
 ## 1. Publish and verify
 
-1. Deploy the approved branch to the production project.
-2. Confirm `NEXT_PUBLIC_SITE_URL=https://www.takfornyelse.as`.
-3. Confirm the existing lead-attribution migration is applied during deployment.
+1. Verify the serving source and use the approved release candidate. Follow the project's Production approval and Preview verification workflow.
+2. Set `NEXT_PUBLIC_SITE_URL=https://takfornyelsenorge.no` and `PUBLIC_HOST_REDIRECTS_ENABLED=true` at build and runtime. Persist these public values in the Production project so later builds retain them.
+3. Build with the established guarded deployment command. Do not run database migrations implicitly as part of a domain-only correction.
 4. Smoke-test `/no`, `/no/takvask`, `/no/takfornying-viken`, `/no/priser`, `/robots.txt` and `/sitemap.xml`.
-5. Confirm that `https://takfornyelse.as` redirects to the canonical `https://www.takfornyelse.as` host.
+5. Verify that legacy public hosts and the new `www` host permanently redirect to `https://takfornyelsenorge.no`, preserving the corresponding path and query. Verify protected operational routes separately.
+6. Inspect the served HTML, not only the code: canonical, language alternates, social/structured URLs, robots and every sitemap entry must use the new origin. Verify both static pages and published CMS content.
 
 ## 2. Google Search Console
 
@@ -18,14 +19,15 @@ NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=<Google verification token only>
 
 After verification:
 
-1. Submit `https://takfornyelse.as/sitemap.xml`.
+1. Use the verified `sc-domain:takfornyelsenorge.no` property and submit `https://takfornyelsenorge.no/sitemap.xml` after its entries use the new domain.
 2. Inspect and request indexing for the Norwegian priority pages.
 3. Check Page indexing, HTTPS and Core Web Vitals reports weekly for the first month.
 4. Record queries where the site ranks 5–20 and improve those pages first.
+5. Once permanent redirects and ownership pass, complete Google's Change of Address for each relevant legacy hostname property. Retain technical ownership and redirects for the migration period; the old origin must not appear in current advertising.
 
 ## 3. Google Ads measurement
 
-Create one primary website conversion for a successfully submitted enquiry. Set the verified values in the hosting environment:
+Keep the existing measurement property/stream and successful-enquiry actions where they represent the same business result. Verify the intended primary conversion so an imported GA4 event and a native Ads action do not count the same enquiry twice. Set the verified account values in the hosting environment:
 
 ```text
 NEXT_PUBLIC_GOOGLE_ADS_ID=AW-XXXXXXXXX
@@ -34,17 +36,19 @@ NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL=XXXXXXXXXXXX
 
 The Google tag loads only after the visitor accepts optional advertising measurement. UTM parameters, Google/Meta/Microsoft click IDs, landing page and referrer are also stored with the submitted lead for CRM reconciliation. The existing consent component can also enable Meta Pixel when `NEXT_PUBLIC_META_PIXEL_ID` is configured.
 
-Do not activate bidding until a test lead appears both in Payload and Google Ads diagnostics.
+Update the existing GA4 stream URL/name to the new domain. Inspect URL-based conversion conditions separately from their names. For Meta, an old-domain custom conversion may need a replacement rule on the existing dataset and an explicit ad-set selection; a renamed label alone is not a migration.
 
-## 4. Initial Search campaign
+Verify consent, accepted/rejected form responses, confirmation-page recovery and attribution across navigation in an isolated Preview. Do not send synthetic leads to Production or deliver test conversions without a controlled verification plan. Record actual platform reception separately from source-level tests. Preserve campaign budgets, targeting and enabled/paused states during migration.
 
-Campaign: `NO | Search | Takfornyelse | Priority regions`
+## 4. Search campaign destinations
+
+Continue the existing campaigns assigned to this website. The following are service-to-page references, not instructions to create replacement campaigns or alter existing targeting during migration.
 
 - Locations: Oslo, Akershus/selected Viken markets and other confirmed service areas only.
 - Location option: people in or regularly in the targeted locations.
 - Networks: Google Search only at launch.
 - Goal: qualified enquiry, not traffic.
-- Final URLs must match the search intent.
+- Final URLs must point directly to `https://takfornyelsenorge.no` and match search intent. Inspect ad/keyword/mobile overrides, sitelinks, tracking templates, URL suffixes, custom parameters and Performance Max asset groups/URL expansion/page feeds. Include paused advertisements and relevant drafts.
 
 ### Ad groups and landing pages
 

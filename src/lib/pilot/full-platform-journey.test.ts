@@ -34,6 +34,11 @@ describe("anonymized internal staging journey", () => {
       authorName: "Takfornyelse",
       reviewerName: "Faglig ansvarlig",
       reviewedAt: "2026-08-23T08:00:00.000Z",
+      qualityScore: 90,
+      qualityChecks: {
+        policyVersion: "2026-09-12-repetition-v1",
+        passed: true,
+      },
       sources: [
         {
           url: "https://www.arbeidstilsynet.no/arbeidsmiljo/arbeid-i-hoyden/",

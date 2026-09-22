@@ -27,7 +27,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: `${siteConfig.url}/${locale}/personvern`,
       languages: Object.fromEntries(
-        routing.locales.map((l) => [l, `${siteConfig.url}/${l}/personvern`]),
+        [
+          ...routing.locales.map((l) => [
+            l,
+            `${siteConfig.url}/${l}/personvern`,
+          ]),
+          ["x-default", `${siteConfig.url}/no/personvern`],
+        ],
       ),
     },
     robots: { index: true, follow: true },

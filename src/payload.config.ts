@@ -61,7 +61,7 @@ function payloadFromAddress() {
   const configured = process.env.PAYLOAD_FROM_EMAIL?.trim();
   if (configured) return configured;
   const leadFrom = process.env.LEAD_FROM_EMAIL?.trim() || "";
-  return leadFrom.match(/<([^>]+)>/)?.[1] || leadFrom || "post@takfornyelse.as";
+  return leadFrom.match(/<([^>]+)>/)?.[1] || leadFrom || "post@takfornyelsenorge.no";
 }
 
 const serverURL =

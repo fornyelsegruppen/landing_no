@@ -58,7 +58,7 @@ describe("platform feature configuration", () => {
     ).toEqual({
       enabled: true,
       ready: false,
-      unavailable: ["ai", "jobs", "stockImages"],
+      unavailable: ["ai", "jobs"],
     });
   });
 

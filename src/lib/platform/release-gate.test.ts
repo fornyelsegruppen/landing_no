@@ -106,16 +106,16 @@ describe("production release gate", () => {
     expect(serialized).not.toContain("secret-resend");
   });
 
-  it("blocks the SEO scheduler when licensed stock imagery is not configured", () => {
+  it("allows the SEO scheduler to use the approved image fallback", () => {
     const gate = buildReleaseGate({
       ...completeEnvironment,
       PEXELS_API_KEY: "",
     });
 
     expect(gate.features.seoScheduler).toMatchObject({
-      status: "no_go",
-      unavailableIntegrations: ["stockImages"],
+      status: "go",
+      unavailableIntegrations: [],
     });
-    expect(gate.productionReady).toBe(false);
+    expect(gate.productionReady).toBe(true);
   });
 });

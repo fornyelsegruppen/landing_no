@@ -85,10 +85,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: pageUrl,
       languages: Object.fromEntries(
-        routing.locales.map((language) => [
-          language,
-          `${siteConfig.url}/${language}/${slug}`,
-        ]),
+        [
+          ...routing.locales.map((language) => [
+            language,
+            `${siteConfig.url}/${language}/${slug}`,
+          ]),
+          ["x-default", `${siteConfig.url}/no/${slug}`],
+        ],
       ),
     },
     openGraph: {

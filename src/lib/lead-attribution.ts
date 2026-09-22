@@ -25,6 +25,8 @@ export type LeadAttribution = Partial<
 const CONTENT_SOURCE_KEY = "takfornyelse_content_source";
 const CONTENT_SOURCE_TTL_MS = 30 * 60 * 1000;
 const CONTENT_SOURCE_PATTERN = /^\/(no|en)\/blogg\/[a-z0-9-]+$/;
+const ACQUISITION_STORAGE_KEY = "takfornyelse_lead_acquisition";
+export const ACQUISITION_TTL_MS = 30 * 60 * 1000;
 
 type SessionStorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -103,4 +105,109 @@ export function captureLeadAttribution(
   }
 
   return attribution;
+}
+
+export function hasCampaignAttribution(attribution: LeadAttribution) {
+  return attributionKeys.some((key) => Boolean(attribution[key]));
+}
+
+function readAcquisition(
+  storage: SessionStorageLike,
+  landingPage: string | undefined,
+  now: number,
+): LeadAttribution | undefined {
+  if (!landingPage) return undefined;
+  try {
+    const raw = storage.getItem(ACQUISITION_STORAGE_KEY);
+    if (!raw) return undefined;
+    const stored = JSON.parse(raw) as Partial<
+      Record<(typeof attributionKeys)[number], unknown>
+    > & {
+      at?: number;
+      landingPage?: string;
+      referrer?: string;
+    };
+    if (
+      typeof stored.at !== "number" ||
+      stored.at > now ||
+      now - stored.at >= ACQUISITION_TTL_MS ||
+      typeof stored.landingPage !== "string" ||
+      new URL(stored.landingPage).origin !== new URL(landingPage).origin
+    ) {
+      return undefined;
+    }
+    const attribution = captureLeadAttribution(
+      stored.landingPage,
+      typeof stored.referrer === "string" ? stored.referrer : "",
+    );
+    for (const key of attributionKeys) {
+      const value = stored[key];
+      if (typeof value === "string") {
+        attribution[key] = clean(value, key.startsWith("utm") ? 255 : 512);
+      }
+    }
+    return attribution;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Persist acquisition only after consent; callers may keep pre-consent context in memory. */
+export function rememberLeadAcquisition(
+  storage: SessionStorageLike,
+  attribution: LeadAttribution,
+  consent: MarketingConsentChoice,
+  now: number = Date.now(),
+) {
+  if (consent !== "granted" || !attribution.landingPage) return;
+  const previous = readAcquisition(storage, attribution.landingPage, now);
+  // Ordinary navigation must not replace the landing URL or extend its lifetime.
+  if (
+    previous &&
+    (!hasCampaignAttribution(attribution) ||
+      (previous.landingPage === attribution.landingPage &&
+        attributionKeys.every((key) => previous[key] === attribution[key])))
+  ) {
+    return;
+  }
+  const acquisition = captureLeadAttribution(
+    attribution.landingPage,
+    attribution.referrer,
+  );
+  for (const key of attributionKeys) {
+    if (attribution[key]) acquisition[key] = attribution[key];
+  }
+  try {
+    storage.setItem(
+      ACQUISITION_STORAGE_KEY,
+      JSON.stringify({
+        at: now,
+        ...acquisition,
+      }),
+    );
+  } catch {}
+}
+
+export function resolveLeadAcquisition(
+  storage: SessionStorageLike,
+  current: LeadAttribution,
+  consent: MarketingConsentChoice,
+  now: number = Date.now(),
+): LeadAttribution {
+  if (consent !== "granted" || hasCampaignAttribution(current)) return current;
+  const acquisition = readAcquisition(storage, current.landingPage, now);
+  return acquisition
+    ? {
+        ...acquisition,
+        ...(current.contentSourcePath
+          ? { contentSourcePath: current.contentSourcePath }
+          : {}),
+      }
+    : current;
+}
+
+export function clearLeadAcquisition(storage: Pick<Storage, "removeItem">) {
+  try {
+    storage.removeItem(ACQUISITION_STORAGE_KEY);
+  } catch {}
 }

@@ -55,6 +55,29 @@ describe("proxy route matching", () => {
     );
   });
 
+  it("redirects an old public root directly to the final Norwegian home page", () => {
+    process.env.PUBLIC_HOST_REDIRECTS_ENABLED = "true";
+    const response = proxy(
+      new NextRequest("https://www.takfornyelse.as/?utm_source=legacy"),
+    );
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://takfornyelsenorge.no/no?utm_source=legacy",
+    );
+  });
+
+  it("permanently redirects the canonical apex root to the Norwegian home page", () => {
+    const response = proxy(
+      new NextRequest("https://takfornyelsenorge.no/?ref=root"),
+    );
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://takfornyelsenorge.no/no?ref=root",
+    );
+  });
+
   it("redirects the new www host to the canonical apex before legacy redirects are enabled", () => {
     const response = proxy(
       new NextRequest("https://www.takfornyelsenorge.no/no?ref=www"),
