@@ -267,8 +267,6 @@ export interface Media {
   };
 }
 /**
- * Versjoner gjenopprettes alltid som utkast og må kontrolleres før publisering.
- *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "services".
  */
@@ -391,6 +389,8 @@ export interface Page {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * Versjoner gjenopprettes alltid som utkast og må kontrolleres før publisering.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts".
  */
