@@ -33,6 +33,7 @@ export function JsonLd({
     "@type": "LocalBusiness",
     "@id": businessId,
     name: settings.brandName,
+    alternateName: "Takfornyelsenorge.no",
     description,
     url: pageUrl,
     telephone: settings.phoneHref.replace("tel:", ""),
@@ -66,6 +67,7 @@ export function JsonLd({
     "@type": "Organization",
     "@id": organizationId,
     name: settings.brandName,
+    alternateName: "Takfornyelsenorge.no",
     url: siteConfig.url,
     logo: {
       "@type": "ImageObject",

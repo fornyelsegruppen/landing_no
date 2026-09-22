@@ -33,20 +33,23 @@ export function publicHostRedirectTarget(input: {
 
   const source = new URL(input.url);
   const hostname = source.hostname.toLowerCase();
+  const canonical = new URL(CANONICAL_PUBLIC_ORIGIN);
+  const canonicalHost = hostname === canonical.hostname;
   const legacyHost = LEGACY_PUBLIC_HOSTS.has(hostname);
   const newWwwHost = hostname === NEW_WWW_HOST;
+  const canonicalRoot = canonicalHost && source.pathname === "/";
 
   const redirectHost = newWwwHost || (input.enabled && legacyHost);
 
-  if (!redirectHost || isOperationalPath(source.pathname)) {
+  if ((!redirectHost && !canonicalRoot) || isOperationalPath(source.pathname)) {
     return null;
   }
 
   const target = new URL(source.toString());
-  const canonical = new URL(CANONICAL_PUBLIC_ORIGIN);
   target.protocol = canonical.protocol;
   target.hostname = canonical.hostname;
   target.port = canonical.port;
+  if (source.pathname === "/") target.pathname = "/no";
   return target;
 }
 

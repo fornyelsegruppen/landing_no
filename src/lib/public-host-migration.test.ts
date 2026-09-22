@@ -20,6 +20,33 @@ describe("public host migration", () => {
     },
   );
 
+  it.each(["takfornyelse.as", "www.takfornyelse.as"])(
+    "redirects the legacy %s root directly to the final Norwegian home page",
+    (host) => {
+      const target = publicHostRedirectTarget({
+        url: `https://${host}/?utm_source=legacy`,
+        method: "GET",
+        enabled: true,
+      });
+
+      expect(target?.toString()).toBe(
+        "https://takfornyelsenorge.no/no?utm_source=legacy",
+      );
+    },
+  );
+
+  it("permanently canonicalizes the new apex root to the Norwegian home page", () => {
+    const target = publicHostRedirectTarget({
+      url: "https://takfornyelsenorge.no/?ref=root",
+      method: "GET",
+      enabled: false,
+    });
+
+    expect(target?.toString()).toBe(
+      "https://takfornyelsenorge.no/no?ref=root",
+    );
+  });
+
   it("redirects the new www host to the canonical apex", () => {
     const target = publicHostRedirectTarget({
       url: "https://www.takfornyelsenorge.no/en?ref=www",
@@ -28,6 +55,18 @@ describe("public host migration", () => {
     });
 
     expect(target?.toString()).toBe("https://takfornyelsenorge.no/en?ref=www");
+  });
+
+  it("redirects the new www root directly to the Norwegian home page", () => {
+    const target = publicHostRedirectTarget({
+      url: "https://www.takfornyelsenorge.no/?ref=www",
+      method: "HEAD",
+      enabled: false,
+    });
+
+    expect(target?.toString()).toBe(
+      "https://takfornyelsenorge.no/no?ref=www",
+    );
   });
 
   it.each([
